@@ -21,7 +21,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.Mempool._
 import encry.view.state.StateReader
@@ -57,7 +57,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       SyncInfoNetworkMessage.NetworkMessageTypeID -> "SyncInfoNetworkMessage"
     )
     networkControllerRef ! RegisterMessagesHandler(messageIds, self)
-    logger.info(s"NVSH sent register messages")
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
@@ -125,6 +124,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         } else peersKeeperRef ! BanPeer(remote, SentInvForPayload)
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
+    case msg@ModifiersFromRemote(_) => nodeViewHolderRef ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
     case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg

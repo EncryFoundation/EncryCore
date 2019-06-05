@@ -2,6 +2,9 @@ package encry.network
 
 import java.net.InetAddress
 
+import HeaderProto.HeaderProtoMessage
+import PayloadProto.PayloadProtoMessage
+import TransactionProto.TransactionProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -15,20 +18,22 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
+import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
 
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
-import scala.util.Random
+import scala.util.{Failure, Random, Success, Try}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.BlackList.SentNetworkMessageWithTooManyModifiers
+import encry.network.BlackList.{SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
 import encry.network.PeersKeeper.{BanPeer, PeersForSyncInfo, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.view.mempool.Mempool.RequestForTransactions
-import org.encryfoundation.common.modifiers.history.Header
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import encry.view.ModifiersCache
+import encry.view.mempool.Mempool.{RequestForTransactions, TransactionsFromRemote}
+import org.encryfoundation.common.modifiers.history.{Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
@@ -114,25 +119,28 @@ class DeliveryManager(influxRef: Option[ActorRef],
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+
     case SemanticallySuccessfulModifier(mod) => receivedModifiers -= toKey(mod.id)
+
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
+
     case SyntacticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
+
     case SuccessfulTransaction(_) => //do nothing
+
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
         s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager.")
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+
     case RequestForTransactions(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
-        if (typeId != Transaction.modifierTypeId)
-          logger.debug(s"Got ${modifiers.size} modifiers on the DM of type: $typeId from $remote with id:" +
-            s"${modifiers.keys.map(Algos.encode).mkString(",")}")
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
-        val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) =
-          modifiers.partition { case (id, _) => isSpam(id) }
+        val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))
         if (spam.nonEmpty) {
           if (typeId != Transaction.modifierTypeId)
             logger.debug(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
@@ -140,13 +148,68 @@ class DeliveryManager(influxRef: Option[ActorRef],
           receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
-        if (filteredModifiers.nonEmpty && typeId == Transaction.modifierTypeId)
-          memoryPoolRef ! ModifiersFromRemote(typeId, filteredModifiers, remote)
-        else if (filteredModifiers.nonEmpty) {
-          logger.debug(s"Sending modifiers form network of type:$typeId from $remote to NVH. ")
-          nodeViewHolderRef ! ModifiersFromRemote(typeId, filteredModifiers, remote)
+
+        //todo Probably we should remove invalid modifier id from received and other collections
+        typeId match {
+          case Payload.modifierTypeId =>
+            val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, bytes) =>
+              PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)) match {
+                case Success(payload) if PU.semanticValidity(payload).isSuccess && PU.syntacticallyValidity(payload).isSuccess =>
+                  logger.info(s"Successfully serialized payload with id: ${Algos.encode(payload.id)}.")
+                  payloadsColl :+ payload
+                case Success(payload) =>
+                  logger.info(s"Payload with id: ${payload.encodedId} invalid caze of: " +
+                    s"${PU.semanticValidity(payload)} && ${PU.syntacticallyValidity(payload)}")
+                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  payloadsColl
+                case Failure(ex) =>
+                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  logger.info(s"Received payload from $remote can't be parsed cause of: ${ex.getMessage}.")
+                  payloadsColl
+              }
+            }
+            logger.info(s"Sending to node view holder parsed payloads: ${payloads.map(_.encodedId)}.")
+            context.parent ! ModifiersFromRemote(payloads)
+
+          case Header.modifierTypeId =>
+            val headers = filteredModifiers.foldLeft(Seq.empty[Header]) { case (headersCollection, bytes) =>
+              HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)) match {
+                case Success(header) if HU.semanticValidity(header).isSuccess && HU.syntacticallyValidity(header).isSuccess =>
+                  logger.info(s"Successfully serialized header with id: ${Algos.encode(header.id)}.")
+                  headersCollection :+ header
+                case Success(header) =>
+                  logger.info(s"Header with id: ${header.encodedId} invalid caze of:" +
+                    s" ${HU.semanticValidity(header)} && ${HU.syntacticallyValidity(header)}")
+                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  headersCollection
+                case Failure(ex) =>
+                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
+                  headersCollection
+              }
+            }
+            logger.info(s"Sending to node view holder parsed headers: ${headers.map(_.encodedId)}.")
+            context.parent ! ModifiersFromRemote(headers)
+
+          case Transaction.modifierTypeId =>
+            val transactions: Seq[Transaction] = filteredModifiers.foldLeft(Seq.empty[Transaction]) {
+              case (transactionsColl, bytes) =>
+                TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
+                  case Success(tx) if tx.semanticValidity.isSuccess => transactionsColl :+ tx
+                  case Success(tx) =>
+                    logger.info(s"Payload with id: ${tx.encodedId} invalid caze of: ${tx.semanticValidity}.")
+                    context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                    transactionsColl
+                  case Failure(ex) =>
+                    context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                    logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
+                    transactionsColl
+                }
+            }
+            logger.info(s"Sending to node mempool parsed transactions: ${transactions.map(_.encodedId)}.")
+            memoryPoolRef ! TransactionsFromRemote(transactions)
         }
-      if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
+        if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
     case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
@@ -529,4 +592,5 @@ object DeliveryManager {
         case PoisonPill => 4
         case _ => 2
       })
+
 }

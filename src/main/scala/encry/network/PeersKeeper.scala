@@ -102,10 +102,10 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
         (if (outgoingConnections.contains(remote.getAddress)) Outgoing else Incoming) match {
           case _@Incoming if connectWithOnlyKnownPeers || isLocal(remote) =>
             logger.info(s"Got incoming connection but we can connect only with known peers.")
-          case in@Incoming =>
+          case in@Incoming if !isLocal(remote) =>
             logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
             sender() ! CreateStableConnection(remote, remoteConnection, in)
-          case out@Outgoing =>
+          case out@Outgoing if !isLocal(remote) =>
             logger.info(s"Got outgoing connection.")
             outgoingConnections -= remote.getAddress
             sender() ! CreateStableConnection(remote, remoteConnection, out)
@@ -200,7 +200,6 @@ object PeersKeeper {
   case object AwaitingOlderPeer
 
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
-
 
 
   case object GetConnectedPeers

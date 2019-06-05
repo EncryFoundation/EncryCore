@@ -68,15 +68,8 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
   def messagesHandler(state: UtxoState): Receive = mainLogic(state).orElse(handleStates)
 
   def mainLogic(state: UtxoState): Receive = {
-    case ModifiersFromRemote(modTypeId, filteredModifiers, _) if modTypeId == Transaction.modifierTypeId =>
-      val parsedModifiers: IndexedSeq[Transaction] = filteredModifiers.foldLeft(IndexedSeq.empty[Transaction]) {
-        case (transactions, bytes) =>
-          TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
-            case Success(value) => transactions :+ value
-            case _ => transactions
-          }
-      }
-      memoryPool = validateAndPutTransactions(parsedModifiers, memoryPool, state, fromNetwork = true)
+    case TransactionsFromRemote(txs) =>
+      memoryPool = validateAndPutTransactions(txs.toIndexedSeq, memoryPool, state, fromNetwork = true)
     case TickForRemoveExpired => memoryPool = cleanMemoryPoolFromExpired(memoryPool)
     case GetMempoolSize => sender() ! memoryPool.size
     case TickForCleanupBloomFilter =>
@@ -170,6 +163,8 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
 }
 
 object Mempool {
+
+  final case class TransactionsFromRemote(tx: Seq[Transaction])
 
   case class CompareTransactionsWithUnconfirmed(peer: ConnectedPeer, transactions: IndexedSeq[ModifierId])
 

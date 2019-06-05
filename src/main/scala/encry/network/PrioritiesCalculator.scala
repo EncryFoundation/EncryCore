@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetAddress
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.PrioritiesCalculator.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus._

@@ -14,7 +14,7 @@ import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
-import encry.network.{_}
+import encry.network._
 import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
@@ -45,23 +45,23 @@ object EncryApp extends App with StrictLogging {
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None
   lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
-  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner).withDispatcher("mempool-dispatcher"))
-
-  val peersKeeper: ActorRef = system.actorOf(PeersKeeper.props(settings).withDispatcher("peers-keeper-dispatcher"))
-
-  lazy val nodeViewHolder: ActorRef =
-    system.actorOf(NodeViewHolder.props(memoryPool, peersKeeper, influxRef).withMailbox("nvh-mailbox"),
-      "nodeViewHolder")
+  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner)
+    .withDispatcher("mempool-dispatcher"))
+  lazy val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef)
+    .withMailbox("nvh-mailbox"), "nodeViewHolder")
 
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
 
+  lazy val peersKeeper: ActorRef = system.actorOf(PeersKeeper.props(settings)
+    .withDispatcher("peers-keeper-dispatcher"))
 
-  lazy val networkController: ActorRef = system.actorOf(
-    NetworkController.props(settings, peersKeeper).withDispatcher("network-dispatcher")
-  )
+  lazy val networkController: ActorRef = system.actorOf(NetworkController.props(settings, peersKeeper)
+    .withDispatcher("network-dispatcher"))
+
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
     .props(influxRef, nodeViewHolder, networkController, settings, memoryPool, peersKeeper)
     .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
+
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
     Kamon.addReporter(new InfluxDBReporter())
