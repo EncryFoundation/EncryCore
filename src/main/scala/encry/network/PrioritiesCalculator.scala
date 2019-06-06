@@ -44,6 +44,7 @@ final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLoggi
   def accumulatePeersStatistic: Map[InetSocketAddress, PeersPriorityStatus] = {
     val updatedStatistic: Map[InetSocketAddress, PeersPriorityStatus] = peersNetworkStatistic.map {
       case (peer, (requested, received)) =>
+        logger.info(s"peer: $peer: received: $received, requested: $requested")
         val priority: PeersPriorityStatus = PeersPriorityStatus.calculateStatuses(received, requested)
         peer -> priority
     }

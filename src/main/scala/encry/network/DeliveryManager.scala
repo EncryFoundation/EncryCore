@@ -149,7 +149,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
         logger.info(s"Filtered modifiers are: ${filteredModifiers.map(Algos.encode).mkString(",")}")
 
-        //todo Probably we should remove invalid modifier id from received and other collections
+        //todo Probably we should remove invalid modifier id from received collections
         typeId match {
           case Payload.modifierTypeId =>
             val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, bytes) =>
