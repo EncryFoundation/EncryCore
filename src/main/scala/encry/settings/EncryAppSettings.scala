@@ -73,7 +73,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val influxSettings = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
     val levelDb = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
-    val blackListSettings = config.as[BlackListSettings](s"$config.blackList")
+    val blackList = config.as[BlackListSettings](s"$configPath.blackList")
 
     EncryAppSettings(
       directory,
@@ -88,7 +88,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       influxSettings,
       levelDb,
       monitoringSettings,
-      blackListSettings
+      blackList
     )
   }
 
