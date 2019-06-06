@@ -9,7 +9,7 @@ import encry.consensus.History.{Equal, HistoryComparisonResult, Older, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{HandshakedPeer, OtherNodeSyncingStatus, RequestFromLocal}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ OtherNodeSyncingStatus, RequestFromLocal}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.modifiers.history.{Block, Header}

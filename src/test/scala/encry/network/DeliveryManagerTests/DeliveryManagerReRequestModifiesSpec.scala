@@ -1,8 +1,9 @@
 package encry.network.DeliveryManagerTests
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
+import encry.consensus.History
 import encry.consensus.History.Older
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
@@ -10,12 +11,13 @@ import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
+import encry.network.PeersKeeper.UpdatedPeersCollection
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.InitialPriority
 import encry.settings.EncryAppSettings
-import encry.view.history.{EncryHistory}
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import encry.view.history.EncryHistory
+import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
-import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scala.concurrent.duration._
@@ -56,8 +58,10 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      deliveryManager ! HandshakedPeer(cp1)
-      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+
+      deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
       val header: ModifierId = headersIds.head
 
@@ -72,6 +76,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       Thread.sleep(6000)
 
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
+      deliveryManager.stop()
     }
     "not re-ask unnecessary modifiers" in {
       val (deliveryManager, _, _, _, _, headersIds, _, _) = initialiseState()
@@ -82,8 +87,10 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      deliveryManager ! HandshakedPeer(cp1)
-      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+
+      deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
       val header: ModifierId = headersIds.head
 
@@ -96,10 +103,11 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header))
       )
 
-      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
-        Map(header -> Array.emptyByteArray)), cp1)
+      val headerBytes: Array[Byte] = HeaderProtoSerializer.toProto(genHeader).toByteArray
 
-      handler1.expectMsg(SyncInfoNetworkMessage(SyncInfo(List())))
+      deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
+        Map(header -> headerBytes)), cp1)
+      deliveryManager.stop()
     }
     "not re-ask modifiers which were applied to the history" in {
       val (deliveryManager, _, _, _, blocks, headerIds, _, history) = initialiseState()
@@ -110,15 +118,19 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      deliveryManager ! HandshakedPeer(cp1)
-      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+
+      deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
 
       handler1.expectMsg(RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(headerIds.head)))
 
+      val headerBytes: Array[Byte] = HeaderProtoSerializer.toProto(genHeader).toByteArray
+
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
-        Map(headerIds.head -> Array.emptyByteArray)), cp1)
+        Map(headerIds.head -> headerBytes)), cp1)
 
       val uHistory: EncryHistory = history.append(blocks.head.header).get._1.reportModifierIsValid(blocks.head.header)
 
@@ -128,10 +140,9 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
 
-      handler1.expectMsg(SyncInfoNetworkMessage(SyncInfo(List())))
-
       assert(deliveryManager.underlyingActor.expectedModifiers
         .getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
+      deliveryManager.stop()
     }
     "remove peer from expectedModifiers if expected modifiers collection from this peer is empty" in {
       val (deliveryManager, cp1, _, _, _, headerIds, _, _) = initialiseState()
@@ -142,6 +153,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
       assert(deliveryManager.underlyingActor.expectedModifiers
         .getOrElse(cp1.socketAddress.getAddress, Map.empty) == Map.empty)
+      deliveryManager.stop()
     }
     "not re-ask transactions" in {
       val (deliveryManager, _, _, _, _, _, _, _) = initialiseState()
@@ -152,8 +164,10 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      deliveryManager ! HandshakedPeer(cp1)
-      deliveryManager ! OtherNodeSyncingStatus(cp1, Older, None)
+      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+
+      deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
       val transactions: Seq[ModifierId] = genValidPaymentTxs(1).map(_.id)
 
@@ -165,6 +179,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       handler1.expectNoMsg(10.seconds)
       assert(deliveryManager.underlyingActor.expectedModifiers
         .getOrElse(cp1.socketAddress.getAddress, Map.empty) == Map.empty)
+      deliveryManager.stop()
     }
   }
 }

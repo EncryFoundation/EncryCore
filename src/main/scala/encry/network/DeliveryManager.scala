@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetAddress
-
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
@@ -19,18 +18,16 @@ import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
 import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Random, Success}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import encry.network.BlackList.{SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
 import encry.network.PeersKeeper.{BanPeer, PeersForSyncInfo, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.view.ModifiersCache
 import encry.view.mempool.Mempool.{RequestForTransactions, TransactionsFromRemote}
 import org.encryfoundation.common.modifiers.history.{Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
@@ -38,7 +35,6 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, 
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -98,12 +94,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case UpdatedPeersCollection(newPeers) =>
       logger.info(s"Delivery manager got updated peers collection.")
       peersCollection = newPeers
+
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       status match {
         case Unknown => logger.info("Peer status is still unknown.")
         case Younger | Fork if isBlockChainSynced => sendInvData(remote, status, extOpt)
         case _ =>
       }
+
     case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
@@ -138,6 +136,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
+        logger.info(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._2)).mkString(",")}")
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))
@@ -148,6 +147,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
+        logger.info(s"Filtered modifiers are: ${filteredModifiers.map(Algos.encode).mkString(",")}")
 
         //todo Probably we should remove invalid modifier id from received and other collections
         typeId match {
@@ -212,6 +212,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
+
     case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
       if (modifierTypeId != Transaction.modifierTypeId)
         logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
@@ -225,10 +226,15 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case PeersForSyncInfo(peers) =>
       logger.info(s"DM gor peers for sync info. Sending sync message!")
       sendSync(history.syncInfo, isBlockChainSynced, peers)
+
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
+
     case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
+
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
+
     case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
+
     case message => logger.debug(s"Got strange message $message(${message.getClass}) on DeliveryManager from $sender")
   }
 
@@ -313,7 +319,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (mTypeId != Transaction.modifierTypeId)
           logger.debug(s"Send request to ${peer.socketAddress.getAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
-        priorityCalculator.incrementRequestForNModifiers(peer.socketAddress.getAddress, notYetRequested.size)
+        priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
         val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
@@ -356,7 +362,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
           logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
-          priorityCalculator.incrementRequest(peer.socketAddress.getAddress)
+          priorityCalculator.incrementRequest(peer.socketAddress)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
             toKey(modId),
             context.system.scheduler
@@ -514,7 +520,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     if (isExpecting(mId, peer)) {
       if (mTid != Transaction.modifierTypeId)
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
-      priorityCalculator.incrementReceive(peer.socketAddress.getAddress)
+      priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress.getAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
@@ -527,7 +533,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
-      priorityCalculator.decrementRequest(peer.socketAddress.getAddress)
+      priorityCalculator.decrementRequest(peer.socketAddress)
     }
 
   /**

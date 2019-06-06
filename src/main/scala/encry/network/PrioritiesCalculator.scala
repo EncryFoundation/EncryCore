@@ -1,6 +1,6 @@
 package encry.network
 
-import java.net.InetAddress
+import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.PrioritiesCalculator.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus._
@@ -9,45 +9,45 @@ import scala.concurrent.duration._
 
 final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLogging {
 
-  private var peersNetworkStatistic: Map[InetAddress, (Requested, Received)] = Map.empty
+  private var peersNetworkStatistic: Map[InetSocketAddress, (Requested, Received)] = Map.empty
 
   val updatingStatisticTime: FiniteDuration = (settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks).seconds
 
-  def incrementRequest(peer: InetAddress): Unit = {
+  def incrementRequest(peer: InetSocketAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = Requested(requested.increment)
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
-  def incrementReceive(peer: InetAddress): Unit = {
+  def incrementReceive(peer: InetSocketAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newReceived: Received = Received(received.increment)
     logger.debug(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (requested, newReceived))
   }
 
-  def decrementRequest(peer: InetAddress): Unit = {
+  def decrementRequest(peer: InetSocketAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = Requested(requested.decrement)
     logger.debug(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
-  def incrementRequestForNModifiers(peer: InetAddress, modifiersQty: Int): Unit = {
+  def incrementRequestForNModifiers(peer: InetSocketAddress, modifiersQty: Int): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = Requested(requested.increment(modifiersQty))
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
-  def accumulatePeersStatistic: Map[InetAddress, PeersPriorityStatus] = {
-    val updatedStatistic: Map[InetAddress, PeersPriorityStatus] = peersNetworkStatistic.map {
+  def accumulatePeersStatistic: Map[InetSocketAddress, PeersPriorityStatus] = {
+    val updatedStatistic: Map[InetSocketAddress, PeersPriorityStatus] = peersNetworkStatistic.map {
       case (peer, (requested, received)) =>
         val priority: PeersPriorityStatus = PeersPriorityStatus.calculateStatuses(received, requested)
         peer -> priority
     }
-    peersNetworkStatistic = Map.empty[InetAddress, (Requested, Received)]
+    peersNetworkStatistic = Map.empty[InetSocketAddress, (Requested, Received)]
     logger.info(s"Accumulated peers statistic. Current stats are: ${updatedStatistic.mkString(",")}")
     updatedStatistic
   }
@@ -55,7 +55,7 @@ final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLoggi
 
 object PrioritiesCalculator {
 
-  final case class AccumulatedPeersStatistic(statistic: Map[InetAddress, PeersPriorityStatus])
+  final case class AccumulatedPeersStatistic(statistic: Map[InetSocketAddress, PeersPriorityStatus])
 
   object PeersPriorityStatus {
 

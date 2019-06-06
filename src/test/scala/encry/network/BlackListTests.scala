@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.network.BlackList._
@@ -11,15 +12,18 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
-import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class BlackListTests extends WordSpecLike
   with Matchers
+  with BeforeAndAfterAll
   with InstanceFactory
   with OneInstancePerTest {
 
   val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
   implicit val system: ActorSystem = ActorSystem()
+
+  override def afterAll(): Unit = system.terminate()
 
   /*
     Unit tests

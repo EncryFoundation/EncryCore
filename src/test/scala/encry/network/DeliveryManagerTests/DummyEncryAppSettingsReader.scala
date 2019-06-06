@@ -9,8 +9,6 @@ object DummyEncryAppSettingsReader extends SettingsReaders with NodeSettingsRead
 
   val configPath: String = "encry"
 
-  val read: EncryAppSettings = ConfigFactory.load("test.conf").as[EncryAppSettings]("encry")
-  // eser scan
-  // waves && etherium
-  // activity
+  val read: EncryAppSettings = ConfigFactory.load("MainTestSetting.conf").as[EncryAppSettings]("encry")
+
 }

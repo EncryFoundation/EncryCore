@@ -1,7 +1,5 @@
 package encry.network
 
-import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
@@ -31,7 +29,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -197,18 +194,9 @@ object NodeViewSynchronizer {
                                             status: encry.consensus.History.HistoryComparisonResult,
                                             extension: Option[Seq[(ModifierTypeId, ModifierId)]])
 
-    case class ResponseFromLocal[M <: NodeViewModifier]
-    (source: ConnectedPeer, modifierTypeId: ModifierTypeId, localObjects: Seq[M])
-
     final case class RequestFromLocal(source: ConnectedPeer,
                                       modifierTypeId: ModifierTypeId,
                                       modifierIds: Seq[ModifierId])
-
-    trait PeerManagerEvent
-
-    case class DisconnectedPeer(remote: InetSocketAddress) extends PeerManagerEvent
-
-    case class HandshakedPeer(remote: ConnectedPeer) extends PeerManagerEvent
 
     trait NodeViewHolderEvent
 
@@ -267,5 +255,4 @@ object NodeViewSynchronizer {
 
         case otherwise => 3
       })
-
 }

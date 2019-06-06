@@ -22,7 +22,7 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
   import context.dispatcher
 
-  var availablePeers: Map[InetAddress, InetSocketAddress] = settings.network.knownPeers.map(p => p.getAddress -> p).toMap
+  var availablePeers: Set[InetSocketAddress] = settings.network.knownPeers.toSet
 
   val connectWithOnlyKnownPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(true)
 
@@ -30,7 +30,7 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
   val blackList: BlackList = new BlackList(settings)
 
-  var outgoingConnections: Set[InetAddress] = Set.empty
+  var outgoingConnections: Set[InetSocketAddress] = Set.empty
 
   override def preStart(): Unit = {
     nodeViewSync ! RegisterMessagesHandler(Seq(
@@ -67,9 +67,9 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       case GetConnectedPeers => sender() ! connectedPeers.getAllConnectedPeers
       case GetInfoAboutConnectedPeers => sender() ! connectedPeers.getPeers
       case PeerFromCli(peer) =>
-        if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer.getAddress)
-          && connectedPeers.contains(peer.getAddress)) {
-          outgoingConnections += peer.getAddress
+        if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer)
+          && connectedPeers.contains(peer)) {
+          outgoingConnections += peer
           sender() ! PeerForConnection(peer)
         }
 
@@ -80,40 +80,41 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connect. Current avalible peers are: ${availablePeers.mkString(",")}.")
-      Random.shuffle(availablePeers).headOption.foreach { case (address, peer) =>
+      Random.shuffle(availablePeers).headOption.foreach { peer =>
         logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
           s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
           s"${outgoingConnections.mkString(",")}.")
         sender() ! PeerForConnection(peer)
-        outgoingConnections += address
-        availablePeers -= address
+        outgoingConnections += peer
+        availablePeers -= peer
       }
 
     case RequestPeerForConnection =>
       logger.info(s"Got request for a new connection but current number of connection is max: ${connectedPeers.size}.")
 
-    case RequestForStableConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections =>
+    case RequestForStableConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isLocal(remote) =>
       logger.info(s"Peers keeper got request for a stable connection with remote: $remote.")
-      val notConnectedYet: Boolean = !connectedPeers.contains(remote.getAddress)
+      val notConnectedYet: Boolean = !connectedPeers.contains(remote)
       val notBannedPeer: Boolean = !blackList.contains(remote.getAddress)
       if (notConnectedYet && notBannedPeer) {
-        logger.info(s"Peer: $remote is available to setup stable connect with it.")
-        (if (outgoingConnections.contains(remote.getAddress)) Outgoing else Incoming) match {
-          case _@Incoming if connectWithOnlyKnownPeers || isLocal(remote) =>
+        logger.info(s"Peer: $remote is available to setup stable connect with.")
+        (if (outgoingConnections.contains(remote)) Outgoing else Incoming) match {
+          case _@Incoming if connectWithOnlyKnownPeers =>
             logger.info(s"Got incoming connection but we can connect only with known peers.")
-          case in@Incoming if !isLocal(remote) =>
+          case in@Incoming =>
             logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
             sender() ! CreateStableConnection(remote, remoteConnection, in)
-          case out@Outgoing if !isLocal(remote) =>
+          case out@Outgoing =>
             logger.info(s"Got outgoing connection.")
-            outgoingConnections -= remote.getAddress
+            outgoingConnections -= remote
             sender() ! CreateStableConnection(remote, remoteConnection, out)
         }
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
         s" Is banned: $notBannedPeer, Is connected: $notConnectedYet.")
 
-    case RequestForStableConnection(_, _) =>
-      logger.info(s"Peers keeper got request for a stable connection but current number of max connection is bigger than possible.")
+    case RequestForStableConnection(remote, _) =>
+      logger.info(s"Peers keeper got request for a stable connection but current number of max connection is " +
+        s"bigger than possible or isLocal: ${isLocal(remote)}.")
 
     case StableConnectionSetup(connectedPeer) =>
       logger.info(s"Peers keeper got approvement about stable connection. Initializing new peer.")
@@ -121,25 +122,25 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
-      connectedPeers.removePeer(peer.getAddress)
+      connectedPeers.removePeer(peer)
       if (!blackList.contains(peer.getAddress)) {
-        availablePeers += peer.getAddress -> peer
+        availablePeers += peer
         logger.info(s"New available peer added to availablePeers. Current is: ${availablePeers.mkString(",")}.")
       }
 
     case OutgoingConnectionFailed(peer) =>
       logger.info(s"Connection failed for: $peer.")
-      outgoingConnections -= peer.getAddress
-      availablePeers += peer.getAddress -> peer
+      outgoingConnections -= peer
+      availablePeers += peer
   }
 
   def networkMessagesProcessingLogic: Receive = {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers => peers
-        .filterNot(p => blackList.contains(p.getAddress) || connectedPeers.contains(p.getAddress) || isLocal(p))
+        .filterNot(p => blackList.contains(p.getAddress) || connectedPeers.contains(p) || isLocal(p))
         .foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
-          availablePeers = availablePeers.updated(p.getAddress, p)
+          availablePeers += p
         }
 
       case PeersNetworkMessage(_) =>
@@ -148,12 +149,12 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
         self ! BanPeer(remote, SentPeersMessageWithoutRequest)
 
       case GetPeersNetworkMessage =>
-        val correctPeers: Seq[InetSocketAddress] = connectedPeers.getAll.filter(address =>
+        val peers: Seq[InetSocketAddress] = connectedPeers.getAll.filter(address =>
           if (remote.socketAddress.getAddress.isSiteLocalAddress) true
           else address.getAddress.isSiteLocalAddress && address != remote.socketAddress
         )
-        logger.info(s"Got request for local known peers. Sending to: $remote peers: ${correctPeers.mkString(",")}.")
-        remote.handlerRef ! PeersNetworkMessage(correctPeers)
+        logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
+        remote.handlerRef ! PeersNetworkMessage(peers)
     }
   }
 
@@ -164,9 +165,11 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       peer.handlerRef ! CloseConnection
   }
 
-  def isLocal(address: InetSocketAddress): Boolean = address == settings.network.bindAddress ||
-    InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
-    InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)
+  def isLocal(address: InetSocketAddress): Boolean =
+    address == settings.network.bindAddress ||
+      InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
+      InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress) ||
+      settings.network.declaredAddress.contains(address)
 
 }
 

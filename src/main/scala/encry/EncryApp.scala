@@ -52,14 +52,8 @@ object EncryApp extends App with StrictLogging {
 
   val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
 
-  lazy val peersKeeper: ActorRef = system.actorOf(PeersKeeper.props(settings)
-    .withDispatcher("peers-keeper-dispatcher"))
-
-  lazy val networkController: ActorRef = system.actorOf(NetworkController.props(settings, peersKeeper)
-    .withDispatcher("network-dispatcher"))
-
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
-    .props(influxRef, nodeViewHolder, networkController, settings, memoryPool, peersKeeper)
+    .props(influxRef, nodeViewHolder, settings, memoryPool)
     .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
 
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
@@ -91,7 +85,7 @@ object EncryApp extends App with StrictLogging {
 
     val apiRoutes: Seq[ApiRoute] = Seq(
       UtilsApiRoute(settings.restApi),
-      PeersApiRoute(networkController, settings.restApi),
+      PeersApiRoute(settings.restApi),
       InfoApiRoute(readersHolder, miner, settings, nodeId, memoryPool, timeProvider),
       HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
       TransactionsApiRoute(readersHolder, memoryPool, settings.restApi, settings.node.stateMode),

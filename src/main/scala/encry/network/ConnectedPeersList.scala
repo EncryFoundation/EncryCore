@@ -10,9 +10,9 @@ import encry.settings.EncryAppSettings
 
 final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging {
 
-  private var peers: Map[InetAddress, PeerInfo] = Map.empty
+  private var peers: Map[InetSocketAddress, PeerInfo] = Map.empty
 
-  def contains(peer: InetAddress): Boolean = peers.contains(peer)
+  def contains(peer: InetSocketAddress): Boolean = peers.contains(peer)
 
   def size: Int = peers.size
 
@@ -24,18 +24,18 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       Outgoing,
       LastUptime(0)
     )
-    peers = peers.updated(peer.socketAddress.getAddress, peerInfo)
+    peers = peers.updated(peer.socketAddress, peerInfo)
   }
 
-  def updatePeerInfo(peer: InetAddress, peerInfo: PeerInfo): Unit = peers = peers.updated(peer, peerInfo)
+  def updatePeerInfo(peer: InetSocketAddress, peerInfo: PeerInfo): Unit = peers = peers.updated(peer, peerInfo)
 
-  def removePeer(peer: InetAddress): Unit = peers -= peer
+  def removePeer(peer: InetSocketAddress): Unit = peers -= peer
 
-  def getAll: Seq[InetSocketAddress] = peers.values.map(_.connectedPeer.socketAddress).toSeq
+  def getAll: Seq[InetSocketAddress] = peers.keys.toSeq
 
   def getAllConnectedPeers: Seq[ConnectedPeer] = peers.values.map(_.connectedPeer).toSeq
 
-  def updatePeersPriorityStatus(statistic: Map[InetAddress, PeersPriorityStatus]): Unit = statistic.foreach {
+  def updatePeersPriorityStatus(statistic: Map[InetSocketAddress, PeersPriorityStatus]): Unit = statistic.foreach {
     case (peer, status) => peers.get(peer) match {
       case Some(peerInfo) =>
         logger.info(s"Updating priority status for peer $peer... $status.")
@@ -45,15 +45,17 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
   }
 
   def updatePeerComparisonStatus(peer: ConnectedPeer, status: HistoryComparisonResult): Unit =
-    peers.get(peer.socketAddress.getAddress) match {
+    peers.get(peer.socketAddress) match {
       case Some(value) =>
         val newPeerInfo: PeerInfo = value.copy(historyComparisonResult = status)
-        peers = peers.updated(peer.socketAddress.getAddress, newPeerInfo)
-      case None => //todo can we have such case??
+        peers = peers.updated(peer.socketAddress, newPeerInfo)
+      case None =>
+        //todo can we have such case??
+        logger.info(s"Trying to update history comparison result but there is no such peer in connected collection.")
     }
 
   def getPeersForDeliveryManager: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] =
-    peers.map(x => x._1 -> (x._2.connectedPeer, x._2.historyComparisonResult, x._2.peerPriorityStatus))
+    peers.map(x => x._1.getAddress -> (x._2.connectedPeer, x._2.historyComparisonResult, x._2.peerPriorityStatus))
 
   def getPeersWithoutYounger: Map[ConnectedPeer, HistoryComparisonResult] =
     peers.map(x => x._2.connectedPeer -> x._2.historyComparisonResult)
@@ -70,14 +72,14 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       p._2.connectedPeer
     }.toSeq
 
-  def updateUptime(peer: InetAddress): Unit = peers.get(peer) match {
+  def updateUptime(peer: InetSocketAddress): Unit = peers.get(peer) match {
     case Some(info) =>
       val newInfo: PeerInfo = info.copy(lastUptime = LastUptime(System.currentTimeMillis()))
       peers = peers.updated(peer, newInfo)
     case None => //todo do we have such case?
   }
 
-  def getPeers: Map[InetAddress, PeerInfo] = peers
+  def getPeers: Map[InetSocketAddress, PeerInfo] = peers
 
 }
 
