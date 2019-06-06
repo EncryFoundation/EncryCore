@@ -20,33 +20,32 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.matching.Regex
 
-case class PeersApiRoute(networkController: ActorRef,
-                         override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {
+case class PeersApiRoute(override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {
 
-  override lazy val route: Route = pathPrefix("peers") { allPeers ~ connectedPeers ~ connect }
+  override lazy val route: Route = pathPrefix("peers") { connect }
   private val addressAndPortRegexp: Regex = "\\w+:\\d{1,5}".r
 
-  def allPeers: Route = (path("all") & get) {
-    val result: Future[immutable.Iterable[PeerInfoResponse]] =
-      (peersKeeper ? GetInfoAboutConnectedPeers).mapTo[Map[InetSocketAddress, PeerInfo]].map {
-        _.map { case (address, peerInfo) =>
-          PeerInfoResponse.fromAddressAndInfo(address, peerInfo)
-        }
-      }
-    onSuccess(result) { r => complete(r) }
-  }
-
-  def connectedPeers: Route = (path("connected") & get) {
-    val result: Future[Seq[PeerInfoResponse]] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
-      _.map { peer =>
-        PeerInfoResponse(
-          address = peer.socketAddress.toString,
-          name = Some(peer.handshake.nodeName),
-          connectionType = Some(peer.direction.toString))
-      }
-    }
-    onSuccess(result) { r => complete(r) }
-  }
+//  def allPeers: Route = (path("all") & get) {
+//    val result: Future[immutable.Iterable[PeerInfoResponse]] =
+//      (peersKeeper ? GetInfoAboutConnectedPeers).mapTo[Map[InetSocketAddress, PeerInfo]].map {
+//        _.map { case (address, peerInfo) =>
+//          PeerInfoResponse.fromAddressAndInfo(address, peerInfo)
+//        }
+//      }
+//    onSuccess(result) { r => complete(r) }
+//  }
+//
+//  def connectedPeers: Route = (path("connected") & get) {
+//    val result: Future[Seq[PeerInfoResponse]] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
+//      _.map { peer =>
+//        PeerInfoResponse(
+//          address = peer.socketAddress.toString,
+//          name = Some(peer.handshake.nodeName),
+//          connectionType = Some(peer.direction.toString))
+//      }
+//    }
+//    onSuccess(result) { r => complete(r) }
+//  }
 
   def connect: Route = (path("connect") & post & entity(as[String])) { body =>
     complete {

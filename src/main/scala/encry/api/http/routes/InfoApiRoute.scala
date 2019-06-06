@@ -35,24 +35,26 @@ case class InfoApiRoute(readersHolder: ActorRef,
 
   override val route: Route = (path("info") & get) {
     val minerInfoF: Future[MinerStatus] = getMinerInfo
-    val connectedPeersF: Future[Int] = getConnectedPeers
+//    val connectedPeersF: Future[Int] = getConnectedPeers
     val readersF: Future[Readers] = (readersHolder ? GetReaders).mapTo[Readers]
     val mempoolSize: Future[Int] = (mempool ? GetMempoolSize).mapTo[Int]
     (for {
       minerInfo <- minerInfoF
-      connectedPeers <- connectedPeersF
+//      connectedPeers <- connectedPeersF
       readers <- readersF
       currentTime <- timeProvider.time()
       launchTime <- launchTimeFuture
       memSize <- mempoolSize
       storage = storageInfo
       nodeUptime = currentTime - launchTime
-    } yield InfoApiRoute.makeInfoJson(nodeId, minerInfo, connectedPeers, readers, getStateType, getNodeName,
+    } yield InfoApiRoute.makeInfoJson(nodeId, minerInfo,
+      1,
+      readers, getStateType, getNodeName,
       getAddress, storage, nodeUptime, memSize, getConnectionWithPeers)
       ).okJson()
   }
 
-  private def getConnectedPeers: Future[Int] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
+//  private def getConnectedPeers: Future[Int] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
 
   private def getStateType: String = appSettings.node.stateMode.verboseName
 

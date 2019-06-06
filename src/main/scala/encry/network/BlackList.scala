@@ -15,13 +15,11 @@ final class BlackList(settings: EncryAppSettings) {
     blackList = blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), TemporaryBan))
 
   def banPeer(reason: BanReason, peer: InetAddress): Unit = reason match {
-    case SpamSender => temporaryBan(reason, peer)
-    case SentPeersMessageWithoutRequest => temporaryBan(reason, peer)
-    case _ => permanentBan(reason, peer)
+    case _ => temporaryBan(reason, peer)
   }
 
-  def cleanupBlackList(): Unit = blackList = blackList.filter { case (_, (_, banTime, banType)) =>
-    banType != PermanentBan && banTime.time <= System.currentTimeMillis() + 600000
+  def cleanupBlackList(): Unit = blackList = blackList.filterNot { case (_, (_, banTime, banType)) =>
+    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= (settings.blackList.banTime._1 * 1000))
   }
 
   def getBannedPeers: Set[InetAddress] = blackList.keySet

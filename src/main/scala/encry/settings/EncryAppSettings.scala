@@ -19,7 +19,8 @@ case class EncryAppSettings(directory: String,
                             postgres: Option[PostgresSettings],
                             influxDB: Option[InfluxDBSettings],
                             levelDB: LevelDBSettings,
-                            monitoringSettings: Option[MonitoringSettings])
+                            monitoringSettings: Option[MonitoringSettings],
+                            blackList: BlackListSettings)
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
@@ -72,6 +73,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val influxSettings = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
     val levelDb = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
+    val blackListSettings = config.as[BlackListSettings](s"$config.blackList")
 
     EncryAppSettings(
       directory,
@@ -85,7 +87,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       postgresSettings,
       influxSettings,
       levelDb,
-      monitoringSettings
+      monitoringSettings,
+      blackListSettings
     )
   }
 

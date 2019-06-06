@@ -17,7 +17,7 @@ case object TestConstants extends Constants {
 
   val ModifierIdSize: Int = DigestLength
 
-  val PayloadMaxSize: Int = 1000000
+  val PayloadMaxSize: Int = 999999999
 
   val HeaderMaxSize: Int = 322
 

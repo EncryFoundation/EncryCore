@@ -8,7 +8,6 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.PeerConnectionHandler._
 import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
-import encry.EncryApp.{networkController, nodeViewSynchronizer}
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.consensus.History.HistoryComparisonResult
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -19,7 +18,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import scala.concurrent.duration._
 import scala.util.Random
 
-class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
+class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Actor with StrictLogging {
 
   import context.dispatcher
 
@@ -34,19 +33,19 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
   var outgoingConnections: Set[InetAddress] = Set.empty
 
   override def preStart(): Unit = {
-    networkController ! RegisterMessagesHandler(Seq(
+    nodeViewSync ! RegisterMessagesHandler(Seq(
       PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
     if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
-    context.system.scheduler.schedule(10.seconds, 10.seconds)(blackList.cleanupBlackList())
+    context.system.scheduler.schedule(5.seconds, settings.blackList.cleanupTime)(blackList.cleanupBlackList())
     context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(
       self ! SendLocalSyncInfo
     )
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
-      nodeViewSynchronizer ! UpdatedPeersCollection(connectedPeers.getPeersForDeliveryManager)
+      nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersForDeliveryManager)
     )
   }
 
@@ -64,7 +63,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       case SendLocalSyncInfo =>
         val peersForConnect: Seq[ConnectedPeer] = connectedPeers.getPeersForSyncInfo
         logger.info(s"Time to send sync info from PK! Current peers are: ${peersForConnect.mkString(",")}")
-        if (peersForConnect.nonEmpty) nodeViewSynchronizer ! PeersForSyncInfo(peersForConnect)
+        if (peersForConnect.nonEmpty) nodeViewSync ! PeersForSyncInfo(peersForConnect)
       case GetConnectedPeers => sender() ! connectedPeers.getAllConnectedPeers
       case GetInfoAboutConnectedPeers => sender() ! connectedPeers.getPeers
       case PeerFromCli(peer) =>
@@ -80,7 +79,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
-        s"so peer keeper allows to add one more connect. Current avalible is: ${availablePeers.mkString(",")}.")
+        s"so peer keeper allows to add one more connect. Current avalible peers are: ${availablePeers.mkString(",")}.")
       Random.shuffle(availablePeers).headOption.foreach { case (address, peer) =>
         logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
           s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
@@ -98,7 +97,7 @@ class PeersKeeper(settings: EncryAppSettings) extends Actor with StrictLogging {
       val notConnectedYet: Boolean = !connectedPeers.contains(remote.getAddress)
       val notBannedPeer: Boolean = !blackList.contains(remote.getAddress)
       if (notConnectedYet && notBannedPeer) {
-        logger.info(s"Peer: $remote is available to setup stable connect with it. Sending approvement for connection.")
+        logger.info(s"Peer: $remote is available to setup stable connect with it.")
         (if (outgoingConnections.contains(remote.getAddress)) Outgoing else Incoming) match {
           case _@Incoming if connectWithOnlyKnownPeers || isLocal(remote) =>
             logger.info(s"Got incoming connection but we can connect only with known peers.")
@@ -208,5 +207,5 @@ object PeersKeeper {
 
   case object GetInfoAboutConnectedPeers
 
-  def props(settings: EncryAppSettings): Props = Props(new PeersKeeper(settings))
+  def props(settings: EncryAppSettings, nodeViewSync: ActorRef): Props = Props(new PeersKeeper(settings, nodeViewSync))
 }

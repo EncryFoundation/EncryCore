@@ -36,10 +36,20 @@ import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
-                           networkControllerRef: ActorRef,
                            settings: EncryAppSettings,
-                           memoryPoolRef: ActorRef,
-                           peersKeeperRef: ActorRef) extends Actor with StrictLogging {
+                           memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+
+  val peersKeeper: ActorRef = context.actorOf(PeersKeeper.props(settings, self)
+    .withDispatcher("peers-keeper-dispatcher"))
+
+  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper)
+    .withDispatcher("network-dispatcher"))
+
+  networkController ! RegisterMessagesHandler(Seq(
+    InvNetworkMessage.NetworkMessageTypeID              -> "InvNetworkMessage",
+    RequestModifiersNetworkMessage.NetworkMessageTypeID -> "RequestModifiersNetworkMessage",
+    SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
+  ), self)
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -47,22 +57,17 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings, memoryPoolRef)
       .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
-    val messageIds: Seq[(Byte, String)] = Seq(
-      InvNetworkMessage.NetworkMessageTypeID -> "InvNetworkMessage",
-      RequestModifiersNetworkMessage.NetworkMessageTypeID -> "RequestModifiersNetworkMessage",
-      SyncInfoNetworkMessage.NetworkMessageTypeID -> "SyncInfoNetworkMessage"
-    )
-    networkControllerRef ! RegisterMessagesHandler(messageIds, self)
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
   override def receive: Receive = {
+    case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>
         broadcastModifierInv(block.header)
@@ -83,7 +88,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
           if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
           deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
-          peersKeeperRef ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
+          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
         case _ =>
       }
       case RequestModifiersNetworkMessage(invData) =>
@@ -121,7 +126,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
           nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
-        } else peersKeeperRef ! BanPeer(remote, SentInvForPayload)
+        } else peersKeeper ! BanPeer(remote, SentInvForPayload)
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case msg@ModifiersFromRemote(_) => nodeViewHolderRef ! msg
@@ -134,9 +139,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
     case msg@DisableMining => deliveryManager ! msg
-    case msg@BanPeer(_, _) => peersKeeperRef ! msg
-    case msg@AccumulatedPeersStatistic(_) => peersKeeperRef ! msg
-    case msg@SendLocalSyncInfo => peersKeeperRef ! msg
+    case msg@BanPeer(_, _) => peersKeeper ! msg
+    case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
+    case msg@SendLocalSyncInfo => peersKeeper ! msg
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
@@ -178,7 +183,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   def broadcastModifierInv(m: NodeViewModifier): Unit =
     if (chainSynced) {
       logger.info(s"NVSH is synced. Going to broadcast inv for: ${m.encodedId}")
-      peersKeeperRef ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
+      peersKeeper ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
     }
 }
 
@@ -235,11 +240,9 @@ object NodeViewSynchronizer {
 
   def props(influxRef: Option[ActorRef],
             nodeViewHolderRef: ActorRef,
-            networkControllerRef: ActorRef,
             settings: EncryAppSettings,
-            memoryPoolRef: ActorRef,
-            peersKeeperRef: ActorRef): Props =
-    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef, peersKeeperRef))
+            memoryPoolRef: ActorRef): Props =
+    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, settings, memoryPoolRef))
 
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
