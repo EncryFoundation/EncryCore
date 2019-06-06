@@ -35,6 +35,7 @@ case class PeersApiRoute(override val settings: RESTApiSettings)(implicit val co
 //    onSuccess(result) { r => complete(r) }
 //  }
 //
+  //todo fix this route
 //  def connectedPeers: Route = (path("connected") & get) {
 //    val result: Future[Seq[PeerInfoResponse]] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
 //      _.map { peer =>
