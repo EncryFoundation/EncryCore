@@ -70,7 +70,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       peersKeeper ! BanPeer(remote, InvalidNetworkMessage)
-      logger.info(s"Invalid message type: ${message.messageName} from remote $remote")
+      logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
   }
 
   def peersLogic: Receive = {
@@ -78,7 +78,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
       logger.info(s"Network controller got new peer for connection: $peer. Trying to set connection with remote...")
       IO(Tcp) ! Connect(
         peer,
-        externalSocketAddress,
+        None,//externalSocketAddress,
         KeepAlive(true) :: Nil,
         Some(settings.network.connectionTimeout),
         pullMode = true

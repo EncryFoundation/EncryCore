@@ -67,8 +67,7 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       case GetConnectedPeers => sender() ! connectedPeers.getAllConnectedPeers
       case GetInfoAboutConnectedPeers => sender() ! connectedPeers.getPeers
       case PeerFromCli(peer) =>
-        if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer)
-          && connectedPeers.contains(peer)) {
+        if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer) && connectedPeers.contains(peer)) {
           outgoingConnections += peer
           sender() ! PeerForConnection(peer)
         }
