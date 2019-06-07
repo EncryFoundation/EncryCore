@@ -22,13 +22,15 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
   import context.dispatcher
 
-  var availablePeers: Set[InetSocketAddress] = settings.network.knownPeers.toSet
-
   val connectWithOnlyKnownPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(true)
 
   val connectedPeers: ConnectedPeersList = new ConnectedPeersList(settings)
 
   val blackList: BlackList = new BlackList(settings)
+
+  var availablePeers: Set[InetSocketAddress] = settings.network.knownPeers.toSet
+
+  var connectionInProgress: Set[InetSocketAddress] = Set.empty
 
   var outgoingConnections: Set[InetSocketAddress] = Set.empty
 
@@ -79,14 +81,17 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connect. Current avalible peers are: ${availablePeers.mkString(",")}.")
-      Random.shuffle(availablePeers).headOption.foreach { peer =>
-        logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
-          s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
-          s"${outgoingConnections.mkString(",")}.")
-        sender() ! PeerForConnection(peer)
-        outgoingConnections += peer
-        availablePeers -= peer
-      }
+      Random.shuffle(availablePeers.filterNot(p => connectionInProgress.contains(p) || connectedPeers.contains(p)))
+        .headOption
+        .foreach { peer =>
+          logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
+            s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
+            s"${outgoingConnections.mkString(",")}.")
+          sender() ! PeerForConnection(peer)
+          outgoingConnections += peer
+          //availablePeers -= peer
+          connectionInProgress += peer
+        }
 
     case RequestPeerForConnection =>
       logger.info(s"Got request for a new connection but current number of connection is max: ${connectedPeers.size}.")
@@ -108,6 +113,8 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
             outgoingConnections -= remote
             sender() ! CreateStableConnection(remote, remoteConnection, out)
         }
+        logger.info(s"Adding new peer: $remote to connectionInProgress." +
+          s" Current in progress is: ${connectionInProgress.mkString(",")}")
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
         s" Is banned: $notBannedPeer, Is connected: $notConnectedYet.")
 
@@ -116,8 +123,11 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
         s"bigger than possible or isLocal: ${isLocal(remote)}.")
 
     case StableConnectionSetup(connectedPeer) =>
-      logger.info(s"Peers keeper got approvement about stable connection. Initializing new peer.")
+      logger.info(s"Peers keeper got approvement about stable connection. Initializing new peer: ${connectedPeer.socketAddress}")
       connectedPeers.initializePeer(connectedPeer)
+      logger.info(s"Remove  ${connectedPeer.socketAddress} from connectionInProgress collection. Current is: " +
+        s"${connectionInProgress.mkString(",")}.")
+      connectionInProgress -= connectedPeer.socketAddress
 
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
