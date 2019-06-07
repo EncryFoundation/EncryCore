@@ -115,6 +115,11 @@ class PeerConnectionHandler(connection: ActorRef,
   }
 
   def processErrors(stateName: CommunicationState): Receive = {
+    case cc: ConnectionClosed if stateName == AwaitingHandshake =>
+      logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      context.parent ! ConnectionStopped(remote)
+      context.stop(self)
+
     case cc: ConnectionClosed =>
       logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
       context.parent ! ConnectionStopped(receivedHandshake.get.declaredAddress.getOrElse(remote))
