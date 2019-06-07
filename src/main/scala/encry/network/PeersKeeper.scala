@@ -132,15 +132,16 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
       connectedPeers.removePeer(peer)
-      if (!blackList.contains(peer.getAddress)) {
-        availablePeers += peer
-        logger.info(s"New available peer added to availablePeers. Current is: ${availablePeers.mkString(",")}.")
+      if (blackList.contains(peer.getAddress)) {
+        availablePeers -= peer
+        logger.info(s"New available peer removed from availablePeers. Current is: ${availablePeers.mkString(",")}.")
       }
 
     case OutgoingConnectionFailed(peer) =>
       logger.info(s"Connection failed for: $peer.")
       outgoingConnections -= peer
-      availablePeers += peer
+      connectionInProgress -= peer
+      //availablePeers += peer
   }
 
   def networkMessagesProcessingLogic: Receive = {
