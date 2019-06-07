@@ -32,7 +32,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(settingsWithAllPeers.network.knownPeers.head))
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe false
+      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       networkController.send(peersKeeper, RequestForStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
@@ -52,7 +52,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(settingsWithAllPeers.network.knownPeers.head))
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe false
+      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       networkController.send(peersKeeper, RequestForStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
@@ -73,7 +73,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(settingsWithAllPeers.network.knownPeers.head))
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe false
+      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       networkController.send(peersKeeper, RequestForStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
