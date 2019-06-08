@@ -137,7 +137,10 @@ class InputSerializerSpec extends PropSpec with Matchers {
     val parsedInput = parsed.get
     parsedInput.boxId.sameElements(input.boxId) shouldBe true
     parsedInput.proofs shouldEqual List.empty
-    parsedInput.contract shouldEqual PubKeyLockedContract(pubKey)
+    parsedInput.contract.toSeq.collect {
+      case contr: PubKeyLockedContract => contr.pubKey.sameElements(pubKey) shouldEqual true
+      case _ => fail
+    }
   }
 
   property("Serialize and parse input with PubKeyLockedContract and with proofs") {
@@ -150,7 +153,10 @@ class InputSerializerSpec extends PropSpec with Matchers {
     val parsedInput = parsed.get
     parsedInput.boxId.sameElements(input.boxId) shouldBe true
     parsedInput.proofs shouldEqual proofList
-    parsedInput.contract shouldEqual PubKeyLockedContract(pubKey)
+    parsedInput.contract.toSeq.collect {
+      case contr: PubKeyLockedContract => contr.pubKey.sameElements(pubKey) shouldEqual true
+      case _ => fail
+    }
   }
 
 }
