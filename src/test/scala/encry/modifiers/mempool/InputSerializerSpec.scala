@@ -13,6 +13,7 @@ import scorex.crypto.signatures.PublicKey
 class InputSerializerSpec extends PropSpec with Matchers {
 
   private val boxId: ADKey = ADKey @@ Random.randomBytes()
+
   private val pubKey: PublicKey = PublicKey @@ Random.randomBytes()
 
   private val proofList: List[Proof] = List(
