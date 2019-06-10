@@ -31,10 +31,6 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
 
   def removePeer(peer: InetSocketAddress): Unit = peers -= peer
 
-  def getAll: Seq[InetSocketAddress] = peers.keys.toSeq
-
-  def getAllConnectedPeers: Seq[ConnectedPeer] = peers.values.map(_.connectedPeer).toSeq
-
   def updatePeersPriorityStatus(statistic: Map[InetSocketAddress, PeersPriorityStatus]): Unit = statistic.foreach {
     case (peer, status) => peers.get(peer) match {
       case Some(peerInfo) =>
@@ -54,23 +50,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
         logger.info(s"Trying to update history comparison result but there is no such peer in connected collection.")
     }
 
-  def getPeersForDeliveryManager: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] =
-    peers.map(x => x._1.getAddress -> (x._2.connectedPeer, x._2.historyComparisonResult, x._2.peerPriorityStatus))
-
-  def getPeersWithoutYounger: Map[ConnectedPeer, HistoryComparisonResult] =
-    peers.map(x => x._2.connectedPeer -> x._2.historyComparisonResult)
-
   def containsOlderPeer: Boolean = peers.exists(p => p._2.historyComparisonResult == Older)
-
-  def getPeersForSyncInfo: Seq[ConnectedPeer] = peers
-    .filter { p =>
-      logger.info(s"GetPeersForSyncInfo: ${p._2.lastUptime.time + settings.network.syncInterval._1} > ${System.currentTimeMillis()}")
-      (System.currentTimeMillis() - p._2.lastUptime.time) > settings.network.syncInterval._1
-    }
-    .map { p =>
-      updateUptime(p._1)
-      p._2.connectedPeer
-    }.toSeq
 
   def updateUptime(peer: InetSocketAddress): Unit = peers.get(peer) match {
     case Some(info) =>
@@ -79,7 +59,9 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
     case None => //todo do we have such case?
   }
 
-  def getPeers: Map[InetSocketAddress, PeerInfo] = peers
+  def getPeersF[T](p: (InetSocketAddress, PeerInfo) => Boolean,
+                   f: (InetSocketAddress, PeerInfo) => T): Iterable[T] =
+    peers.filter(k => p(k._1, k._2)).map(x => f(x._1, x._2))
 
 }
 

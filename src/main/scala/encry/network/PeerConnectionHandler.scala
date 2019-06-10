@@ -12,7 +12,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{settings, _}
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import encry.network.PeerConnectionHandler.ReceivableMessages._
-import encry.network.PeersKeeper.{ConnectionStopped, StableConnectionSetup}
+import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 
 import scala.annotation.tailrec
@@ -107,7 +107,7 @@ class PeerConnectionHandler(connection: ActorRef,
         receivedHandshake.get
       )
       selfPeer = Some(peer)
-      context.parent ! StableConnectionSetup(peer)
+      context.parent ! HandshakedDone(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
       logger.debug(s"Starting workingCycleWriting on peerHandler for $remote.")
@@ -263,14 +263,8 @@ class PeerConnectionHandler(connection: ActorRef,
 object PeerConnectionHandler {
 
   sealed trait ConnectionType
-
-  case object Incoming extends ConnectionType {
-    override def toString: String = "Incomming"
-  }
-
-  case object Outgoing extends ConnectionType {
-    override def toString: String = "Outgoing"
-  }
+  case object Incoming extends ConnectionType
+  case object Outgoing extends ConnectionType
 
   case class ConnectedPeer(socketAddress: InetSocketAddress,
                            handlerRef: ActorRef,

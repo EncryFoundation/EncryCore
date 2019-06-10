@@ -15,28 +15,28 @@ final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLoggi
 
   def incrementRequest(peer: InetSocketAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
-    val newRequested: Requested = Requested(requested.increment)
+    val newRequested: Requested = requested.increment
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
   def incrementReceive(peer: InetSocketAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
-    val newReceived: Received = Received(received.increment)
+    val newReceived: Received = received.increment
     logger.debug(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (requested, newReceived))
   }
 
   def decrementRequest(peer: InetSocketAddress): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
-    val newRequested: Requested = Requested(requested.decrement)
+    val newRequested: Requested = requested.decrement
     logger.debug(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
 
   def incrementRequestForNModifiers(peer: InetSocketAddress, modifiersQty: Int): Unit = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
-    val newRequested: Requested = Requested(requested.increment(modifiersQty))
+    val newRequested: Requested = requested.incrementForN(modifiersQty)
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
     peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
   }
@@ -62,46 +62,34 @@ object PrioritiesCalculator {
 
     sealed trait PeersPriorityStatus
 
-    final case class HighPriority(priority: Int = 4) extends PeersPriorityStatus {
-      override def toString: String = "Priority status is: HighPriority"
-    }
+    final case class HighPriority(priority: Int = 4) extends PeersPriorityStatus
 
-    final case class LowPriority(priority: Int = 3) extends PeersPriorityStatus {
-      override def toString: String = "Priority status is: LowPriority"
-    }
+    final case class LowPriority(priority: Int = 3) extends PeersPriorityStatus
 
-    final case class InitialPriority(priority: Int = 2) extends PeersPriorityStatus {
-      override def toString: String = "Priority status is: InitialPriority"
-    }
+    final case class InitialPriority(priority: Int = 2) extends PeersPriorityStatus
 
-    final case class BadNode(priority: Int = 1) extends PeersPriorityStatus {
-      override def toString: String = "Priority status is: BadNodePriority"
-    }
+    final case class BadNode(priority: Int = 1) extends PeersPriorityStatus
 
     final case class Received(received: Int = 0) extends AnyVal {
-      def increment: Int = received + 1
-
-      override def toString: String = s"Received: $received"
+      def increment: Received = Received(received + 1)
     }
 
     final case class Requested(requested: Int = 0) extends AnyVal {
-      def increment: Int = requested + 1
+      def increment: Requested = Requested(requested + 1)
 
-      def decrement: Int = requested - 1
+      def decrement: Requested = Requested(requested - 1)
 
-      def increment(qty: Int): Int = requested + qty
-
-      override def toString: String = s"Requested: $requested"
+      def incrementForN(n: Int): Requested = Requested(requested + n)
     }
 
     private val criterionForHighP: Double = 0.75
-    private val criterionForLowP: Double = 0.50
+    private val criterionForLowP: Double  = 0.50
 
     def calculateStatuses(res: Received, req: Requested): PeersPriorityStatus =
       res.received.toDouble / req.requested match {
         case t if t >= criterionForHighP => HighPriority()
-        case t if t >= criterionForLowP => LowPriority()
-        case _ => BadNode()
+        case t if t >= criterionForLowP  => LowPriority()
+        case _                           => BadNode()
       }
   }
 }

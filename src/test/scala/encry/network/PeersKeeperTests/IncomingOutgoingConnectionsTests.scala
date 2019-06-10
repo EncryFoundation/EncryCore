@@ -6,7 +6,7 @@ import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.BlackList.SyntacticallyInvalidModifier
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming, Outgoing}
-import encry.network.PeersKeeper.{BanPeer, CreateStableConnection, RequestForStableConnection, RequestPeerForConnection, StableConnectionSetup}
+import encry.network.PeersKeeper.{BanPeer, ConnectionVerified, VerifyConnection, RequestPeerForConnection, HandshakedDone}
 import encry.network.{NetworkUtils, PeersKeeper}
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
@@ -30,8 +30,8 @@ class IncomingOutgoingConnectionsTests extends WordSpecLike
       val remoteAddress: InetSocketAddress = new InetSocketAddress("172.16.11.11", 9001)
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, TestProbe().ref))
 
-      networkController.send(peersKeeper, RequestForStableConnection(remoteAddress, remoteConnectionTestProbe.ref))
-      networkController.expectMsg(CreateStableConnection(remoteAddress, remoteConnectionTestProbe.ref, Incoming))
+      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.expectMsg(ConnectionVerified(remoteAddress, remoteConnectionTestProbe.ref, Incoming))
       peersKeeper.stop()
     }
     "handle incoming connections correctly while connection with only known peers false " +
@@ -45,7 +45,7 @@ class IncomingOutgoingConnectionsTests extends WordSpecLike
           "test-peer", Some(remoteAddress), System.currentTimeMillis()))
 
       peersKeeper ! BanPeer(connectedPeer, SyntacticallyInvalidModifier)
-      networkController.send(peersKeeper, RequestForStableConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
     }
@@ -59,8 +59,8 @@ class IncomingOutgoingConnectionsTests extends WordSpecLike
         Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
           "test-peer", Some(remoteAddress), System.currentTimeMillis()))
 
-      peersKeeper ! StableConnectionSetup(connectedPeer)
-      networkController.send(peersKeeper, RequestForStableConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      peersKeeper ! HandshakedDone(connectedPeer)
+      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
     }
@@ -70,7 +70,7 @@ class IncomingOutgoingConnectionsTests extends WordSpecLike
       val remoteAddress: InetSocketAddress = new InetSocketAddress("172.16.11.11", 9001)
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithKnownPeers, TestProbe().ref))
 
-      networkController.send(peersKeeper, RequestForStableConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
     }
@@ -79,7 +79,7 @@ class IncomingOutgoingConnectionsTests extends WordSpecLike
       val remoteConnectionTestProbe: TestProbe = TestProbe()
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, TestProbe().ref))
 
-      networkController.send(peersKeeper, RequestForStableConnection(
+      networkController.send(peersKeeper, VerifyConnection(
         new InetSocketAddress("0.0.0.0", 9001), remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
@@ -93,9 +93,9 @@ class IncomingOutgoingConnectionsTests extends WordSpecLike
 
         peersKeeper ! RequestPeerForConnection
         peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithKnownPeers.network.knownPeers.head) shouldBe true
-        networkController.send(peersKeeper, RequestForStableConnection(settingsWithKnownPeers.network.knownPeers.head, remoteConnectionTestProbe.ref))
+        networkController.send(peersKeeper, VerifyConnection(settingsWithKnownPeers.network.knownPeers.head, remoteConnectionTestProbe.ref))
         networkController.expectMsg(
-          CreateStableConnection(settingsWithKnownPeers.network.knownPeers.head, remoteConnectionTestProbe.ref, Outgoing))
+          ConnectionVerified(settingsWithKnownPeers.network.knownPeers.head, remoteConnectionTestProbe.ref, Outgoing))
       }
     }
   }

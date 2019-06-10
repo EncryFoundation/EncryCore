@@ -209,22 +209,20 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   /** Validator for `BlockPayload` and `AdProofs` */
   object PayloadValidator extends ModifierValidator {
 
-    def validate(m: PersistentModifier, header: Header, minimalHeight: Int): ValidationResult = {
-      failFast
-        .validate(!historyStorage.containsObject(m.id)) {
-          fatal(s"Modifier ${m.encodedId} is already in history")
-        }
-        .validate(header.height >= minimalHeight) {
-          error(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
-        }
-        .validate(header.isRelated(m)) {
-          fatal(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}")
-        }
-        .validate(isSemanticallyValid(header.id) != Invalid) {
-          fatal(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid")
-        }
-        .result
-    }
+    def validate(m: PersistentModifier, header: Header, minimalHeight: Int): ValidationResult = failFast
+      .validate(!historyStorage.containsObject(m.id)) {
+        fatal(s"Modifier ${m.encodedId} is already in history")
+      }
+      .validate(header.height >= minimalHeight) {
+        error(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
+      }
+      .validate(header.isRelated(m)) {
+        fatal(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}")
+      }
+      .validate(isSemanticallyValid(header.id) != Invalid) {
+        fatal(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid")
+      }
+      .result
   }
 
 }

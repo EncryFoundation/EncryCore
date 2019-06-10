@@ -25,7 +25,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
   import context.system
 
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
-  val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress.orElse(None)
+  val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress
   logger.info(s"Declared address is: $externalSocketAddress.")
 
   if (!settings.network.localOnly.getOrElse(false)) settings.network.declaredAddress.foreach(myAddress =>
@@ -86,9 +86,9 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
 
     case Connected(remote, _) =>
       logger.info(s"Network controller got 'Connected' message from: $remote. Trying to set stable connection with remote...")
-      peersKeeper ! RequestForStableConnection(remote, sender())
+      peersKeeper ! VerifyConnection(remote, sender())
 
-    case CreateStableConnection(remote, remoteConnection, connectionType) =>
+    case ConnectionVerified(remote, remoteConnection, connectionType) =>
       logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
       val peerConnectionHandler: ActorRef = context.actorOf(
         PeerConnectionHandler.props(remoteConnection, connectionType, externalSocketAddress, remote)
@@ -96,10 +96,10 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
       )
       peerConnectionHandler ! StartInteraction
 
-    case StableConnectionSetup(remote) =>
+    case HandshakedDone(remote) =>
       logger.info(s"Network controller got approvement from peer handler about successful handshake. " +
         s"Sending to peerKeeper connected peer.")
-      peersKeeper ! StableConnectionSetup(remote)
+      peersKeeper ! HandshakedDone(remote)
 
     case ConnectionStopped(peer) =>
       logger.info(s"Network controller got signal about breaking connection with: $peer. " +

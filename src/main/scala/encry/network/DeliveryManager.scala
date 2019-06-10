@@ -146,24 +146,24 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
-        val filteredModifiers: Seq[Array[Byte]] = fm.filterNot { case (modId, _) => history.contains(modId) }.values.toSeq
-        logger.info(s"Filtered modifiers are: ${filteredModifiers.map(Algos.encode).mkString(",")}")
+        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot { case (modId, _) => history.contains(modId) }.toSeq
 
-        //todo Probably we should remove invalid modifier id from received collections
         typeId match {
           case Payload.modifierTypeId =>
-            val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, bytes) =>
+            val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, (id, bytes)) =>
               PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)) match {
                 case Success(payload) if PU.semanticValidity(payload).isSuccess && PU.syntacticallyValidity(payload).isSuccess =>
                   logger.info(s"Successfully serialized payload with id: ${Algos.encode(payload.id)}.")
                   payloadsColl :+ payload
                 case Success(payload) =>
-                  logger.info(s"Payload with id: ${payload.encodedId} invalid caze of: " +
+                  logger.info(s"Payload with id: ${payload.encodedId} invalid cause of: " +
                     s"${PU.semanticValidity(payload)} && ${PU.syntacticallyValidity(payload)}")
                   context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  receivedModifiers -= toKey(id)
                   payloadsColl
                 case Failure(ex) =>
                   context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  receivedModifiers -= toKey(id)
                   logger.info(s"Received payload from $remote can't be parsed cause of: ${ex.getMessage}.")
                   payloadsColl
               }
@@ -172,18 +172,20 @@ class DeliveryManager(influxRef: Option[ActorRef],
             context.parent ! ModifiersFromRemote(payloads)
 
           case Header.modifierTypeId =>
-            val headers = filteredModifiers.foldLeft(Seq.empty[Header]) { case (headersCollection, bytes) =>
+            val headers = filteredModifiers.foldLeft(Seq.empty[Header]) { case (headersCollection, (id, bytes)) =>
               HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)) match {
                 case Success(header) if HU.semanticValidity(header).isSuccess && HU.syntacticallyValidity(header).isSuccess =>
                   logger.info(s"Successfully serialized header with id: ${Algos.encode(header.id)}.")
                   headersCollection :+ header
                 case Success(header) =>
-                  logger.info(s"Header with id: ${header.encodedId} invalid caze of:" +
+                  logger.info(s"Header with id: ${header.encodedId} invalid cause of:" +
                     s" ${HU.semanticValidity(header)} && ${HU.syntacticallyValidity(header)}")
                   context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  receivedModifiers -= toKey(id)
                   headersCollection
                 case Failure(ex) =>
                   context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  receivedModifiers -= toKey(id)
                   logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
                   headersCollection
               }
@@ -193,15 +195,17 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
           case Transaction.modifierTypeId =>
             val transactions: Seq[Transaction] = filteredModifiers.foldLeft(Seq.empty[Transaction]) {
-              case (transactionsColl, bytes) =>
+              case (transactionsColl, (id, bytes)) =>
                 TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
                   case Success(tx) if tx.semanticValidity.isSuccess => transactionsColl :+ tx
                   case Success(tx) =>
                     logger.info(s"Payload with id: ${tx.encodedId} invalid caze of: ${tx.semanticValidity}.")
                     context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                    receivedModifiers -= toKey(id)
                     transactionsColl
                   case Failure(ex) =>
                     context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                    receivedModifiers -= toKey(id)
                     logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
                     transactionsColl
                 }
@@ -218,7 +222,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
       if (previousModifier.isDefined && isBlockChainSynced) {
-        logger.debug(s"Sending this donwload request! for modfiier: ${Algos.encode(modifiersId)}")
+        logger.debug(s"Sending this download request for modifiers: ${Algos.encode(modifiersId)}")
         priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
       }
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)

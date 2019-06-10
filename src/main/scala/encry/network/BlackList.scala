@@ -8,18 +8,15 @@ final class BlackList(settings: EncryAppSettings) {
 
   private var blackList: Map[InetAddress, (BanReason, BanTime, BanType)] = Map.empty
 
-  private def permanentBan(reason: BanReason, peer: InetAddress): Unit =
-    blackList = blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), PermanentBan))
-
-  private def temporaryBan(reason: BanReason, peer: InetAddress): Unit =
-    blackList = blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), TemporaryBan))
-
-  def banPeer(reason: BanReason, peer: InetAddress): Unit = reason match {
-    case _ => temporaryBan(reason, peer)
+  def banPeer(reason: BanReason, peer: InetAddress): Unit = {
+    val banType: BanType = reason match {
+      case _ => TemporaryBan
+    }
+    blackList = blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), banType))
   }
 
   def cleanupBlackList(): Unit = blackList = blackList.filterNot { case (_, (_, banTime, banType)) =>
-    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= (settings.blackList.banTime._1 * 1000))
+    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= settings.blackList.banTime.toMillis)
   }
 
   def getBannedPeers: Set[InetAddress] = blackList.keySet

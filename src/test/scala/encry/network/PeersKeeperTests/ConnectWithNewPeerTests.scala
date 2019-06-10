@@ -34,11 +34,11 @@ class ConnectWithNewPeerTests extends WordSpecLike
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
       peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
-      networkController.send(peersKeeper, RequestForStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
+      networkController.send(peersKeeper, VerifyConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
-        CreateStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
+        ConnectionVerified(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
 
-      networkController.send(peersKeeper, StableConnectionSetup(connectedPeer))
+      networkController.send(peersKeeper, HandshakedDone(connectedPeer))
       peersKeeper.underlyingActor.connectedPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
     }
     "correctly handle stop connection process" in {
@@ -54,11 +54,11 @@ class ConnectWithNewPeerTests extends WordSpecLike
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
       peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
-      networkController.send(peersKeeper, RequestForStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
+      networkController.send(peersKeeper, VerifyConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
-        CreateStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
+        ConnectionVerified(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
 
-      networkController.send(peersKeeper, StableConnectionSetup(connectedPeer))
+      networkController.send(peersKeeper, HandshakedDone(connectedPeer))
       peersKeeper.underlyingActor.connectedPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       peersKeeper ! ConnectionStopped(settingsWithAllPeers.network.knownPeers.head)
@@ -75,9 +75,9 @@ class ConnectWithNewPeerTests extends WordSpecLike
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
       peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
-      networkController.send(peersKeeper, RequestForStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
+      networkController.send(peersKeeper, VerifyConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
-        CreateStableConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
+        ConnectionVerified(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
 
       peersKeeper ! OutgoingConnectionFailed(settingsWithAllPeers.network.knownPeers.head)
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe false

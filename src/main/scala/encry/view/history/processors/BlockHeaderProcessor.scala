@@ -351,9 +351,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def requiredDifficultyAfter(parent: Header): Difficulty = {
     val parentHeight: Int = parent.height
-    val requiredHeights: Seq[Height] =
-      difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
-        .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
+    val requiredHeights: Seq[Height] = difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
+      .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
     val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
     val requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
       .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
@@ -383,38 +382,37 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         }
         .result
 
-    private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = {
-      failFast
-        .validate(header.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift) {
-          error(s"Header timestamp ${header.timestamp} is too far in future from now " +
-            s"${timeProvider.estimatedTime}")
-        }
-        .validate(header.timestamp > parent.timestamp) {
-          fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
-        }
-        .validate(header.height == parent.height + 1) {
-          fatal(s"Header height ${header.height} is not greater by 1 than parents ${parent.height}")
-        }
-        .validateNot(historyStorage.containsObject(header.id)) {
-          fatal("Header is already in history")
-        }
-        .validate(realDifficulty(header) >= header.requiredDifficulty) {
-          fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
-            s"${header.requiredDifficulty}")
-        }
-        .validate(header.difficulty >= requiredDifficultyAfter(parent)) {
-          fatal(s"Incorrect required difficulty in header: " +
-            s"${Algos.encode(header.id)} on height ${header.height}")
-        }
-        .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth)) {
-          fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
-        }
-        .validate(powScheme.verify(header)) {
-          fatal(s"Wrong proof-of-work solution for $header")
-        }
-        .validateSemantics(isSemanticallyValid(header.parentId)) {
-          fatal("Parent header is marked as semantically invalid")
-        }.result
-    }
+    private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = failFast
+      .validate(header.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift) {
+        error(s"Header timestamp ${header.timestamp} is too far in future from now " +
+          s"${timeProvider.estimatedTime}")
+      }
+      .validate(header.timestamp > parent.timestamp) {
+        fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
+      }
+      .validate(header.height == parent.height + 1) {
+        fatal(s"Header height ${header.height} is not greater by 1 than parents ${parent.height}")
+      }
+      .validateNot(historyStorage.containsObject(header.id)) {
+        fatal("Header is already in history")
+      }
+      .validate(realDifficulty(header) >= header.requiredDifficulty) {
+        fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
+          s"${header.requiredDifficulty}")
+      }
+      .validate(header.difficulty >= requiredDifficultyAfter(parent)) {
+        fatal(s"Incorrect required difficulty in header: " +
+          s"${Algos.encode(header.id)} on height ${header.height}")
+      }
+      .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth)) {
+        fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
+      }
+      .validate(powScheme.verify(header)) {
+        fatal(s"Wrong proof-of-work solution for $header")
+      }
+      .validateSemantics(isSemanticallyValid(header.parentId)) {
+        fatal("Parent header is marked as semantically invalid")
+      }.result
   }
+
 }
