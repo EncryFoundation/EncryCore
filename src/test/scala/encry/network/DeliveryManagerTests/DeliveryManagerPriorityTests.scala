@@ -10,7 +10,7 @@ import encry.consensus.History.{Equal, Older, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{OtherNodeSyncingStatus, RequestFromLocal}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.UpdatedPeersCollection
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.{BadNode, HighPriority, InitialPriority, LowPriority}
