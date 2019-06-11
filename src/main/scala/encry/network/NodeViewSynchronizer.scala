@@ -13,7 +13,7 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, SendToNetwork, UpdatedPeersCollection}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, RequestPeersForFirstSyncInfo, SendToNetwork, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -29,6 +29,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -126,6 +127,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         } else peersKeeper ! BanPeer(remote, SentInvForPayload)
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
+    case msg@RequestPeersForFirstSyncInfo =>
+      logger.info(s"NodeViewSyncronizer got request from delivery manager to peers keeper for" +
+        s" peers for first sync info message. Resending $msg to peers keeper.")
+      peersKeeper ! msg
     case msg@ModifiersFromRemote(_) => nodeViewHolderRef ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
     case msg@DownloadRequest(_, _, _) => deliveryManager ! msg

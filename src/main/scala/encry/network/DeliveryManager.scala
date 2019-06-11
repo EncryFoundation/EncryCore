@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetAddress
+
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
@@ -18,6 +19,7 @@ import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
 import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
+
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
@@ -25,7 +27,7 @@ import scala.util.{Failure, Random, Success, Try}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import encry.network.BlackList.{InvalidModifierFromNetwork, SemanticallyInvalidModifier, SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
-import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, UpdatedPeersCollection}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, RequestPeersForFirstSyncInfo, SyncInfoDone, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.view.mempool.Mempool.{RequestForTransactions, TransactionsFromRemote}
@@ -36,6 +38,7 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.validation.RecoverableModifierError
+
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -88,6 +91,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
         self ! CheckModifiersToDownload
       )
+      nodeViewSync ! RequestPeersForFirstSyncInfo
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }

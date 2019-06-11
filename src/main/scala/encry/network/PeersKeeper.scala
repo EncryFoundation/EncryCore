@@ -29,6 +29,8 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
   val blackList: BlackList = new BlackList(settings)
 
+  var availablePeers1: Map[InetSocketAddress, Int] = settings.network.knownPeers.map(peer => peer -> 0).toMap
+
   var availablePeers: Set[InetSocketAddress] = settings.network.knownPeers.toSet
 
   var connectionInProgress: Set[InetSocketAddress] = Set.empty
@@ -44,15 +46,9 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
     context.system.scheduler.schedule(5.seconds, settings.blackList.cleanupTime)(blackList.cleanupBlackList())
-    context.system.scheduler.schedule(settings.network.syncInterval, settings.network.syncInterval)(sendSyncInfo())
-    context.system.scheduler.schedule(10.seconds, 5.seconds) {
-      def f(address: InetSocketAddress,
-            info: PeerInfo): (InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)) =
-        address.getAddress -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
-      val peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] =
-        connectedPeers.getPeersF((_, _) => true, f).toMap
-      nodeViewSync ! UpdatedPeersCollection(peers)
-    }
+    context.system.scheduler.schedule(10.seconds, 5.seconds)(
+      nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersF((_, _) => true, getPeersForDMF).toMap)
+    )
   }
 
   override def receive: Receive = setupConnectionsLogic
@@ -142,24 +138,26 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
         self ! BanPeer(remote, SentPeersMessageWithoutRequest)
 
       case GetPeersNetworkMessage =>
-        def p(add: InetSocketAddress, info: PeerInfo): Boolean =
+        def getPeersForRemoteP(add: InetSocketAddress, info: PeerInfo): Boolean =
           if (remote.socketAddress.getAddress.isSiteLocalAddress) true
           else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
-        def f(add: InetSocketAddress, info: PeerInfo): InetSocketAddress = add
-        val peers: Seq[InetSocketAddress] = connectedPeers.getPeersF(p, f).toSeq
+        val peers: Seq[InetSocketAddress] = connectedPeers.getPeersF(getPeersForRemoteP, getPeersForRemoteF).toSeq
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
         remote.handlerRef ! PeersNetworkMessage(peers)
     }
   }
 
   def additionalMessages: Receive = {
+    case RequestPeersForFirstSyncInfo =>
+      logger.info(s"Peers keeper got request for peers for first sync info. Starting scheduler for this logic.")
+      context.system.scheduler.schedule(1.seconds, settings.network.syncInterval)(sendSyncInfo())
+
     case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
 
     case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
 
     case SendToNetwork(message, strategy) =>
-      def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
-      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, f).toSeq
+      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq
       strategy.choose(peers).foreach { peer =>
         logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
@@ -168,13 +166,11 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
     case SendLocalSyncInfo => sendSyncInfo()
 
     case GetConnectedPeers =>
-      def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
-      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, f).toSeq
+      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq
       sender() ! peers
 
     case GetInfoAboutConnectedPeers =>
-      def f(add: InetSocketAddress, info: PeerInfo): (InetSocketAddress, PeerInfo) = add -> info
-      val peers: Map[InetSocketAddress, PeerInfo] = connectedPeers.getPeersF((_, _) => true, f).toMap
+      val peers: Map[InetSocketAddress, PeerInfo] = connectedPeers.getPeersF((_, _) => true, getPeersAndInfoF).toMap
       sender() ! peers
 
     case PeerFromCli(peer) =>
@@ -200,16 +196,21 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       settings.network.declaredAddress.contains(address)
 
   def sendSyncInfo(): Unit = {
-    def predicate(add: InetSocketAddress, info: PeerInfo): Boolean =
-      (System.currentTimeMillis() - info.lastUptime.time) > settings.network.syncInterval.toMillis
-    def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = {
-      connectedPeers.updateUptime(add)
-      info.connectedPeer
-    }
-    val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(predicate, f).toSeq
+    val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(findPeersForSyncInfoP, findPeersForSyncInfoF).toSeq
     if (peers.nonEmpty) nodeViewSync ! PeersForSyncInfo(peers)
   }
 
+  def findPeersForSyncInfoP(add: InetSocketAddress, info: PeerInfo): Boolean =
+    (System.currentTimeMillis() - info.lastUptime.time) > settings.network.syncInterval.toMillis
+  def findPeersForSyncInfoF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = {
+    connectedPeers.updateUptime(add)
+    info.connectedPeer
+  }
+  def getConnectedPeersF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
+  def getPeersAndInfoF(add: InetSocketAddress, info: PeerInfo): (InetSocketAddress, PeerInfo) = add -> info
+  def getPeersForRemoteF(add: InetSocketAddress, info: PeerInfo): InetSocketAddress = add
+  def getPeersForDMF(address: InetSocketAddress, info: PeerInfo): (InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)) =
+    address.getAddress -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
 }
 
 object PeersKeeper {
@@ -233,6 +234,8 @@ object PeersKeeper {
 
   final case class SendToNetwork(message: NetworkMessage,
                                  sendingStrategy: SendingStrategy)
+
+  case object RequestPeersForFirstSyncInfo
 
   final case class PeersForSyncInfo(peers: Seq[ConnectedPeer])
 
