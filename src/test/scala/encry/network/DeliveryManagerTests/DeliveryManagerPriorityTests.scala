@@ -92,6 +92,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
       val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
+
       assert(result.contains(cp1.socketAddress))
       assert(result(cp1.socketAddress) == HighPriority())
       deliveryManager.stop()
