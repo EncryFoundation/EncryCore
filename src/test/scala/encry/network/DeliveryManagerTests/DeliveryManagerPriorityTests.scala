@@ -6,7 +6,7 @@ import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, i
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
 import encry.consensus.History
-import encry.consensus.History.{Equal, HistoryComparisonResult, Older, Younger}
+import encry.consensus.History.{Equal, Older, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
