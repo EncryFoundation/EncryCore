@@ -81,8 +81,9 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      val headerBytes: Array[Byte] = HeaderProtoSerializer.toProto(genHeader).toByteArray
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty)
         .keys.isEmpty)
       assert(deliveryManager.underlyingActor.receivedModifiers.size == blocks.size)
@@ -97,10 +98,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+      val headerBytes: Array[Byte] = HeaderProtoSerializer.toProto(genHeader).toByteArray
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
-        Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
+        Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1)
       assert(deliveryManager.underlyingActor.receivedModifiers.size == headersIds.size)
       assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => headersAsKey.contains(elem)))
       assert(deliveryManager.underlyingActor.headersForPriorityRequest.forall(x => headersAsKey.contains(x._1)))

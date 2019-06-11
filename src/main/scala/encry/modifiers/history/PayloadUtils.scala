@@ -13,9 +13,4 @@ object PayloadUtils {
     .demand(payload.serializer.toBytes(payload).length < TestConstants.PayloadMaxSize,
       "Payload's max size should be less than boundary value")
     .result
-
-  def semanticValidity(payload: Payload): ValidationResult = ModifierValidator.accumulateErrors
-    .demand(payload.txs.nonEmpty, "Should contain at least 1 coinbase-like transaction")
-    .result
-
 }

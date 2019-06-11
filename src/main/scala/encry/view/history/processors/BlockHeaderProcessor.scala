@@ -20,7 +20,6 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.{ModifierSemanticValidity, ModifierValidator, ValidationResult}
 import scorex.crypto.hash.Digest32
 import supertagged.@@
-
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.immutable.HashSet
@@ -369,24 +368,18 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         validateChildBlockHeader(header, parent)
       } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
 
-    private def validateGenesisBlockHeader(header: Header): ValidationResult =
-      accumulateErrors
-        .validateEqualIds(header.parentId, Header.GenesisParentId) { detail =>
-          fatal(s"Genesis block should have genesis parent id. $detail")
-        }
-        .validate(bestHeaderIdOpt.isEmpty) {
-          fatal("Trying to append genesis block to non-empty history")
-        }
-        .validate(header.height == TestNetConstants.GenesisHeight) {
-          fatal(s"Height of genesis block $header is incorrect")
-        }
-        .result
+    private def validateGenesisBlockHeader(header: Header): ValidationResult = accumulateErrors
+      .validateEqualIds(header.parentId, Header.GenesisParentId) { detail =>
+        fatal(s"Genesis block should have genesis parent id. $detail")
+      }
+      .validate(bestHeaderIdOpt.isEmpty) {
+        fatal("Trying to append genesis block to non-empty history")
+      }
+      .validate(header.height == TestNetConstants.GenesisHeight) {
+        fatal(s"Height of genesis block $header is incorrect")
+      }.result
 
     private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = failFast
-      .validate(header.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift) {
-        error(s"Header timestamp ${header.timestamp} is too far in future from now " +
-          s"${timeProvider.estimatedTime}")
-      }
       .validate(header.timestamp > parent.timestamp) {
         fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
       }
@@ -412,6 +405,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       }
       .validateSemantics(isSemanticallyValid(header.parentId)) {
         fatal("Parent header is marked as semantically invalid")
+      }
+      .validate(header.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift) {
+        error(s"Header timestamp ${header.timestamp} is too far in future from now " +
+          s"${timeProvider.estimatedTime}")
       }.result
   }
 

@@ -17,12 +17,6 @@ object HeaderUtils {
     .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize, "TransactionsRoot's size should be 32 bytes")
     .result
 
-  def semanticValidity(header: Header): ValidationResult = ModifierValidator.accumulateErrors
-    .demand(header.height >= TestNetConstants.GenesisHeight, "Header's height should be more than 0")
-    .demand(header.difficulty >= TestNetConstants.InitialDifficulty, "Difficulty should be more than 0")
-    .demand(header.equihashSolution.ints.nonEmpty, "Equihash solution shouldn't be empty")
-    .result
-
   def headerBytesSize(header: Header): Int = 1 + header.id.size + header.parentId.size +
     header.adProofsRoot.size + header.stateRoot.size + header.transactionsRoot.size +
       Longs.toByteArray(header.timestamp).length + Ints.toByteArray(header.height).length +

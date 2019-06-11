@@ -19,7 +19,9 @@ import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.Try
 
-class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) extends Actor with StrictLogging {
+class NetworkController(settings: EncryAppSettings,
+                        peersKeeper: ActorRef,
+                        nodeViewSync: ActorRef) extends Actor with StrictLogging {
 
   import context.dispatcher
   import context.system
@@ -105,6 +107,7 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
       logger.info(s"Network controller got signal about breaking connection with: $peer. " +
         s"Sending to peerKeeper actual information.")
       peersKeeper ! ConnectionStopped(peer)
+      nodeViewSync ! ConnectionStopped(peer)
 
     case CommandFailed(connect: Connect) =>
       logger.info(s"Failed to connect to: ${connect.remoteAddress}.")
@@ -125,7 +128,9 @@ class NetworkController(settings: EncryAppSettings, peersKeeper: ActorRef) exten
 
 object NetworkController {
 
-  def props(settings: EncryAppSettings, peersKeeper: ActorRef): Props = Props(new NetworkController(settings, peersKeeper))
+  def props(settings: EncryAppSettings,
+            peersKeeper: ActorRef,
+            nodeViewSync: ActorRef): Props = Props(new NetworkController(settings, peersKeeper, nodeViewSync))
 
   object ReceivableMessages {
 

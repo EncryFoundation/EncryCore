@@ -13,7 +13,7 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeersKeeper.{BanPeer, PeersForSyncInfo, SendToNetwork, UpdatedPeersCollection}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, SendToNetwork, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -36,10 +36,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            settings: EncryAppSettings,
                            memoryPoolRef: ActorRef) extends Actor with StrictLogging {
 
-  val peersKeeper: ActorRef = context.actorOf(PeersKeeper.props(settings, self)
+  val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self)
     .withDispatcher("peers-keeper-dispatcher"))
 
-  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper)
+  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper, self)
     .withDispatcher("network-dispatcher"))
 
   networkController ! RegisterMessagesHandler(Seq(
@@ -54,7 +54,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings, memoryPoolRef)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings, memoryPoolRef, self)
       .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
@@ -133,6 +133,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
       deliveryManager ! msg
+    case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
     case msg@DisableMining => deliveryManager ! msg

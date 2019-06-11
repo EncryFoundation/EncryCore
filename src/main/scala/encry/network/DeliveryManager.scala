@@ -21,11 +21,11 @@ import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
-import scala.util.{Failure, Random, Success}
+import scala.util.{Failure, Random, Success, Try}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.BlackList.{SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
-import encry.network.PeersKeeper.{BanPeer, PeersForSyncInfo, UpdatedPeersCollection}
+import encry.network.BlackList.{InvalidModifierFromNetwork, SemanticallyInvalidModifier, SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.view.mempool.Mempool.{RequestForTransactions, TransactionsFromRemote}
@@ -35,13 +35,15 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, 
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.validation.RecoverableModifierError
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
                       networkControllerRef: ActorRef,
                       settings: EncryAppSettings,
-                      memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+                      memoryPoolRef: ActorRef,
+                      nodeViewSync: ActorRef) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -95,6 +97,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
       logger.info(s"Delivery manager got updated peers collection.")
       peersCollection = newPeers
 
+    case ConnectionStopped(peer) =>
+      peersCollection -= peer.getAddress
+      logger.info(s"Removed peer: ${peer.getAddress} from peers collection on Delivery Manager." +
+        s" Current peers are: ${peersCollection.mkString(",")}")
+
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       status match {
         case Unknown => logger.info("Peer status is still unknown.")
@@ -136,13 +143,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
-        logger.info(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._2)).mkString(",")}")
+        logger.info(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))
         if (spam.nonEmpty) {
           if (typeId != Transaction.modifierTypeId)
-            logger.debug(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
+            logger.info(s"Spam attempt: peer $remote has sent a non-requested modifiers of type $typeId with ids" +
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
@@ -152,17 +159,29 @@ class DeliveryManager(influxRef: Option[ActorRef],
           case Payload.modifierTypeId =>
             val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, (id, bytes)) =>
               PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)) match {
-                case Success(payload) if PU.semanticValidity(payload).isSuccess && PU.syntacticallyValidity(payload).isSuccess =>
-                  logger.info(s"Successfully serialized payload with id: ${Algos.encode(payload.id)}.")
-                  payloadsColl :+ payload
+                case Success(payload) if PU.syntacticallyValidity(payload).isSuccess => history.testApplicable(payload) match {
+                  case Failure(ex: RecoverableModifierError) =>
+                    logger.info(s"payload: ${payload.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
+                      s"RecoverableModifierError so continue working with this modifier.")
+                    payloadsColl :+ payload
+                  case Failure(ex) =>
+                    logger.info(s"payload: ${payload.encodedId} after testApplicable has: ${ex.getMessage}. This is " +
+                      s"unhandled exception so reject this modifier and ban peer: $remote")
+                    nodeViewSync ! BanPeer(remote, SemanticallyInvalidModifier)
+                    receivedModifiers -= toKey(id)
+                    payloadsColl
+                  case Success(_) =>
+                    logger.info(s"Header: ${payload.encodedId} after testApplicable is correct.")
+                    payloadsColl :+ payload
+                }
                 case Success(payload) =>
                   logger.info(s"Payload with id: ${payload.encodedId} invalid cause of: " +
-                    s"${PU.semanticValidity(payload)} && ${PU.syntacticallyValidity(payload)}")
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                    s"${PU.syntacticallyValidity(payload)}")
+                  nodeViewSync ! BanPeer(remote, SyntacticallyInvalidModifier)
                   receivedModifiers -= toKey(id)
                   payloadsColl
                 case Failure(ex) =>
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  nodeViewSync ! BanPeer(remote, SyntacticallyInvalidModifier)
                   receivedModifiers -= toKey(id)
                   logger.info(s"Received payload from $remote can't be parsed cause of: ${ex.getMessage}.")
                   payloadsColl
@@ -174,17 +193,29 @@ class DeliveryManager(influxRef: Option[ActorRef],
           case Header.modifierTypeId =>
             val headers = filteredModifiers.foldLeft(Seq.empty[Header]) { case (headersCollection, (id, bytes)) =>
               HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)) match {
-                case Success(header) if HU.semanticValidity(header).isSuccess && HU.syntacticallyValidity(header).isSuccess =>
-                  logger.info(s"Successfully serialized header with id: ${Algos.encode(header.id)}.")
-                  headersCollection :+ header
+                case Success(value) if HU.syntacticallyValidity(value).isSuccess => history.testApplicable(value) match {
+                  case Failure(ex: RecoverableModifierError) =>
+                    logger.info(s"Header: ${value.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
+                      s"RecoverableModifierError so continue working with this modifier.")
+                    headersCollection :+ value
+                  case Failure(ex) =>
+                    logger.info(s"Header: ${value.encodedId} after testApplicable has: ${ex.getMessage}. This is " +
+                      s"unhandled exception so reject this modifier and ban peer: $remote")
+                    nodeViewSync ! BanPeer(remote, SemanticallyInvalidModifier)
+                    receivedModifiers -= toKey(id)
+                    headersCollection
+                  case Success(_) =>
+                    logger.info(s"Header: ${value.encodedId} after testApplicable is correct.")
+                    headersCollection :+ value
+                }
                 case Success(header) =>
                   logger.info(s"Header with id: ${header.encodedId} invalid cause of:" +
-                    s" ${HU.semanticValidity(header)} && ${HU.syntacticallyValidity(header)}")
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                    s" ${HU.syntacticallyValidity(header)}. Ban peer: $remote")
+                  nodeViewSync ! BanPeer(remote, SyntacticallyInvalidModifier)
                   receivedModifiers -= toKey(id)
                   headersCollection
                 case Failure(ex) =>
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  nodeViewSync ! BanPeer(remote, InvalidModifierFromNetwork)
                   receivedModifiers -= toKey(id)
                   logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
                   headersCollection
@@ -310,7 +341,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (!isBlockChainSynced) peersCollection.get(peer.socketAddress.getAddress).exists(p => p._2 != Younger)
       else peersCollection.contains(peer.socketAddress.getAddress)
     if (mTypeId != Transaction.modifierTypeId)
-      logger.debug(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
+      logger.info(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
         s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition.")
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
@@ -321,7 +352,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
       if (notYetRequested.nonEmpty) {
         if (mTypeId != Transaction.modifierTypeId)
-          logger.debug(s"Send request to ${peer.socketAddress.getAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
+          logger.info(s"Send request to ${peer.socketAddress.getAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
         val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
@@ -583,8 +614,9 @@ object DeliveryManager {
             nodeViewHolderRef: ActorRef,
             networkControllerRef: ActorRef,
             settings: EncryAppSettings,
-            memoryPoolRef: ActorRef): Props =
-    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef))
+            memoryPoolRef: ActorRef,
+            nodeViewSync: ActorRef): Props =
+    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef, nodeViewSync))
 
   class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

@@ -58,39 +58,7 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
   override def receive: Receive = setupConnectionsLogic
     .orElse(networkMessagesProcessingLogic)
     .orElse(banPeersLogic)
-    .orElse {
-      case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
-
-      case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
-
-      case SendToNetwork(message, strategy) =>
-        def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
-        val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, f).toSeq
-        strategy.choose(peers).foreach { peer =>
-          logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
-          peer.handlerRef ! message
-        }
-
-      case SendLocalSyncInfo => sendSyncInfo()
-
-      case GetConnectedPeers =>
-        def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
-        val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, f).toSeq
-        sender() ! peers
-
-      case GetInfoAboutConnectedPeers =>
-        def f(add: InetSocketAddress, info: PeerInfo): (InetSocketAddress, PeerInfo) = add -> info
-        val peers: Map[InetSocketAddress, PeerInfo] = connectedPeers.getPeersF((_, _) => true, f).toMap
-        sender() ! peers
-
-      case PeerFromCli(peer) =>
-        if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer) && connectedPeers.contains(peer)) {
-          outgoingConnections += peer
-          sender() ! PeerForConnection(peer)
-        }
-
-      case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
-    }
+    .orElse(additionalMessages)
 
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
@@ -182,6 +150,40 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
         remote.handlerRef ! PeersNetworkMessage(peers)
     }
+  }
+
+  def additionalMessages: Receive = {
+    case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
+
+    case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
+
+    case SendToNetwork(message, strategy) =>
+      def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
+      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, f).toSeq
+      strategy.choose(peers).foreach { peer =>
+        logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
+        peer.handlerRef ! message
+      }
+
+    case SendLocalSyncInfo => sendSyncInfo()
+
+    case GetConnectedPeers =>
+      def f(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
+      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, f).toSeq
+      sender() ! peers
+
+    case GetInfoAboutConnectedPeers =>
+      def f(add: InetSocketAddress, info: PeerInfo): (InetSocketAddress, PeerInfo) = add -> info
+      val peers: Map[InetSocketAddress, PeerInfo] = connectedPeers.getPeersF((_, _) => true, f).toMap
+      sender() ! peers
+
+    case PeerFromCli(peer) =>
+      if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer) && connectedPeers.contains(peer)) {
+        outgoingConnections += peer
+        sender() ! PeerForConnection(peer)
+      }
+
+    case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
   }
 
   def banPeersLogic: Receive = {
