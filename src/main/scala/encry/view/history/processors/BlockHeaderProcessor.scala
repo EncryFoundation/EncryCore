@@ -269,6 +269,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       .filter(h => !isInBestChain(h))
     val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
       val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
+      headersCacheIndexes =
+        headersCacheIndexes.updated(header.height, header.id +: otherIds)
       heightIdsKey(header.height) -> StorageValue @@ (Seq(header.id) ++ otherIds).flatten.toArray
     }
     forkIds :+ self
