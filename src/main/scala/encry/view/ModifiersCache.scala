@@ -68,11 +68,16 @@ object ModifiersCache extends StrictLogging {
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
-      case Failure(_: RecoverableModifierError) => false
-      case Failure(_: MalformedModifierError) =>
+      case Failure(er: RecoverableModifierError) =>
+        logger.info(s"Err: ${er.message} for mod: ${Algos.encode(key.toArray)}")
+        false
+      case Failure(er: MalformedModifierError) =>
+        logger.info(s"Err: ${er.message} for mod: ${Algos.encode(key.toArray)}")
         remove(key)
         false
-      case Failure(_) => false
+      case Failure(er) =>
+        logger.info(s"Err: ${er.getMessage} for mod: ${Algos.encode(key.toArray)}")
+        false
       case m => m.isSuccess
     })
 
@@ -83,7 +88,7 @@ object ModifiersCache extends StrictLogging {
             case headerKey if isApplicable(headerKey) => headerKey
           }
         case None =>
-          logger.debug(s"Can't find headers at height $height in cache")
+          logger.info(s"Can't find headers at height $height in cache")
           List.empty[Key]
       }
     }
@@ -100,7 +105,7 @@ object ModifiersCache extends StrictLogging {
         //case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
-          //logger.info(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
+          logger.info(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
