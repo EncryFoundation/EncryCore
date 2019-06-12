@@ -269,8 +269,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       .filter(h => !isInBestChain(h))
     val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
       val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
-      headersCacheIndexes =
-        headersCacheIndexes.updated(header.height, header.id +: otherIds)
       heightIdsKey(header.height) -> StorageValue @@ (Seq(header.id) ++ otherIds).flatten.toArray
     }
     forkIds :+ self
@@ -306,12 +304,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.
     */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = {
-    headersCacheIndexes.getOrElse(height, historyStorage.store
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] =
+    historyStorage.store
       .get(heightIdsKey(height))
       .map{elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq}
-      .getOrElse(Seq.empty[ModifierId]))
-  }
+      .getOrElse(Seq.empty[ModifierId])
 
   /**
     * @param limit       - maximum length of resulting HeaderChain

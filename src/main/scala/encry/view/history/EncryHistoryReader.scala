@@ -76,7 +76,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     if (isEmpty) info.startingPoints
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
-      val startId: ModifierId = headersCacheIndexes.getOrElse(heightFrom, headerIdsAtHeight(heightFrom)).head
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = headersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
@@ -87,7 +87,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
       val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
       val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
-      val startId: ModifierId = headersCacheIndexes.getOrElse(heightFrom, headerIdsAtHeight(heightFrom)).head
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
       val startHeader: Header = headersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
       headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers.map(h => Header.modifierTypeId -> h.id)
@@ -100,7 +100,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     @tailrec
     def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
-        .flatMap { h => headersCacheIndexes.getOrElse(h + 1, headerIdsAtHeight(h + 1))}
+        .flatMap { h => headerIdsAtHeight(h + 1)}
         .flatMap { id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)) }
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
