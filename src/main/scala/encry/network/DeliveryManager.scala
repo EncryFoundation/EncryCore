@@ -23,11 +23,11 @@ import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.{Failure, Random, Success}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import encry.network.BlackList.{InvalidModifierFromNetwork, SemanticallyInvalidModifier, SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
-import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, RequestPeersForFirstSyncInfo, SyncInfoDone, UpdatedPeersCollection}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, RequestPeersForFirstSyncInfo, UpdatedPeersCollection}
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.view.mempool.Mempool.{RequestForTransactions, TransactionsFromRemote}
@@ -158,7 +158,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
           receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot { case (modId, _) => history.contains(modId) }.toSeq
-
+        val start = System.currentTimeMillis()
+        logger.info(s"\n\nGot DataFromPeer with ${modifiers.size} modifiers. Starting parsing and validation\n\n")
         typeId match {
           case Payload.modifierTypeId =>
             val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, (id, bytes)) =>
@@ -248,6 +249,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
             logger.info(s"Sending to node mempool parsed transactions: ${transactions.map(_.encodedId)}.")
             memoryPoolRef ! TransactionsFromRemote(transactions)
         }
+        logger.info(s"Finished parsing on DM. Time: ${(System.currentTimeMillis() - start) / 1000}.")
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }

@@ -36,6 +36,8 @@ object BlackList {
   case object SentNetworkMessageWithTooManyModifiers extends BanReason
   case object InvalidNetworkMessage extends BanReason
   case object InvalidModifierFromNetwork extends BanReason
+  case object PeerUnavailable extends BanReason
+  case object ExpiredNumberOfConnections extends BanReason
 
   final case class BanTime(time: Long) extends AnyVal
 

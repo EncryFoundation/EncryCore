@@ -80,7 +80,7 @@ class NetworkController(settings: EncryAppSettings,
       logger.info(s"Network controller got new peer for connection: $peer. Trying to set connection with remote...")
       IO(Tcp) ! Connect(
         peer,
-        None,//externalSocketAddress,
+        None,
         KeepAlive(true) :: Nil,
         Some(settings.network.connectionTimeout),
         pullMode = true
