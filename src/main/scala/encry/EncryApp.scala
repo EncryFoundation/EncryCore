@@ -1,9 +1,15 @@
 package encry
 
+import java.net.InetAddress
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpResponse
+import akka.http.scaladsl.server.ExceptionHandler
+import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi
+import encry.api.http.{ApiRoute, CompositeHttpService, DataHolderForApi}
+import encry.api.http.routes._
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
 import encry.local.miner.Miner
@@ -17,15 +23,17 @@ import encry.view.NodeViewHolder
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
-
+import org.encryfoundation.common.utils.Algos
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
+import scala.io.Source
 import scala.language.postfixOps
 
 object EncryApp extends App with StrictLogging {
 
   implicit val system: ActorSystem = ActorSystem()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
@@ -36,10 +44,41 @@ object EncryApp extends App with StrictLogging {
 
   lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
 
+  if (settings.restApi.enabled.getOrElse(false)) {
+    import akka.http.scaladsl.model.StatusCodes._
+    import akka.http.scaladsl.server.Directives._
+
+    val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
+    val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
+      .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
+
+    implicit def apiExceptionHandler: ExceptionHandler = ExceptionHandler {
+      case e: Exception => extractUri { uri =>
+        logger.info(s"Request to $uri could not be handled normally due to: $e")
+        complete(HttpResponse(InternalServerError, entity = "Internal server error"))
+      }
+    }
+
+    val apiRoutes: Seq[ApiRoute] = Seq(
+      UtilsApiRoute(settings.restApi),
+      PeersApiRoute(settings.restApi, dataHolderForApi),
+      InfoApiRoute(dataHolderForApi, settings, nodeId, timeProvider),
+      HistoryApiRoute(dataHolderForApi, settings, nodeId, settings.node.stateMode),
+      TransactionsApiRoute(dataHolderForApi, memoryPool,  settings.restApi, settings.node.stateMode),
+      StateInfoApiRoute(dataHolderForApi, settings.restApi, settings.node.stateMode),
+      WalletInfoApiRoute(dataHolderForApi, settings.restApi)
+    )
+    Http().bindAndHandle(
+      CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
+      settings.restApi.bindAddress.getAddress.getHostAddress,
+      settings.restApi.bindAddress.getPort)
+  }
+
   lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
-  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner)
+  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner, influxRef)
     .withDispatcher("mempool-dispatcher"))
-  lazy val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
+  logger.info(s"Node view holder starting...")
+   val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
     .withMailbox("nvh-mailbox"), "nodeViewHolder")
 
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer

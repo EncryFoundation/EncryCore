@@ -1,13 +1,14 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.{logger, _}
 import encry.consensus.History.ProgressInfo
 import encry.network.AuxiliaryHistoryHolder
 import encry.network.AuxiliaryHistoryHolder.NewHistory
@@ -28,6 +29,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -39,6 +41,8 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
                                                          dataHolder: ActorRef) extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
+
+  logger.info(s"Node view holder started.")
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -55,6 +59,8 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
     ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
   })
+
+  override def preStart(): Unit = logger.info(s"Node view holder started.")
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()

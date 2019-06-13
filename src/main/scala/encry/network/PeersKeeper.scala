@@ -40,6 +40,7 @@ class PeersKeeper(settings: EncryAppSettings,
   var outgoingConnections: Set[InetSocketAddress] = Set.empty
 
   override def preStart(): Unit = {
+    logger.info(s"Peers keeper started")
     nodeViewSync ! RegisterMessagesHandler(Seq(
       PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
@@ -65,7 +66,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connect. Current available peers are: " +
-        s"${availablePeers.keys.mkString(",")}. Current black list is: ${
+        s"${availablePeers.mkString(",")}. Current black list is: ${
           blackList.getBannedPeersAndReasons.mkString(",")
         }")
       availablePeers

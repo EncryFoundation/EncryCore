@@ -26,6 +26,8 @@ class NetworkController(settings: EncryAppSettings,
   import context.dispatcher
   import context.system
 
+  override def preStart(): Unit = logger.info(s"Network controller started")
+
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress
   logger.info(s"Declared address is: $externalSocketAddress.")

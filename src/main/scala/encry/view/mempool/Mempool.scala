@@ -27,8 +27,10 @@ import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.Success
 
-class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef) extends Actor
-  with StrictLogging {
+class Mempool(settings: EncryAppSettings,
+              ntp: NetworkTimeProvider,
+              minerRef: ActorRef,
+              influx: Option[ActorRef]) extends Actor with StrictLogging {
 
   type WrappedIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -57,7 +59,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
             settings.node.mempoolTxSendingInterval, self, TickForSendTransactionsToMiner)
           context.system.scheduler.schedule(
             5.seconds,
-            5.seconds)(context.system.actorSelection("user/statsSender") ! MempoolStat(memoryPool.size))
+            5.seconds)(influx.foreach(_ ! MempoolStat(memoryPool.size)))
           context.become(messagesHandler(utxoState))
         case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
       }
@@ -196,8 +198,8 @@ object Mempool {
                                           modifierTypeId: ModifierTypeId,
                                           modifierIds: Seq[ModifierId])
 
-  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef): Props =
-    Props(new Mempool(settings, ntp, minerRef))
+  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef, influx: Option[ActorRef]): Props =
+    Props(new Mempool(settings, ntp, minerRef, influx))
 
   class MempoolPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
