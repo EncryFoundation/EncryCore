@@ -116,17 +116,17 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
             logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
-          sendResponse(remote, invData._1, inRequestCache.values.toSeq)
+          //sendResponse(remote, invData._1, inRequestCache.values.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
             if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote, nonInRequestCache)
             else Option(encryHistory).foreach { reader =>
               invData._1 match {
                 case typeId: ModifierTypeId => nonInRequestCache.foreach(id =>
-                  reader.modifierById(id).foreach { mod =>
+                  reader.modifierBytesById(id).foreach { mod =>
                     if (typeId != Transaction.modifierTypeId)
                       logger.debug(s"Trigger sendResponse to $remote for modifier $mod of type: $typeId.")
-                    sendResponse(remote, invData._1, Seq(mod))
+                    sendResponse(remote, invData._1, Seq(id -> mod))
                   }
                 )
               }
@@ -149,7 +149,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         } //todo: Ban node that send payload id?
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
-    case TxsForNVSH(remote, txs) => sendResponse(remote, Transaction.modifierTypeId, txs)
+    case TxsForNVSH(remote, txs) => sendResponse(
+      remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
+    )
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
         s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager." +
@@ -164,27 +166,21 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
-  def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiers: Seq[NodeViewModifier]): Unit =
-    if (modifiers.nonEmpty) {
+  def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiersBytes: Seq[(ModifierId, Array[Byte])]): Unit =
+    if (modifiersBytes.nonEmpty) {
       if (typeId != Transaction.modifierTypeId)
-        logger.debug(s"Sent modifiers to $peer size is: ${modifiers.length}|${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")}")
+        logger.debug(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
       typeId match {
         case Header.modifierTypeId =>
-          val modsB: Seq[(ModifierId, Array[Byte])] =
-            modifiers.map { case h: Header => h.id -> HeaderProtoSerializer.toProto(h).toByteArray }
-          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for HEADERS with ${modsB.size} headers." +
-            s" \n Headers are: ${modsB.map(x => Algos.encode(x._1)).mkString(",")}.")
-          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for HEADERS with ${modifiersBytes.size} headers." +
+            s" \n Headers are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
+          peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Payload.modifierTypeId =>
-          val modsB: Seq[(ModifierId, Array[Byte])] =
-            modifiers.map { case h: Payload => h.id -> PayloadProtoSerializer.toProto(h).toByteArray }
-          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modsB.size} payloads." +
-            s" \n Payloads are: ${modsB.map(x => Algos.encode(x._1)).mkString(",")}.")
-          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modsB.toMap)
+          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
+            s" \n Payloads are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
+          peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Transaction.modifierTypeId =>
-          peer.handlerRef ! ModifiersNetworkMessage(modifiers.head.modifierTypeId -> modifiers.map {
-            case h: Transaction => h.id -> TransactionProtoSerializer.toProto(h).toByteArray
-          }.toMap)
+          peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
       }
     }
 
