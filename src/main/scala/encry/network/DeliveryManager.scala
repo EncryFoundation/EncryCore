@@ -89,6 +89,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case Younger | Fork if isBlockChainSynced => sendInvData(remote, status, extOpt)
         case _ =>
       }
+    case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
+      checkDelivery(peer, modifierTypeId, modifierId)
     case HandshakedPeer(remote) => syncTracker.updateStatus(remote, Unknown)
     case DisconnectedPeer(remote) => syncTracker.clearStatus(remote)
     case CheckModifiersToDownload =>
@@ -246,7 +248,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
               context.system
-                .scheduler.scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, id)) -> 1)
+                .scheduler.scheduleOnce(settings.network.deliveryTimeout)(self ! CheckDelivery(peer, mTypeId, id)) -> 1)
           }
         expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
       }
@@ -286,7 +288,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
             toKey(modId),
             context.system.scheduler
-              .scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, modId)) -> (attempts + 1)
+              .scheduleOnce(settings.network.deliveryTimeout)(self ! CheckDelivery(peer, mTypeId, modId)) -> (attempts + 1)
           ))
         case None =>
           expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
@@ -478,6 +480,7 @@ object DeliveryManager {
 
   case object FullBlockChainIsSynced
   case class  CheckModifiersWithQueueSize(size: Int)
+  final case class CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId)
 
   def props(influxRef: Option[ActorRef],
             nodeViewHolderRef: ActorRef,
