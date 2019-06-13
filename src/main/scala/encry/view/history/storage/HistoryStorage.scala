@@ -29,9 +29,9 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def modifiersBytesById(id: ModifierId): Option[Array[Byte]] = store match {
     case iodb: IODBHistoryWrapper =>
-      iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data)
+      iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.tail)
     case _: VLDBWrapper =>
-      store.get(StorageKey @@ id.untag(ModifierId))
+      store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
   }
 
 
