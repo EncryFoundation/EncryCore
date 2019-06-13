@@ -5,6 +5,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.api.http.DataHolderForApi.UpdatingConnectedPeers
 import encry.network.BlackList.{BanReason, ExpiredNumberOfConnections, SentPeersMessageWithoutRequest}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.PeerConnectionHandler._
@@ -19,11 +20,10 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import scala.concurrent.duration._
-import scala.util.Random
 
-
-
-class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Actor with StrictLogging {
+class PeersKeeper(settings: EncryAppSettings,
+                  nodeViewSync: ActorRef,
+                  dataHolder: ActorRef) extends Actor with StrictLogging {
 
   import context.dispatcher
 
@@ -51,6 +51,9 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
     context.system.scheduler.schedule(10.seconds, 10.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersF((_, _) => true, getPeersForDMF).toMap)
     )
+    context.system.scheduler.schedule(5.seconds, 5.seconds)(
+      dataHolder ! UpdatingConnectedPeers(connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq)
+    )
   }
 
   override def receive: Receive = setupConnectionsLogic
@@ -62,10 +65,11 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connect. Current available peers are: " +
-        s"${availablePeers.keys.mkString(",")}.")
-      Random.shuffle(availablePeers.filterNot(p =>
-        awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
-      )
+        s"${availablePeers.keys.mkString(",")}. Current black list is: ${
+          blackList.getBannedPeersAndReasons.mkString(",")
+        }")
+      availablePeers
+        .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
         .headOption
         .foreach { case (peer, _) =>
           outgoingConnections += peer
@@ -99,7 +103,7 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
-        s" Is banned: $notBannedPeer, Is connected: $notConnectedYet.")
+        s" Didn't banned: $notBannedPeer, Didn't connected: $notConnectedYet.")
 
     case VerifyConnection(remote, _) =>
       logger.info(s"Peers keeper got request for verifying the connection but current number of max connection is " +
@@ -130,22 +134,24 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       outgoingConnections -= peer
       awaitingHandshakeConnections -= peer
       val connectionAttempts: Int = availablePeers.getOrElse(peer, 0) + 1
-      if (connectionAttempts > settings.network.maxNumberOfReConnections) {
-        logger.info(s"Banning peer: $peer for $ExpiredNumberOfConnections.")
+      if (connectionAttempts >= settings.network.maxNumberOfReConnections) {
+        logger.info(s"Banning peer: $peer for ExpiredNumberOfConnections.")
         blackList.banPeer(ExpiredNumberOfConnections, peer.getAddress)
-      }
-      availablePeers = availablePeers.updated(peer, connectionAttempts)
+        availablePeers -= peer
+      } else availablePeers = availablePeers.updated(peer, connectionAttempts)
   }
 
   def networkMessagesProcessingLogic: Receive = {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers => peers
-        .filterNot(p => blackList.contains(p.getAddress) || connectedPeers.contains(p) || isLocal(p))
+        .filterNot(p =>
+          blackList.contains(p.getAddress) || connectedPeers.contains(p) || isLocal(p) || availablePeers.contains(p)
+        )
         .foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           availablePeers = availablePeers.updated(p, 0)
         }
-        logger.info(s"New available peers are: ${availablePeers.keys.mkString(",")}.")
+        logger.info(s"New available peers collection are: ${availablePeers.keys.mkString(",")}.")
 
       case PeersNetworkMessage(_) =>
         logger.info(s"Got PeersNetworkMessage from $remote, but connectWithOnlyKnownPeers: $connectWithOnlyKnownPeers, " +
@@ -159,6 +165,7 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
         val peers: Seq[InetSocketAddress] = connectedPeers.getPeersF(getPeersForRemoteP, getPeersForRemoteF).toSeq
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
+        logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
         remote.handlerRef ! PeersNetworkMessage(peers)
     }
   }
@@ -180,14 +187,6 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
       }
 
     case SendLocalSyncInfo => sendSyncInfo()
-
-    case GetConnectedPeers =>
-      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq
-      sender() ! peers
-
-    case GetInfoAboutConnectedPeers =>
-      val peers: Map[InetSocketAddress, PeerInfo] = connectedPeers.getPeersF((_, _) => true, getPeersAndInfoF).toMap
-      sender() ! peers
 
     case PeerFromCli(peer) =>
       if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer) && connectedPeers.contains(peer)) {
@@ -229,8 +228,8 @@ class PeersKeeper(settings: EncryAppSettings, nodeViewSync: ActorRef) extends Ac
 
   def getPeersForRemoteF(add: InetSocketAddress, info: PeerInfo): InetSocketAddress = add
 
-  def getPeersForDMF(address: InetSocketAddress, info: PeerInfo): (InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)) =
-    address.getAddress -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
+  def getPeersForDMF(address: InetSocketAddress, info: PeerInfo): (InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)) =
+    address -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
 }
 
 object PeersKeeper {
@@ -259,19 +258,19 @@ object PeersKeeper {
 
   final case class PeersForSyncInfo(peers: Seq[ConnectedPeer])
 
-  final case class UpdatedPeersCollection(peers: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
+  final case class UpdatedPeersCollection(peers: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
 
 
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
 
 
-  case object GetConnectedPeers
-
   case object GetKnownPeers
 
   case object GetInfoAboutConnectedPeers
 
-  def props(settings: EncryAppSettings, nodeViewSync: ActorRef): Props = Props(new PeersKeeper(settings, nodeViewSync))
+  def props(settings: EncryAppSettings,
+            nodeViewSync: ActorRef,
+            dataHolder: ActorRef): Props = Props(new PeersKeeper(settings, nodeViewSync, dataHolder))
 
   class PeersKeeperPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
@@ -286,4 +285,5 @@ object PeersKeeper {
         case PoisonPill => 4
         case otherwise => 3
       })
+
 }

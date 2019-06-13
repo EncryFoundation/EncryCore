@@ -35,7 +35,8 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef,
-                                                         influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+                                                         influxRef: Option[ActorRef],
+                                                         dataHolder: ActorRef) extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
 
@@ -47,6 +48,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
   )
 
   memoryPoolRef ! UpdatedState(nodeView.state)
+
+  dataHolder ! UpdatedState(nodeView.state)
+  dataHolder ! UpdatedHistory(nodeView.history)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
     ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
@@ -68,11 +72,13 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifiers) => modifiers.foreach { mod =>
-      val isInHistory: Boolean = nodeView.history.contains(mod.id)
+      //todo i'm checking this in modifiers validator. Do i really need to check this one more time
+//      val isInHistory: Boolean = nodeView.history.contains(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
-      if (isInHistory || isInCache)
+//      if (isInHistory || isInCache)
+      if (isInCache)
         logger.info(s"Received payload ${Algos.encode(mod.id)} can't be placed into cache cause of: " +
-          s"inHistory: $isInHistory, inCache: $isInCache.")
+          s"inCache: $isInCache.")
       else ModifiersCache.put(key(mod.id), mod, nodeView.history)
     }
       computeApplications()
@@ -436,9 +442,9 @@ object NodeViewHolder {
         case otherwise => 1
       })
 
-  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef]): Props =
+  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef): Props =
     settings.node.stateMode match {
-      case StateMode.Digest => Props(new NodeViewHolder[DigestState](memoryPoolRef, influxRef))
-      case StateMode.Utxo   => Props(new NodeViewHolder[UtxoState](memoryPoolRef, influxRef))
+      case StateMode.Digest => Props(new NodeViewHolder[DigestState](memoryPoolRef, influxRef, dataHolder))
+      case StateMode.Utxo   => Props(new NodeViewHolder[UtxoState](memoryPoolRef, influxRef, dataHolder))
     }
 }

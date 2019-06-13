@@ -21,8 +21,4 @@ trait ApiRoute extends Directives with FailFastCirceSupport with PredefinedFromE
   def context: ActorRefFactory
 
   def route: Route
-
-  protected def jsonRoute(fn: ScorexApiResponse, method: Directive0): Route = method {
-    withCors(complete(fn))
-  }
 }

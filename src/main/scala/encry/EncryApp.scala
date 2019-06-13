@@ -1,15 +1,9 @@
 package encry
 
-import java.net.InetAddress
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
-import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.HttpResponse
-import akka.http.scaladsl.server.ExceptionHandler
-import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.routes._
-import encry.api.http.{ApiRoute, CompositeHttpService, PeersApiRoute, UtilsApiRoute}
+import encry.api.http.DataHolderForApi
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.StartListening
 import encry.local.miner.Miner
@@ -19,41 +13,37 @@ import encry.settings.EncryAppSettings
 import encry.stats.{KafkaActor, StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.Mempool
-import encry.view.{NodeViewHolder, ReadersHolder}
+import encry.view.NodeViewHolder
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
-import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
-import scala.io.Source
 import scala.language.postfixOps
 
 object EncryApp extends App with StrictLogging {
 
   implicit val system: ActorSystem = ActorSystem()
-  implicit val materializer: ActorMaterializer = ActorMaterializer()
   implicit val ec: ExecutionContextExecutor = system.dispatcher
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
-  val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
-  val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
-    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
   val influxRef: Option[ActorRef] =
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None
-  lazy val miner: ActorRef = system.actorOf(Props[Miner], "miner")
+
+  lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
+
+  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
   lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner)
     .withDispatcher("mempool-dispatcher"))
-  lazy val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef)
+  lazy val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
     .withMailbox("nvh-mailbox"), "nodeViewHolder")
 
-  val readersHolder: ActorRef = system.actorOf(Props[ReadersHolder], "readersHolder")
-
   lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
-    .props(influxRef, nodeViewHolder, settings, memoryPool)
+    .props(influxRef, nodeViewHolder, settings, memoryPool, dataHolderForApi)
     .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
 
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
@@ -70,33 +60,6 @@ object EncryApp extends App with StrictLogging {
   }
 
   system.actorOf(Props[Zombie], "zombie")
-
-  if (settings.restApi.enabled.getOrElse(false)) {
-    import akka.http.scaladsl.model.StatusCodes._
-    import akka.http.scaladsl.server.Directives._
-    implicit def apiExceptionHandler: ExceptionHandler =
-      ExceptionHandler {
-        case e: Exception =>
-          extractUri { uri =>
-            logger.info(s"Request to $uri could not be handled normally due to: $e")
-            complete(HttpResponse(InternalServerError, entity = "Internal server error"))
-          }
-      }
-
-    val apiRoutes: Seq[ApiRoute] = Seq(
-      UtilsApiRoute(settings.restApi),
-      PeersApiRoute(settings.restApi),
-      InfoApiRoute(readersHolder, miner, settings, nodeId, memoryPool, timeProvider),
-      HistoryApiRoute(readersHolder, miner, settings, nodeId, settings.node.stateMode),
-      TransactionsApiRoute(readersHolder, memoryPool, settings.restApi, settings.node.stateMode),
-      StateInfoApiRoute(readersHolder, nodeViewHolder, settings.restApi, settings.node.stateMode),
-      WalletInfoApiRoute(nodeViewHolder, settings.restApi)
-    )
-    Http().bindAndHandle(
-      CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
-      settings.restApi.bindAddress.getAddress.getHostAddress,
-      settings.restApi.bindAddress.getPort)
-  }
 
   def forceStopApplication(code: Int = 0): Nothing = {
     system.registerOnTermination {

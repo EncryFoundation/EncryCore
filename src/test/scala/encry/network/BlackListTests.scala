@@ -71,7 +71,7 @@ class BlackListTests extends WordSpecLike
    */
   "Peers keeper" should {
     "handle ban peer message correctly" in {
-      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settings, TestProbe().ref))
+      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settings, TestProbe().ref, TestProbe().ref))
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
       val connectedPeer: ConnectedPeer = ConnectedPeer(
@@ -85,7 +85,7 @@ class BlackListTests extends WordSpecLike
       peersKeeper.underlyingActor.blackList.contains(address.getAddress) shouldBe true
     }
     "cleanup black list by scheduler correctly" in {
-      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settings, TestProbe().ref))
+      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settings, TestProbe().ref, TestProbe().ref))
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
       val connectedPeer: ConnectedPeer = ConnectedPeer(
@@ -99,7 +99,7 @@ class BlackListTests extends WordSpecLike
       peersKeeper.underlyingActor.blackList.contains(address.getAddress) shouldBe false
     }
     "don't remove peer from black list before ban time expired" in {
-      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settings, TestProbe().ref))
+      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settings, TestProbe().ref, TestProbe().ref))
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
       val connectedPeer: ConnectedPeer = ConnectedPeer(
@@ -157,12 +157,12 @@ class BlackListTests extends WordSpecLike
       val nodeViewSync: TestProbe = TestProbe()
       val deliveryManager: TestActorRef[DeliveryManager] =
         TestActorRef[DeliveryManager](DeliveryManager
-          .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref, nodeViewSync.ref))
+          .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref, nodeViewSync.ref, TestProbe().ref))
       deliveryManager ! UpdatedHistory(history1)
       deliveryManager ! StartMining
       deliveryManager ! FullBlockChainIsSynced
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(connectedPeer.socketAddress.getAddress -> (connectedPeer, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(connectedPeer.socketAddress -> (connectedPeer, Older, InitialPriority()))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 

@@ -1,10 +1,6 @@
 package encry.network
 
-import java.net.InetAddress
-
-import HeaderProto.HeaderProtoMessage
-import PayloadProto.PayloadProtoMessage
-import TransactionProto.TransactionProtoMessage
+import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -15,30 +11,26 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
-import encry.modifiers.history.{HeaderUtils => HU, PayloadUtils => PU}
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
-import scala.util.{Failure, Random, Success}
+import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.BlackList.{InvalidModifierFromNetwork, SemanticallyInvalidModifier, SentNetworkMessageWithTooManyModifiers, SyntacticallyInvalidModifier}
-import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, PeersForSyncInfo, RequestPeersForFirstSyncInfo, UpdatedPeersCollection}
+import encry.network.BlackList.SentNetworkMessageWithTooManyModifiers
+import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, ModifiersIdsForRemove}
+import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.view.mempool.Mempool.{RequestForTransactions, TransactionsFromRemote}
-import org.encryfoundation.common.modifiers.history.{Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import encry.view.mempool.Mempool.RequestForTransactions
+import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-import org.encryfoundation.common.validation.RecoverableModifierError
-
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -46,7 +38,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       networkControllerRef: ActorRef,
                       settings: EncryAppSettings,
                       memoryPoolRef: ActorRef,
-                      nodeViewSync: ActorRef) extends Actor with StrictLogging {
+                      nodeViewSync: ActorRef,
+                      downloadedModifiersValidator: ActorRef) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -55,7 +48,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * If block chain is synced, we will put all headers ids and peers who sent us this headers to this collection
     * in order to ask payload directly from peers who sent us appropriate header.
     */
-  var headersForPriorityRequest: Map[ModifierIdAsKey, Seq[InetAddress]] = Map.empty
+  var headersForPriorityRequest: Map[ModifierIdAsKey, Seq[InetSocketAddress]] = Map.empty
   /**
     * Collection with spam modifiers.
     * Modifier considered spam if we receive it but it doesn't contain in expected modifiers collection.
@@ -70,9 +63,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * Collection of expected modifiers ids.
     * Modifier considered expected if we sent request for it.
     */
-  var expectedModifiers: Map[InetAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = Map.empty
+  var expectedModifiers: Map[InetSocketAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = Map.empty
 
-  var peersCollection: Map[InetAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
+  var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
   val priorityCalculator: PrioritiesCalculator = new PrioritiesCalculator(settings)
 
@@ -97,13 +90,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
   }
 
   def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
+    //todo check this operation
+    case ModifiersIdsForRemove(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
+
     case UpdatedPeersCollection(newPeers) =>
       logger.info(s"Delivery manager got updated peers collection.")
       peersCollection = newPeers
 
     case ConnectionStopped(peer) =>
-      peersCollection -= peer.getAddress
-      logger.info(s"Removed peer: ${peer.getAddress} from peers collection on Delivery Manager." +
+      peersCollection -= peer
+      logger.info(s"Removed peer: $peer from peers collection on Delivery Manager." +
         s" Current peers are: ${peersCollection.mkString(",")}")
 
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
@@ -158,98 +154,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
           receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot { case (modId, _) => history.contains(modId) }.toSeq
-        val start = System.currentTimeMillis()
-        logger.info(s"\n\nGot DataFromPeer with ${modifiers.size} modifiers. Starting parsing and validation\n\n")
-        typeId match {
-          case Payload.modifierTypeId =>
-            val payloads: Seq[Payload] = filteredModifiers.foldLeft(Seq.empty[Payload]) { case (payloadsColl, (id, bytes)) =>
-              PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)) match {
-                case Success(payload) if PU.syntacticallyValidity(payload).isSuccess => history.testApplicable(payload) match {
-                  case Failure(ex: RecoverableModifierError) =>
-                    logger.info(s"payload: ${payload.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
-                      s"RecoverableModifierError so continue working with this modifier.")
-                    payloadsColl :+ payload
-                  case Failure(ex) =>
-                    logger.info(s"payload: ${payload.encodedId} after testApplicable has: ${ex.getMessage}. This is " +
-                      s"unhandled exception so reject this modifier and ban peer: $remote")
-                    nodeViewSync ! BanPeer(remote, SemanticallyInvalidModifier)
-                    receivedModifiers -= toKey(id)
-                    payloadsColl
-                  case Success(_) =>
-                    logger.info(s"Header: ${payload.encodedId} after testApplicable is correct.")
-                    payloadsColl :+ payload
-                }
-                case Success(payload) =>
-                  logger.info(s"Payload with id: ${payload.encodedId} invalid cause of: " +
-                    s"${PU.syntacticallyValidity(payload)}")
-                  nodeViewSync ! BanPeer(remote, SyntacticallyInvalidModifier)
-                  receivedModifiers -= toKey(id)
-                  payloadsColl
-                case Failure(ex) =>
-                  nodeViewSync ! BanPeer(remote, SyntacticallyInvalidModifier)
-                  receivedModifiers -= toKey(id)
-                  logger.info(s"Received payload from $remote can't be parsed cause of: ${ex.getMessage}.")
-                  payloadsColl
-              }
-            }
-            logger.info(s"Sending to node view holder parsed payloads: ${payloads.map(_.encodedId)}.")
-            context.parent ! ModifiersFromRemote(payloads)
-
-          case Header.modifierTypeId =>
-            val headers = filteredModifiers.foldLeft(Seq.empty[Header]) { case (headersCollection, (id, bytes)) =>
-              HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)) match {
-                case Success(value) if HU.syntacticallyValidity(value).isSuccess => history.testApplicable(value) match {
-                  case Failure(ex: RecoverableModifierError) =>
-                    logger.info(s"Header: ${value.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
-                      s"RecoverableModifierError so continue working with this modifier.")
-                    headersCollection :+ value
-                  case Failure(ex) =>
-                    logger.info(s"Header: ${value.encodedId} after testApplicable has: ${ex.getMessage}. This is " +
-                      s"unhandled exception so reject this modifier and ban peer: $remote")
-                    nodeViewSync ! BanPeer(remote, SemanticallyInvalidModifier)
-                    receivedModifiers -= toKey(id)
-                    headersCollection
-                  case Success(_) =>
-                    logger.info(s"Header: ${value.encodedId} after testApplicable is correct.")
-                    headersCollection :+ value
-                }
-                case Success(header) =>
-                  logger.info(s"Header with id: ${header.encodedId} invalid cause of:" +
-                    s" ${HU.syntacticallyValidity(header)}. Ban peer: $remote")
-                  nodeViewSync ! BanPeer(remote, SyntacticallyInvalidModifier)
-                  receivedModifiers -= toKey(id)
-                  headersCollection
-                case Failure(ex) =>
-                  nodeViewSync ! BanPeer(remote, InvalidModifierFromNetwork)
-                  receivedModifiers -= toKey(id)
-                  logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-                  headersCollection
-              }
-            }
-            logger.info(s"Sending to node view holder parsed headers: ${headers.map(_.encodedId)}.")
-            context.parent ! ModifiersFromRemote(headers)
-
-          case Transaction.modifierTypeId =>
-            val transactions: Seq[Transaction] = filteredModifiers.foldLeft(Seq.empty[Transaction]) {
-              case (transactionsColl, (id, bytes)) =>
-                TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
-                  case Success(tx) if tx.semanticValidity.isSuccess => transactionsColl :+ tx
-                  case Success(tx) =>
-                    logger.info(s"Payload with id: ${tx.encodedId} invalid caze of: ${tx.semanticValidity}.")
-                    context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
-                    receivedModifiers -= toKey(id)
-                    transactionsColl
-                  case Failure(ex) =>
-                    context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
-                    receivedModifiers -= toKey(id)
-                    logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-                    transactionsColl
-                }
-            }
-            logger.info(s"Sending to node mempool parsed transactions: ${transactions.map(_.encodedId)}.")
-            memoryPoolRef ! TransactionsFromRemote(transactions)
-        }
-        logger.info(s"Finished parsing on DM. Time: ${(System.currentTimeMillis() - start) / 1000}.")
+        //todo check this logic
+        downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
         if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
@@ -292,16 +198,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   def checkDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId): Unit = {
     val expectedModifiersByPeer: Map[ModifierIdAsKey, (Cancellable, Int)] =
-      expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty)
+      expectedModifiers.getOrElse(peer.socketAddress, Map.empty)
     if (modifierTypeId == Transaction.modifierTypeId)
-      expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, toKey(modifierId), peer.socketAddress.getAddress)
+      expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, toKey(modifierId), peer.socketAddress)
     else expectedModifiersByPeer.find { case (id, (_, _)) => id == toKey(modifierId) } match {
       case Some((_, (_, attempts))) if attempts <= settings.network.maxDeliveryChecks =>
         logger.debug(s"Modifier ${Algos.encode(modifierId)} needed to be requested from $peer!")
         reRequestModifier(peer, modifierTypeId, modifierId, expectedModifiersByPeer)
       case Some((modId, (_, _))) =>
         logger.debug(s"Maximum number of attempts has expired. Remove modifier ${Algos.encode(modifierId)} from $peer.")
-        expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress.getAddress)
+        expectedModifiers = clearExpectedModifiersCollection(expectedModifiersByPeer, modId, peer.socketAddress)
       case _ =>
         logger.debug(s"This modifiers ${Algos.encode(modifierId)} is not contained in expectedModifiers collection from $peer.")
     }
@@ -344,21 +250,21 @@ class DeliveryManager(influxRef: Option[ActorRef],
     val firstCondition: Boolean = mTypeId == Transaction.modifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.modifierTypeId
     val thirdCondition: Boolean =
-      if (!isBlockChainSynced) peersCollection.get(peer.socketAddress.getAddress).exists(p => p._2 != Younger)
-      else peersCollection.contains(peer.socketAddress.getAddress)
+      if (!isBlockChainSynced) peersCollection.get(peer.socketAddress).exists(p => p._2 != Younger)
+      else peersCollection.contains(peer.socketAddress)
     if (mTypeId != Transaction.modifierTypeId)
       logger.info(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
         s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition.")
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
-        .getOrElse(peer.socketAddress.getAddress, Map.empty)
+        .getOrElse(peer.socketAddress, Map.empty)
 
       val notYetRequested: Seq[ModifierId] = modifierIds.filter(id => !history.contains(id)
         && !requestedModifiersFromPeer.contains(toKey(id)) && !receivedModifiers.contains(toKey(id)))
 
       if (notYetRequested.nonEmpty) {
         if (mTypeId != Transaction.modifierTypeId)
-          logger.info(s"Send request to ${peer.socketAddress.getAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
+          logger.info(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
         val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
@@ -367,7 +273,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
               context.system
                 .scheduler.scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, id)) -> 1)
           }
-        expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, requestedModIds)
+        expectedModifiers = expectedModifiers.updated(peer.socketAddress, requestedModIds)
       }
     }
   }
@@ -397,20 +303,20 @@ class DeliveryManager(influxRef: Option[ActorRef],
                         peerRequests: Map[ModifierIdAsKey, (Cancellable, Int)]): Unit =
     peerRequests.get(toKey(modId)) match {
       case Some((_, attempts)) => peersCollection.find { case (innerAddr, (_, cResult, _)) =>
-        innerAddr == peer.socketAddress.getAddress && cResult != Younger
+        innerAddr == peer.socketAddress && cResult != Younger
       } match {
         case Some((_, (cP, _, _))) =>
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
           logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
           priorityCalculator.incrementRequest(peer.socketAddress)
-          expectedModifiers = expectedModifiers.updated(peer.socketAddress.getAddress, peerRequests.updated(
+          expectedModifiers = expectedModifiers.updated(peer.socketAddress, peerRequests.updated(
             toKey(modId),
             context.system.scheduler
               .scheduleOnce(settings.network.deliveryTimeout)(schedulerChecker(peer, mTypeId, modId)) -> (attempts + 1)
           ))
         case None =>
-          expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress.getAddress)
+          expectedModifiers = clearExpectedModifiersCollection(peerRequests, toKey(modId), peer.socketAddress)
           logger.debug(s"Tried to re-ask modifier ${Algos.encode(modId)}, but this id not needed from this peer")
       }
       case _ => logger.debug(s"There is no such modifier ${Algos.encode(modId)} in expected collection.")
@@ -424,7 +330,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @return 'true' if we are expecting this modifier from this peer otherwise 'false'
     */
   def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean =
-    expectedModifiers.getOrElse(peer.socketAddress.getAddress, Map.empty).contains(toKey(mId))
+    expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
 
   /**
     * Clear the 'receivedSpamModifiers' collection
@@ -530,7 +436,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val cP = shuffle.last._1
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         if (modifierTypeId != Transaction.modifierTypeId)
-          logger.debug(s"requestModifies for peer ${cP.socketAddress.getAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
+          logger.debug(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.debug(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
@@ -563,14 +469,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
       priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
-        .getOrElse(peer.socketAddress.getAddress, Map.empty)
+        .getOrElse(peer.socketAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
       if (mTid != Transaction.modifierTypeId) receivedModifiers += toKey(mId)
-      expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress.getAddress)
+      expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
       if (isBlockChainSynced && mTid == Header.modifierTypeId) {
-        logger.debug(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress.getAddress}")
+        logger.debug(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress}")
         headersForPriorityRequest = headersForPriorityRequest
-          .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress.getAddress)
+          .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress)
       }
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
@@ -599,7 +505,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   def clearExpectedModifiersCollection(expectedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)],
                                        modifierId: ModifierIdAsKey,
-                                       peer: InetAddress): Map[InetAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = {
+                                       peer: InetSocketAddress): Map[InetSocketAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = {
     val collectionWithoutModId: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiersFromPeer - modifierId
     collectionWithoutModId match {
       case coll: Map[_, _] if coll.nonEmpty => expectedModifiers.updated(peer, coll)
@@ -621,8 +527,10 @@ object DeliveryManager {
             networkControllerRef: ActorRef,
             settings: EncryAppSettings,
             memoryPoolRef: ActorRef,
-            nodeViewSync: ActorRef): Props =
-    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings, memoryPoolRef, nodeViewSync))
+            nodeViewSync: ActorRef,
+            downloadedModifiersValidator: ActorRef): Props =
+    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings,
+      memoryPoolRef, nodeViewSync, downloadedModifiersValidator))
 
   class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
@@ -630,6 +538,10 @@ object DeliveryManager {
         case RequestFromLocal(_, _, _) => 0
 
         case OtherNodeSyncingStatus(_, _, _) => 1
+
+        case ConnectionStopped(_) => 1
+
+        case ModifiersIdsForRemove(_) => 2
 
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {

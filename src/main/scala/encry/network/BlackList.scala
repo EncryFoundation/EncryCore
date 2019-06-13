@@ -21,6 +21,8 @@ final class BlackList(settings: EncryAppSettings) {
 
   def getBannedPeers: Set[InetAddress] = blackList.keySet
 
+  def getBannedPeersAndReasons: Map[InetAddress, BanReason] = blackList.map(p => p._1 -> p._2._1)
+
   def contains(peer: InetAddress): Boolean = blackList.contains(peer)
 
 }

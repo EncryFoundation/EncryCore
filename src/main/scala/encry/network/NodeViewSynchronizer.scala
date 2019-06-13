@@ -10,6 +10,7 @@ import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
 import encry.network.BlackList.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DownloadedModifiersValidator.ModifiersIdsForRemove
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -35,9 +36,10 @@ import scala.concurrent.duration._
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
                            settings: EncryAppSettings,
-                           memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+                           memoryPoolRef: ActorRef,
+                           dataHolder: ActorRef) extends Actor with StrictLogging {
 
-  val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self)
+  val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
     .withDispatcher("peers-keeper-dispatcher"))
 
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper, self)
@@ -54,8 +56,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var historyReaderOpt: Option[EncryHistory] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
+
+  val downloadedModifiersValidator: ActorRef = context.system
+    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef)
+    .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"))
+
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings, memoryPoolRef, self)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings,
+      memoryPoolRef, self, downloadedModifiersValidator)
       .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
 
   override def preStart(): Unit = {
@@ -65,6 +73,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   }
 
   override def receive: Receive = {
+    case msg@ModifiersIdsForRemove(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>
@@ -148,6 +157,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
+      downloadedModifiersValidator ! UpdatedHistory(reader)
     case TxsForNVSH(remote, txs) => sendResponse(remote, Transaction.modifierTypeId, txs)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
@@ -235,8 +245,9 @@ object NodeViewSynchronizer {
   def props(influxRef: Option[ActorRef],
             nodeViewHolderRef: ActorRef,
             settings: EncryAppSettings,
-            memoryPoolRef: ActorRef): Props =
-    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, settings, memoryPoolRef))
+            memoryPoolRef: ActorRef,
+            dataHolder: ActorRef): Props =
+    Props(new NodeViewSynchronizer(influxRef, nodeViewHolderRef, settings, memoryPoolRef, dataHolder))
 
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

@@ -7,20 +7,19 @@ import akka.http.scaladsl.server.Route
 import encry.api.http.routes.SwaggerRoute
 import encry.settings.RESTApiSettings
 
-case class CompositeHttpService(system: ActorSystem, routes: Seq[ApiRoute], settings: RESTApiSettings, swaggerConf: String)
-  extends CorsSupport {
+case class CompositeHttpService(system: ActorSystem,
+                                routes: Seq[ApiRoute],
+                                settings: RESTApiSettings,
+                                swaggerConf: String) extends CorsSupport {
 
   implicit val actorSystem: ActorSystem = system
 
-
-  val redirectToSwagger: Route = {
-    redirect("/swagger", StatusCodes.PermanentRedirect)
-  }
+  val redirectToSwagger: Route = redirect("/swagger", StatusCodes.PermanentRedirect)
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   val compositeRoute: Route = routes.map(_.route).reduce(_ ~ _) ~
-    path("swagger") {
-      getFromResource("swagger-ui/index.html")
-    } ~ getFromResourceDirectory("swagger-ui") ~ SwaggerRoute.routes ~ redirectToSwagger
-
+    path("swagger") { getFromResource("swagger-ui/index.html") } ~
+    getFromResourceDirectory("swagger-ui") ~
+    SwaggerRoute.routes ~
+    redirectToSwagger
 }

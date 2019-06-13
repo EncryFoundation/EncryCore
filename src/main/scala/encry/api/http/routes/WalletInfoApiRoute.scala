@@ -13,8 +13,9 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import scala.concurrent.Future
 import scala.util.Random
+import encry.EncryApp.nodeViewHolder
 
-case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
+case class WalletInfoApiRoute(dataHolder: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
 
@@ -22,7 +23,7 @@ case class WalletInfoApiRoute(nodeViewActorRef: ActorRef,
 
   override val settings: RESTApiSettings = restApiSettings
 
-  private def getWallet: Future[EncryWallet] = (nodeViewActorRef ?
+  private def getWallet: Future[EncryWallet] = (nodeViewHolder ?
     GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 

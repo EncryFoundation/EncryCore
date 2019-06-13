@@ -58,8 +58,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1 -> (cp1, Older, InitialPriority()))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -75,7 +75,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       //this thread sleep is using for expecting modifier removal
       Thread.sleep(6000)
 
-      assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
+      assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress, Map.empty).isEmpty)
       deliveryManager.stop()
     }
     "not re-ask unnecessary modifiers" in {
@@ -87,8 +87,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1 -> (cp1, Older, InitialPriority()))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -118,8 +118,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1 -> (cp1, Older, InitialPriority()))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -141,7 +141,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
 
       assert(deliveryManager.underlyingActor.expectedModifiers
-        .getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
+        .getOrElse(cp1.socketAddress, Map.empty).isEmpty)
       deliveryManager.stop()
     }
     "remove peer from expectedModifiers if expected modifiers collection from this peer is empty" in {
@@ -150,9 +150,9 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
       //this thread sleep is using for expecting modifier removal
       Thread.sleep((settings.network.maxDeliveryChecks * settings.network.deliveryTimeout._1) * 1000)
-      assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress.getAddress, Map.empty).isEmpty)
+      assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress, Map.empty).isEmpty)
       assert(deliveryManager.underlyingActor.expectedModifiers
-        .getOrElse(cp1.socketAddress.getAddress, Map.empty) == Map.empty)
+        .getOrElse(cp1.socketAddress, Map.empty) == Map.empty)
       deliveryManager.stop()
     }
     "not re-ask transactions" in {
@@ -164,8 +164,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(address1 -> (cp1, Older, InitialPriority()))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -178,7 +178,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       )
       handler1.expectNoMsg(10.seconds)
       assert(deliveryManager.underlyingActor.expectedModifiers
-        .getOrElse(cp1.socketAddress.getAddress, Map.empty) == Map.empty)
+        .getOrElse(cp1.socketAddress, Map.empty) == Map.empty)
       deliveryManager.stop()
     }
   }

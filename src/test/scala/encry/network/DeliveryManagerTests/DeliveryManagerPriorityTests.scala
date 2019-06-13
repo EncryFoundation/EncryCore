@@ -63,8 +63,8 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "mark peer as BadNode with BadPriority (1)" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, _, headersIds) = initialiseState
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
@@ -85,8 +85,8 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "mark peer as HighPriorityNode with HighPriority (4)" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, headersIds) = initialiseState
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
@@ -110,8 +110,8 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "mark peer as LowPriorityNode with LowPriority (3)" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, headersIds) = initialiseState
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -141,15 +141,15 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       val (deliveryManager, cp1, cp2, cp3, cp4, cp5, cp6, cp7, cp8, cp9, blocks, headersIds) = initialiseState
       val updatedPeersCollection =
         Map(
-          cp1.socketAddress.getAddress -> (cp1, Older, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp2, Younger, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp3, Equal, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp4, Older, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp5, Younger, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp6, Equal, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp7, Older, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp8, Younger, InitialPriority()),
-          cp1.socketAddress.getAddress -> (cp9, Equal, InitialPriority())
+          cp1.socketAddress -> (cp1, Older, InitialPriority()),
+          cp1.socketAddress -> (cp2, Younger, InitialPriority()),
+          cp1.socketAddress -> (cp3, Equal, InitialPriority()),
+          cp1.socketAddress -> (cp4, Older, InitialPriority()),
+          cp1.socketAddress -> (cp5, Younger, InitialPriority()),
+          cp1.socketAddress -> (cp6, Equal, InitialPriority()),
+          cp1.socketAddress -> (cp7, Older, InitialPriority()),
+          cp1.socketAddress -> (cp8, Younger, InitialPriority()),
+          cp1.socketAddress -> (cp9, Equal, InitialPriority())
         )
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
@@ -230,8 +230,8 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "not increment modifiers which will be putted in spam collection" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, _) = initialiseState
-      val updatedPeersCollection: Map[InetAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress.getAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)

@@ -1,4 +1,4 @@
-package encry.api.http
+package encry.api.http.routes
 
 import java.net.{InetAddress, InetSocketAddress}
 
@@ -6,27 +6,28 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.PeersApiRoute.PeerInfoResponse
+import encry.api.http.DataHolderForApi.GetConnectedPeers
+import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
+import encry.network.ConnectedPeersList.PeerInfo
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
-import encry.EncryApp._
-import encry.network.ConnectedPeersList.PeerInfo
-import encry.network.PeersKeeper.{GetConnectedPeers, GetInfoAboutConnectedPeers}
 import io.circe.generic.semiauto._
 
-import scala.collection.immutable
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.matching.Regex
 
-case class PeersApiRoute(override val settings: RESTApiSettings)(implicit val context: ActorRefFactory) extends ApiRoute {
+case class PeersApiRoute(override val settings: RESTApiSettings,
+                         dataHolder: ActorRef)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
-  override lazy val route: Route = pathPrefix("peers") { connect }
+  override lazy val route: Route = pathPrefix("peers") {
+    connect ~ connectedPeers
+  }
+
   private val addressAndPortRegexp: Regex = "\\w+:\\d{1,5}".r
 
 //  def allPeers: Route = (path("all") & get) {
-//    val result: Future[immutable.Iterable[PeerInfoResponse]] =
+//    val result: Future[Iterable[PeerInfoResponse]] =
 //      (peersKeeper ? GetInfoAboutConnectedPeers).mapTo[Map[InetSocketAddress, PeerInfo]].map {
 //        _.map { case (address, peerInfo) =>
 //          PeerInfoResponse.fromAddressAndInfo(address, peerInfo)
@@ -34,19 +35,18 @@ case class PeersApiRoute(override val settings: RESTApiSettings)(implicit val co
 //      }
 //    onSuccess(result) { r => complete(r) }
 //  }
-//
-  //todo fix this route
-//  def connectedPeers: Route = (path("connected") & get) {
-//    val result: Future[Seq[PeerInfoResponse]] = (peersKeeper ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
-//      _.map { peer =>
-//        PeerInfoResponse(
-//          address = peer.socketAddress.toString,
-//          name = Some(peer.handshake.nodeName),
-//          connectionType = Some(peer.direction.toString))
-//      }
-//    }
-//    onSuccess(result) { r => complete(r) }
-//  }
+
+  def connectedPeers: Route = (path("connected") & get) {
+    val result: Future[Seq[PeerInfoResponse]] = (dataHolder ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
+      _.map { peer =>
+        PeerInfoResponse(
+          address = peer.socketAddress.toString,
+          name = Some(peer.handshake.nodeName),
+          connectionType = Some(peer.direction.toString))
+      }
+    }
+    onSuccess(result) { r => complete(r) }
+  }
 
   def connect: Route = (path("connect") & post & entity(as[String])) { body =>
     complete {

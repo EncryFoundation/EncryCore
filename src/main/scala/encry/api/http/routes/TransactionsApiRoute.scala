@@ -10,7 +10,8 @@ import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.settings.RESTApiSettings
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 
-case class TransactionsApiRoute(readersHolder: ActorRef, memoryPoolRef: ActorRef,
+case class TransactionsApiRoute(dataHolder: ActorRef,
+                                memoryPoolRef: ActorRef,
                                 restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 

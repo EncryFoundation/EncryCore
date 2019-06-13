@@ -2,7 +2,6 @@ package encry.api.http.routes
 
 import com.github.swagger.akka.model.{Info, License}
 import com.github.swagger.akka.{SwaggerHttpService, model}
-import encry.api.http.{PeersApiRoute, UtilsApiRoute}
 
 object SwaggerRoute extends SwaggerHttpService {
   override def apiClasses: Set[Class[_]] =

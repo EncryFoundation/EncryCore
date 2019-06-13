@@ -305,6 +305,16 @@ object PeerConnectionHandler {
 
   }
 
+  /**
+    * @param message - message, received from network
+    * @param source - sender of received message
+    *
+    * This case class transfers network message from PeerConnectionHandler actor to the NetworkController.
+    * Main duty is to transfer message from network with sender of it message to the NetworkController as an end point.
+    */
+
+  final case class MessageFromNetwork(message: NetworkMessage, source: Option[ConnectedPeer])
+
   def props(connection: ActorRef, direction: ConnectionType,
             ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
     Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote))
