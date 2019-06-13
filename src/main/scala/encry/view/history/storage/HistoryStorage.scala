@@ -17,8 +17,14 @@ import scala.util.{Failure, Random, Success}
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
-  def modifierById(id: ModifierId): Option[PersistentModifier] =
-    modifiersBytesById(id).flatMap { res =>
+  def modifierById(id: ModifierId): Option[PersistentModifier] = {
+    val modBytesWithTypeId = store match {
+      case iodb: IODBHistoryWrapper =>
+        iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.tail)
+      case _: VLDBWrapper =>
+        store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
+    }
+    modBytesWithTypeId.flatMap { res =>
       HistoryModifiersProtoSerializer.fromProto(res) match {
         case Success(b) => Some(b)
         case Failure(e) =>
@@ -26,6 +32,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
           None
       }
     }
+  }
 
   def modifiersBytesById(id: ModifierId): Option[Array[Byte]] = store match {
     case iodb: IODBHistoryWrapper =>
