@@ -20,9 +20,9 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
   def modifierById(id: ModifierId): Option[PersistentModifier] = {
     val modBytesWithTypeId = store match {
       case iodb: IODBHistoryWrapper =>
-        iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.tail)
+        iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data)
       case _: VLDBWrapper =>
-        store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
+        store.get(StorageKey @@ id.untag(ModifierId))
     }
     modBytesWithTypeId.flatMap { res =>
       HistoryModifiersProtoSerializer.fromProto(res) match {
