@@ -8,9 +8,11 @@ import org.encryfoundation.common.validation.{ModifierValidator, ValidationResul
 object PayloadUtils {
 
   def syntacticallyValidity(payload: Payload): ValidationResult = ModifierValidator.accumulateErrors
-    .demand(payload.modifierTypeId == Payload.modifierTypeId, "Modifier's type id should be 102")
-    .demand(payload.headerId.size == TestNetConstants.ModifierIdSize, "Modifier's id should be 32 bytes")
+    .demand(payload.modifierTypeId == Payload.modifierTypeId,
+      s"Modifier's type id should be ${Payload.modifierTypeId}")
+    .demand(payload.headerId.size == TestNetConstants.ModifierIdSize,
+      s"Modifier's id should be ${TestNetConstants.ModifierIdSize} bytes")
     .demand(payload.serializer.toBytes(payload).length < TestConstants.PayloadMaxSize,
-      "Payload's max size should be less than boundary value")
+      s"Payload's max size should be less than ${TestConstants.PayloadMaxSize} boundary value")
     .result
 }

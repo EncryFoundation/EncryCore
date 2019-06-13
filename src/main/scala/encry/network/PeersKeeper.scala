@@ -33,7 +33,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   val blackList: BlackList = new BlackList(settings)
 
-  var availablePeers: Map[InetSocketAddress, Int] = settings.network.knownPeers.map(peer => peer -> 0).toMap
+  var knownPeers: Map[InetSocketAddress, Int] = settings.network.knownPeers.map(peer => peer -> 0).toMap
 
   var awaitingHandshakeConnections: Set[InetSocketAddress] = Set.empty
 
@@ -49,7 +49,7 @@ class PeersKeeper(settings: EncryAppSettings,
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
     context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime)(blackList.cleanupBlackList())
-    context.system.scheduler.schedule(10.seconds, 10.seconds)(
+    context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersF((_, _) => true, getPeersForDMF).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
@@ -64,12 +64,12 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
-      logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
-        s"so peer keeper allows to add one more connect. Current available peers are: " +
-        s"${availablePeers.mkString(",")}. Current black list is: ${
+      logger.debug(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
+        s"so peer keeper allows to add one more connection. Current available peers are: " +
+        s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.getBannedPeersAndReasons.mkString(",")
         }")
-      availablePeers
+      knownPeers
         .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
         .headOption
         .foreach { case (peer, _) =>
@@ -117,42 +117,42 @@ class PeersKeeper(settings: EncryAppSettings,
       logger.info(s"Remove  ${connectedPeer.socketAddress} from awaitingHandshakeConnections collection. Current is: " +
         s"${awaitingHandshakeConnections.mkString(",")}.")
       awaitingHandshakeConnections -= connectedPeer.socketAddress
-      availablePeers = availablePeers.updated(connectedPeer.socketAddress, 0)
+      knownPeers = knownPeers.updated(connectedPeer.socketAddress, 0)
       logger.info(s"Adding new peer: ${connectedPeer.socketAddress} to available collection." +
-        s" Current collection is: ${availablePeers.keys.mkString(",")}.")
+        s" Current collection is: ${knownPeers.keys.mkString(",")}.")
 
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
       connectedPeers.removePeer(peer)
       if (blackList.contains(peer.getAddress)) {
-        availablePeers -= peer
+        knownPeers -= peer
         logger.info(s"Peer: $peer removed from availablePeers cause of it has been banned. " +
-          s"Current is: ${availablePeers.mkString(",")}.")
+          s"Current is: ${knownPeers.mkString(",")}.")
       }
 
     case OutgoingConnectionFailed(peer) =>
       logger.info(s"Connection failed for: $peer.")
       outgoingConnections -= peer
       awaitingHandshakeConnections -= peer
-      val connectionAttempts: Int = availablePeers.getOrElse(peer, 0) + 1
+      val connectionAttempts: Int = knownPeers.getOrElse(peer, 0) + 1
       if (connectionAttempts >= settings.network.maxNumberOfReConnections) {
         logger.info(s"Banning peer: $peer for ExpiredNumberOfConnections.")
         blackList.banPeer(ExpiredNumberOfConnections, peer.getAddress)
-        availablePeers -= peer
-      } else availablePeers = availablePeers.updated(peer, connectionAttempts)
+        knownPeers -= peer
+      } else knownPeers = knownPeers.updated(peer, connectionAttempts)
   }
 
   def networkMessagesProcessingLogic: Receive = {
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers => peers
         .filterNot(p =>
-          blackList.contains(p.getAddress) || connectedPeers.contains(p) || isLocal(p) || availablePeers.contains(p)
+          blackList.contains(p.getAddress) || connectedPeers.contains(p) || isLocal(p) || knownPeers.contains(p)
         )
         .foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
-          availablePeers = availablePeers.updated(p, 0)
+          knownPeers = knownPeers.updated(p, 0)
         }
-        logger.info(s"New available peers collection are: ${availablePeers.keys.mkString(",")}.")
+        logger.info(s"New available peers collection are: ${knownPeers.keys.mkString(",")}.")
 
       case PeersNetworkMessage(_) =>
         logger.info(s"Got PeersNetworkMessage from $remote, but connectWithOnlyKnownPeers: $connectWithOnlyKnownPeers, " +
@@ -190,7 +190,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case SendLocalSyncInfo => sendSyncInfo()
 
     case PeerFromCli(peer) =>
-      if (!blackList.contains(peer.getAddress) && !availablePeers.contains(peer) && connectedPeers.contains(peer)) {
+      if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && connectedPeers.contains(peer)) {
         outgoingConnections += peer
         sender() ! PeerForConnection(peer)
       }
@@ -224,8 +224,6 @@ class PeersKeeper(settings: EncryAppSettings,
   }
 
   def getConnectedPeersF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
-
-  def getPeersAndInfoF(add: InetSocketAddress, info: PeerInfo): (InetSocketAddress, PeerInfo) = add -> info
 
   def getPeersForRemoteF(add: InetSocketAddress, info: PeerInfo): InetSocketAddress = add
 

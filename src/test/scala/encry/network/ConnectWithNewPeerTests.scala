@@ -32,7 +32,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       val nodeViewSync = TestProbe()
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
 
-      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.availablePeers
+      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
 
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(availablePeers.head._1))
@@ -53,12 +53,12 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       networkController.send(peersKeeper, HandshakedDone(connectedPeer))
       peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(availablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.get(availablePeers.head._1) shouldBe Some(0)
+      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.get(availablePeers.head._1) shouldBe Some(0)
 
       /* Request next peer after first connection setup */
 
-      val newAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.availablePeers.drop(1)
+      val newAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers.drop(1)
 
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(newAvailablePeers.head._1))
@@ -77,8 +77,8 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       networkController.send(peersKeeper, HandshakedDone(newConnectedPeer))
       peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(newAvailablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.get(newAvailablePeers.head._1) shouldBe Some(0)
+      peersKeeper.underlyingActor.knownPeers.contains(newAvailablePeers.head._1) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.get(newAvailablePeers.head._1) shouldBe Some(0)
 
       /* Try to ask one more peer while max number of connections has been expired */
 
@@ -93,7 +93,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       newPeerHandler.expectMsgAnyOf(CloseConnection, GetPeersNetworkMessage)
       peersKeeper.underlyingActor.blackList.contains(newConnectedPeer.socketAddress.getAddress) shouldBe true
       networkController.send(peersKeeper, ConnectionStopped(newConnectedPeer.socketAddress))
-      peersKeeper.underlyingActor.availablePeers.contains(newConnectedPeer.socketAddress) shouldBe false
+      peersKeeper.underlyingActor.knownPeers.contains(newConnectedPeer.socketAddress) shouldBe false
       peersKeeper.underlyingActor.connectedPeers.contains(newConnectedPeer.socketAddress) shouldBe false
 
       /* Try to setup Incoming connection from banned peer */
@@ -103,7 +103,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       /* Try to request new connection */
 
-      val updatedAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.availablePeers.takeRight(1)
+      val updatedAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers.takeRight(1)
 
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(updatedAvailablePeers.head._1))
@@ -123,15 +123,15 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       networkController.send(peersKeeper, HandshakedDone(updatedConnectedPeer))
       peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(updatedAvailablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.get(updatedAvailablePeers.head._1) shouldBe Some(0)
+      peersKeeper.underlyingActor.knownPeers.contains(updatedAvailablePeers.head._1) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.get(updatedAvailablePeers.head._1) shouldBe Some(0)
     }
     "ban peer we can't connect to" in {
       val networkController = TestProbe()
       val nodeViewSync = TestProbe()
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
 
-      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.availablePeers
+      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
 
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(availablePeers.head._1))
@@ -139,7 +139,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, OutgoingConnectionFailed(availablePeers.head._1))
       peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
       peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.get(availablePeers.head._1) shouldBe Some(1)
+      peersKeeper.underlyingActor.knownPeers.get(availablePeers.head._1) shouldBe Some(1)
 
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(availablePeers.head._1))
@@ -147,7 +147,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, OutgoingConnectionFailed(availablePeers.head._1))
       peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
       peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(availablePeers.head._1) shouldBe false
+      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe false
       peersKeeper.underlyingActor.blackList.contains(availablePeers.head._1.getAddress) shouldBe true
     }
     "remove peer from available if it has been banned" in {
@@ -155,7 +155,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       val nodeViewSync = TestProbe()
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
 
-      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.availablePeers
+      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
 
       val peerHandler = TestProbe()
       val connectedPeer: ConnectedPeer = ConnectedPeer(availablePeers.head._1, peerHandler.ref, Outgoing,
@@ -165,14 +165,14 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, BanPeer(connectedPeer, ExpiredNumberOfConnections))
       networkController.send(peersKeeper, ConnectionStopped(availablePeers.head._1))
 
-      peersKeeper.underlyingActor.availablePeers.contains(availablePeers.head._1) shouldBe false
+      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe false
     }
     "filter peers from network message" in {
       val networkController = TestProbe()
       val nodeViewSync = TestProbe()
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
 
-      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.availablePeers
+      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
 
       val peerHandler = TestProbe()
       val connectedPeer: ConnectedPeer = ConnectedPeer(availablePeers.head._1, peerHandler.ref, Outgoing,
@@ -187,14 +187,14 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, BanPeer(connectedPeer, ExpiredNumberOfConnections))
       networkController.send(peersKeeper, ConnectionStopped(availablePeers.head._1))
       networkController.send(peersKeeper, HandshakedDone(newConnectedPeer))
-      peersKeeper.underlyingActor.availablePeers.contains(availablePeers.head._1) shouldBe false
+      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe false
 
       val peer = new InetSocketAddress("172.16.28.98", 9023)
       val peers = Seq(availablePeers.last._1, availablePeers.head._1, peer)
 
       networkController.send(peersKeeper, DataFromPeer(PeersNetworkMessage(peers), newConnectedPeer))
-      peersKeeper.underlyingActor.availablePeers.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(peer) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe false
+      peersKeeper.underlyingActor.knownPeers.contains(peer) shouldBe true
     }
     "handle successful connection process" in {
       val networkController = TestProbe()
@@ -207,7 +207,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(settingsWithAllPeers.network.knownPeers.head))
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       networkController.send(peersKeeper, VerifyConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
@@ -227,7 +227,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(settingsWithAllPeers.network.knownPeers.head))
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       networkController.send(peersKeeper, VerifyConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
@@ -238,7 +238,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       peersKeeper ! ConnectionStopped(settingsWithAllPeers.network.knownPeers.head)
       peersKeeper.underlyingActor.connectedPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
     }
     "handle failed connection process" in {
       val networkController = TestProbe()
@@ -248,7 +248,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       networkController.send(peersKeeper, RequestPeerForConnection)
       networkController.expectMsg(PeerForConnection(settingsWithAllPeers.network.knownPeers.head))
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
 
       networkController.send(peersKeeper, VerifyConnection(settingsWithAllPeers.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
@@ -256,7 +256,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       peersKeeper ! OutgoingConnectionFailed(settingsWithAllPeers.network.knownPeers.head)
       peersKeeper.underlyingActor.outgoingConnections.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe false
-      peersKeeper.underlyingActor.availablePeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
+      peersKeeper.underlyingActor.knownPeers.contains(settingsWithAllPeers.network.knownPeers.head) shouldBe true
     }
     "handle incoming connections correctly while connection with only known peers false " +
       "and incoming peer doesn't contains in black list and connected peers collection" in {

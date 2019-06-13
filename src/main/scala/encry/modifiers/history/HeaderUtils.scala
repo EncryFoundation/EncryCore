@@ -9,12 +9,18 @@ import org.encryfoundation.common.validation.{ModifierValidator, ValidationResul
 object HeaderUtils {
 
   def syntacticallyValidity(header: Header): ValidationResult = ModifierValidator.accumulateErrors
-    .demand(header.modifierTypeId == Header.modifierTypeId, "Modifier's type id should be 101")
-    .demand(header.id.size == TestNetConstants.ModifierIdSize, "Modifier's id should be 32 bytes")
-    .demand(header.parentId.size == TestNetConstants.ModifierIdSize, "Parent's id should be 32 bytes")
-    .demand(header.stateRoot.size == TestConstants.StateRootSize, "StateRoot's size should be 33 bytes")
-    .demand(header.adProofsRoot.size == TestConstants.AdProofsRootSize, "AdProofsRoot's size should be 32 bytes")
-    .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize, "TransactionsRoot's size should be 32 bytes")
+    .demand(header.modifierTypeId == Header.modifierTypeId,
+      s"Modifier's type id should be ${Header.modifierTypeId}")
+    .demand(header.id.size == TestNetConstants.ModifierIdSize,
+      s"Modifier's id should be ${TestNetConstants.ModifierIdSize} bytes")
+    .demand(header.parentId.size == TestNetConstants.ModifierIdSize,
+      s"Parent's id should be ${TestNetConstants.ModifierIdSize} bytes")
+    .demand(header.stateRoot.size == TestConstants.StateRootSize,
+      s"StateRoot's size should be ${TestConstants.StateRootSize} bytes")
+    .demand(header.adProofsRoot.size == TestConstants.AdProofsRootSize,
+      s"AdProofsRoot's size should be ${TestConstants.AdProofsRootSize} bytes")
+    .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize,
+      s"TransactionsRoot's size should be ${TestConstants.TransactionsRootSize} bytes")
     .result
 
   def headerBytesSize(header: Header): Int = 1 + header.id.size + header.parentId.size +
