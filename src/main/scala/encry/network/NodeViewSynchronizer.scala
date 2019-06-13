@@ -116,11 +116,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
             logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
-          sendResponse(remote, invData._1, inRequestCache.values.map {
-            case header: Header => ModifierId @@ header.id -> HeaderProtoSerializer.toProto(header).toByteArray
-            case payload: Payload => ModifierId @@ payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
-            case adProof: ADProofs => ModifierId @@ adProof.id -> ADProofsProtoSerializer.toProto(adProof).toByteArray
-            case _ => ModifierId @@ Array.emptyByteArray -> Array.emptyByteArray
+          sendResponse(remote, invData._1, inRequestCache.values.collect {
+            case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
+            case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
+            case adProof: ADProofs => adProof.id -> ADProofsProtoSerializer.toProto(adProof).toByteArray
           }.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
