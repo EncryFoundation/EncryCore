@@ -78,11 +78,9 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
 
   override def receive: Receive = {
     case ModifiersFromRemote(modifiers) => modifiers.foreach { mod =>
-      //todo i'm checking this in modifiers validator. Do i really need to check this one more time
-//      val isInHistory: Boolean = nodeView.history.contains(mod.id)
+      val isInHistory: Boolean = nodeView.history.contains(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
-//      if (isInHistory || isInCache)
-      if (isInCache)
+      if (isInHistory || isInCache)
         logger.info(s"Received payload ${Algos.encode(mod.id)} can't be placed into cache cause of: " +
           s"inCache: $isInCache.")
       else ModifiersCache.put(key(mod.id), mod, nodeView.history)
