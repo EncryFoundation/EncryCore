@@ -17,7 +17,6 @@ case class ApiError(statusCode: StatusCode, reason: String = "") {
 }
 
 object ApiError {
-
   def apply(s: String): Route = InternalError(s)
   def apply(e: Throwable): Route = InternalError(e.getMessage)
   def apply(causes: Seq[Throwable]): Route = InternalError(mkString(causes))
