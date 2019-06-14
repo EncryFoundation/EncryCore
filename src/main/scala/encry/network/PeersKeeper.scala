@@ -23,6 +23,7 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 import org.encryfoundation.common.network.BasicMessagesRepo._
 
 import scala.concurrent.duration._
+import scala.util.Try
 
 class PeersKeeper(settings: EncryAppSettings,
                   nodeViewSync: ActorRef,
@@ -211,10 +212,10 @@ class PeersKeeper(settings: EncryAppSettings,
       peer.handlerRef ! CloseConnection
   }
 
-  def isLocal(address: InetSocketAddress): Boolean = address == settings.network.bindAddress ||
+  def isLocal(address: InetSocketAddress): Boolean = Try(address == settings.network.bindAddress ||
     InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
     InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress) ||
-    settings.network.declaredAddress.contains(address)
+    settings.network.declaredAddress.contains(address)).getOrElse(true)
 
   def sendSyncInfo(): Unit = {
     val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(findPeersForSyncInfoP, findPeersForSyncInfoF).toSeq
