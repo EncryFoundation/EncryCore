@@ -19,7 +19,8 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.validation.RecoverableModifierError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.utils.Algos
-import scala.util.{Failure, Success}
+
+import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(settings: EncryAppSettings,
                                    nodeViewHolder: ActorRef,
@@ -72,7 +73,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
         val transactions: (Seq[Transaction], Seq[ModifierId]) = filteredModifiers
           .foldLeft(Seq.empty[Transaction], Seq.empty[ModifierId]) {
             case ((transactionsColl, forRemove), (id, bytes)) =>
-              TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
+              Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
                 case Success(tx) if tx.semanticValidity.isSuccess => (transactionsColl :+ tx, forRemove)
                 case Success(tx) =>
                   logger.info(s"Payload with id: ${tx.encodedId} invalid caze of: ${tx.semanticValidity}.")
