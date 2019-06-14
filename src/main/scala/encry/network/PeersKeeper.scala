@@ -65,7 +65,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
-      logger.debug(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
+      logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connection. Current available peers are: " +
         s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.getBannedPeersAndReasons.mkString(",")
