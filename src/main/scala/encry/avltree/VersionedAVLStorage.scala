@@ -135,7 +135,7 @@ object VersionedAVLStorage extends StrictLogging {
         val labelOpt: Option[D] = if (bytes.length > 2 + keySize + (2 * labelSize))
           Some(bytes.slice(2 + keySize + (2 * labelSize), bytes.length).asInstanceOf[D])
         else None
-        if (isTop) n.labelOpt = labelOpt
+        n.labelOpt = labelOpt
         n.isNew = false
         n
       case LeafPrefix =>
@@ -156,7 +156,7 @@ object VersionedAVLStorage extends StrictLogging {
           else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
-        if (isTop) l.labelOpt = labelOpt
+        l.labelOpt = labelOpt
         l.isNew = false
         l
     }
