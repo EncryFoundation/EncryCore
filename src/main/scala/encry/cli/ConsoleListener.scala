@@ -49,7 +49,8 @@ object ConsoleListener {
   ))
 
   private val settingsCmds = Map("settings" -> Map(
-    "addPeer" -> AddPeer
+    "addPeer" -> AddPeer,
+    "removeFromBlackList" -> RemoveFromBlackList
   ))
 
   private val walletCmds = Map("wallet" -> Map(

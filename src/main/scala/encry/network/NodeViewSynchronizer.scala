@@ -5,6 +5,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.AuxiliaryHistoryHolder.AuxHistoryChanged
@@ -157,6 +158,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case AuxHistoryChanged(history) => historyReaderOpt = Some(history)
+    case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
     case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)

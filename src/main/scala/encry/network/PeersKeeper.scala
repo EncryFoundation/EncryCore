@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
@@ -12,6 +13,7 @@ import encry.network.PeerConnectionHandler._
 import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
 import encry.cli.commands.AddPeer.PeerFromCli
+import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
 import encry.network.ConnectedPeersList.PeerInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -19,6 +21,7 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import org.encryfoundation.common.network.BasicMessagesRepo._
+
 import scala.concurrent.duration._
 
 class PeersKeeper(settings: EncryAppSettings,
@@ -193,6 +196,10 @@ class PeersKeeper(settings: EncryAppSettings,
         outgoingConnections += peer
         sender() ! PeerForConnection(peer)
       }
+
+    case RemovePeerFromBlackList(peer) =>
+      blackList.remove(peer.getAddress)
+      knownPeers = knownPeers.updated(peer, 0)
 
     case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
   }

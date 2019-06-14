@@ -25,6 +25,8 @@ final class BlackList(settings: EncryAppSettings) {
 
   def contains(peer: InetAddress): Boolean = blackList.contains(peer)
 
+  def remove(peer: InetAddress): Unit = blackList -= peer
+
 }
 
 object BlackList {
