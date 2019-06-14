@@ -43,7 +43,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)) match {
               case Success(payload) if PU.syntacticallyValidity(payload).isSuccess => history.testApplicable(payload) match {
                 case Failure(ex: RecoverableModifierError) =>
-                  logger.info(s"payload: ${payload.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
+                  logger.debug(s"payload: ${payload.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
                     s"RecoverableModifierError so continue working with this modifier.")
                   (payloadsColl :+ payload, forRemove)
                 case Failure(ex) =>
@@ -52,7 +52,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
                   peersKeeper ! BanPeer(remote, SemanticallyInvalidModifier)
                   (payloadsColl, forRemove :+ id)
                 case Success(_) =>
-                  logger.info(s"Header: ${payload.encodedId} after testApplicable is correct.")
+                  logger.debug(s"Header: ${payload.encodedId} after testApplicable is correct.")
                   (payloadsColl :+ payload, forRemove)
               }
               case Success(payload) =>
@@ -66,7 +66,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
                 (payloadsColl, forRemove :+ id)
             }
           }
-        logger.info(s"Sending to node view holder parsed payloads: ${payloads._1.map(_.encodedId)}.")
+        logger.debug(s"Sending to node view holder parsed payloads: ${payloads._1.map(_.encodedId)}.")
         if (payloads._1.nonEmpty) nodeViewHolder ! ModifiersFromRemote(payloads._1)
         logger.info(s"Sending to delivery manager invalid modifiers: ${payloads._2.map(k => Algos.encode(k))}.")
         if (payloads._2.nonEmpty) nodeViewSync ! ModifiersIdsForRemove(payloads._2)
@@ -77,7 +77,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)) match {
               case Success(value) if HU.syntacticallyValidity(value).isSuccess => history.testApplicable(value) match {
                 case Failure(ex: RecoverableModifierError) =>
-                  logger.info(s"Header: ${value.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
+                  logger.debug(s"Header: ${value.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
                     s"RecoverableModifierError so continue working with this modifier.")
                   (headersCollection :+ value, forRemove)
                 case Failure(ex) =>
@@ -86,7 +86,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
                   peersKeeper ! BanPeer(remote, SemanticallyInvalidModifier)
                   (headersCollection, forRemove :+ id)
                 case Success(_) =>
-                  logger.info(s"Header: ${value.encodedId} after testApplicable is correct.")
+                  logger.debug(s"Header: ${value.encodedId} after testApplicable is correct.")
                   (headersCollection :+ value, forRemove)
               }
               case Success(header) =>
@@ -100,7 +100,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
                 (headersCollection, forRemove :+ id)
             }
           }
-        logger.info(s"Sending to node view holder parsed headers: ${headers._1.map(_.encodedId)}.")
+        logger.debug(s"Sending to node view holder parsed headers: ${headers._1.map(_.encodedId)}.")
         if (headers._1.nonEmpty) nodeViewHolder ! ModifiersFromRemote(headers._1)
         logger.info(s"Sending to delivery manager invalid modifiers: ${headers._2.map(k => Algos.encode(k))}.")
         if (headers._2.nonEmpty) nodeViewSync ! ModifiersIdsForRemove(headers._2)
@@ -121,9 +121,9 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
                 (transactionsColl, forRemove :+ id)
             }
         }
-        logger.info(s"Sending to node mempool parsed transactions: ${transactions._1.map(_.encodedId)}.")
+        logger.debug(s"Sending to node mempool parsed transactions: ${transactions._1.map(_.encodedId)}.")
         if (transactions._1.nonEmpty) memoryPoolRef ! TransactionsFromRemote(transactions._1)
-        logger.info(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
+        logger.debug(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
         if (transactions._2.nonEmpty) nodeViewSync ! ModifiersIdsForRemove(transactions._2)
     }
     case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))

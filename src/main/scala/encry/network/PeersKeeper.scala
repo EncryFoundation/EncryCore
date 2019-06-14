@@ -40,9 +40,8 @@ class PeersKeeper(settings: EncryAppSettings,
   var outgoingConnections: Set[InetSocketAddress] = Set.empty
 
   override def preStart(): Unit = {
-    logger.info(s"Peers keeper started")
     nodeViewSync ! RegisterMessagesHandler(Seq(
-      PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
+      PeersNetworkMessage.NetworkMessageTypeID    -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
     if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
@@ -183,7 +182,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case SendToNetwork(message, strategy) =>
       val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq
       strategy.choose(peers).foreach { peer =>
-        logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
+        logger.debug(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
       }
 

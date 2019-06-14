@@ -197,7 +197,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   def broadcastModifierInv(m: NodeViewModifier): Unit =
     if (chainSynced) {
-      logger.info(s"NVSH is synced. Going to broadcast inv for: ${m.encodedId}")
+      logger.debug(s"NVSH is synced. Going to broadcast inv for: ${m.encodedId}")
       peersKeeper ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
     }
 }
