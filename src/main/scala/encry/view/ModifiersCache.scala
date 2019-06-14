@@ -102,10 +102,10 @@ object ModifiersCache extends StrictLogging {
 
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
       v match {
-        //case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
+        case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
-          logger.info(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
+          logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
