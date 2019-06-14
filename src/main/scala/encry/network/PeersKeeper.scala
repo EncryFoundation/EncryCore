@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
@@ -21,7 +20,6 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import org.encryfoundation.common.network.BasicMessagesRepo._
-
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -89,7 +87,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case RequestPeerForConnection =>
       logger.info(s"Got request for a new connection but current number of connection is max: ${connectedPeers.size}.")
 
-    case VerifyConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isLocal(remote) =>
+    case VerifyConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote.")
       val notConnectedYet: Boolean = !connectedPeers.contains(remote)
       val notBannedPeer: Boolean = !blackList.contains(remote.getAddress)
@@ -111,7 +109,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
     case VerifyConnection(remote, _) =>
       logger.info(s"Peers keeper got request for verifying the connection but current number of max connection is " +
-        s"bigger than possible or isLocal: ${isLocal(remote)}.")
+        s"bigger than possible or isSelf: ${isSelf(remote)}.")
 
     case HandshakedDone(connectedPeer) =>
       logger.info(s"Peers keeper got approvement about finishing a handshake." +
@@ -149,7 +147,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case DataFromPeer(message, remote) => message match {
       case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers => peers
         .filterNot(p =>
-          blackList.contains(p.getAddress) || connectedPeers.contains(p) || isLocal(p) || knownPeers.contains(p)
+          blackList.contains(p.getAddress) || connectedPeers.contains(p) || isSelf(p) || knownPeers.contains(p)
         )
         .foreach { p =>
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
@@ -212,10 +210,11 @@ class PeersKeeper(settings: EncryAppSettings,
       peer.handlerRef ! CloseConnection
   }
 
-  def isLocal(address: InetSocketAddress): Boolean = Try(address == settings.network.bindAddress ||
+  //todo NPE in InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress)
+  def isSelf(address: InetSocketAddress): Boolean = Try(address == settings.network.bindAddress ||
+    settings.network.declaredAddress.contains(address) ||
     InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
-    InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress) ||
-    settings.network.declaredAddress.contains(address)).getOrElse(true)
+    InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)).getOrElse(true)
 
   def sendSyncInfo(): Unit = {
     val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(findPeersForSyncInfoP, findPeersForSyncInfoF).toSeq
