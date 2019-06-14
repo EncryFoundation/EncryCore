@@ -1,6 +1,7 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import encry.consensus.History
@@ -8,19 +9,20 @@ import encry.consensus.History.{Fork, Older, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ RequestFromLocal}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.InitialPriority
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.mutable.WrappedArray
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
@@ -48,8 +50,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
   "RequestModifies" should {
     "handle uniq modifiers from RequestFromLocal message correctly" in {
       val (deliveryManager, cp1, _, _, _, headersIds, headersAsKey) = initialiseState()
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -62,8 +64,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
     }
     "not handle repeating modifiers from RequestFromLocal message" in {
       val (deliveryManager, cp1, _, _, _, headersIds, headersAsKey) = initialiseState()
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -76,8 +78,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
     }
     "Delivery Manager should handle received modifier which were requested correctly" in {
       val (deliveryManager, cp1, _, _, blocks, headersIds, headersAsKey) = initialiseState()
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -93,8 +95,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
     }
     "Delivery manager should not handle repeating modifiers" in {
       val (deliveryManager, cp1, _, _, blocks, headersIds, headersAsKey) = initialiseState()
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -110,8 +112,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
     }
     "handle priority request for payload correctly" in {
       val (deliveryManager, cp1, _, _, blocks, headersIds, _) = initialiseState()
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(cp1.socketAddress -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -146,11 +148,11 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.125", Some(address3), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
         Map(
-          address1 -> (cp1, Older, InitialPriority()),
-          address2 -> (cp2, Older, InitialPriority()),
-          address3 -> (cp3, Older, InitialPriority())
+          address1 -> (cp1, Older, InitialPriority),
+          address2 -> (cp2, Older, InitialPriority),
+          address3 -> (cp3, Older, InitialPriority)
         )
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
@@ -194,8 +196,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
 
       val updatedPeersCollection =
         Map(
-          address2 -> (cp2, Younger, InitialPriority()),
-          address3 -> (cp3, Fork, InitialPriority())
+          address2 -> (cp2, Younger, InitialPriority),
+          address3 -> (cp3, Fork, InitialPriority)
         )
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
@@ -225,8 +227,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.124", Some(address2), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address2 -> (cp2, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address2 -> (cp2, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -249,8 +251,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -269,8 +271,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -288,8 +290,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 

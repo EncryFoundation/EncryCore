@@ -421,7 +421,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {
       val (withBadNodesMap, withoutBadNodesMap) = peersCollection.partition {
-        case (_, (_, _, priority)) => priority == PeersPriorityStatus.BadNode()
+        case (_, (_, _, priority)) => priority == PeersPriorityStatus.BadNode
       }
       val withBadNodes: IndexedSeq[(ConnectedPeer, HistoryComparisonResult)] =
         withBadNodesMap.map(x => x._2._1 -> x._2._2).toIndexedSeq

@@ -12,7 +12,7 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.InitialPriority
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
@@ -58,8 +58,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -87,8 +87,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -118,8 +118,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 
@@ -164,8 +164,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Handshake(protocolToBytes(settings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, InitialPriority)] =
-        Map(address1 -> (cp1, Older, InitialPriority()))
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+        Map(address1 -> (cp1, Older, InitialPriority))
 
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
 

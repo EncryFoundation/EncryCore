@@ -19,7 +19,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
   def initializePeer(peer: ConnectedPeer): Unit = {
     val peerInfo: PeerInfo = PeerInfo(
       Unknown,
-      InitialPriority(),
+      InitialPriority,
       peer,
       Outgoing,
       LastUptime(0)

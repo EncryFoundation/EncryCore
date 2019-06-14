@@ -38,19 +38,42 @@ object EncryApp extends App with StrictLogging {
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
+  val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
+  val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
+    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
+
   val influxRef: Option[ActorRef] =
     if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
     else None
 
   lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
 
+  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
+  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner, influxRef)
+    .withDispatcher("mempool-dispatcher"))
+   val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
+    .withMailbox("nvh-mailbox"), "nodeViewHolder")
+
+  lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
+    .props(influxRef, nodeViewHolder, settings, memoryPool, dataHolderForApi)
+    .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
+
+  if (settings.monitoringSettings.exists(_.kamonEnabled)) {
+    Kamon.reconfigure(EncryAppSettings.allConfig)
+    Kamon.addReporter(new InfluxDBReporter())
+    SystemMetrics.startCollecting()
+  }
+  if (settings.kafka.exists(_.sendToKafka))
+    system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
+  if (settings.node.mining) miner ! StartMining
+  if (settings.node.useCli) {
+    system.actorOf(Props[ConsoleListener], "cliListener")
+    system.actorSelection("/user/cliListener") ! StartListening
+  }
+
   if (settings.restApi.enabled.getOrElse(false)) {
     import akka.http.scaladsl.model.StatusCodes._
     import akka.http.scaladsl.server.Directives._
-
-    val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
-    val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
-      .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
 
     implicit def apiExceptionHandler: ExceptionHandler = ExceptionHandler {
       case e: Exception => extractUri { uri =>
@@ -72,30 +95,6 @@ object EncryApp extends App with StrictLogging {
       CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
       settings.restApi.bindAddress.getAddress.getHostAddress,
       settings.restApi.bindAddress.getPort)
-  }
-
-  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
-  lazy val memoryPool: ActorRef = system.actorOf(Mempool.props(settings, timeProvider, miner, influxRef)
-    .withDispatcher("mempool-dispatcher"))
-  logger.info(s"Node view holder starting...")
-   val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
-    .withMailbox("nvh-mailbox"), "nodeViewHolder")
-
-  lazy val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
-    .props(influxRef, nodeViewHolder, settings, memoryPool, dataHolderForApi)
-    .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
-
-  if (settings.monitoringSettings.exists(_.kamonEnabled)) {
-    Kamon.reconfigure(EncryAppSettings.allConfig)
-    Kamon.addReporter(new InfluxDBReporter())
-    SystemMetrics.startCollecting()
-  }
-  if (settings.kafka.exists(_.sendToKafka))
-    system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
-  if (settings.node.mining) miner ! StartMining
-  if (settings.node.useCli) {
-    system.actorOf(Props[ConsoleListener], "cliListener")
-    system.actorSelection("/user/cliListener") ! StartListening
   }
 
   system.actorOf(Props[Zombie], "zombie")

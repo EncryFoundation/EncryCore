@@ -52,10 +52,10 @@ class PeersKeeper(settings: EncryAppSettings,
     )
     context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime)(blackList.cleanupBlackList())
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
-      nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersF((_, _) => true, getPeersForDMF).toMap)
+      nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersF(allPeers, getPeersForDMF).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
-      dataHolder ! UpdatingConnectedPeers(connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq)
+      dataHolder ! UpdatingConnectedPeers(connectedPeers.getPeersF(allPeers, getConnectedPeersF).toSeq)
     )
   }
 
@@ -183,7 +183,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
 
     case SendToNetwork(message, strategy) =>
-      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF((_, _) => true, getConnectedPeersF).toSeq
+      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(allPeers, getConnectedPeersF).toSeq
       strategy.choose(peers).foreach { peer =>
         logger.debug(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
@@ -235,6 +235,8 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def getPeersForDMF(address: InetSocketAddress, info: PeerInfo): (InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)) =
     address -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
+
+  def allPeers: (InetSocketAddress, PeerInfo) => Boolean = (_, _) => true
 }
 
 object PeersKeeper {

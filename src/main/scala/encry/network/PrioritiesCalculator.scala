@@ -62,13 +62,13 @@ object PrioritiesCalculator {
 
     sealed trait PeersPriorityStatus
 
-    final case class HighPriority(priority: Int = 4) extends PeersPriorityStatus
+    case object HighPriority extends PeersPriorityStatus
 
-    final case class LowPriority(priority: Int = 3) extends PeersPriorityStatus
+    case object LowPriority extends PeersPriorityStatus
 
-    final case class InitialPriority(priority: Int = 2) extends PeersPriorityStatus
+    case object InitialPriority extends PeersPriorityStatus
 
-    final case class BadNode(priority: Int = 1) extends PeersPriorityStatus
+    case object BadNode extends PeersPriorityStatus
 
     final case class Received(received: Int = 0) extends AnyVal {
       def increment: Received = Received(received + 1)
@@ -87,9 +87,9 @@ object PrioritiesCalculator {
 
     def calculateStatuses(res: Received, req: Requested): PeersPriorityStatus =
       res.received.toDouble / req.requested match {
-        case t if t >= criterionForHighP => HighPriority()
-        case t if t >= criterionForLowP  => LowPriority()
-        case _                           => BadNode()
+        case t if t >= criterionForHighP => HighPriority
+        case t if t >= criterionForLowP  => LowPriority
+        case _                           => BadNode
       }
   }
 }

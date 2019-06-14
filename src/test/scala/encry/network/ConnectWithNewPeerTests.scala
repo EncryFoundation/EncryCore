@@ -21,7 +21,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
   implicit val system: ActorSystem = ActorSystem()
   val settingsWithKnownPeers: EncryAppSettings = NetworkUtils.TestNetworkSettings.read("AdditionalTestSettings.conf")
-  val settingsWithAllPeers: EncryAppSettings = NetworkUtils.TestNetworkSettings.read("MainTestSetting.conf")
+  val settingsWithAllPeers: EncryAppSettings = NetworkUtils.TestNetworkSettings.read("MainTestSettings.conf")
 
   override def afterAll(): Unit = system.terminate()
 
