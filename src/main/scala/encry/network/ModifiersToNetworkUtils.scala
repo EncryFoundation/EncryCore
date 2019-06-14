@@ -18,12 +18,12 @@ object ModifiersToNetworkUtils {
     case m           => throw new RuntimeException(s"Try to serialize unknown modifier: $m to proto.")
   }
 
-  def fromProto(modType: ModifierTypeId, bytes: Array[Byte]): Try[PersistentModifier] = modType match {
+  def fromProto(modType: ModifierTypeId, bytes: Array[Byte]): Try[PersistentModifier] = Try(modType match {
     case Header.modifierTypeId   => HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes))
     case ADProofs.modifierTypeId => Try(ADProofsProtoSerializer.fromProto(AdProofsProtoMessage.parseFrom(bytes)))
     case Payload.modifierTypeId  => PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes))
     case m                       => Failure(new RuntimeException(s"Try to deserialize unknown modifier: $m from proto."))
-  }
+  }).flatten
 
   def isSyntacticallyValid(modifier: PersistentModifier): Boolean = modifier match {
     case h: Header => HeaderUtils.syntacticallyValidity(h).isSuccess
