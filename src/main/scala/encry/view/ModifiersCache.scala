@@ -68,16 +68,11 @@ object ModifiersCache extends StrictLogging {
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
-      case Failure(er: RecoverableModifierError) =>
-        logger.info(s"Err: ${er.message} for mod: ${Algos.encode(key.toArray)}")
-        false
-      case Failure(er: MalformedModifierError) =>
-        logger.info(s"Err: ${er.message} for mod: ${Algos.encode(key.toArray)}")
+      case Failure(_: RecoverableModifierError) => false
+      case Failure(_: MalformedModifierError) =>
         remove(key)
         false
-      case Failure(er) =>
-        logger.info(s"Err: ${er.getMessage} for mod: ${Algos.encode(key.toArray)}")
-        false
+      case Failure(_) => false
       case m => m.isSuccess
     })
 
@@ -117,8 +112,6 @@ object ModifiersCache extends StrictLogging {
       else prevKeys
     }
 
-    logger.info(s"history.bestHeaderHeight: ${history.bestHeaderHeight}")
-    logger.info(s"history.bestBlockHeight: ${history.bestBlockHeight}")
     val bestHeadersIds: List[Key] = {
       headersCollection.get(history.bestHeaderHeight + 1) match {
         case Some(value) =>
