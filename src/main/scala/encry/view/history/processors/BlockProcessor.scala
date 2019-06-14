@@ -90,7 +90,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       }
       else {
         //application of this block leads to full chain with higher score
-        println(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
+        logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
         logStatus(toRemove, toApply, fullBlock, Some(prevBest))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
