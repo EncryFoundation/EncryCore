@@ -46,7 +46,7 @@ class PeersKeeper(settings: EncryAppSettings,
     nodeViewSync ! RegisterMessagesHandler(Seq(
       PeersNetworkMessage.NetworkMessageTypeID    -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
-    ), self)
+    ), nodeViewSync)
     if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
