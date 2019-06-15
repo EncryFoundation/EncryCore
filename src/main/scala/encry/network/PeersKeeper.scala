@@ -71,9 +71,10 @@ class PeersKeeper(settings: EncryAppSettings,
         s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.getBannedPeersAndReasons.mkString(",")
         }")
-      //todo add shuffle
-      knownPeers
+      scala.util.Random.shuffle(
+        knownPeers
         .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
+      )
         .headOption
         .foreach { case (peer, _) =>
           outgoingConnections += peer

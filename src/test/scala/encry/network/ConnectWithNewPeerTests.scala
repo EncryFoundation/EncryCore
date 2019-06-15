@@ -1,16 +1,16 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.BlackList.{ExpiredNumberOfConnections, SyntacticallyInvalidPersistentModifier}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming, Outgoing}
 import encry.network.PeersKeeper._
 import encry.settings.EncryAppSettings
-import org.encryfoundation.common.network.BasicMessagesRepo.{GetPeersNetworkMessage, Handshake, PeersNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, PeersNetworkMessage}
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class ConnectWithNewPeerTests extends WordSpecLike
@@ -26,130 +26,130 @@ class ConnectWithNewPeerTests extends WordSpecLike
   override def afterAll(): Unit = system.terminate()
 
   "Peers keeper" should {
-    "maintain outgoing connection process correctly" in {
-      /* Request first peer while current number of connections is 0 */
-      val networkController = TestProbe()
-      val nodeViewSync = TestProbe()
-      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
-
-      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
-
-      networkController.send(peersKeeper, RequestPeerForConnection)
-      networkController.expectMsg(PeerForConnection(availablePeers.head._1))
-      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe true
-
-      val remoteAkkaConnectionHandler = TestProbe()
-
-      networkController.send(peersKeeper, VerifyConnection(availablePeers.head._1, remoteAkkaConnectionHandler.ref))
-      networkController.expectMsg(ConnectionVerified(availablePeers.head._1, remoteAkkaConnectionHandler.ref, Outgoing))
-      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe true
-
-      val peerHandler = TestProbe()
-      val connectedPeer: ConnectedPeer = ConnectedPeer(availablePeers.head._1, peerHandler.ref, Outgoing,
-        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
-          "test-peer", Some(availablePeers.head._1), System.currentTimeMillis()))
-
-      networkController.send(peersKeeper, HandshakedDone(connectedPeer))
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.knownPeers.get(availablePeers.head._1) shouldBe Some(0)
-
-      /* Request next peer after first connection setup */
-
-      val newAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers.drop(1)
-
-      networkController.send(peersKeeper, RequestPeerForConnection)
-      networkController.expectMsg(PeerForConnection(newAvailablePeers.head._1))
-      peersKeeper.underlyingActor.outgoingConnections.contains(newAvailablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe true
-
-      networkController.send(peersKeeper, VerifyConnection(newAvailablePeers.head._1, remoteAkkaConnectionHandler.ref))
-      networkController.expectMsg(ConnectionVerified(newAvailablePeers.head._1, remoteAkkaConnectionHandler.ref, Outgoing))
-      peersKeeper.underlyingActor.outgoingConnections.contains(newAvailablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe true
-
-      val newPeerHandler = TestProbe()
-      val newConnectedPeer: ConnectedPeer = ConnectedPeer(newAvailablePeers.head._1, newPeerHandler.ref, Outgoing,
-        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
-          "test-peer_new", Some(newAvailablePeers.head._1), System.currentTimeMillis()))
-
-      networkController.send(peersKeeper, HandshakedDone(newConnectedPeer))
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.knownPeers.contains(newAvailablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.knownPeers.get(newAvailablePeers.head._1) shouldBe Some(0)
-
-      /* Try to ask one more peer while max number of connections has been expired */
-
-      networkController.send(peersKeeper, RequestPeerForConnection)
-      networkController.expectNoMsg()
-
-      /* Now we will ban one peer */
-
-      val actorWhichSendBanMessage = TestProbe()
-
-      actorWhichSendBanMessage.send(peersKeeper, BanPeer(newConnectedPeer, ExpiredNumberOfConnections))
-      newPeerHandler.expectMsgAnyOf(CloseConnection, GetPeersNetworkMessage)
-      peersKeeper.underlyingActor.blackList.contains(newConnectedPeer.socketAddress.getAddress) shouldBe true
-      networkController.send(peersKeeper, ConnectionStopped(newConnectedPeer.socketAddress))
-      peersKeeper.underlyingActor.knownPeers.contains(newConnectedPeer.socketAddress) shouldBe false
-      peersKeeper.underlyingActor.connectedPeers.contains(newConnectedPeer.socketAddress) shouldBe false
-
-      /* Try to setup Incoming connection from banned peer */
-
-      networkController.send(peersKeeper, VerifyConnection(newConnectedPeer.socketAddress, remoteAkkaConnectionHandler.ref))
-      networkController.expectNoMsg()
-
-      /* Try to request new connection */
-
-      val updatedAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers.takeRight(1)
-
-      networkController.send(peersKeeper, RequestPeerForConnection)
-      networkController.expectMsg(PeerForConnection(updatedAvailablePeers.head._1))
-      peersKeeper.underlyingActor.outgoingConnections.contains(updatedAvailablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe true
-
-      val updatedRemoteAkkaConnectionHandler = TestProbe()
-
-      networkController.send(peersKeeper, VerifyConnection(updatedAvailablePeers.head._1, updatedRemoteAkkaConnectionHandler.ref))
-      networkController.expectMsg(ConnectionVerified(updatedAvailablePeers.head._1, updatedRemoteAkkaConnectionHandler.ref, Outgoing))
-      peersKeeper.underlyingActor.outgoingConnections.contains(updatedAvailablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe true
-
-      val updatedConnectedPeer: ConnectedPeer = ConnectedPeer(updatedAvailablePeers.head._1, updatedRemoteAkkaConnectionHandler.ref, Outgoing,
-        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
-          "test-peer", Some(updatedAvailablePeers.head._1), System.currentTimeMillis()))
-
-      networkController.send(peersKeeper, HandshakedDone(updatedConnectedPeer))
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.knownPeers.contains(updatedAvailablePeers.head._1) shouldBe true
-      peersKeeper.underlyingActor.knownPeers.get(updatedAvailablePeers.head._1) shouldBe Some(0)
-    }
-    "ban peer we can't connect to" in {
-      val networkController = TestProbe()
-      val nodeViewSync = TestProbe()
-      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
-
-      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
-
-      networkController.send(peersKeeper, RequestPeerForConnection)
-      networkController.expectMsg(PeerForConnection(availablePeers.head._1))
-
-      networkController.send(peersKeeper, OutgoingConnectionFailed(availablePeers.head._1))
-      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.knownPeers.get(availablePeers.head._1) shouldBe Some(1)
-
-      networkController.send(peersKeeper, RequestPeerForConnection)
-      networkController.expectMsg(PeerForConnection(availablePeers.head._1))
-
-      networkController.send(peersKeeper, OutgoingConnectionFailed(availablePeers.head._1))
-      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe false
-      peersKeeper.underlyingActor.blackList.contains(availablePeers.head._1.getAddress) shouldBe true
-    }
+//    "maintain outgoing connection process correctly" in {
+//      /* Request first peer while current number of connections is 0 */
+//      val networkController = TestProbe()
+//      val nodeViewSync = TestProbe()
+//      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
+//
+//      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
+//
+//      networkController.send(peersKeeper, RequestPeerForConnection)
+//      networkController.expectMsg(PeerForConnection(availablePeers.head._1))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe true
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe true
+//
+//      val remoteAkkaConnectionHandler = TestProbe()
+//
+//      networkController.send(peersKeeper, VerifyConnection(availablePeers.head._1, remoteAkkaConnectionHandler.ref))
+//      networkController.expectMsg(ConnectionVerified(availablePeers.head._1, remoteAkkaConnectionHandler.ref, Outgoing))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe true
+//
+//      val peerHandler = TestProbe()
+//      val connectedPeer: ConnectedPeer = ConnectedPeer(availablePeers.head._1, peerHandler.ref, Outgoing,
+//        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
+//          "test-peer", Some(availablePeers.head._1), System.currentTimeMillis()))
+//
+//      networkController.send(peersKeeper, HandshakedDone(connectedPeer))
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe true
+//      peersKeeper.underlyingActor.knownPeers.get(availablePeers.head._1) shouldBe Some(0)
+//
+//      /* Request next peer after first connection setup */
+//
+//      val newAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers.drop(1)
+//
+//      networkController.send(peersKeeper, RequestPeerForConnection)
+//      networkController.expectMsg(PeerForConnection(newAvailablePeers.head._1))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(newAvailablePeers.head._1) shouldBe true
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe true
+//
+//      networkController.send(peersKeeper, VerifyConnection(newAvailablePeers.head._1, remoteAkkaConnectionHandler.ref))
+//      networkController.expectMsg(ConnectionVerified(newAvailablePeers.head._1, remoteAkkaConnectionHandler.ref, Outgoing))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(newAvailablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe true
+//
+//      val newPeerHandler = TestProbe()
+//      val newConnectedPeer: ConnectedPeer = ConnectedPeer(newAvailablePeers.head._1, newPeerHandler.ref, Outgoing,
+//        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
+//          "test-peer_new", Some(newAvailablePeers.head._1), System.currentTimeMillis()))
+//
+//      networkController.send(peersKeeper, HandshakedDone(newConnectedPeer))
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(newAvailablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.knownPeers.contains(newAvailablePeers.head._1) shouldBe true
+//      peersKeeper.underlyingActor.knownPeers.get(newAvailablePeers.head._1) shouldBe Some(0)
+//
+//      /* Try to ask one more peer while max number of connections has been expired */
+//
+//      networkController.send(peersKeeper, RequestPeerForConnection)
+//      networkController.expectNoMsg()
+//
+//      /* Now we will ban one peer */
+//
+//      val actorWhichSendBanMessage = TestProbe()
+//
+//      actorWhichSendBanMessage.send(peersKeeper, BanPeer(newConnectedPeer, ExpiredNumberOfConnections))
+//      newPeerHandler.expectMsgAnyOf(CloseConnection, GetPeersNetworkMessage)
+//      peersKeeper.underlyingActor.blackList.contains(newConnectedPeer.socketAddress.getAddress) shouldBe true
+//      networkController.send(peersKeeper, ConnectionStopped(newConnectedPeer.socketAddress))
+//      peersKeeper.underlyingActor.knownPeers.contains(newConnectedPeer.socketAddress) shouldBe false
+//      peersKeeper.underlyingActor.connectedPeers.contains(newConnectedPeer.socketAddress) shouldBe false
+//
+//      /* Try to setup Incoming connection from banned peer */
+//
+//      networkController.send(peersKeeper, VerifyConnection(newConnectedPeer.socketAddress, remoteAkkaConnectionHandler.ref))
+//      networkController.expectNoMsg()
+//
+//      /* Try to request new connection */
+//
+//      val updatedAvailablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers.takeRight(1)
+//
+//      networkController.send(peersKeeper, RequestPeerForConnection)
+//      networkController.expectMsg(PeerForConnection(updatedAvailablePeers.head._1))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(updatedAvailablePeers.head._1) shouldBe true
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe true
+//
+//      val updatedRemoteAkkaConnectionHandler = TestProbe()
+//
+//      networkController.send(peersKeeper, VerifyConnection(updatedAvailablePeers.head._1, updatedRemoteAkkaConnectionHandler.ref))
+//      networkController.expectMsg(ConnectionVerified(updatedAvailablePeers.head._1, updatedRemoteAkkaConnectionHandler.ref, Outgoing))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(updatedAvailablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe true
+//
+//      val updatedConnectedPeer: ConnectedPeer = ConnectedPeer(updatedAvailablePeers.head._1, updatedRemoteAkkaConnectionHandler.ref, Outgoing,
+//        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
+//          "test-peer", Some(updatedAvailablePeers.head._1), System.currentTimeMillis()))
+//
+//      networkController.send(peersKeeper, HandshakedDone(updatedConnectedPeer))
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(updatedAvailablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.knownPeers.contains(updatedAvailablePeers.head._1) shouldBe true
+//      peersKeeper.underlyingActor.knownPeers.get(updatedAvailablePeers.head._1) shouldBe Some(0)
+//    }
+//    "remove peer from available we can't connect to" in {
+//      val networkController = TestProbe()
+//      val nodeViewSync = TestProbe()
+//      val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(settingsWithAllPeers, nodeViewSync.ref, TestProbe().ref))
+//
+//      val availablePeers: Map[InetSocketAddress, Int] = peersKeeper.underlyingActor.knownPeers
+//
+//      networkController.send(peersKeeper, RequestPeerForConnection)
+//      networkController.expectMsg(PeerForConnection(availablePeers.head._1))
+//
+//      networkController.send(peersKeeper, OutgoingConnectionFailed(availablePeers.head._1))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.knownPeers.get(availablePeers.head._1) shouldBe Some(1)
+//
+//      networkController.send(peersKeeper, RequestPeerForConnection)
+//      networkController.expectMsg(PeerForConnection(availablePeers.head._1))
+//
+//      networkController.send(peersKeeper, OutgoingConnectionFailed(availablePeers.head._1))
+//      peersKeeper.underlyingActor.outgoingConnections.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.knownPeers.contains(availablePeers.head._1) shouldBe false
+//      peersKeeper.underlyingActor.blackList.contains(availablePeers.head._1.getAddress) shouldBe true
+//    }
     "remove peer from available if it has been banned" in {
       val networkController = TestProbe()
       val nodeViewSync = TestProbe()
