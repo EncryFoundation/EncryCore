@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
-import encry.network.BlackList.{ExpiredNumberOfConnections, SyntacticallyInvalidModifier}
+import encry.network.BlackList.{ExpiredNumberOfConnections, SyntacticallyInvalidPersistentModifier}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming, Outgoing}
@@ -279,7 +279,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
         Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion),
           "test-peer", Some(remoteAddress), System.currentTimeMillis()))
 
-      peersKeeper ! BanPeer(connectedPeer, SyntacticallyInvalidModifier)
+      peersKeeper ! BanPeer(connectedPeer, SyntacticallyInvalidPersistentModifier)
       networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()

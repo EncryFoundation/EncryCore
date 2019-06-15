@@ -4,29 +4,14 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import encry.consensus.History
-import encry.consensus.History.Older
-import encry.local.miner.Miner.StartMining
-import encry.network.BlackList._
 import encry.modifiers.InstanceFactory
-import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DeliveryManagerTests.{DMUtils, DummyEncryAppSettingsReader}
-import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, UpdatedHistory}
-import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
+import encry.network.BlackList._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
-import encry.network.PeersKeeper.{BanPeer, RequestPeersForFirstSyncInfo, UpdatedPeersCollection}
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.InitialPriority
+import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
+import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
-import encry.view.history.EncryHistory
-import org.encryfoundation.common.crypto.equihash.EquihashSolution
-import org.encryfoundation.common.modifiers.history.{Header, HeaderProtoSerializer}
-import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-import scorex.crypto.hash.Digest32
-import scorex.utils.Random
 
 class BlackListTests extends WordSpecLike
   with Matchers
@@ -46,13 +31,13 @@ class BlackListTests extends WordSpecLike
     "temporary ban requested peer correctly" in {
       val blackList: BlackList = new BlackList(settingsWithKnownPeers)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
-      blackList.banPeer(SemanticallyInvalidModifier, peer)
+      blackList.banPeer(SemanticallyInvalidPersistentModifier, peer)
       blackList.contains(peer) shouldBe true
     }
     "clean black list from peers with expired ban time which were banned by temporary ban" in {
       val blackList: BlackList = new BlackList(settingsWithKnownPeers)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
-      blackList.banPeer(SyntacticallyInvalidModifier, peer)
+      blackList.banPeer(SyntacticallyInvalidPersistentModifier, peer)
       Thread.sleep(2000)
       blackList.cleanupBlackList()
       blackList.contains(peer) shouldBe false

@@ -6,19 +6,19 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.UpdatingConnectedPeers
-import encry.network.BlackList.{BanReason, ExpiredNumberOfConnections, SentPeersMessageWithoutRequest}
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.PeerConnectionHandler._
-import encry.network.PeersKeeper._
-import encry.settings.EncryAppSettings
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
+import encry.network.BlackList.{BanReason, SentPeersMessageWithoutRequest}
 import encry.network.ConnectedPeersList.PeerInfo
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
+import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
+import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import scala.concurrent.duration._
 import scala.util.Try
@@ -35,7 +35,8 @@ class PeersKeeper(settings: EncryAppSettings,
 
   val blackList: BlackList = new BlackList(settings)
 
-  var knownPeers: Map[InetSocketAddress, Int] = settings.network.knownPeers.map(peer => peer -> 0).toMap
+  var knownPeers: Map[InetSocketAddress, Int] = settings.network.knownPeers
+    .collect { case peer if !isSelf(peer) => peer -> 0 }.toMap
 
   var awaitingHandshakeConnections: Set[InetSocketAddress] = Set.empty
 
@@ -70,6 +71,7 @@ class PeersKeeper(settings: EncryAppSettings,
         s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.getBannedPeersAndReasons.mkString(",")
         }")
+      //todo add shuffle
       knownPeers
         .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
         .headOption
@@ -138,7 +140,8 @@ class PeersKeeper(settings: EncryAppSettings,
       val connectionAttempts: Int = knownPeers.getOrElse(peer, 0) + 1
       if (connectionAttempts >= settings.network.maxNumberOfReConnections) {
         logger.info(s"Banning peer: $peer for ExpiredNumberOfConnections.")
-        blackList.banPeer(ExpiredNumberOfConnections, peer.getAddress)
+        //todo think about penalty for the less time than general ban
+        //blackList.banPeer(ExpiredNumberOfConnections, peer.getAddress)
         knownPeers -= peer
       } else knownPeers = knownPeers.updated(peer, connectionAttempts)
   }
@@ -191,14 +194,12 @@ class PeersKeeper(settings: EncryAppSettings,
     case SendLocalSyncInfo => sendSyncInfo()
 
     case PeerFromCli(peer) =>
-      if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && connectedPeers.contains(peer)) {
+      if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && connectedPeers.contains(peer) && !isSelf(peer)) {
         outgoingConnections += peer
         sender() ! PeerForConnection(peer)
       }
 
-    case RemovePeerFromBlackList(peer) =>
-      blackList.remove(peer.getAddress)
-      knownPeers = knownPeers.updated(peer, 0)
+    case RemovePeerFromBlackList(peer) => blackList.remove(peer.getAddress)
 
     case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
   }
@@ -290,7 +291,7 @@ object PeersKeeper {
         case ConnectionStopped(_) => 2
         case OutgoingConnectionFailed(_) => 2
         case PoisonPill => 4
-        case otherwise => 3
+        case _          => 3
       })
 
 }

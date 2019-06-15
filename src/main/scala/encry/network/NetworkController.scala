@@ -73,7 +73,7 @@ class NetworkController(settings: EncryAppSettings,
       logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
-      peersKeeper ! BanPeer(remote, InvalidNetworkMessage)
+      peersKeeper ! BanPeer(remote, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
   }
 

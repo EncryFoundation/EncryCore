@@ -32,15 +32,15 @@ final class BlackList(settings: EncryAppSettings) {
 object BlackList {
 
   sealed trait BanReason
-  case object SemanticallyInvalidModifier extends BanReason
-  case object SyntacticallyInvalidModifier extends BanReason
+  case object SemanticallyInvalidPersistentModifier extends BanReason
+  case object SyntacticallyInvalidPersistentModifier extends BanReason
+  case object SyntacticallyInvalidTransaction extends BanReason
+  case object CorruptedSerializedBytes extends BanReason
   case object SpamSender extends BanReason
   case object SentPeersMessageWithoutRequest extends BanReason
   case object SentInvForPayload extends BanReason
   case object SentNetworkMessageWithTooManyModifiers extends BanReason
-  case object InvalidNetworkMessage extends BanReason
-  case object InvalidModifierFromNetwork extends BanReason
-  case object PeerUnavailable extends BanReason
+  final case class InvalidNetworkMessage(msgName: String) extends BanReason
   case object ExpiredNumberOfConnections extends BanReason
 
   final case class BanTime(time: Long) extends AnyVal

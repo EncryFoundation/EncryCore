@@ -2,7 +2,6 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
-
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
@@ -14,7 +13,6 @@ import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationStat
 import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._

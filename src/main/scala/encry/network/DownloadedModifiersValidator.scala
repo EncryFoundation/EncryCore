@@ -5,7 +5,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.{SemanticallyInvalidModifier, SyntacticallyInvalidModifier}
+import encry.network.BlackList._
 import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, ModifiersIdsForRemove}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -19,7 +19,6 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.validation.RecoverableModifierError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.utils.Algos
-
 import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(settings: EncryAppSettings,
@@ -46,7 +45,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
               case Failure(ex) =>
                 logger.info(s"Modifier: ${modifier.encodedId} after testApplicable has: ${ex.getMessage}. This is " +
                   s"unhandled exception so reject this modifier and ban peer: $remote")
-                peersKeeper ! BanPeer(remote, SemanticallyInvalidModifier)
+                peersKeeper ! BanPeer(remote, SemanticallyInvalidPersistentModifier)
                 (modsColl, forRemove :+ id)
               case Success(_) =>
                 logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
@@ -54,10 +53,10 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             }
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} invalid cause of: isSyntacticallyValid = false")
-            peersKeeper ! BanPeer(remote, SyntacticallyInvalidModifier)
+            peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
             (modsColl, forRemove :+ id)
           case Failure(ex) =>
-            peersKeeper ! BanPeer(remote, SyntacticallyInvalidModifier)
+            peersKeeper ! BanPeer(remote, CorruptedSerializedBytes)
             logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
             (modsColl, forRemove :+ id)
         }
@@ -76,11 +75,11 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
               Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
                 case Success(tx) if tx.semanticValidity.isSuccess => (transactionsColl :+ tx, forRemove)
                 case Success(tx) =>
-                  logger.info(s"Payload with id: ${tx.encodedId} invalid caze of: ${tx.semanticValidity}.")
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  logger.info(s"Payload with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
+                  context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
                   (transactionsColl, forRemove :+ id)
                 case Failure(ex) =>
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidModifier)
+                  context.parent ! BanPeer(remote, CorruptedSerializedBytes)
                   logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
                   (transactionsColl, forRemove :+ id)
               }

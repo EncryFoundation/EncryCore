@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
-import encry.network.BlackList.{SemanticallyInvalidModifier, SyntacticallyInvalidModifier}
+import encry.network.BlackList.{SemanticallyInvalidPersistentModifier, SyntacticallyInvalidPersistentModifier}
 import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, ModifiersIdsForRemove}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
@@ -94,7 +94,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val msg = ModifiersForValidating(connectedPeer, Header.modifierTypeId, mods)
 
       deliveryManager.send(downloadedModifiersValidator, msg)
-      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidModifier))
+      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidPersistentModifier))
       nodeViewHolder.expectNoMsg()
       nodeViewSync.expectMsg(ModifiersIdsForRemove(Seq(header_second.id)))
     }
@@ -136,7 +136,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
 
       deliveryManager.send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
-      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidModifier))
+      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidPersistentModifier))
       nodeViewHolder.expectMsg(ModifiersFromRemote(Seq(payload)))
       nodeViewSync.expectMsg(ModifiersIdsForRemove(historyWith10Blocks._2.map(b => b.payload.id)))
     }
