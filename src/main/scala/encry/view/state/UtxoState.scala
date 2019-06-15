@@ -93,7 +93,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
   override def applyModifier(mod: PersistentModifier): Try[UtxoState] = mod match {
     //here
     case block: Block =>
-      logger.debug(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
       val startTime = System.currentTimeMillis()
       logger.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height.")
@@ -214,13 +214,13 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.realContract,
+              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
                 defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
             case (Some(bx), Some(defaultProof)) =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition,
-                Context(tx, bx, stateView), input.realContract, Seq(defaultProof))) acc :+ bx else acc
+                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) acc :+ bx else acc
             case (Some(bx), defaultProofOpt) =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.realContract,
+              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
                 defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
             case _ => acc
           }

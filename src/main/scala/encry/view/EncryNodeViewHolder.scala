@@ -11,8 +11,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
 import encry.consensus.History.ProgressInfo
-import encry.network.AuxiliaryHistoryHolder
-import encry.network.AuxiliaryHistoryHolder.NewHistory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -31,6 +29,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -45,9 +44,9 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-  val auxHistoryHolder: ActorRef =
-    system.actorOf(Props(AuxiliaryHistoryHolder(nodeView.history, nodeViewSynchronizer))
-      .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
+//  val auxHistoryHolder: ActorRef =
+//    system.actorOf(Props(AuxiliaryHistoryHolder(nodeView.history, nodeViewSynchronizer))
+//      .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
 
   memoryPoolRef ! UpdatedState(nodeView.state)
 
@@ -69,7 +68,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     System.exit(100)
   }
 
-  system.scheduler.schedule(5.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
+  system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
     s"Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -174,7 +173,10 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet))
-    if (updatedHistory.nonEmpty) context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+    if (updatedHistory.nonEmpty) {
+      nodeViewSynchronizer ! ChangedHistory(newNodeView.history)
+      context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+    }
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
     nodeView = newNodeView
   }
@@ -232,13 +234,13 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
                 case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              auxHistoryHolder ! NewHistory(newHis)
+              //auxHistoryHolder ! NewHistory(newHis)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
-              auxHistoryHolder ! NewHistory(newHis)
+              //auxHistoryHolder ! NewHistory(newHis)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
@@ -375,19 +377,23 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] = if (!EncryHistory.getHistoryObjectsDir(settings).listFiles.isEmpty)
-    try {
-      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
-      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val state: StateType =
-        restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
-      Some(NodeView(history, state, wallet))
-    } catch {
-      case ex: Throwable =>
-        logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
-        new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
-        Some(genesisState)
-    } else None
+  def restoreState(): Option[NodeView] =
+    if (EncryHistory.getHistoryIndexDir(settings).listFiles.nonEmpty)
+      try {
+        val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+        val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+        val state: StateType =
+          restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
+        Some(NodeView(history, state, wallet))
+      } catch {
+        case ex: Throwable =>
+          logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+          new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
+          Some(genesisState)
+      } else {
+      logger.info("none")
+      None
+    }
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
     val dir: File = EncryState.getStateDir(settings)

@@ -5,11 +5,16 @@ import encry.EncryApp.system
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import io.circe.syntax._
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity.Invalid
 import org.encryfoundation.common.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
+
+import scala.collection.immutable.HashSet
 import scala.util.{Failure, Try}
 
 trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
@@ -27,6 +32,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   protected[history] def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]]
 
+  //contains last n proccesed blocks
+  var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
+
+  var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
+
   /** Process full block when we have one.
     *
     * @param fullBlock  - block to process
@@ -38,6 +48,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
+    addBlockToCacheIfNecessary(fullBlock)
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
   }
 
@@ -88,6 +99,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
               scoreOf(fullBlock.id)
                 .flatMap(fbScore => bestHeaderIdOpt.flatMap(id => scoreOf(id).map(_ < fbScore)))
                 .getOrElse(false))
+
         updateStorage(newModRow, newBestHeader.id, updateBestHeader)
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -105,12 +117,31 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
-      heightOfThisHeader <- typedModifierById[Header](id).map(_.height)
+      heightOfThisHeader <- headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
     isBetter getOrElse false
   }
+
+  private def addBlockToCacheIfNecessary(b: Block): Unit =
+    if (b.header.height >= bestBlockHeight - TestNetConstants.MaxRollbackDepth) {
+      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
+      val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
+      blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
+      blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
+      // cleanup cache if necessary
+      if (blocksCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
+        blocksCacheIndexes.get(bestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
+          val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
+          logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
+          blocksCache = blocksCache.filterNot{case (id, _) => wrappedIds.contains(id)}
+        }
+        blocksCacheIndexes = blocksCacheIndexes - (bestBlockHeight - TestNetConstants.MaxRollbackDepth)
+      }
+      logger.debug(s"headersCache size: ${blocksCache.size}")
+      logger.debug(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")
+    }
 
   private def nonBestBlock: BlockProcessing = {
     case params =>
@@ -138,7 +169,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
-      .flatMap(id => typedModifierById[Header](id))
+      .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
       .flatMap(h => Seq(h.adProofsId, h.payloadId))
     historyStorage.removeObjects(toRemove)
   }

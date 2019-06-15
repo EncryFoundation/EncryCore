@@ -8,7 +8,7 @@ import scorex.crypto.hash._
 sealed trait EncryNode[D <: Digest] extends StrictLogging{
 
   var visited: Boolean = false
-  var labelOpt: Option[D] = None
+  var labelOpt: Option[D] = Option.empty[D]
 
   protected def arrayToString(a: Array[Byte]): String = Base16.encode(a).take(8)
 

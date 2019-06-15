@@ -4,8 +4,10 @@ import encry.consensus.History.ProgressInfo
 import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
 import encry.settings.EncryAppSettings
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+
 import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
@@ -23,15 +25,14 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
         else Some(processBlock(block, payload))
       ).getOrElse(putToHistory(payload))
 
-  private def getBlockByPayload(payload: Payload): Option[Block] = {
-    typedModifierById[Header](payload.headerId).flatMap { h =>
+  private def getBlockByPayload(payload: Payload): Option[Block] = headersCache.get(ByteArrayWrapper(payload.headerId))
+    .orElse(typedModifierById[Header](payload.headerId)).flatMap { h =>
       if (!adState) Some(Block(h, payload, None))
       else typedModifierById[ADProofs](h.adProofsId).map(ps => Block(h, payload, Some(ps)))
     }
-  }
 
   override protected def validate(m: Payload): Try[Unit] =
-    modifierValidation(m, typedModifierById[Header](m.headerId))
+    modifierValidation(m, headersCache.get(ByteArrayWrapper(m.headerId)).orElse(typedModifierById[Header](m.headerId)))
 
   private def putToHistory(payload: Payload): ProgressInfo[PersistentModifier] = {
     historyStorage.insertObjects(Seq(payload))

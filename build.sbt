@@ -104,8 +104,8 @@ evictionWarningOptions in update := EvictionWarningOptions.default
 logLevel := Level.Info
 val opts = Seq(
   "-server",
-  "-Xms1G",
-  "-Xmx2G",
+  "-Xms3G",
+  "-Xmx6G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
