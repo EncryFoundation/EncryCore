@@ -76,6 +76,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case ChangedHistory(reader: EncryHistory) =>
       logger.info(s"get history: $reader from $sender")
       deliveryManager ! UpdatedHistory(reader)
+      downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case msg => logger.info(s"Nvsh got strange message: $msg during history awaiting.")
