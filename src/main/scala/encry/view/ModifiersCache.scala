@@ -9,7 +9,6 @@ import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.validation.{MalformedModifierError, RecoverableModifierError}
-
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap

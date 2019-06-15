@@ -26,8 +26,8 @@ object ModifiersToNetworkUtils {
   }).flatten
 
   def isSyntacticallyValid(modifier: PersistentModifier): Boolean = modifier match {
-    case h: Header => HeaderUtils.syntacticallyValidity(h).isSuccess
+    case h: Header  => HeaderUtils.syntacticallyValidity(h).isSuccess
     case p: Payload => PayloadUtils.syntacticallyValidity(p).isSuccess
-    case _ => true
+    case _          => true
   }
 }

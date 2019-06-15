@@ -115,7 +115,7 @@ object DownloadedModifiersValidator {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case UpdatedHistory(_) => 0
-        case PoisonPill => 2
-        case otherwise => 1
+        case PoisonPill        => 2
+        case _                 => 1
       })
 }

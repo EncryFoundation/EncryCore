@@ -1,6 +1,5 @@
 package encry.modifiers.history
 
-import com.google.common.primitives.{Ints, Longs}
 import encry.settings.TestConstants
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.constants.TestNetConstants
@@ -22,10 +21,4 @@ object HeaderUtils {
     .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize,
       s"TransactionsRoot's size should be ${TestConstants.TransactionsRootSize} bytes")
     .result
-
-  def headerBytesSize(header: Header): Int = 1 + header.id.size + header.parentId.size +
-    header.adProofsRoot.size + header.stateRoot.size + header.transactionsRoot.size +
-      Longs.toByteArray(header.timestamp).length + Ints.toByteArray(header.height).length +
-    Longs.toByteArray(header.nonce).length
-
 }

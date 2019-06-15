@@ -1,6 +1,6 @@
 package encry.network
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{HistoryComparisonResult, Older, Unknown}
 import encry.network.ConnectedPeersList.{LastUptime, PeerInfo}
@@ -46,7 +46,7 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
         val newPeerInfo: PeerInfo = value.copy(historyComparisonResult = status)
         peers = peers.updated(peer.socketAddress, newPeerInfo)
       case None =>
-        //todo can we have such case??
+        //todo do we have such case?
         logger.info(s"Trying to update history comparison result but there is no such peer in connected collection.")
     }
 
@@ -56,7 +56,9 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
     case Some(info) =>
       val newInfo: PeerInfo = info.copy(lastUptime = LastUptime(System.currentTimeMillis()))
       peers = peers.updated(peer, newInfo)
-    case None => //todo do we have such case?
+    case None =>
+      //todo do we have such case?
+      logger.info(s"Trying to update time but there is no such peer in connected collection.")
   }
 
   def getPeersF[T](p: (InetSocketAddress, PeerInfo) => Boolean,

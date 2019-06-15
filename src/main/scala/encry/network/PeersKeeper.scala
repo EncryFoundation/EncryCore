@@ -285,14 +285,14 @@ object PeersKeeper {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case OtherNodeSyncingStatus(_, _, _) => 0
-        case AccumulatedPeersStatistic(_) => 1
-        case BanPeer(_, _) => 1
-        case VerifyConnection(_, _) => 2
-        case HandshakedDone(_) => 2
-        case ConnectionStopped(_) => 2
-        case OutgoingConnectionFailed(_) => 2
-        case PoisonPill => 4
-        case _          => 3
+        case AccumulatedPeersStatistic(_)    => 1
+        case BanPeer(_, _)                   => 1
+        case VerifyConnection(_, _)          => 2
+        case HandshakedDone(_)               => 2
+        case ConnectionStopped(_)            => 2
+        case OutgoingConnectionFailed(_)     => 2
+        case PoisonPill                      => 4
+        case _                               => 3
       })
 
 }
