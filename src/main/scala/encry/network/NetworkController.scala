@@ -70,7 +70,7 @@ class NetworkController(settings: EncryAppSettings,
 
   def businessLogic: Receive = {
     case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.network.syncPacketLength) =>
-      logger.info(s"Got ${message.messageName} on the NetworkController.")
+      logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       peersKeeper ! BanPeer(remote, InvalidNetworkMessage(message.messageName))
@@ -123,7 +123,7 @@ class NetworkController(settings: EncryAppSettings,
     mH.find(_._1.contains(messageId)).map(_._2) match {
       case Some(handler) =>
         handler ! DataFromPeer(message, remote)
-        logger.info(s"Send message DataFromPeer with ${message.messageName} to $handler.")
+        logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler.")
       case None => logger.info("No handlers found for message: " + message.messageName)
     }
 }

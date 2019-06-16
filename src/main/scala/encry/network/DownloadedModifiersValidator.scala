@@ -67,7 +67,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
         nodeViewHolder ! ModifiersFromRemote(modifiers._1)
       }
       if (modifiers._2.nonEmpty) {
-        logger.info(s"Sending to delivery manager invalid modifiers: ${modifiers._2.map(k => Algos.encode(k))}.")
+        logger.debug(s"Sending to delivery manager invalid modifiers: ${modifiers._2.map(k => Algos.encode(k))}.")
         nodeViewSync ! ModifiersIdsForRemove(modifiers._2)
       }
 

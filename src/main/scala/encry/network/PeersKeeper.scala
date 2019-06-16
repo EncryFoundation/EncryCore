@@ -29,8 +29,6 @@ class PeersKeeper(settings: EncryAppSettings,
 
   import context.dispatcher
 
-  //todo проверить на рассылку пиров
-
   val connectWithOnlyKnownPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(true)
 
   val connectedPeers: ConnectedPeersList = new ConnectedPeersList(settings)
@@ -190,7 +188,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case SendToNetwork(message, strategy) =>
       val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(allPeers, getConnectedPeersF).toSeq
       strategy.choose(peers).foreach { peer =>
-        logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
+        logger.debug(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
       }
 
