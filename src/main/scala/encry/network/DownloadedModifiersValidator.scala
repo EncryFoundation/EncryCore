@@ -62,10 +62,14 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
         }
       }
 
-      logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size}.")
-      if (modifiers._1.nonEmpty) nodeViewHolder ! ModifiersFromRemote(modifiers._1)
-      logger.info(s"Sending to delivery manager invalid modifiers: ${modifiers._2.map(k => Algos.encode(k))}.")
-      if (modifiers._2.nonEmpty) nodeViewSync ! ModifiersIdsForRemove(modifiers._2)
+      if (modifiers._1.nonEmpty) {
+        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size}.")
+        nodeViewHolder ! ModifiersFromRemote(modifiers._1)
+      }
+      if (modifiers._2.nonEmpty) {
+        logger.info(s"Sending to delivery manager invalid modifiers: ${modifiers._2.map(k => Algos.encode(k))}.")
+        nodeViewSync ! ModifiersIdsForRemove(modifiers._2)
+      }
 
     case ModifiersForValidating(remote, typeId, filteredModifiers) => typeId match {
       case Transaction.modifierTypeId =>
@@ -85,10 +89,14 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
               }
           }
 
-        logger.debug(s"Sending to node mempool parsed transactions: ${transactions._1.map(_.encodedId)}.")
-        if (transactions._1.nonEmpty) memoryPoolRef ! TransactionsFromRemote(transactions._1)
-        logger.debug(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
-        if (transactions._2.nonEmpty) nodeViewSync ! ModifiersIdsForRemove(transactions._2)
+        if (transactions._1.nonEmpty) {
+          logger.debug(s"Sending to node mempool parsed transactions: ${transactions._1.map(_.encodedId)}.")
+          memoryPoolRef ! TransactionsFromRemote(transactions._1)
+        }
+        if (transactions._2.nonEmpty) {
+          logger.debug(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
+          nodeViewSync ! ModifiersIdsForRemove(transactions._2)
+        }
     }
     case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
     case msg => logger.info(s"Got $msg on DownloadedModifiersValidator")

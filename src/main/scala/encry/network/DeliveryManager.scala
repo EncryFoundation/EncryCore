@@ -145,7 +145,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
-        logger.info(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
+        logger.debug(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))

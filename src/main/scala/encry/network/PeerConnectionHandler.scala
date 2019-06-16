@@ -148,6 +148,7 @@ class PeerConnectionHandler(connection: ActorRef,
     case message: NetworkMessage =>
       def sendMessage(): Unit = {
         outMessagesCounter += 1
+        logger.info(s"Sent to $remote msg: ${message.messageName}")
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
         connection ! Write(bytes, Ack(outMessagesCounter))
@@ -225,7 +226,7 @@ class PeerConnectionHandler(connection: ActorRef,
         GeneralizedNetworkMessage.fromProto(packet.toArray) match {
           case Success(message) =>
             context.parent ! MessageFromNetwork(message, selfPeer)
-            logger.debug("Received message " + message.messageName + " from " + remote)
+            logger.info("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
             logger.info(s"Corrupted data from: " + remote + s"$e")
