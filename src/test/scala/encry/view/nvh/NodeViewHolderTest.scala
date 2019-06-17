@@ -1,24 +1,5 @@
 package encry.view.nvh
 
-import java.io.File
-
-import akka.actor.ActorSystem
-import akka.testkit.TestKit
-import encry.modifiers.InstanceFactory
-import encry.network.DeliveryManagerTests.DummyEncryAppSettingsReader
-import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage
-import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.EncryNodeViewHolder.ReceivableMessages.ModifiersFromRemote
-import encry.view.state.{BoxHolder, EncryState, UtxoState}
-import org.encryfoundation.common.modifiers.history._
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.Difficulty
-import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-
-import scala.concurrent.Await
-
 //class NodeViewHolderTest extends WordSpecLike
 //  with BeforeAndAfterAll
 //  with Matchers

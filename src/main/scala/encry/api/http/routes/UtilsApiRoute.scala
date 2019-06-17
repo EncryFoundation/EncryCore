@@ -1,8 +1,10 @@
-package encry.api.http
+package encry.api.http.routes
 
 import java.security.SecureRandom
+
 import akka.actor.ActorRefFactory
 import akka.http.scaladsl.server.Route
+import encry.api.http.ApiRoute
 import encry.settings.RESTApiSettings
 import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Blake2b256

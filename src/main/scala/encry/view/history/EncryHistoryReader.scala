@@ -15,7 +15,6 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
-
 import scala.annotation.tailrec
 import scala.util.{Failure, Try}
 
@@ -118,10 +117,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   }
 
   def testApplicable(modifier: PersistentModifier): Try[Unit] = modifier match {
-    case header: Header => validate(header)
-    case payload: Payload => validate(payload)
+    case header: Header     => validate(header)
+    case payload: Payload   => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
-    case mod: Any => Failure(new Exception(s"Modifier $mod is of incorrect type."))
+    case mod: Any           => Failure(new Exception(s"Modifier $mod is of incorrect type."))
   }
 
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt

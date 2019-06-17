@@ -5,7 +5,6 @@ import akka.testkit.{TestActor, TestActorRef, TestProbe}
 import encry.EncryApp.settings
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.EncryNodeViewHolder
 import encry.view.state.UtxoState
 
 object NVHUtils {

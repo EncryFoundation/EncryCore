@@ -1,23 +1,25 @@
 package encry.cli.commands
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import encry.EncryApp._
 import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import scala.concurrent.Future
 
 /**
-  * Command "settings addPeer -host=<addr[String]> -port=<addr[String]>"
-  * Example: settings addPeer -host='172.16.10.57' -port=9020
+  * Command "settings removeFromBlackList -host=<addr[String]> -port=<addr[String]>"
+  * Example: settings removeFromBlackList -host='10.101.0.30' -port=53648
   */
-object AddPeer extends Command {
+
+object RemoveFromBlackList extends Command {
+
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     val host: String = args.requireArg[Ast.Str]("host").s
     val port: Long = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
-    nodeViewSynchronizer ! PeerFromCli(peer)
-    Future(Some(Response("Peer added!")))
+    nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
+    Future(Some(Response("Peer removed from black list")))
   }
 
-  case class PeerFromCli(address: InetSocketAddress)
+  final case class RemovePeerFromBlackList(address: InetSocketAddress)
 }

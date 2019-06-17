@@ -19,7 +19,8 @@ case class EncryAppSettings(directory: String,
                             postgres: Option[PostgresSettings],
                             influxDB: Option[InfluxDBSettings],
                             levelDB: LevelDBSettings,
-                            monitoringSettings: Option[MonitoringSettings])
+                            monitoringSettings: Option[MonitoringSettings],
+                            blackList: BlackListSettings)
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
@@ -60,18 +61,19 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     .withFallback(ConfigFactory.load())
   def fromConfig(config: Config): EncryAppSettings = {
 
-    val directory = config.as[String](s"$configPath.directory")
-    val nodeSettings = config.as[NodeSettings](s"$configPath.node")
-    val walletSettings = config.as[Option[WalletSettings]](s"$configPath.wallet")
-    val kafkaSettings = config.as[Option[KafkaSettings]](s"$configPath.kafka")
-    val networkSettings = config.as[NetworkSettings](s"$configPath.network")
-    val restApiSettings = config.as[RESTApiSettings](s"$configPath.restApi")
-    val storageSettings = config.as[StorageSettings](s"$configPath.storage")
-    val ntpSettings = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
-    val postgresSettings = config.as[Option[PostgresSettings]](s"$configPath.postgres")
-    val influxSettings = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
-    val levelDb = config.as[LevelDBSettings](s"$configPath.levelDB")
+    val directory          = config.as[String](s"$configPath.directory")
+    val nodeSettings       = config.as[NodeSettings](s"$configPath.node")
+    val walletSettings     = config.as[Option[WalletSettings]](s"$configPath.wallet")
+    val kafkaSettings      = config.as[Option[KafkaSettings]](s"$configPath.kafka")
+    val networkSettings    = config.as[NetworkSettings](s"$configPath.network")
+    val restApiSettings    = config.as[RESTApiSettings](s"$configPath.restApi")
+    val storageSettings    = config.as[StorageSettings](s"$configPath.storage")
+    val ntpSettings        = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
+    val postgresSettings   = config.as[Option[PostgresSettings]](s"$configPath.postgres")
+    val influxSettings     = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
+    val levelDb            = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
+    val blackList          = config.as[BlackListSettings](s"$configPath.blackList")
 
     EncryAppSettings(
       directory,
@@ -85,7 +87,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       postgresSettings,
       influxSettings,
       levelDb,
-      monitoringSettings
+      monitoringSettings,
+      blackList
     )
   }
 
@@ -100,4 +103,3 @@ case class WalletSettings(password: String, seed: Option[String])
 case class KafkaSettings(sendToKafka: Boolean, topicName: String, groupId: String, kafkaBrokers: String)
 
 case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
-

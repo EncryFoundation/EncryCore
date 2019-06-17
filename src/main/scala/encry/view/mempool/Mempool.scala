@@ -7,12 +7,14 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.History.HistoryComparisonResult
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
 import encry.utils.NetworkTimeProvider
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
+import encry.view.NodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
 import encry.view.mempool.Mempool._
 import encry.view.state.{DigestState, EncryState, UtxoState}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
@@ -20,13 +22,15 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId, ModifierTypeId}
 
 import scala.collection.immutable.HashMap
-import scala.collection.mutable
+import scala.collection.{IndexedSeq, mutable}
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.Success
 
-class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef) extends Actor
-  with StrictLogging {
+class Mempool(settings: EncryAppSettings,
+              ntp: NetworkTimeProvider,
+              minerRef: ActorRef,
+              influx: Option[ActorRef]) extends Actor with StrictLogging {
 
   type WrappedIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -55,7 +59,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
             settings.node.mempoolTxSendingInterval, self, TickForSendTransactionsToMiner)
           context.system.scheduler.schedule(
             5.seconds,
-            5.seconds)(context.system.actorSelection("user/statsSender") ! MempoolStat(memoryPool.size))
+            5.seconds)(influx.foreach(_ ! MempoolStat(memoryPool.size)))
           context.become(messagesHandler(utxoState))
         case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
       }
@@ -66,15 +70,8 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
   def messagesHandler(state: UtxoState): Receive = mainLogic(state).orElse(handleStates)
 
   def mainLogic(state: UtxoState): Receive = {
-    case ModifiersFromRemote(modTypeId, filteredModifiers) if modTypeId == Transaction.modifierTypeId =>
-      val parsedModifiers: IndexedSeq[Transaction] = filteredModifiers.foldLeft(IndexedSeq.empty[Transaction]) {
-        case (transactions, bytes) =>
-          TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes)) match {
-            case Success(value) => transactions :+ value
-            case _ => transactions
-          }
-      }
-      memoryPool = validateAndPutTransactions(parsedModifiers, memoryPool, state, fromNetwork = true)
+    case TransactionsFromRemote(txs) =>
+      memoryPool = validateAndPutTransactions(txs.toIndexedSeq, memoryPool, state, fromNetwork = true)
     case TickForRemoveExpired => memoryPool = cleanMemoryPoolFromExpired(memoryPool)
     case GetMempoolSize => sender() ! memoryPool.size
     case TickForCleanupBloomFilter =>
@@ -126,7 +123,7 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
                                  fromNetwork: Boolean): HashMap[WrappedIdAsKey, Transaction] = {
     val validatedTransactions: IndexedSeq[Transaction] = inputTransactions.filter(tx =>
       tx.semanticValidity.isSuccess && !currentMemoryPool.contains(toKey(tx.id))
-        //&& currentState.validate(tx).isSuccess
+      //&& currentState.validate(tx).isSuccess
     )
     if (memoryPool.size + validatedTransactions.size <= settings.node.mempoolMaxCapacity)
       validatedTransactions.foldLeft(memoryPool) { case (pool, tx) =>
@@ -169,6 +166,8 @@ class Mempool(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: Ac
 
 object Mempool {
 
+  final case class TransactionsFromRemote(tx: Seq[Transaction])
+
   case class CompareTransactionsWithUnconfirmed(peer: ConnectedPeer, transactions: IndexedSeq[ModifierId])
 
   case class TransactionsFromMemoryPool(txs: IndexedSeq[Transaction])
@@ -195,10 +194,12 @@ object Mempool {
 
   case class TxsForNVSH(peer: ConnectedPeer, txs: Seq[Transaction])
 
-  case class RequestForTransactions(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+  final case class RequestForTransactions(source: ConnectedPeer,
+                                          modifierTypeId: ModifierTypeId,
+                                          modifierIds: Seq[ModifierId])
 
-  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef): Props =
-    Props(new Mempool(settings, ntp, minerRef))
+  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef, influx: Option[ActorRef]): Props =
+    Props(new Mempool(settings, ntp, minerRef, influx))
 
   class MempoolPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
@@ -211,4 +212,5 @@ object Mempool {
         // We default to 1, which is in between high and low
         case otherwise => 2
       })
+
 }

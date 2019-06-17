@@ -2,8 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
@@ -14,8 +13,8 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
-import encry.view.EncryNodeViewHolder.CurrentView
-import encry.view.EncryNodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
+import encry.view.NodeViewHolder.CurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
 import encry.view.state.{StateMode, UtxoState}
@@ -28,14 +27,14 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
-
 import scala.collection._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 import Miner._
+import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 
-class Miner extends Actor with StrictLogging {
+class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -55,8 +54,12 @@ class Miner extends Actor with StrictLogging {
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
     context.system.scheduler.schedule(5.seconds, 1.seconds)(
-      influxRef.foreach(_ ! InfoAboutTxsFromMiner(transactionsPool.size))
+      influx.foreach(_ ! InfoAboutTxsFromMiner(transactionsPool.size))
     )
+    context.system.scheduler.schedule(5.seconds, 5.seconds) {
+      dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
+      dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
+    }
   }
 
   override def postStop(): Unit = killAllWorkers()
@@ -90,8 +93,8 @@ class Miner extends Actor with StrictLogging {
       candidateOpt = None
       context.become(miningDisabled)
     case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
-      logger.info(s"Going to propagate new block $block from worker $workerIdx" +
-        s" with nonce: ${block.header.nonce}.")
+      logger.info(s"Going to propagate new block (${block.header.height}, ${block.header.encodedId}, ${block.payload.txs.size}" +
+        s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedModifier(block)
@@ -103,7 +106,6 @@ class Miner extends Actor with StrictLogging {
         block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
-    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt)
   }
 
   def miningEnabled: Receive =
@@ -117,7 +119,6 @@ class Miner extends Actor with StrictLogging {
     case EnableMining =>
       context.become(miningEnabled)
       self ! StartMining
-    case GetMinerStatus => sender ! MinerStatus(context.children.nonEmpty, candidateOpt)
     case FullBlockChainIsSynced =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
@@ -224,10 +225,7 @@ class Miner extends Actor with StrictLogging {
 
 object Miner {
 
-  case object GetMinerStatus
-
   case object DisableMining
-
 
   case object EnableMining
 
@@ -255,4 +253,6 @@ object Miner {
     "isMining"       -> r.isMining.asJson,
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
+
+  def props(dataHolder: ActorRef, influx: Option[ActorRef]): Props = Props(new Miner(dataHolder, influx))
 }

@@ -3,9 +3,9 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.local.miner.Miner.{GetMinerStatus, MinerStatus}
+import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetMinerStatus}
+import encry.local.miner.Miner.MinerStatus
 import encry.settings.{EncryAppSettings, RESTApiSettings}
-import encry.view.ReadersHolder.GetDataFromHistory
 import encry.view.history.EncryHistoryReader
 import encry.view.state.StateMode
 import io.circe.Json
@@ -13,12 +13,12 @@ import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.concurrent.Future
 
-case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings: EncryAppSettings,
-                           nodeId: Array[Byte], stateMode: StateMode)(implicit val context: ActorRefFactory)
-  extends EncryBaseApiRoute {
+case class HistoryApiRoute(dataHolder: ActorRef,
+                           appSettings: EncryAppSettings,
+                           nodeId: Array[Byte],
+                           stateMode: StateMode)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override val route: Route = pathPrefix("history") {
     getBlocksR ~
@@ -32,7 +32,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private def getHistory: Future[EncryHistoryReader] = (readersHolder ? GetDataFromHistory).mapTo[EncryHistoryReader]
+  private def getHistory: Future[EncryHistoryReader] = (dataHolder ? GetDataFromHistory).mapTo[EncryHistoryReader]
 
   private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map {
     _.headerIdsAtHeight(h).map(Algos.encode).asJson
@@ -66,7 +66,7 @@ case class HistoryApiRoute(readersHolder: ActorRef, miner: ActorRef, appSettings
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
-    (miner ? GetMinerStatus).mapTo[MinerStatus].map(_.json).okJson()
+    (dataHolder ? GetMinerStatus).mapTo[MinerStatus].map(_.json).okJson()
   }
 
   def getFullBlockByHeaderIdR: Route = (modifierId & get) { id =>

@@ -1,8 +1,6 @@
 package encry.view
 
 import java.io.File
-import HeaderProto.HeaderProtoMessage
-import PayloadProto.PayloadProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -16,102 +14,68 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.EncryNodeViewHolder.ReceivableMessages._
-import encry.view.EncryNodeViewHolder.{DownloadRequest, _}
+import encry.view.NodeViewHolder._
+import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
 import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentModifier}
+import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.serialization.Serializer
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef,
-                                                              influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef,
+                                                         influxRef: Option[ActorRef],
+                                                         dataHolder: ActorRef) extends Actor with StrictLogging {
 
   case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-//  val auxHistoryHolder: ActorRef =
-//    system.actorOf(Props(AuxiliaryHistoryHolder(nodeView.history, nodeViewSynchronizer))
-//      .withDispatcher("aux-history-dispatcher"), "auxHistoryHolder")
-
   memoryPoolRef ! UpdatedState(nodeView.state)
+  dataHolder ! UpdatedState(nodeView.state)
+  dataHolder ! UpdatedHistory(nodeView.history)
 
-  val modifierSerializers: Map[ModifierTypeId, Serializer[_ <: NodeViewModifier]] = Map(
-    Header.modifierTypeId   -> HeaderSerializer,
-    Payload.modifierTypeId  -> PayloadSerializer,
-    ADProofs.modifierTypeId -> ADProofSerializer
-  )
+  influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
+    ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+  })
 
-  if (settings.influxDB.isDefined) {
-    context.system.scheduler.schedule(5.second, 5.second) {
-      context.system.actorSelection("user/statsSender") !
-        HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
-    }
-  }
+  override def preStart(): Unit = logger.info(s"Node view holder started.")
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
     System.exit(100)
   }
 
-  system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: ${ModifiersCache.size}. " +
-    s"Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
+  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: " +
+    s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
-    logger.warn(s"Stopping EncryNodeViewHolder")
+    logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
     nodeView.state.closeStorage()
   }
 
   override def receive: Receive = {
-    case ModifiersFromRemote(modifierTypeId, modifiers) =>
-      val startTime = System.currentTimeMillis()
-      //logger.info(s"Start processing ModifiersFromRemote message on NVH.")
-      modifierTypeId match {
-        case Payload.modifierTypeId =>
-          modifiers.foreach { bytes =>
-            Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes)).foreach { payload =>
-              logger.info(s"after ser: ${Algos.encode(payload.id)}")
-              if (nodeView.history.contains(payload.id) || ModifiersCache.contains(key(payload.id)))
-                logger.info(s"Received modifier ${payload.encodedId} that is already in history(" +
-                  s"history: ${nodeView.history.contains(payload.id)}. Cache: ${ModifiersCache.contains(key(payload.id))})")
-              else ModifiersCache.put(key(payload.id), payload, nodeView.history)
-            })
-          }
-          computeApplications()
-        case Header.modifierTypeId =>
-          modifiers.foreach { bytes =>
-            Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes)).foreach { header =>
-              if (nodeView.history.contains(header.id) || ModifiersCache.contains(key(header.id)))
-                logger.info(s"Received modifier ${header.encodedId} that is already in history(" +
-                  s"history: ${nodeView.history.contains(header.id)}. Cache: ${ModifiersCache.contains(key(header.id))})")
-              else ModifiersCache.put(key(header.id), header, nodeView.history)
-              if (settings.influxDB.isDefined && nodeView.history.isFullChainSynced) {
-                header match {
-                  case h: Header => context.system.actorSelection("user/statsSender") ! TimestampDifference(timeProvider.estimatedTime - h.timestamp)
-                  case _ =>
-                }
-              }
-            })
-          }
-          computeApplications()
-        case id => logger.info(s"NodeViewHolder got modifier of wrong type: $id!")
-      }
-      logger.debug(s"Time processing of msg ModifiersFromRemote with mod of type: $modifierTypeId: ${System.currentTimeMillis() - startTime}")
+    case ModifiersFromRemote(modifiers) => modifiers.foreach { mod =>
+      val isInHistory: Boolean = nodeView.history.contains(mod.id)
+      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+      if (isInHistory || isInCache)
+        logger.info(s"Received payload ${Algos.encode(mod.id)} can't be placed into cache cause of: " +
+          s"inCache: $isInCache.")
+      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+    }
+      computeApplications()
+
     case lm: LocallyGeneratedModifier[PersistentModifier]@unchecked =>
       logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
@@ -125,21 +89,17 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
       }
       logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
+
     case GetDataFromCurrentView(f) =>
-      logger.debug(s"Start processing GetDataFromCurrentView message on NVH.")
-      val startTime = System.currentTimeMillis()
-      val result = f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet))
-      result match {
+      f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet)) match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
-        case _ => sender() ! result
+        case result => sender() ! result
       }
-      logger.debug(s"Time processing of msg GetDataFromCurrentView from $sender(): ${System.currentTimeMillis() - startTime}")
+
     case GetNodeViewChanges(history, state, _) =>
-      logger.debug(s"Start processing GetNodeViewChanges message on NVH.")
-      val startTime = System.currentTimeMillis()
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
-      logger.debug(s"Time processing of msg GetNodeViewChanges from $sender(): ${System.currentTimeMillis() - startTime}")
+
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       logger.debug(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
@@ -152,7 +112,8 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
-    case a: Any => logger.error(s"Strange input: $a")
+
+    case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
   //todo refactor loop
@@ -185,6 +146,7 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
+
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
 
@@ -225,7 +187,6 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          //here
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
               modToApply match {
@@ -234,13 +195,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
                 case _ =>
               }
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
-              //auxHistoryHolder ! NewHistory(newHis)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Failure(e) =>
               val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
-              //auxHistoryHolder ! NewHistory(newHis)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
@@ -377,23 +336,22 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] =
-    if (EncryHistory.getHistoryIndexDir(settings).listFiles.nonEmpty)
-      try {
-        val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
-        val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-        val state: StateType =
-          restoreConsistentState(EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history)
-        Some(NodeView(history, state, wallet))
-      } catch {
-        case ex: Throwable =>
-          logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
-          new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
-          Some(genesisState)
-      } else {
-      logger.info("none")
-      None
-    }
+  def restoreState(): Option[NodeView] = if (EncryHistory.getHistoryIndexDir(settings).listFiles.nonEmpty)
+    try {
+      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+      val state: StateType = restoreConsistentState(
+        EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history
+      )
+      Some(NodeView(history, state, wallet))
+    } catch {
+      case ex: Throwable =>
+        logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+        new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
+        Some(genesisState)
+    } else {
+    None
+  }
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
     val dir: File = EncryState.getStateDir(settings)
@@ -444,11 +402,11 @@ class EncryNodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: Act
     }
 }
 
-object EncryNodeViewHolder {
+object NodeViewHolder {
 
-  case class DownloadRequest(modifierTypeId: ModifierTypeId,
-                             modifierId: ModifierId,
-                             previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
+  final case class DownloadRequest(modifierTypeId: ModifierTypeId,
+                                   modifierId: ModifierId,
+                                   previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
 
@@ -462,7 +420,7 @@ object EncryNodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    case class ModifiersFromRemote(modTypeId: ModifierTypeId, remoteObjects: Seq[Array[Byte]])
+    case class ModifiersFromRemote(serializedModifiers: Seq[PersistentModifier])
 
     case class LocallyGeneratedTransaction(tx: Transaction)
 
@@ -470,7 +428,7 @@ object EncryNodeViewHolder {
 
   }
 
-  class EncryNodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case CompareViews(_, _, _) => 0
@@ -480,8 +438,9 @@ object EncryNodeViewHolder {
         case otherwise => 1
       })
 
-  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef]): Props = settings.node.stateMode match {
-    case StateMode.Digest => Props(new EncryNodeViewHolder[DigestState](memoryPoolRef, influxRef))
-    case StateMode.Utxo => Props(new EncryNodeViewHolder[UtxoState](memoryPoolRef, influxRef))
-  }
+  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef): Props =
+    settings.node.stateMode match {
+      case StateMode.Digest => Props(new NodeViewHolder[DigestState](memoryPoolRef, influxRef, dataHolder))
+      case StateMode.Utxo => Props(new NodeViewHolder[UtxoState](memoryPoolRef, influxRef, dataHolder))
+    }
 }

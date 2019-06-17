@@ -6,18 +6,17 @@ import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
-import encry.EncryApp.settings
-import encry.EncryApp._
-import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
-import PeerManager.ReceivableMessages.{Disconnected, DoConnecting, Handshaked}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import PeerConnectionHandler.ReceivableMessages._
+import encry.EncryApp.{settings, _}
+import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
+import encry.network.PeerConnectionHandler.ReceivableMessages._
+import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
+import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
-import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 
 class PeerConnectionHandler(connection: ActorRef,
                             direction: ConnectionType,
@@ -35,9 +34,9 @@ class PeerConnectionHandler(connection: ActorRef,
   var outMessagesCounter: Long = 0
 
   override def preStart: Unit = {
-    peerManager ! DoConnecting(remote, direction)
-    handshakeTimeoutCancellableOpt = Some(context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)
-    (self ! HandshakeTimeout))
+    handshakeTimeoutCancellableOpt = Some(
+      context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)(self ! HandshakeTimeout)
+    )
     connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
     connection ! ResumeReading
   }
@@ -50,20 +49,21 @@ class PeerConnectionHandler(connection: ActorRef,
   override def preRestart(reason: Throwable, message: Option[Any]): Unit =
     logger.info(s"Reason of restarting actor $self: ${reason.toString}.")
 
-  override def receive: Receive =
-    startInteraction orElse
-      receivedData orElse
-      handshakeTimeout orElse
-      handshakeDone orElse
-      processErrors(AwaitingHandshake)
+  override def receive: Receive = startInteraction
+    .orElse(receivedData)
+    .orElse(handshakeTimeout)
+    .orElse(handshakeDone)
+    .orElse(processErrors(AwaitingHandshake))
 
   def startInteraction: Receive = {
     case StartInteraction =>
       timeProvider.time().map { time =>
-        val handshake: Handshake = Handshake(protocolToBytes(settings.network.appVersion),
+        val handshake: Handshake = Handshake(
+          protocolToBytes(settings.network.appVersion),
           settings.network.nodeName
             .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
-          ownSocketAddress, time
+          ownSocketAddress,
+          time
         )
         connection ! Tcp.Write(ByteString(GeneralizedNetworkMessage.toProto(handshake).toByteArray))
         logger.info(s"Handshake sent to $remote.")
@@ -97,26 +97,40 @@ class PeerConnectionHandler(connection: ActorRef,
   def handshakeDone: Receive = {
     case HandshakeDone =>
       require(receivedHandshake.isDefined)
-      val peer: ConnectedPeer = ConnectedPeer(remote, self, direction, receivedHandshake.get)
+      logger.info(s"Got handshake with declared address: ${receivedHandshake.get.declaredAddress}")
+      val peer: ConnectedPeer = ConnectedPeer(
+        receivedHandshake.get.declaredAddress.getOrElse(remote),
+        self,
+        direction,
+        receivedHandshake.get
+      )
       selfPeer = Some(peer)
-      peerManager ! Handshaked(peer)
+      context.parent ! HandshakedDone(peer)
       handshakeTimeoutCancellableOpt.map(_.cancel())
       connection ! ResumeReading
       logger.debug(s"Starting workingCycleWriting on peerHandler for $remote.")
-      context become workingCycleWriting
+      context.become(workingCycleWriting)
   }
 
   def processErrors(stateName: CommunicationState): Receive = {
+    case cc: ConnectionClosed if stateName == AwaitingHandshake =>
+      logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
+      context.parent ! ConnectionStopped(remote)
+      context.stop(self)
+
     case cc: ConnectionClosed =>
       logger.info("Connection closed to : " + remote + ": " + cc.getErrorCause + s" in state $stateName")
-      peerManager ! Disconnected(remote)
-      context stop self
+      context.parent ! ConnectionStopped(receivedHandshake.get.declaredAddress.getOrElse(remote))
+      context.stop(self)
+
     case CloseConnection =>
       logger.info(s"Enforced to abort communication with: " + remote + s" in state $stateName")
       connection ! Close
+
     case fail@CommandFailed(cmd: Tcp.Command) =>
       logger.debug("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
       connection ! ResumeReading
+
     case message => logger.debug(s"Peer connection handler for $remote Got something strange: $message")
   }
 
@@ -134,10 +148,12 @@ class PeerConnectionHandler(connection: ActorRef,
     case message: NetworkMessage =>
       def sendMessage(): Unit = {
         outMessagesCounter += 1
+        logger.debug(s"Sent to $remote msg: ${message.messageName}")
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
         connection ! Write(bytes, Ack(outMessagesCounter))
       }
+
       settings.network.addedMaxDelay match {
         case Some(delay) =>
           context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendMessage())
@@ -172,7 +188,7 @@ class PeerConnectionHandler(connection: ActorRef,
       outMessagesBuffer -= id
       if (outMessagesBuffer.nonEmpty) writeFirst()
       else {
-        logger.info("Buffered messages processed, exiting buffering mode")
+        logger.debug("Buffered messages processed, exiting buffering mode")
         context become workingCycleWriting
       }
     case CloseConnection =>
@@ -209,7 +225,7 @@ class PeerConnectionHandler(connection: ActorRef,
       packet._1.find { packet =>
         GeneralizedNetworkMessage.fromProto(packet.toArray) match {
           case Success(message) =>
-            networkController ! MessageFromNetwork(message, selfPeer)
+            context.parent ! MessageFromNetwork(message, selfPeer)
             logger.debug("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
@@ -267,17 +283,36 @@ object PeerConnectionHandler {
   }
 
   sealed trait CommunicationState
-  case object AwaitingHandshake     extends CommunicationState
-  case object WorkingCycleWriting   extends CommunicationState
+
+  case object AwaitingHandshake extends CommunicationState
+
+  case object WorkingCycleWriting extends CommunicationState
+
   case object WorkingCycleBuffering extends CommunicationState
 
   object ReceivableMessages {
+
     case object HandshakeDone
+
     case object StartInteraction
+
     case object HandshakeTimeout
+
     case object CloseConnection
+
     final case class Ack(offset: Long) extends Tcp.Event
+
   }
+
+  /**
+    * @param message - message, received from network
+    * @param source - sender of received message
+    *
+    * This case class transfers network message from PeerConnectionHandler actor to the NetworkController.
+    * Main duty is to transfer message from network with sender of it message to the NetworkController as an end point.
+    */
+
+  final case class MessageFromNetwork(message: NetworkMessage, source: Option[ConnectedPeer])
 
   def props(connection: ActorRef, direction: ConnectionType,
             ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
