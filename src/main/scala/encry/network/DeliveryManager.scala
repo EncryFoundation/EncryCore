@@ -20,7 +20,7 @@ import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import encry.network.BlackList.SentNetworkMessageWithTooManyModifiers
-import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, ModifiersIdsForRemove}
+import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
@@ -90,7 +90,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   }
 
   def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
-    case ModifiersIdsForRemove(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
+    case InvalidModifiers(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
 
     case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       checkDelivery(peer, modifierTypeId, modifierId)
@@ -536,7 +536,7 @@ object DeliveryManager {
 
         case ConnectionStopped(_) => 1
 
-        case ModifiersIdsForRemove(_) => 2
+        case InvalidModifiers(_) => 2
 
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {

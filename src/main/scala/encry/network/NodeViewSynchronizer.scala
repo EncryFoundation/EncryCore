@@ -5,12 +5,13 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.BlackList.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.ModifiersIdsForRemove
+import encry.network.DownloadedModifiersValidator.InvalidModifiers
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -83,7 +84,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   }
 
   def workingCycle(history: EncryHistory): Receive = {
-    case msg@ModifiersIdsForRemove(_) => deliveryManager ! msg
+    case msg@InvalidModifiers(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>
@@ -179,6 +180,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
+    case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced

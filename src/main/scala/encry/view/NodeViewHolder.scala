@@ -350,7 +350,6 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
         Some(genesisState)
     } else {
-    logger.info("none")
     None
   }
 

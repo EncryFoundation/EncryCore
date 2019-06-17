@@ -8,14 +8,14 @@ import scala.concurrent.Future
 
 /**
   * Command "settings addPeer -host=<addr[String]> -port=<addr[String]>"
-  * Example: settings addPeer -host='10.101.0.30' -port=53648
+  * Example: settings addPeer -host='172.16.10.57' -port=9020
   */
 object AddPeer extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     val host: String = args.requireArg[Ast.Str]("host").s
     val port: Long = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
-//    peersKeeper ! PeerFromCli(peer)
+    nodeViewSynchronizer ! PeerFromCli(peer)
     Future(Some(Response("Peer added!")))
   }
 

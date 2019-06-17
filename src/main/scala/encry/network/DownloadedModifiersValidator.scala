@@ -6,7 +6,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList._
-import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, ModifiersIdsForRemove}
+import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -68,7 +68,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
       }
       if (modifiers._2.nonEmpty) {
         logger.debug(s"Sending to delivery manager invalid modifiers: ${modifiers._2.map(k => Algos.encode(k))}.")
-        nodeViewSync ! ModifiersIdsForRemove(modifiers._2)
+        nodeViewSync ! InvalidModifiers(modifiers._2)
       }
 
     case ModifiersForValidating(remote, typeId, filteredModifiers) => typeId match {
@@ -95,7 +95,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
         }
         if (transactions._2.nonEmpty) {
           logger.debug(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
-          nodeViewSync ! ModifiersIdsForRemove(transactions._2)
+          nodeViewSync ! InvalidModifiers(transactions._2)
         }
     }
     case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
@@ -110,7 +110,7 @@ object DownloadedModifiersValidator {
                                           typeId: ModifierTypeId,
                                           modifiers: Seq[(ModifierId, Array[Byte])])
 
-  final case class ModifiersIdsForRemove(ids: Seq[ModifierId])
+  final case class InvalidModifiers(ids: Seq[ModifierId])
 
   def props(settings: EncryAppSettings,
             nodeViewHolder: ActorRef,

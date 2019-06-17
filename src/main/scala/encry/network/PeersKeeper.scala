@@ -195,9 +195,9 @@ class PeersKeeper(settings: EncryAppSettings,
     case SendLocalSyncInfo => sendSyncInfo()
 
     case PeerFromCli(peer) =>
-      if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && connectedPeers.contains(peer) && !isSelf(peer)) {
-        outgoingConnections += peer
-        sender() ! PeerForConnection(peer)
+      if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && !connectedPeers.contains(peer) && !isSelf(peer)) {
+        knownPeers += (peer -> 0)
+        logger.info(s"Added peer: $peer to known peers. Current known peers are: ${knownPeers.mkString(",")}")
       }
 
     case RemovePeerFromBlackList(peer) => blackList.remove(peer.getAddress)
