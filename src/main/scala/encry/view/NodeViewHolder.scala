@@ -72,7 +72,10 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
       if (isInHistory || isInCache)
         logger.info(s"Received payload ${Algos.encode(mod.id)} can't be placed into cache cause of: " +
           s"inCache: $isInCache.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      else {
+        logger.info(s"Modifier is valid. Putting it to cache.")
+        ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      }
     }
       computeApplications()
 

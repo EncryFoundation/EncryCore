@@ -114,7 +114,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
-            logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
+            logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
           sendResponse(remote, invData._1, inRequestCache.values.collect {
             case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
             case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
@@ -128,7 +128,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                 case typeId: ModifierTypeId => nonInRequestCache.foreach(id =>
                   reader.modifierBytesById(id).foreach { mod =>
                     if (typeId != Transaction.modifierTypeId)
-                      logger.debug(s"Trigger sendResponse to $remote for modifier $mod of type: $typeId.")
+                      logger.info(s"Trigger sendResponse to $remote for modifier $mod of type: $typeId.")
                     sendResponse(remote, invData._1, Seq(id -> mod))
                   }
                 )
@@ -136,7 +136,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             }
           }
         }
-        else logger.debug(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
+        else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
@@ -144,7 +144,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           else logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}") // do nothing
         }
         else if (invData._1 != Payload.modifierTypeId) {
-          logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
+          logger.info(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
           nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
@@ -190,14 +190,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiersBytes: Seq[(ModifierId, Array[Byte])]): Unit =
     if (modifiersBytes.nonEmpty) {
       if (typeId != Transaction.modifierTypeId)
-        logger.debug(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
+        logger.info(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
       typeId match {
         case Header.modifierTypeId =>
-          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for HEADERS with ${modifiersBytes.size} headers." +
+          logger.info(s"Sent to peer handler for $peer ModfiersNetworkMessage for HEADERS with ${modifiersBytes.size} headers." +
             s" \n Headers are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Payload.modifierTypeId =>
-          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
+          logger.info(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
             s" \n Payloads are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Transaction.modifierTypeId =>
@@ -207,7 +207,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   def broadcastModifierInv(m: NodeViewModifier): Unit =
     if (chainSynced) {
-      logger.debug(s"NVSH is synced. Going to broadcast inv for: ${m.encodedId}")
+      if (m.modifierTypeId != Transaction.modifierTypeId)
+        logger.info(s"NVSH is synced. Going to broadcast inv for: ${m.encodedId}")
       peersKeeper ! SendToNetwork(InvNetworkMessage(m.modifierTypeId -> Seq(m.id)), Broadcast)
     }
 }

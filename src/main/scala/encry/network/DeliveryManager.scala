@@ -96,7 +96,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       checkDelivery(peer, modifierTypeId, modifierId)
 
     case UpdatedPeersCollection(newPeers) =>
-      logger.info(s"Delivery manager got updated peers collection.")
+      logger.info(s"Delivery manager got updated peers collection. Current is: ${peersCollection.mkString(",")}")
       peersCollection = newPeers
 
     case ConnectionStopped(peer) =>
@@ -104,17 +104,19 @@ class DeliveryManager(influxRef: Option[ActorRef],
       logger.info(s"Removed peer: $peer from peers collection on Delivery Manager." +
         s" Current peers are: ${peersCollection.mkString(",")}")
 
-    case OtherNodeSyncingStatus(remote, status, extOpt) =>
-      status match {
-        case Unknown => logger.info("Peer status is still unknown.")
-        case Younger | Fork if isBlockChainSynced => sendInvData(remote, status, extOpt)
-        case _ =>
-      }
+    case OtherNodeSyncingStatus(remote, status, extOpt) => status match {
+      case Unknown => logger.info("Peer status is still unknown.")
+      case Younger | Fork if isBlockChainSynced =>
+        logger.info(s"Delivery manager got $status node syncing from $remote")
+        sendInvData(remote, status, extOpt)
+      case _ => logger.info(s"DM got $status. Ignore this")
+    }
 
     case CheckModifiersToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
-      logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.info(s"Expectd mods - ${expectedModifiers.map(x => x._1 -> x._2.map(k => Algos.encode(k._1.toArray)))}")
       val newIds: Seq[(ModifierTypeId, ModifierId)] =
         history.modifiersToDownload(
           settings.network.networkChunkSize - currentQueue.size,
@@ -145,8 +147,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
-        logger.debug(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
-        influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
+        logger.info(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))
         if (spam.nonEmpty) {
@@ -350,6 +351,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                   status: HistoryComparisonResult,
                   dataForInvMessage: Option[Seq[(ModifierTypeId, ModifierId)]]): Unit = dataForInvMessage match {
     case Some(data) =>
+      logger.info(s"sendInvData from $peer is NonEmpty.")
       data.groupBy(_._1).mapValues(_.map(_._2)).foreach {
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
           logger.info(s"Send to peer $peer inv msg with mods: ${mods.map(Algos.encode).mkString(",")}")
@@ -550,4 +552,5 @@ object DeliveryManager {
 
         case _ => 2
       })
+
 }

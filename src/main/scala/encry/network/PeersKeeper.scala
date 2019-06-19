@@ -66,7 +66,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
-      logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
+      logger.debug(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connection. Current available peers are: " +
         s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.getBannedPeersAndReasons.mkString(",")
@@ -83,7 +83,7 @@ class PeersKeeper(settings: EncryAppSettings,
             s"${outgoingConnections.mkString(",")}.")
           sender() ! PeerForConnection(peer)
           awaitingHandshakeConnections += peer
-          logger.info(s"Adding new peer: $peer to awaitingHandshakeConnections." +
+          logger.debug(s"Adding new peer: $peer to awaitingHandshakeConnections." +
             s" Current is: ${awaitingHandshakeConnections.mkString(",")}")
         }
 
@@ -179,7 +179,8 @@ class PeersKeeper(settings: EncryAppSettings,
   def additionalMessages: Receive = {
     case RequestPeersForFirstSyncInfo =>
       logger.info(s"Peers keeper got request for peers for first sync info. Starting scheduler for this logic.")
-      context.system.scheduler.schedule(1.seconds, settings.network.syncInterval)(sendSyncInfo())
+      self ! SendLocalSyncInfo
+      //context.system.scheduler.schedule(1.seconds, settings.network.syncInterval)(sendSyncInfo())
 
     case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
 
