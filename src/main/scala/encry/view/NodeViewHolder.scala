@@ -104,17 +104,17 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
       if (state) sender() ! ChangedState(nodeView.state)
 
     case CompareViews(peer, modifierTypeId, modifierIds) =>
-      logger.debug(s"Start processing CompareViews message on NVH.")
+      logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds.filterNot(mid => nodeView.history.contains(mid) || ModifiersCache.contains(key(mid)))
       }
-      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
+      if (modifierTypeId != Transaction.modifierTypeId) logger.info(s"Got compare view message on NVH from ${peer.socketAddress}." +
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-      logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
+      logger.info(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
