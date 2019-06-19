@@ -156,7 +156,7 @@ object VersionedAVLStorage extends StrictLogging {
           else (value, nextLeafKey, None)
         }
         val l: ProverLeaf[D] = new ProverLeaf[D](key, value, nextLeafKey)
-        l.labelOpt = labelOpt
+        if(isTop) l.labelOpt = labelOpt
         l.isNew = false
         l
     }

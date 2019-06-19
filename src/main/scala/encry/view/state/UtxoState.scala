@@ -90,7 +90,7 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
     }
   }
 
-  override def applyModifier(mod: PersistentModifier): Try[UtxoState] = mod match {
+  override def applyModifier(mod: PersistentModifier, lastHeaderHeight: Int = 0): Try[UtxoState] = mod match {
     //here
     case block: Block =>
       logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)}!")
@@ -105,14 +105,21 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           Height @@ block.header.height,
           block.header.timestamp
         )
-        val proofBytes: SerializedAdProof = persistentProver.generateProofAndUpdateStorage(meta)
+        if (lastHeaderHeight - block.header.height < TestNetConstants.MaxRollbackDepth) {
+          val proofBytes = persistentProver.generateProofAndUpdateStorage(meta)
+          val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
+          if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
+            onAdProofGenerated(ADProofs(block.header.id, proofBytes))
+          if (!(block.header.adProofsRoot sameElements proofHash))
+            throw new Exception("Calculated proofHash is not equal to the declared one.")
+        } else {
+          persistentProver.updateStorage(meta)
+          persistentProver.resetTopNodeAndCleanBuffers()
+        }
+
         logger.debug(s"starting generating proofHash!")
         val timer1 = System.currentTimeMillis()
-        val proofHash: Digest32 = ADProofs.proofDigest(proofBytes)
         logger.debug(s"Finifhsing generating proofHash! Process time is: ${System.currentTimeMillis() - timer1}")
-
-        if (block.adProofsOpt.isEmpty && settings.node.stateMode.isDigest)
-          onAdProofGenerated(ADProofs(block.header.id, proofBytes))
         logger.info(s"Valid modifier ${block.encodedId} with header ${block.header.encodedId} applied to UtxoState with" +
           s" root hash ${Algos.encode(rootHash)}")
 
@@ -120,8 +127,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
           throw new Exception("Storage kept roothash is not equal to the declared one.")
         else if (!stateStore.versions.exists(_ sameElements block.header.stateRoot))
           throw new Exception("Unable to apply modification properly.")
-        else if (!(block.header.adProofsRoot sameElements proofHash))
-          throw new Exception("Calculated proofHash is not equal to the declared one.")
         else if (!(block.header.stateRoot sameElements persistentProver.digest))
           throw new Exception("Calculated stateRoot is not equal to the declared one.")
 

@@ -31,6 +31,22 @@ trait PersistentBatchAVLProver[D <: Digest, HF <: CryptographicHash[D]] extends 
     a
   }
 
+  def updateStorage[K <: Array[Byte], V <: Array[Byte]](additionalData: Seq[(K, V)]): Unit = {
+    logger.debug(s"\nStarting generateProofAndUpdateStorage!!!\n")
+    val startTime1 = System.currentTimeMillis()
+    logger.debug(s"Starting storage.update!")
+    storage.update(avlProver, additionalData).get
+    logger.debug(s"Finished storage.update! Process time is: ${System.currentTimeMillis() - startTime1}")
+    logger.debug(s"Starting generateProof!")
+  }
+
+  def generateProof: SerializedAdProof = avlProver.generateProof()
+
+  def resetTopNodeAndCleanBuffers(): Unit = {
+    avlProver.cleanBuffers()
+    avlProver.resetTopNode()
+  }
+
   def generateProofAndUpdateStorage(): SerializedAdProof = generateProofAndUpdateStorage(Seq())
 
   def nodeKey(node: EncryProverNodes[D]): ByteArrayWrapper = ByteArrayWrapper(node.label)

@@ -187,7 +187,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
+          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply, nodeView.history.bestHeaderHeight) match {
             case Success(stateAfterApply) =>
               modToApply match {
                 case block: Block if settings.influxDB.isDefined =>
@@ -398,7 +398,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).get }
+        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m, history.bestHeaderHeight).get }
     }
 }
 

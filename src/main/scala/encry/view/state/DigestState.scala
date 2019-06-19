@@ -17,7 +17,7 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ADDigest
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 
@@ -70,7 +70,7 @@ class DigestState protected(override val version: VersionTag,
     new DigestState(newVersion, newRootHash, stateStore, settings)
   }
 
-  override def applyModifier(mod: PersistentModifier): Try[DigestState] = mod match {
+  override def applyModifier(mod: PersistentModifier, lastHeaderHeight: Int = 0): Try[DigestState] = mod match {
     case block: Block if settings.verifyTransactions =>
       logger.info(s"Got new full block with id ${block.encodedId} " +
         s"with root ${Algos.encoder.encode(block.header.stateRoot)}")

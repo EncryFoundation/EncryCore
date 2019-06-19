@@ -136,8 +136,7 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
   def generateProof(): SerializedAdProof = {
     //here
-    changedNodesBuffer.clear()
-    changedNodesBufferToCheck.clear()
+    cleanBuffers()
     var packagedTree = Array.emptyByteArray
     var previousLeafAvailable: Boolean = false
 
@@ -165,17 +164,6 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
       }
     }
 
-    def resetNew(r: EncryProverNodes[D]): Unit = if (r.isNew) {
-      r match {
-        case rn: InternalProverEncryNode[D] =>
-          resetNew(rn.left)
-          resetNew(rn.right)
-        case _ =>
-      }
-      r.isNew = false
-      r.visited = false
-    }
-
     logger.debug(s"\n\nStarting to PACK TREE!!")
     val startTime = System.currentTimeMillis()
     packTree(oldTopNode)
@@ -191,13 +179,34 @@ class BatchAVLProver[D <: Digest, HF <: CryptographicHash[D]](val keyLength: Int
 
     logger.debug(s"\n\nStarting to resetNew!!")
     val startTime3 = System.currentTimeMillis()
-    resetNew(topNode)
+    resetTopNode()
     logger.debug(s"\n\nFinishing to resetNew. Process time is: ${System.currentTimeMillis() - startTime3}")
+
+    SerializedAdProof @@ packagedTree
+  }
+
+  def cleanBuffers(): Unit = {
+    changedNodesBuffer.clear()
+    changedNodesBufferToCheck.clear()
+  }
+
+  def resetNew(r: EncryProverNodes[D]): Unit = if (r.isNew) {
+    r match {
+      case rn: InternalProverEncryNode[D] =>
+        resetNew(rn.left)
+        resetNew(rn.right)
+      case _ =>
+    }
+    r.isNew = false
+    r.visited = false
+  }
+
+  def resetTopNode(): Unit = {
+    if (oldTopNode.visited) oldTopNode.visited = false
+    resetNew(topNode)
     directions = Array.emptyByteArray
     directionsBitLength = 0
     oldTopNode = topNode
-
-    SerializedAdProof @@ packagedTree
   }
 
   def treeWalk[IR, LR](internalNodeFn: (InternalProverEncryNode[D], IR) => (EncryProverNodes[D], IR),

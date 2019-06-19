@@ -9,7 +9,7 @@ import scala.util.Try
 trait MinimalState[M <: PersistentNodeViewModifier, MS <: MinimalState[M, MS]] extends StateReader {
   self: MS =>
 
-  def applyModifier(mod: M): Try[MS]
+  def applyModifier(mod: M, lastHeaderHeight: Int): Try[MS]
 
   def rollbackTo(version: VersionTag): Try[MS]
 
