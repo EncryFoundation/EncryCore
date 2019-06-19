@@ -128,7 +128,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                 case typeId: ModifierTypeId => nonInRequestCache.foreach(id =>
                   reader.modifierBytesById(id).foreach { mod =>
                     if (typeId != Transaction.modifierTypeId)
-                      logger.info(s"Trigger sendResponse to $remote for modifier $mod of type: $typeId.")
+                      logger.info(s"Trigger sendResponse to $remote for modifier  of type: $typeId.")
                     sendResponse(remote, invData._1, Seq(id -> mod))
                   }
                 )
