@@ -1,5 +1,8 @@
 package encry.view.state
 
+import java.io.File
+
+import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.storage.VersionalStorage
@@ -28,6 +31,12 @@ import cats.syntax.traverse._
 import cats.instances.list._
 import cats.Traverse
 import com.google.common.primitives.Ints
+import encry.avltree.VersionedAVLStorage
+import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import io.iohk.iodb.LSMStore
+import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
@@ -144,7 +153,7 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
   override type NVCT = this.type
 }
 
-object UtxoStateWithoutAVL {
+object UtxoStateWithoutAVL extends StrictLogging {
 
   final case class StateChange(inputsToDb: List[StorageKey],
                                outputsToDb: List[(StorageKey, StorageValue)])
@@ -159,4 +168,27 @@ object UtxoStateWithoutAVL {
     tx.inputs.map(input => StorageKey !@@ input.boxId).toList,
     tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
   )
+
+  def genesis(boxes: List[EncryBaseBox],
+              stateDir: File,
+              nodeViewHolderRef: Option[ActorRef],
+              settings: EncryAppSettings,
+              statsSenderRef: Option[ActorRef]): UtxoStateWithoutAVL = {
+    //check kind of storage
+    val storage = settings.storage.state match {
+      case VersionalStorage.IODB =>
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 33))
+    }
+
+    new UtxoStateWithoutAVL(
+      storage,
+      TestNetConstants.PreGenesisHeight,
+      0L,
+    )
+  }
 }
