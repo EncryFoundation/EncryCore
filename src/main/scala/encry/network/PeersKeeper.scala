@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
@@ -11,6 +12,7 @@ import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
 import encry.network.BlackList.{BanReason, SentPeersMessageWithoutRequest}
 import encry.network.ConnectedPeersList.PeerInfo
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
@@ -20,6 +22,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
+
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -42,9 +45,11 @@ class PeersKeeper(settings: EncryAppSettings,
 
   var outgoingConnections: Set[InetSocketAddress] = Set.empty
 
+  var isBlockChainSynced: Boolean = false
+
   override def preStart(): Unit = {
     nodeViewSync ! RegisterMessagesHandler(Seq(
-      PeersNetworkMessage.NetworkMessageTypeID    -> "PeersNetworkMessage",
+      PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
       GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
     if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
@@ -52,10 +57,10 @@ class PeersKeeper(settings: EncryAppSettings,
     )
     context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime)(blackList.cleanupBlackList())
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
-      nodeViewSync ! UpdatedPeersCollection(connectedPeers.getPeersF(allPeers, getPeersForDMF).toMap)
+      nodeViewSync ! UpdatedPeersCollection(connectedPeers.findAndMapF(allPeers, getPeersForDMF).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
-      dataHolder ! UpdatingConnectedPeers(connectedPeers.getPeersF(allPeers, getConnectedPeersF).toSeq)
+      dataHolder ! UpdatingConnectedPeers(connectedPeers.findAndMapF(allPeers, getConnectedPeersF).toSeq)
     )
   }
 
@@ -73,7 +78,7 @@ class PeersKeeper(settings: EncryAppSettings,
         }")
       scala.util.Random.shuffle(
         knownPeers
-        .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
+          .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
       )
         .headOption
         .foreach { case (peer, _) =>
@@ -169,7 +174,7 @@ class PeersKeeper(settings: EncryAppSettings,
           if (remote.socketAddress.getAddress.isSiteLocalAddress) true
           else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
 
-        val peers: Seq[InetSocketAddress] = connectedPeers.getPeersF(getPeersForRemoteP, getPeersForRemoteF).toSeq
+        val peers: Seq[InetSocketAddress] = connectedPeers.findAndMapF(getPeersForRemoteP, getPeersForRemoteF).toSeq
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
         logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
         remote.handlerRef ! PeersNetworkMessage(peers)
@@ -177,22 +182,32 @@ class PeersKeeper(settings: EncryAppSettings,
   }
 
   def additionalMessages: Receive = {
-    case RequestPeersForFirstSyncInfo =>
-      logger.info(s"Peers keeper got request for peers for first sync info. Starting scheduler for this logic.")
-      context.system.scheduler.schedule(1.seconds, settings.network.syncInterval)(sendSyncInfo())
-
     case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
 
     case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
 
     case SendToNetwork(message, strategy) =>
-      val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(allPeers, getConnectedPeersF).toSeq
+      val peers: Seq[ConnectedPeer] = connectedPeers.findAndMapF(allPeers, getConnectedPeersF).toSeq
       strategy.choose(peers).foreach { peer =>
         logger.debug(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
       }
 
-    case SendLocalSyncInfo => sendSyncInfo()
+    case SendLocalSyncInfo => connectedPeers.findAndMapF(findPeersForSyncInfoP, findPeersForSyncInfoF).toSeq match {
+      case coll: Seq[_] if coll.nonEmpty && isBlockChainSynced =>
+        coll.foreach(p => connectedPeers.updateUptime(p.socketAddress))
+        nodeViewSync ! PeersForSyncInfo(coll)
+        logger.info(s"Peers collection for sync info non empty and block chain is synced. Sending to DM" +
+          s" peers collection: ${coll.mkString(",")}.")
+      case coll: Seq[_] if coll.nonEmpty => scala.util.Random.shuffle(coll).headOption.foreach { p =>
+        connectedPeers.updateUptime(p.socketAddress)
+        nodeViewSync ! PeersForSyncInfo(Seq(p))
+        logger.info(s"Peers collection for sync info non empty but block chain is not synced. Sending to DM" +
+          s" peer for sync: $p.")
+      }
+      case _ => logger.info(s"Peers collection for sync info message is empty.")
+    }
+      context.system.scheduler.scheduleOnce(settings.network.syncInterval)(self ! SendLocalSyncInfo)
 
     case PeerFromCli(peer) =>
       if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && !connectedPeers.contains(peer) && !isSelf(peer)) {
@@ -201,6 +216,10 @@ class PeersKeeper(settings: EncryAppSettings,
       }
 
     case RemovePeerFromBlackList(peer) => blackList.remove(peer.getAddress)
+
+    case FullBlockChainIsSynced =>
+      logger.info(s"Peers keeper got message: FullBlockChainIsSynced")
+      isBlockChainSynced = true
 
     case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
   }
@@ -218,18 +237,15 @@ class PeersKeeper(settings: EncryAppSettings,
     InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
     InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)).getOrElse(true)
 
-  def sendSyncInfo(): Unit = {
-    val peers: Seq[ConnectedPeer] = connectedPeers.getPeersF(findPeersForSyncInfoP, findPeersForSyncInfoF).toSeq
-    if (peers.nonEmpty) nodeViewSync ! PeersForSyncInfo(peers)
+  def findPeersForSyncInfoP(add: InetSocketAddress, info: PeerInfo): Boolean = {
+    val time: Long = System.currentTimeMillis()
+    val bool: Boolean = (time - info.lastUptime.time) > settings.network.syncInterval.toMillis
+    logger.info(s"findPeersForSyncInfoP: peer: ${info.connectedPeer}, current time: ${time / 1000}," +
+      s" last uptime: ${info.lastUptime.time / 1000}")
+    bool
   }
 
-  def findPeersForSyncInfoP(add: InetSocketAddress, info: PeerInfo): Boolean =
-    (System.currentTimeMillis() - info.lastUptime.time) > settings.network.syncInterval.toMillis
-
-  def findPeersForSyncInfoF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = {
-    connectedPeers.updateUptime(add)
-    info.connectedPeer
-  }
+  def findPeersForSyncInfoF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 
   def getConnectedPeersF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 
@@ -285,14 +301,15 @@ object PeersKeeper {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case OtherNodeSyncingStatus(_, _, _) => 0
-        case AccumulatedPeersStatistic(_)    => 1
-        case BanPeer(_, _)                   => 1
-        case VerifyConnection(_, _)          => 2
-        case HandshakedDone(_)               => 2
-        case ConnectionStopped(_)            => 2
-        case OutgoingConnectionFailed(_)     => 2
-        case PoisonPill                      => 4
-        case _                               => 3
+        case AccumulatedPeersStatistic(_) => 1
+        case BanPeer(_, _) => 1
+        case SendLocalSyncInfo => 1
+        case VerifyConnection(_, _) => 2
+        case HandshakedDone(_) => 2
+        case ConnectionStopped(_) => 2
+        case OutgoingConnectionFailed(_) => 2
+        case PoisonPill => 4
+        case _ => 3
       })
 
 }

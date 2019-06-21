@@ -84,7 +84,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
         self ! CheckModifiersToDownload
       )
-      nodeViewSync ! RequestPeersForFirstSyncInfo
+      nodeViewSync ! SendLocalSyncInfo
       context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }
@@ -172,9 +172,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
-    case PeersForSyncInfo(peers) =>
-      logger.info(s"DM gor peers for sync info. Sending sync message!")
-      sendSync(history.syncInfo, isBlockChainSynced, peers)
+    case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
 
@@ -218,15 +216,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
   /**
     * If node is not synced, send sync info to random peer, otherwise to all known peers.
     *
-    * @param syncInfo           - sync info
-    * @param isBlockChainSynced - current block chain status
+    * @param syncInfo - sync info
     */
-  def sendSync(syncInfo: SyncInfo, isBlockChainSynced: Boolean, peers: Seq[ConnectedPeer]): Unit =
-    if (isBlockChainSynced) peers.foreach(peer => peer.handlerRef ! SyncInfoNetworkMessage(syncInfo))
-    else Random.shuffle(peers).headOption.foreach { peer =>
-      logger.info(s"Sending syncInfo message from DM to $peer.")
-      peer.handlerRef ! SyncInfoNetworkMessage(syncInfo)
-    }
+  def sendSync(syncInfo: SyncInfo, peers: Seq[ConnectedPeer]): Unit = peers.foreach { peer =>
+    logger.info(s"Sending to $peer sync info message.")
+    peer.handlerRef ! SyncInfoNetworkMessage(syncInfo)
+  }
 
   /**
     * Send request to 'peer' with modifiers ids of type 'modifierTypeId'.
@@ -470,7 +465,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         headersForPriorityRequest = headersForPriorityRequest
           .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress)
       }
-      if (expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
+      //if (expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       priorityCalculator.decrementRequest(peer.socketAddress)
@@ -550,4 +545,5 @@ object DeliveryManager {
 
         case _ => 2
       })
+
 }
