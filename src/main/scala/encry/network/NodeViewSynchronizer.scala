@@ -124,14 +124,20 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           if (nonInRequestCache.nonEmpty) {
             if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote, nonInRequestCache)
             else Option(history).foreach { reader =>
+              val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
+                case (id, mod) if mod.isDefined  => id -> mod.get
+              }
               invData._1 match {
-                case typeId: ModifierTypeId => nonInRequestCache.foreach(id =>
-                  reader.modifierBytesById(id).foreach { mod =>
-                    if (typeId != Transaction.modifierTypeId)
-                      logger.debug(s"Trigger sendResponse to $remote for modifier $mod of type: $typeId.")
-                    sendResponse(remote, invData._1, Seq(id -> mod))
+                case Header.modifierTypeId =>
+                  logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
+                  sendResponse(remote, invData._1, mods)
+                case Payload.modifierTypeId => mods.foreach {
+                  case (id, modBytes) =>
+                    logger.debug(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
+                      s"${Payload.modifierTypeId}.")
+                    sendResponse(remote, invData._1, Seq(id -> modBytes))
                   }
-                )
+                case _ => //nothing
               }
             }
           }
