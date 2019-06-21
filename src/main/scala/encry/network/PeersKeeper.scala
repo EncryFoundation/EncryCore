@@ -19,7 +19,7 @@ import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.{HighPriority, InitialPriority, PeersPriorityStatus}
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
 
@@ -145,7 +145,7 @@ class PeersKeeper(settings: EncryAppSettings,
       awaitingHandshakeConnections -= peer
       val connectionAttempts: Int = knownPeers.getOrElse(peer, 0) + 1
       if (connectionAttempts >= settings.network.maxNumberOfReConnections) {
-        logger.info(s"Banning peer: $peer for ExpiredNumberOfConnections.")
+        logger.info(s"Removing peer: $peer from available peers for ExpiredNumberOfConnections.")
         //todo think about penalty for the less time than general ban
         //blackList.banPeer(ExpiredNumberOfConnections, peer.getAddress)
         knownPeers -= peer
@@ -162,7 +162,7 @@ class PeersKeeper(settings: EncryAppSettings,
           logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
           knownPeers = knownPeers.updated(p, 0)
         }
-        logger.info(s"New available peers collection are: ${knownPeers.keys.mkString(",")}.")
+        logger.info(s"New available peers collection from $remote are: ${knownPeers.keys.mkString(",")}.")
 
       case PeersNetworkMessage(_) =>
         logger.info(s"Got PeersNetworkMessage from $remote, but connectWithOnlyKnownPeers: $connectWithOnlyKnownPeers, " +
@@ -170,11 +170,11 @@ class PeersKeeper(settings: EncryAppSettings,
         self ! BanPeer(remote, SentPeersMessageWithoutRequest)
 
       case GetPeersNetworkMessage =>
-        def getPeersForRemoteP(add: InetSocketAddress, info: PeerInfo): Boolean =
+        def findPeersForRemote(add: InetSocketAddress, info: PeerInfo): Boolean =
           if (remote.socketAddress.getAddress.isSiteLocalAddress) true
           else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
 
-        val peers: Seq[InetSocketAddress] = connectedPeers.findAndMapF(getPeersForRemoteP, getPeersForRemoteF).toSeq
+        val peers: Seq[InetSocketAddress] = connectedPeers.findAndMapF(findPeersForRemote, getPeersForRemoteF).toSeq
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
         logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
         remote.handlerRef ! PeersNetworkMessage(peers)
@@ -193,21 +193,25 @@ class PeersKeeper(settings: EncryAppSettings,
         peer.handlerRef ! message
       }
 
-    case SendLocalSyncInfo => connectedPeers.findAndMapF(findPeersForSyncInfoP, findPeersForSyncInfoF).toSeq match {
-      case coll: Seq[_] if coll.nonEmpty && isBlockChainSynced =>
-        coll.foreach(p => connectedPeers.updateUptime(p.socketAddress))
-        nodeViewSync ! PeersForSyncInfo(coll)
-        logger.info(s"Peers collection for sync info non empty and block chain is synced. Sending to DM" +
-          s" peers collection: ${coll.mkString(",")}.")
-      case coll: Seq[_] if coll.nonEmpty => scala.util.Random.shuffle(coll).headOption.foreach { p =>
+    case SendLocalSyncInfo =>
+      logger.debug(s"Received SendLocalSyncInfo from $sender on PK")
+      val peersWithHP: Seq[ConnectedPeer] = connectedPeers.findAndMapF(findHPPeersForSync, mapPeersForSyncInfoF).toSeq
+      val peersWithIP: Seq[ConnectedPeer] = connectedPeers.findAndMapF(findIPPeersForSync, mapPeersForSyncInfoF).toSeq
+
+      val accumulatedHPPeers = accumulatePeersForSync(peersWithHP, isBlockChainSynced)
+      val accumulatedIPPeers = accumulatePeersForSync(peersWithIP, isBlockChainSynced)
+      val accumulatedPeers = accumulatedHPPeers ++: accumulatedIPPeers
+
+      accumulatedPeers.foreach { p =>
+        logger.debug(s"Update uptime from $p")
         connectedPeers.updateUptime(p.socketAddress)
-        nodeViewSync ! PeersForSyncInfo(Seq(p))
-        logger.info(s"Peers collection for sync info non empty but block chain is not synced. Sending to DM" +
-          s" peer for sync: $p.")
       }
-      case _ => logger.info(s"Peers collection for sync info message is empty.")
-    }
-      context.system.scheduler.scheduleOnce(settings.network.syncInterval)(self ! SendLocalSyncInfo)
+      nodeViewSync ! PeersForSyncInfo(accumulatedPeers)
+
+      context.system.scheduler.scheduleOnce(settings.network.syncInterval) {
+        logger.debug("Scheduler once for SendLocalSyncInfo triggered")
+        self ! SendLocalSyncInfo
+      }
 
     case PeerFromCli(peer) =>
       if (!blackList.contains(peer.getAddress) && !knownPeers.contains(peer) && !connectedPeers.contains(peer) && !isSelf(peer)) {
@@ -237,15 +241,24 @@ class PeersKeeper(settings: EncryAppSettings,
     InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
     InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)).getOrElse(true)
 
-  def findPeersForSyncInfoP(add: InetSocketAddress, info: PeerInfo): Boolean = {
-    val time: Long = System.currentTimeMillis()
-    val bool: Boolean = (time - info.lastUptime.time) > settings.network.syncInterval.toMillis
-    logger.info(s"findPeersForSyncInfoP: peer: ${info.connectedPeer}, current time: ${time / 1000}," +
-      s" last uptime: ${info.lastUptime.time / 1000}")
-    bool
+  def findPeersForSyncInfoP(add: InetSocketAddress, info: PeerInfo): Boolean =
+    (System.currentTimeMillis() - info.lastUptime.time) > settings.network.syncInterval.toMillis
+
+  def findHPPeersForSync(add: InetSocketAddress, info: PeerInfo): Boolean = {
+    val condition1 = (System.currentTimeMillis() - info.lastUptime.time) > settings.network.syncInterval.toMillis
+    val condition2 = info.peerPriorityStatus == HighPriority
+    logger.debug(s"findHPPeersForSync: peer: $add, cond1: $condition1, cond2: $condition2")
+    condition1 && condition2
   }
 
-  def findPeersForSyncInfoF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
+  def findIPPeersForSync(add: InetSocketAddress, info: PeerInfo): Boolean = {
+    val condition1 = (System.currentTimeMillis() - info.lastUptime.time) > settings.network.syncInterval.toMillis
+    val condition2 = info.peerPriorityStatus == InitialPriority
+    logger.debug(s"findIPPeersForSync: peer: $add, cond1: $condition1, cond2: $condition2")
+    condition1 && condition2
+  }
+
+  def mapPeersForSyncInfoF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 
   def getConnectedPeersF(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 
@@ -255,6 +268,22 @@ class PeersKeeper(settings: EncryAppSettings,
     address -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
 
   def allPeers: (InetSocketAddress, PeerInfo) => Boolean = (_, _) => true
+
+  def accumulatePeersForSync(peers: Seq[ConnectedPeer], isChainSynced: Boolean): Seq[ConnectedPeer] = peers match {
+    case coll: Seq[_] if coll.nonEmpty && isBlockChainSynced =>
+      logger.info(s"Peers collection for sync info non empty and block chain is synced. Sending to DM" +
+        s" peers collection: ${coll.mkString(",")}.")
+      coll
+    case coll: Seq[_] if coll.nonEmpty => scala.util.Random.shuffle(coll).headOption.toSeq.map { p =>
+      logger.info(s"Peers collection for sync info non empty but block chain is not synced. Sending to DM" +
+        s" peer for sync: $p.")
+      p
+    }
+    case _ =>
+      logger.info(s"Peers collection for sync info message is empty.")
+      Seq.empty[ConnectedPeer]
+
+  }
 }
 
 object PeersKeeper {

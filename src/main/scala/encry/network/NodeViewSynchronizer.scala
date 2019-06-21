@@ -40,15 +40,15 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            dataHolder: ActorRef) extends Actor with StrictLogging {
 
   val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
-    .withDispatcher("peers-keeper-dispatcher"))
+    .withDispatcher("peers-keeper-dispatcher"), "PeersKeeper")
 
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper, self)
-    .withDispatcher("network-dispatcher"))
+    .withDispatcher("network-dispatcher"), "NetworkController")
 
   networkController ! RegisterMessagesHandler(Seq(
-    InvNetworkMessage.NetworkMessageTypeID              -> "InvNetworkMessage",
+    InvNetworkMessage.NetworkMessageTypeID -> "InvNetworkMessage",
     RequestModifiersNetworkMessage.NetworkMessageTypeID -> "RequestModifiersNetworkMessage",
-    SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
+    SyncInfoNetworkMessage.NetworkMessageTypeID -> "SyncInfoNetworkMessage"
   ), self)
 
   implicit val timeout: Timeout = Timeout(5.seconds)
@@ -59,12 +59,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   val downloadedModifiersValidator: ActorRef = context.system
     .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef)
-      .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"))
+      .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
     DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings,
       memoryPoolRef, self, downloadedModifiersValidator)
-      .withDispatcher("delivery-manager-dispatcher"), "deliveryManager")
+      .withDispatcher("delivery-manager-dispatcher"), "DeliveryManager")
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
@@ -125,18 +125,17 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote, nonInRequestCache)
             else Option(history).foreach { reader =>
               val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
-                case (id, mod) if mod.isDefined  => id -> mod.get
+                case (id, mod) if mod.isDefined => id -> mod.get
               }
               invData._1 match {
                 case Header.modifierTypeId =>
                   logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
                   sendResponse(remote, invData._1, mods)
-                case Payload.modifierTypeId => mods.foreach {
-                  case (id, modBytes) =>
-                    logger.debug(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
-                      s"${Payload.modifierTypeId}.")
-                    sendResponse(remote, invData._1, Seq(id -> modBytes))
-                  }
+                case Payload.modifierTypeId => mods.foreach { case (id, modBytes) =>
+                  logger.debug(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
+                    s"${Payload.modifierTypeId}.")
+                  sendResponse(remote, invData._1, Seq(id -> modBytes))
+                }
                 case _ => //nothing
               }
             }

@@ -158,7 +158,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot { case (modId, _) => history.contains(modId) }.toSeq
         //todo check this logic
         downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
-        if (!history.isHeadersChainSynced && expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
 

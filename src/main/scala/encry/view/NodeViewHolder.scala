@@ -70,8 +70,8 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
       val isInHistory: Boolean = nodeView.history.contains(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
       if (isInHistory || isInCache)
-        logger.info(s"Received payload ${Algos.encode(mod.id)} can't be placed into cache cause of: " +
-          s"inCache: $isInCache.")
+        logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+          s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else ModifiersCache.put(key(mod.id), mod, nodeView.history)
     }
       computeApplications()
@@ -234,7 +234,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
           }
           ref ! ModifierAppendedToHistory(isHeader, success = true)
         }
-        logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+        logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
         val startAppState = System.currentTimeMillis()
         if (progressInfo.toApply.nonEmpty) {
           logger.debug(s"\n progress info non empty")
