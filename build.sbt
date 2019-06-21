@@ -129,6 +129,8 @@ assemblyJarName in assembly := "EncryCore.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 
+scalacOptions += "-Ypartial-unification"
+
 test in assembly := {}
 
 assemblyMergeStrategy in assembly := {
