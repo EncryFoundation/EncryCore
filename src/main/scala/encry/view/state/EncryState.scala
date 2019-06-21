@@ -4,19 +4,15 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
-import encry.utils.CoreTaggedTypes.VersionTag
-import encry.modifiers.mempool._
-import encry.settings.{EncryAppSettings, NodeSettings}
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDB
-import io.iohk.iodb.Store
+import encry.utils.CoreTaggedTypes.VersionTag
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.TaggedTypes.ADDigest
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.encode.Base16
-
 import scala.util.Try
 
 trait EncryState[IState <: MinimalState[PersistentModifier, IState]]
