@@ -132,10 +132,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                   logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
                   sendResponse(remote, invData._1, mods)
                 case Payload.modifierTypeId => mods.foreach {
-                    case (id, modBytes) =>
-                      logger.debug(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
-                        s"${Payload.modifierTypeId}.")
-                      sendResponse(remote, invData._1, Seq(id -> modBytes))
+                  case (id, modBytes) =>
+                    logger.debug(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
+                      s"${Payload.modifierTypeId}.")
+                    sendResponse(remote, invData._1, Seq(id -> modBytes))
                   }
                 case _ => //nothing
               }
