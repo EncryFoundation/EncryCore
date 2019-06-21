@@ -3,10 +3,11 @@ package encry.view.state
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.Validation._
+import encry.utils.implicits.UTXO._
 import encry.view.state.UtxoStateWithoutAVL._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
@@ -26,15 +27,25 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import cats.instances.list._
 import cats.Traverse
+import com.google.common.primitives.Ints
+import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 final case class UtxoStateWithoutAVL(storage: VersionalStorage,
                                      height: Height,
                                      lastBlockTimestamp: Long) extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging {
 
   override def applyModifier(mod: PersistentModifier): Try[UtxoStateWithoutAVL] = mod match {
-    case header: Header => Try(this)
+    case header: Header =>
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+      Try (
+        UtxoStateWithoutAVL(
+          storage,
+          Height @@ header.height,
+          header.timestamp
+        )
+      )
     case block: Block =>
       logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
       val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => validate(tx)).toList
@@ -45,11 +56,39 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
           logger.info(s"Error during applying block ${block.encodedId}. Errors: ${err.errors.map(_.message).mkString(",")}")
           Try(this)
         },
-        _ => Try(this)
+        txsToApply => {
+          val combinedStateChange = combineAll(txsToApply.map(tx2StateChange))
+          storage.insert(
+            StorageVersion !@@ block.id,
+            combinedStateChange.outputsToDb,
+            combinedStateChange.inputsToDb,
+          )
+          Try (
+            UtxoStateWithoutAVL(
+              storage,
+              Height @@ block.header.height,
+              block.header.timestamp
+            )
+          )
+        }
       )
   }
 
-  override def rollbackTo(version: VersionTag): Try[UtxoStateWithoutAVL] = ???
+  override def rollbackTo(version: VersionTag): Try[UtxoStateWithoutAVL] = Try {
+    storage.versions.find(_ sameElements version) match {
+      case Some(v) =>
+        logger.info(s"Rollback to version ${Algos.encode(version)}")
+        storage.rollbackTo(StorageVersion !@@ version)
+        val stateHeight: Int = storage.get(StorageKey @@ UtxoStateWithoutAVL.bestHeightKey.untag(Digest32))
+          .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
+        UtxoStateWithoutAVL(
+          storage,
+          Height @@ stateHeight,
+          lastBlockTimestamp
+        )
+      case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
+    }
+  }
 
   def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
@@ -101,8 +140,7 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
       else Right[Invalid, Transaction](tx)
     } else tx.semanticValidity.errors.headOption.map(err => Left[Invalid, Transaction](Invalid(Seq(err)))).getOrElse(Right[Invalid, Transaction](tx))
 
-  override def version: VersionTag = ???
-
+  override def version: VersionTag = VersionTag @@ Array.emptyByteArray
   override type NVCT = this.type
 }
 
@@ -110,6 +148,12 @@ object UtxoStateWithoutAVL {
 
   final case class StateChange(inputsToDb: List[StorageKey],
                                outputsToDb: List[(StorageKey, StorageValue)])
+
+  private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
+
+  private val bestHeightKey: Digest32 = Algos.hash("state_height")
+
+  private val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
 
   def tx2StateChange(tx: Transaction): StateChange = StateChange(
     tx.inputs.map(input => StorageKey !@@ input.boxId).toList,
