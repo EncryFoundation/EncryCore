@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -14,7 +13,6 @@ import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
@@ -24,8 +22,9 @@ import com.typesafe.config.Config
 import encry.network.BlackList.BanReason.SentNetworkMessageWithTooManyModifiers
 import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.PeersKeeper._
-import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
+import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.Mempool.RequestForTransactions
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -33,7 +32,6 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -70,7 +68,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
-  val priorityCalculator: PrioritiesCalculator = new PrioritiesCalculator(settings)
+  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings, Map.empty)
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
@@ -81,9 +79,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
   override def receive: Receive = {
     case UpdatedHistory(historyReader) =>
       logger.debug(s"Got message with history. Starting normal actor's work.")
-      context.system.scheduler.schedule(0.second, priorityCalculator.updatingStatisticTime)(
-        context.parent ! AccumulatedPeersStatistic(priorityCalculator.accumulatePeersStatistic)
-      )
+      context.system.scheduler.schedule(0.second, priorityCalculator.updatingStatisticTime) {
+        val (accumulatedStatistic: Map[InetSocketAddress, PeersPriorityStatus], newStat: PrioritiesCalculator) =
+          priorityCalculator.accumulatePeersStatistic
+        priorityCalculator = newStat
+        context.parent ! AccumulatedPeersStatistic(accumulatedStatistic)
+      }
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
         self ! CheckModifiersToDownload
       )
@@ -271,7 +272,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (mTypeId != Transaction.modifierTypeId)
           logger.info(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
-        priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
+        priorityCalculator = priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
         val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
           notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
             rYet.updated(toKey(id),
@@ -304,7 +305,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
           logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
-          priorityCalculator.incrementRequest(peer.socketAddress)
+          priorityCalculator = priorityCalculator.incrementRequest(peer.socketAddress)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress, peerRequests.updated(
             toKey(modId),
             context.system.scheduler
@@ -416,7 +417,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {
       val (withBadNodesMap, withoutBadNodesMap) = peersCollection.filter(p => p._2._2 != Younger).partition {
-        case (_, (_, _, priority)) => priority == PeersPriorityStatus.BadNode
+        case (_, (_, _, priority)) => priority == BadNode
       }
       val withBadNodes: IndexedSeq[(ConnectedPeer, HistoryComparisonResult)] =
         withBadNodesMap.map(x => x._2._1 -> x._2._2).toIndexedSeq
@@ -462,7 +463,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     if (isExpecting(mId, peer)) {
       if (mTid != Transaction.modifierTypeId)
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
-      priorityCalculator.incrementReceive(peer.socketAddress)
+      priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
@@ -476,7 +477,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
-      priorityCalculator.decrementRequest(peer.socketAddress)
+      priorityCalculator = priorityCalculator.decrementRequest(peer.socketAddress)
     }
 
   /**

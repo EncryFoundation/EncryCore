@@ -1,6 +1,6 @@
 package encry.network.DeliveryManagerTests
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.consensus.History
@@ -12,12 +12,13 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scala.concurrent.duration._
