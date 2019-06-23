@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -13,14 +14,15 @@ import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
 import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.BlackList.SentNetworkMessageWithTooManyModifiers
-import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
+import encry.network.BlackList.BanReason.SentNetworkMessageWithTooManyModifiers
+import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.{AccumulatedPeersStatistic, PeersPriorityStatus}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
@@ -31,6 +33,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],

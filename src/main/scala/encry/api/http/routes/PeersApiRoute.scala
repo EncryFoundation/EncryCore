@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.DataHolderForApi.GetConnectedPeers
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.ConnectedPeersList.PeerInfo
+import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.RESTApiSettings
 import io.circe.Encoder

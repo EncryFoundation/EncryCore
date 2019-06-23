@@ -9,7 +9,7 @@ import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.BlackList.SentInvForPayload
+import encry.network.BlackList.BanReason.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifiers
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
@@ -31,6 +31,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],

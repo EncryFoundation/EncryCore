@@ -9,6 +9,9 @@ import encry.api.http.DataHolderForApi.UpdatingConnectedPeers
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
+import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
+import encry.network.BlackList.BanReason
+import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.BlackList.{BanReason, SentPeersMessageWithoutRequest}
 import encry.network.ConnectedPeersList.PeerInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
@@ -32,7 +35,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   val connectWithOnlyKnownPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(true)
 
-  val connectedPeers: ConnectedPeersList = new ConnectedPeersList(settings)
+  var connectedPeers: ConnectedPeersCollection = ConnectedPeersCollection(Map.empty[InetSocketAddress, PeerInfo])
 
   val blackList: BlackList = new BlackList(settings)
 
@@ -120,7 +123,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case HandshakedDone(connectedPeer) =>
       logger.info(s"Peers keeper got approvement about finishing a handshake." +
         s" Initializing new peer: ${connectedPeer.socketAddress}")
-      connectedPeers.initializePeer(connectedPeer)
+      connectedPeers = connectedPeers.initializePeer(connectedPeer)
       logger.info(s"Remove  ${connectedPeer.socketAddress} from awaitingHandshakeConnections collection. Current is: " +
         s"${awaitingHandshakeConnections.mkString(",")}.")
       awaitingHandshakeConnections -= connectedPeer.socketAddress
@@ -130,7 +133,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
-      connectedPeers.removePeer(peer)
+      connectedPeers = connectedPeers.removePeer(peer)
       if (blackList.contains(peer.getAddress)) {
         knownPeers -= peer
         logger.info(s"Peer: $peer removed from availablePeers cause of it has been banned. " +
@@ -182,7 +185,8 @@ class PeersKeeper(settings: EncryAppSettings,
   def additionalMessages(isBlockChainSynced: Boolean): Receive = {
     case OtherNodeSyncingStatus(remote, comparison, _) => connectedPeers.updatePeerComparisonStatus(remote, comparison)
 
-    case AccumulatedPeersStatistic(statistic) => connectedPeers.updatePeersPriorityStatus(statistic)
+    case AccumulatedPeersStatistic(statistic) =>
+      connectedPeers = connectedPeers.updatePriorityStatus(statistic)
 
     case SendToNetwork(message, strategy) =>
       val peers: Seq[ConnectedPeer] = connectedPeers.collect(allPeers, getConnectedPeersF).toSeq
