@@ -7,7 +7,7 @@ import encry.consensus.History.{Fork, Older, Unknown, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{BadNode, HighPriority, LowPriority}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}

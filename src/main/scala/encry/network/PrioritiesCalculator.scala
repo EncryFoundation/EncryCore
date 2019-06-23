@@ -3,54 +3,54 @@ package encry.network
 import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.PrioritiesCalculator.PeersPriorityStatus
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
 import encry.network.PrioritiesCalculator.PeersPriorityStatus._
 import encry.settings.EncryAppSettings
 import scala.concurrent.duration._
 
-final class PrioritiesCalculator(settings: EncryAppSettings) extends StrictLogging {
-
-  private var peersNetworkStatistic: Map[InetSocketAddress, (Requested, Received)] = Map.empty
+final case class PrioritiesCalculator(settings: EncryAppSettings,
+                                      private val peersNetworkStatistic: Map[InetSocketAddress, (Requested, Received)])
+  extends StrictLogging {
 
   val updatingStatisticTime: FiniteDuration = (settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks).seconds
 
-  def incrementRequest(peer: InetSocketAddress): Unit = {
+  def incrementRequest(peer: InetSocketAddress): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = requested.increment
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
+    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (newRequested, received)))
   }
 
-  def incrementReceive(peer: InetSocketAddress): Unit = {
+  def incrementReceive(peer: InetSocketAddress): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newReceived: Received = received.increment
     logger.debug(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (requested, newReceived))
+    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (requested, newReceived)))
   }
 
-  def decrementRequest(peer: InetSocketAddress): Unit = {
+  def decrementRequest(peer: InetSocketAddress): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = requested.decrement
     logger.debug(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
+    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (newRequested, received)))
   }
 
-  def incrementRequestForNModifiers(peer: InetSocketAddress, modifiersQty: Int): Unit = {
+  def incrementRequestForNModifiers(peer: InetSocketAddress, modifiersQty: Int): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = requested.incrementForN(modifiersQty)
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    peersNetworkStatistic = peersNetworkStatistic.updated(peer, (newRequested, received))
+    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (newRequested, received)))
   }
 
-  def accumulatePeersStatistic: Map[InetSocketAddress, PeersPriorityStatus] = {
+  def accumulatePeersStatistic: (Map[InetSocketAddress, PeersPriorityStatus], PrioritiesCalculator) = {
     val updatedStatistic: Map[InetSocketAddress, PeersPriorityStatus] = peersNetworkStatistic.map {
       case (peer, (requested, received)) =>
         logger.info(s"peer: $peer: received: $received, requested: $requested")
         val priority: PeersPriorityStatus = PeersPriorityStatus.calculateStatuses(received, requested)
         peer -> priority
     }
-    peersNetworkStatistic = Map.empty[InetSocketAddress, (Requested, Received)]
     logger.info(s"Accumulated peers statistic. Current stats are: ${updatedStatistic.mkString(",")}")
-    updatedStatistic
+    (updatedStatistic, PrioritiesCalculator(settings, Map.empty[InetSocketAddress, (Requested, Received)]))
   }
 }
 
@@ -61,14 +61,12 @@ object PrioritiesCalculator {
   object PeersPriorityStatus {
 
     sealed trait PeersPriorityStatus
-
-    case object HighPriority extends PeersPriorityStatus
-
-    case object LowPriority extends PeersPriorityStatus
-
-    case object InitialPriority extends PeersPriorityStatus
-
-    case object BadNode extends PeersPriorityStatus
+    object PeersPriorityStatus {
+      case object HighPriority extends PeersPriorityStatus
+      case object LowPriority extends PeersPriorityStatus
+      case object InitialPriority extends PeersPriorityStatus
+      case object BadNode extends PeersPriorityStatus
+    }
 
     final case class Received(received: Int = 0) extends AnyVal {
       def increment: Received = Received(received + 1)

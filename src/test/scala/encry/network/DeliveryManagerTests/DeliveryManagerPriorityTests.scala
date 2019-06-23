@@ -11,9 +11,9 @@ import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{BadNode, HighPriority, InitialPriority, LowPriority}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
@@ -67,7 +67,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
         Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
-      val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
+      val (result, _) = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
       assert(result.contains(cp1.socketAddress))
       assert(result(cp1.socketAddress) == BadNode)
       deliveryManager.stop()
@@ -91,7 +91,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
-      val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
+      val (result, _) = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
 
       assert(result.contains(cp1.socketAddress))
       assert(result(cp1.socketAddress) == HighPriority)
@@ -117,7 +117,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId, blocks.take(6).map(block => block.header.id -> block.header.bytes).toMap), cp1)
-      val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
+      val (result, _) = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
       assert(result.contains(cp1.socketAddress))
       assert(result(cp1.socketAddress) == LowPriority)
       deliveryManager.stop()
@@ -187,7 +187,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId, blocks.take(2).map(block => block.header.id -> headerBytes).toMap), cp9)
 
-      val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
+      val (result, _) = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
 
       assert(result.contains(cp1.socketAddress))
       assert(result(cp1.socketAddress) == HighPriority)
@@ -235,7 +235,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId, blocks.map(block => block.header.id -> block.header.bytes).toMap), cp1)
-      val result = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
+      val (result, _) = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
       assert(result.contains(cp1.socketAddress))
       assert(result(cp1.socketAddress) == BadNode)
       deliveryManager.stop()

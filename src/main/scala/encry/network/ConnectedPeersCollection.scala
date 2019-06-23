@@ -5,7 +5,8 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.{HistoryComparisonResult, Unknown}
 import encry.network.ConnectedPeersCollection.{LastUptime, PeerInfo}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, ConnectionType, Outgoing}
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 
 final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddress, PeerInfo]) extends StrictLogging {
 
