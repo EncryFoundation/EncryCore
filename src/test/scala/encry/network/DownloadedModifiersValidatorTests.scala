@@ -5,8 +5,8 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
-import encry.network.BlackList.{SemanticallyInvalidPersistentModifier, SyntacticallyInvalidPersistentModifier}
-import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
+import encry.network.BlackList.{CorruptedSerializedBytes, SemanticallyInvalidPersistentModifier, SyntacticallyInvalidPersistentModifier}
+import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
@@ -90,11 +90,11 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history1))
 
       /* Header */
-      val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray)
+      val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray.reverse)
       val msg = ModifiersForValidating(connectedPeer, Header.modifierTypeId, mods)
 
       deliveryManager.send(downloadedModifiersValidator, msg)
-      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidPersistentModifier))
+      peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
       nodeViewHolder.expectNoMsg()
       nodeViewSync.expectMsg(InvalidModifiers(Seq(header_second.id)))
     }
@@ -131,12 +131,12 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(historyWith10Blocks._1))
 
       val mods: Seq[(ModifierId, Array[Byte])] = historyWith10Blocks._2.map(b =>
-        b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray
+        b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray.reverse
       ) :+ (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)
 
       deliveryManager.send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
-      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidPersistentModifier))
+      peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
       nodeViewHolder.expectMsg(ModifiersFromRemote(Seq(payload)))
       nodeViewSync.expectMsg(InvalidModifiers(historyWith10Blocks._2.map(b => b.payload.id)))
     }
