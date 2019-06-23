@@ -10,7 +10,7 @@ import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
-import encry.network.BlackList.BanReason
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -35,7 +35,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   var connectedPeers: ConnectedPeersCollection = ConnectedPeersCollection(Map.empty[InetSocketAddress, PeerInfo])
 
-  val blackList: BlackList = new BlackList(settings)
+  var blackList: BlackList = BlackList(settings, Map.empty)
 
   var knownPeers: Map[InetSocketAddress, Int] = settings.network.knownPeers
     .collect { case peer if !isSelf(peer) => peer -> 0 }.toMap
@@ -52,12 +52,12 @@ class PeersKeeper(settings: EncryAppSettings,
     if (!connectWithOnlyKnownPeers) context.system.scheduler.schedule(2.seconds, settings.network.syncInterval)(
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
-    context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime)(blackList.cleanupBlackList())
+    context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime){blackList = blackList.cleanupBlackList}
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
-      nodeViewSync ! UpdatedPeersCollection(connectedPeers.findAndMap(allPeers, getPeersForDMF).toMap)
+      nodeViewSync ! UpdatedPeersCollection(connectedPeers.findAndMap(allElems, getPeersForDMF).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
-      dataHolder ! UpdatingConnectedPeers(connectedPeers.findAndMap(allPeers, getConnectedPeersF))
+      dataHolder ! UpdatingConnectedPeers(connectedPeers.findAndMap(allElems, getConnectedPeersF))
     )
   }
 
@@ -68,10 +68,11 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def setupConnectionsLogic: Receive = {
     case RequestPeerForConnection if connectedPeers.size < settings.network.maxConnections =>
+      def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType): (InetAddress, BanReason) = address -> r
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
         s"so peer keeper allows to add one more connection. Current available peers are: " +
         s"${knownPeers.mkString(",")}. Current black list is: ${
-          blackList.getBannedPeersAndReasons.mkString(",")
+          blackList.findAndMap((_, _, _, _) => true, mapReason).mkString(",")
         }")
       scala.util.Random.shuffle(
         knownPeers
@@ -190,7 +191,7 @@ class PeersKeeper(settings: EncryAppSettings,
       connectedPeers = connectedPeers.updatePriorityStatus(statistic)
 
     case SendToNetwork(message, strategy) =>
-      val peers: Seq[ConnectedPeer] = connectedPeers.findAndMap(allPeers, getConnectedPeersF)
+      val peers: Seq[ConnectedPeer] = connectedPeers.findAndMap(allElems, getConnectedPeersF)
       strategy.choose(peers).foreach { peer =>
         logger.debug(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
@@ -204,7 +205,7 @@ class PeersKeeper(settings: EncryAppSettings,
         logger.info(s"Added peer: $peer to known peers. Current known peers are: ${knownPeers.mkString(",")}")
       }
 
-    case RemovePeerFromBlackList(peer) => blackList.remove(peer.getAddress)
+    case RemovePeerFromBlackList(peer) => blackList = blackList.remove(peer.getAddress)
 
     case msg => logger.info(s"Peers keeper got unhandled message: $msg.")
   }
@@ -212,7 +213,7 @@ class PeersKeeper(settings: EncryAppSettings,
   def banPeersLogic: Receive = {
     case BanPeer(peer, reason) =>
       logger.info(s"Banning peer: ${peer.socketAddress} for $reason.")
-      blackList.banPeer(reason, peer.socketAddress.getAddress)
+      blackList = blackList.banPeer(reason, peer.socketAddress.getAddress)
       peer.handlerRef ! CloseConnection
   }
 
@@ -242,7 +243,7 @@ class PeersKeeper(settings: EncryAppSettings,
   def getPeersForDMF(address: InetSocketAddress, info: PeerInfo): (InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)) =
     address -> (info.connectedPeer, info.historyComparisonResult, info.peerPriorityStatus)
 
-  def allPeers: (InetSocketAddress, PeerInfo) => Boolean = (_, _) => true
+  def allElems: (InetSocketAddress, PeerInfo) => Boolean = (_, _) => true
 }
 
 object PeersKeeper {

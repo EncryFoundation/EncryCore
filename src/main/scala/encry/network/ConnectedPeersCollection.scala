@@ -13,12 +13,9 @@ final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddre
 
   def contains(peer: InetSocketAddress): Boolean = peers.contains(peer)
 
-  def initializePeer(cp: ConnectedPeer): ConnectedPeersCollection =
-    ConnectedPeersCollection(peers.updated(cp.socketAddress, initializePeerInfo(cp)))
-
-  private def initializePeerInfo(cp: ConnectedPeer): PeerInfo = PeerInfo(
-    Unknown, InitialPriority, cp, Outgoing, LastUptime(0)
-  )
+  def initializePeer(cp: ConnectedPeer): ConnectedPeersCollection = ConnectedPeersCollection(peers.updated(
+    cp.socketAddress, PeerInfo(Unknown, InitialPriority, cp, Outgoing, LastUptime(0))
+  ))
 
   def updatePriorityStatus(stats: Map[InetSocketAddress, PeersPriorityStatus]): ConnectedPeersCollection =
     ConnectedPeersCollection(stats.foldLeft(peers) { case (oldPeers, (address, status)) =>
