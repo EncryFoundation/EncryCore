@@ -28,25 +28,25 @@ class BlackListTests extends WordSpecLike
    */
   "Black list" should {
     "temporary ban requested peer correctly" in {
-      val blackList: BlackList = new BlackList(settingsWithKnownPeers)
+      val blackList: BlackList = new BlackList(settingsWithKnownPeers, Map.empty)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
-      blackList.banPeer(SemanticallyInvalidPersistentModifier, peer)
-      blackList.contains(peer) shouldBe true
+      val newBL = blackList.banPeer(SemanticallyInvalidPersistentModifier, peer)
+      newBL.contains(peer) shouldBe true
     }
     "clean black list from peers with expired ban time which were banned by temporary ban" in {
-      val blackList: BlackList = new BlackList(settingsWithKnownPeers)
+      val blackList: BlackList = new BlackList(settingsWithKnownPeers, Map.empty)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
-      blackList.banPeer(SyntacticallyInvalidPersistentModifier, peer)
+      val newBL = blackList.banPeer(SyntacticallyInvalidPersistentModifier, peer)
       Thread.sleep(2000)
-      blackList.cleanupBlackList()
-      blackList.contains(peer) shouldBe false
+      val newBL1 = newBL.cleanupBlackList
+      newBL1.contains(peer) shouldBe false
     }
     "don't remove peer from black list before ban time expired" in {
-      val blackList: BlackList = new BlackList(settingsWithKnownPeers)
+      val blackList: BlackList = new BlackList(settingsWithKnownPeers, Map.empty)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
-      blackList.banPeer(SentInvForPayload, peer)
-      blackList.cleanupBlackList()
-      blackList.contains(peer) shouldBe true
+      val newBL = blackList.banPeer(SentInvForPayload, peer)
+      val newBL1 = newBL.cleanupBlackList
+      newBL1.contains(peer) shouldBe true
     }
   }
 
