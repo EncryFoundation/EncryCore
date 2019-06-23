@@ -5,7 +5,7 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
-import encry.network.BlackList.{SemanticallyInvalidPersistentModifier, SyntacticallyInvalidPersistentModifier}
+import encry.network.BlackList.BanReason._
 import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
