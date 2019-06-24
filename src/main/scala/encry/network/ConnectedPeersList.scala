@@ -61,9 +61,9 @@ final class ConnectedPeersList(settings: EncryAppSettings) extends StrictLogging
       logger.info(s"Trying to update time but there is no such peer in connected collection.")
   }
 
-  def getPeersF[T](p: (InetSocketAddress, PeerInfo) => Boolean,
-                   f: (InetSocketAddress, PeerInfo) => T): Iterable[T] =
-    peers.filter(k => p(k._1, k._2)).map(x => f(x._1, x._2))
+  def collect[T](p: (InetSocketAddress, PeerInfo) => Boolean,
+                 f: (InetSocketAddress, PeerInfo) => T): Iterable[T] = peers
+    .collect { case (peer, info) if p(peer, info) => f(peer, info) }
 
 }
 

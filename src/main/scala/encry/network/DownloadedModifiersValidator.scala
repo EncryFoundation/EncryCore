@@ -6,7 +6,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList._
-import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
+import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -16,7 +16,6 @@ import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool.TransactionsFromRemote
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-import org.encryfoundation.common.validation.RecoverableModifierError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.utils.Algos
 import scala.util.{Failure, Success, Try}
@@ -37,22 +36,10 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
       val modifiers = filteredModifiers.foldLeft(Seq.empty[PersistentModifier], Seq.empty[ModifierId]) {
         case ((modsColl, forRemove), (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
-            history.testApplicable(modifier) match {
-              case Failure(ex: RecoverableModifierError) =>
-                logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable has: ${ex.getMessage}. But this is " +
-                  s"RecoverableModifierError so continue working with this modifier.")
-                (modsColl :+ modifier, forRemove)
-              case Failure(ex) =>
-                logger.info(s"Modifier: ${modifier.encodedId} after testApplicable has: ${ex.getMessage}. This is " +
-                  s"unhandled exception so reject this modifier and ban peer: $remote")
-                peersKeeper ! BanPeer(remote, SemanticallyInvalidPersistentModifier)
-                (modsColl, forRemove :+ id)
-              case Success(_) =>
-                logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
-                (modsColl :+ modifier, forRemove)
-            }
+            logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
+            (modsColl :+ modifier, forRemove)
           case Success(modifier) =>
-            logger.info(s"Modifier with id: ${modifier.encodedId} invalid cause of: isSyntacticallyValid = false")
+            logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
             (modsColl, forRemove :+ id)
           case Failure(ex) =>
