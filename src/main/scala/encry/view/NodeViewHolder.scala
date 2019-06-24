@@ -32,11 +32,11 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef,
-                                                         influxRef: Option[ActorRef],
-                                                         dataHolder: ActorRef) extends Actor with StrictLogging {
+class NodeViewHolder(memoryPoolRef: ActorRef,
+                     influxRef: Option[ActorRef],
+                     dataHolder: ActorRef) extends Actor with StrictLogging {
 
-  case class NodeView(history: EncryHistory, state: StateType, wallet: EncryWallet)
+  case class NodeView(history: EncryHistory, state: UtxoStateWithoutAVL, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -129,7 +129,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
   def updateNodeView(updatedHistory: Option[EncryHistory] = None,
-                     updatedState: Option[StateType] = None,
+                     updatedState: Option[UtxoStateWithoutAVL] = None,
                      updatedVault: Option[EncryWallet] = None): Unit = {
     val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
       updatedState.getOrElse(nodeView.state),
@@ -158,12 +158,12 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
 
   @tailrec
   private def updateState(history: EncryHistory,
-                          state: StateType,
+                          state: UtxoStateWithoutAVL,
                           progressInfo: ProgressInfo[PersistentModifier],
                           suffixApplied: IndexedSeq[PersistentModifier]):
-  (EncryHistory, Try[StateType], Seq[PersistentModifier]) = {
+  (EncryHistory, Try[UtxoStateWithoutAVL], Seq[PersistentModifier]) = {
     case class UpdateInformation(history: EncryHistory,
-                                 state: StateType,
+                                 state: UtxoStateWithoutAVL,
                                  failedMod: Option[PersistentModifier],
                                  alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
                                  suffix: IndexedSeq[PersistentModifier])
@@ -171,7 +171,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     val startTime = System.currentTimeMillis()
     requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    val (stateToApplyTry: Try[StateType], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
+    val (stateToApplyTry: Try[UtxoStateWithoutAVL], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
         branchingPointOpt.map { branchPoint =>
           if (!state.version.sameElements(branchPoint))
@@ -238,7 +238,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         if (progressInfo.toApply.nonEmpty) {
           logger.debug(s"\n progress info non empty")
           val startPoint: Long = System.currentTimeMillis()
-          val (newHistory: EncryHistory, newStateTry: Try[StateType], blocksApplied: Seq[PersistentModifier]) =
+          val (newHistory: EncryHistory, newStateTry: Try[UtxoStateWithoutAVL], blocksApplied: Seq[PersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           if (settings.influxDB.isDefined)
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
@@ -303,7 +303,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     }
   } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
 
-  def sendUpdatedInfoToMemoryPool(state: StateType,
+  def sendUpdatedInfoToMemoryPool(state: UtxoStateWithoutAVL,
                                   toRemove: Seq[PersistentModifier],
                                   blocksApplied: Seq[PersistentModifier]): Unit = {
     memoryPoolRef ! UpdatedState(state)
@@ -326,10 +326,11 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     val stateDir: File = EncryState.getStateDir(settings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: StateType = {
-      if (settings.node.stateMode.isDigest) EncryState.generateGenesisDigestState(stateDir, settings)
-      else EncryState.generateGenesisUtxoState(stateDir, Some(self), settings, influxRef)
-    }.asInstanceOf[StateType]
+    val state: UtxoStateWithoutAVL = {
+//      if (settings.node.stateMode.isDigest) //EncryState.generateGenesisDigestState(stateDir, settings)
+//      else
+        EncryState.generateGenesisUtxoStateWithoutAVL(stateDir, Some(self), settings, influxRef)
+    }
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     NodeView(history, state, wallet)
@@ -339,8 +340,8 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     try {
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
-      val state: StateType = restoreConsistentState(
-        EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[StateType], history
+      val state: UtxoStateWithoutAVL = restoreConsistentState(
+        EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[UtxoStateWithoutAVL], history
       )
       Some(NodeView(history, state, wallet))
     } catch {
@@ -352,7 +353,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
     None
   }
 
-  def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): StateType = {
+  def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): UtxoStateWithoutAVL = {
     val dir: File = EncryState.getStateDir(settings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
@@ -363,11 +364,10 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
           DigestState.create(version, digest, dir, settings)
         case _ => EncryState.readOrGenerate(settings, Some(self), influxRef)
       }
-    }.asInstanceOf[StateType]
-      .ensuring(_.rootHash sameElements digest.getOrElse(EncryState.afterGenesisStateDigest), "State root is incorrect")
+    }.asInstanceOf[UtxoStateWithoutAVL]
   }
 
-  def restoreConsistentState(stateIn: StateType, history: EncryHistory): StateType =
+  def restoreConsistentState(stateIn: UtxoStateWithoutAVL, history: EncryHistory): UtxoStateWithoutAVL =
     (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
         logger.info(s"State and history are both empty on startup")
@@ -379,11 +379,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState()
-      case (_, Some(bestBlock), _: DigestState) =>
-        logger.info(s"State and history are inconsistent." +
-          s" Going to switch state to version ${bestBlock.encodedId}")
-        getRecreatedState(Some(VersionTag !@@ bestBlock.id), Some(bestBlock.header.stateRoot))
-      case (stateId, Some(historyBestBlock), state: StateType@unchecked) =>
+      case (stateId, Some(historyBestBlock), state: UtxoStateWithoutAVL@unchecked) =>
         val stateBestHeaderOpt = history.typedModifierById[Header](ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
@@ -438,8 +434,5 @@ object NodeViewHolder {
       })
 
   def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef): Props =
-    settings.node.stateMode match {
-      case StateMode.Digest => Props(new NodeViewHolder[DigestState](memoryPoolRef, influxRef, dataHolder))
-      case StateMode.Utxo => Props(new NodeViewHolder[UtxoState](memoryPoolRef, influxRef, dataHolder))
-    }
+    Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder))
 }

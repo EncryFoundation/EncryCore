@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -17,7 +18,7 @@ import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
-import encry.view.state.{StateMode, UtxoState}
+import encry.view.state.{StateMode, UtxoState, UtxoStateWithoutAVL}
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -27,6 +28,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
+
 import scala.collection._
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
@@ -92,7 +94,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
-    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
+    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.timestamp == block.header.timestamp) =>
       logger.info(s"Going to propagate new block (${block.header.height}, ${block.header.encodedId}, ${block.payload.txs.size}" +
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
@@ -155,9 +157,9 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
+  def createCandidate(view: CurrentView[EncryHistory, UtxoStateWithoutAVL, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess).distinct
+    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
         if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
@@ -174,27 +176,22 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
 
-    view.state.generateProofs(txs) match {
-      case Success((adProof, adDigest)) =>
-        val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-          .getOrElse(TestNetConstants.InitialDifficulty)
 
-        val candidate: CandidateBlock =
-          CandidateBlock(bestHeaderOpt, adProof, adDigest, TestNetConstants.Version, txs, timestamp, difficulty)
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+      .getOrElse(TestNetConstants.InitialDifficulty)
 
-        logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-          s"and 1 coinbase for height $height.")
+    val candidate: CandidateBlock =
+      CandidateBlock(bestHeaderOpt, TestNetConstants.Version, txs, timestamp, difficulty)
 
-        transactionsPool = IndexedSeq.empty[Transaction]
-        candidate
-      case Failure(ex) =>
-        logger.info(s"Failed to gen candidate: ${ex.getMessage}")
-        createCandidate(view, bestHeaderOpt)
-    }
+    logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+      s"and 1 coinbase for height $height.")
+
+    transactionsPool = IndexedSeq.empty[Transaction]
+    candidate
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoStateWithoutAVL, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime

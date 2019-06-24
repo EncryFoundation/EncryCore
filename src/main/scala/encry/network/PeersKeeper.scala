@@ -79,7 +79,8 @@ class PeersKeeper(settings: EncryAppSettings,
         }")
       val peers = knownPeers
         .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
-      peers.take(Random.nextInt(peers.size))
+      logger.info(s"peers size: ${peers.size}")
+      Random.shuffle(peers.toSeq)
         .headOption
         .foreach { case (peer, _) =>
           outgoingConnections += peer

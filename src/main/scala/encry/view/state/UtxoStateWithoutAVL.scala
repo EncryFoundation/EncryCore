@@ -11,7 +11,6 @@ import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.Validation._
 import encry.utils.implicits.UTXO._
-import encry.view.state.UtxoStateWithoutAVL._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Transaction}
@@ -32,11 +31,13 @@ import cats.instances.list._
 import cats.Traverse
 import com.google.common.primitives.Ints
 import encry.avltree.VersionedAVLStorage
+import encry.consensus.EncrySupplyController
 import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import io.iohk.iodb.LSMStore
 import org.iq80.leveldb.Options
+import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
@@ -44,6 +45,8 @@ import scala.util.{Failure, Try}
 final case class UtxoStateWithoutAVL(storage: VersionalStorage,
                                      height: Height,
                                      lastBlockTimestamp: Long) extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging {
+
+  override type NVCT = this.type
 
   override def applyModifier(mod: PersistentModifier): Try[UtxoStateWithoutAVL] = mod match {
     case header: Header =>
@@ -57,7 +60,12 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
       )
     case block: Block =>
       logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => validate(tx)).toList
+      val lastTxId = block.payload.txs.last.id
+      val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
+      val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+        if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
+        else validate(tx)
+      }).toList
         .traverse(Validated.fromEither)
         .toEither
       res.fold(
@@ -66,7 +74,7 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
           Try(this)
         },
         txsToApply => {
-          val combinedStateChange = combineAll(txsToApply.map(tx2StateChange))
+          val combinedStateChange = combineAll(txsToApply.map(UtxoStateWithoutAVL.tx2StateChange))
           storage.insert(
             StorageVersion !@@ block.id,
             combinedStateChange.outputsToDb,
@@ -150,7 +158,8 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
     } else tx.semanticValidity.errors.headOption.map(err => Left[Invalid, Transaction](Invalid(Seq(err)))).getOrElse(Right[Invalid, Transaction](tx))
 
   override def version: VersionTag = VersionTag @@ Array.emptyByteArray
-  override type NVCT = this.type
+
+  def closeStorage(): Unit = storage.close()
 }
 
 object UtxoStateWithoutAVL extends StrictLogging {
@@ -182,8 +191,13 @@ object UtxoStateWithoutAVL extends StrictLogging {
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 33))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
+
+    storage.insert(
+      StorageVersion @@ Array.fill(32)(0: Byte),
+      boxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+    )
 
     new UtxoStateWithoutAVL(
       storage,

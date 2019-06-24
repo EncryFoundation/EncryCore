@@ -16,7 +16,7 @@ import encry.stats.StatsSender.MempoolStat
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
 import encry.view.mempool.Mempool._
-import encry.view.state.{DigestState, EncryState, UtxoState}
+import encry.view.state.{DigestState, EncryState, UtxoStateWithoutAVL}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId, ModifierTypeId}
@@ -47,7 +47,7 @@ class Mempool(settings: EncryAppSettings,
   override def receive: Receive = {
     case _@UpdatedState(updatedState) =>
       updatedState match {
-        case utxoState: UtxoState => logger.debug(s"Received state instance on MemoryPool actor. Starting mainLogic on this actor.")
+        case utxoState: UtxoStateWithoutAVL => logger.debug(s"Received state instance on MemoryPool actor. Starting mainLogic on this actor.")
           context.system.scheduler.schedule(
             settings.node.bloomFilterCleanupInterval,
             settings.node.bloomFilterCleanupInterval, self, TickForCleanupBloomFilter)
@@ -61,15 +61,15 @@ class Mempool(settings: EncryAppSettings,
             5.seconds,
             5.seconds)(influx.foreach(_ ! MempoolStat(memoryPool.size)))
           context.become(messagesHandler(utxoState))
-        case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
+        //case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
       }
     case GetMempoolSize => sender() ! memoryPool.size
     case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
 
-  def messagesHandler(state: UtxoState): Receive = mainLogic(state).orElse(handleStates)
+  def messagesHandler(state: UtxoStateWithoutAVL): Receive = mainLogic(state).orElse(handleStates)
 
-  def mainLogic(state: UtxoState): Receive = {
+  def mainLogic(state: UtxoStateWithoutAVL): Receive = {
     case TransactionsFromRemote(txs) =>
       memoryPool = validateAndPutTransactions(txs.toIndexedSeq, memoryPool, state, fromNetwork = true)
     case TickForRemoveExpired => memoryPool = cleanMemoryPoolFromExpired(memoryPool)
@@ -105,8 +105,8 @@ class Mempool(settings: EncryAppSettings,
   def handleStates: Receive = {
     case _@UpdatedState(updatedState) =>
       updatedState match {
-        case utxoState: UtxoState => context.become(messagesHandler(utxoState))
-        case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
+        case utxoState: UtxoStateWithoutAVL => context.become(messagesHandler(utxoState))
+        //case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
       }
     case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
@@ -119,7 +119,7 @@ class Mempool(settings: EncryAppSettings,
 
   def validateAndPutTransactions(inputTransactions: IndexedSeq[Transaction],
                                  currentMemoryPool: HashMap[WrappedIdAsKey, Transaction],
-                                 currentState: UtxoState,
+                                 currentState: UtxoStateWithoutAVL,
                                  fromNetwork: Boolean): HashMap[WrappedIdAsKey, Transaction] = {
     val validatedTransactions: IndexedSeq[Transaction] = inputTransactions.filter(tx =>
       tx.semanticValidity.isSuccess && !currentMemoryPool.contains(toKey(tx.id))
@@ -176,7 +176,7 @@ object Mempool {
 
   case class RolledBackTransactions(txs: IndexedSeq[Transaction])
 
-  case class UpdatedState[StateType <: EncryState[StateType]](state: StateType)
+  case class UpdatedState(state: UtxoStateWithoutAVL)
 
   case object TickForSendTransactionsToMiner
 

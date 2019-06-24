@@ -61,9 +61,9 @@ object EncryState extends StrictLogging {
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
   def generateGenesisUtxoState(stateDir: File,
-                               nodeViewHolderRef: Option[ActorRef],
-                               settings: EncryAppSettings,
-                               statsSenderRef: Option[ActorRef]): UtxoState = {
+    nodeViewHolderRef: Option[ActorRef],
+    settings: EncryAppSettings,
+    statsSenderRef: Option[ActorRef]): UtxoState = {
     val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
     UtxoState.genesis(supplyBoxes, stateDir, nodeViewHolderRef, settings, statsSenderRef).ensuring(us => {
       logger.info(s"Expected afterGenesisDigest: ${TestNetConstants.AfterGenesisStateDigestHex}")
@@ -71,6 +71,14 @@ object EncryState extends StrictLogging {
       logger.info(s"Generated UTXO state with ${supplyBoxes.size} boxes inside.")
       us.rootHash.sameElements(afterGenesisStateDigest) && us.version.sameElements(genesisStateVersion)
     })
+  }
+
+  def generateGenesisUtxoStateWithoutAVL(stateDir: File,
+                                         nodeViewHolderRef: Option[ActorRef],
+                                         settings: EncryAppSettings,
+                                         statsSenderRef: Option[ActorRef]): UtxoStateWithoutAVL = {
+    val supplyBoxes: List[EncryBaseBox] = EncryState.initialStateBoxes.toList
+    UtxoStateWithoutAVL.genesis(supplyBoxes, stateDir, nodeViewHolderRef, settings, statsSenderRef)
   }
 
   def generateGenesisDigestState(stateDir: File, settings: EncryAppSettings): DigestState =
