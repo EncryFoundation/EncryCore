@@ -55,4 +55,6 @@ object ConnectedPeersCollection {
                             connectedPeer: ConnectedPeer,
                             connectionType: ConnectionType,
                             lastUptime: LastUptime)
+
+  def apply(): ConnectedPeersCollection = ConnectedPeersCollection(Map.empty[InetSocketAddress, PeerInfo])
 }

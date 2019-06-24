@@ -50,4 +50,7 @@ object BlackList {
   }
 
   final case class BanTime(time: Long) extends AnyVal
+
+  def apply(settings: EncryAppSettings): BlackList =
+    BlackList(settings, Map.empty[InetAddress, (BanReason, BanTime, BanType)])
 }

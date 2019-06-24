@@ -68,7 +68,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
-  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings, Map.empty[InetSocketAddress, (Requested, Received)])
+  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings)
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(

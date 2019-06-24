@@ -90,4 +90,7 @@ object PrioritiesCalculator {
         case _                           => BadNode
       }
   }
+
+  def apply(settings: EncryAppSettings): PrioritiesCalculator =
+    PrioritiesCalculator(settings, Map.empty[InetSocketAddress, (Requested, Received)])
 }

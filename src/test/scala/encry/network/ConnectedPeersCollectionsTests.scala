@@ -23,7 +23,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
 
   "ConnectedPeersCollection" should {
     "initialize new peer" in {
-      val connectedPeersCollection = ConnectedPeersCollection(Map.empty)
+      val connectedPeersCollection = ConnectedPeersCollection()
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
@@ -52,7 +52,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       }
     }
     "update priority status" in {
-      val connectedPeersCollection = ConnectedPeersCollection(Map.empty)
+      val connectedPeersCollection = ConnectedPeersCollection()
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
@@ -91,7 +91,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       cpcState.get(address2) shouldBe None
     }
     "update history comparison result" in {
-      val connectedPeersCollection = ConnectedPeersCollection(Map.empty)
+      val connectedPeersCollection = ConnectedPeersCollection()
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
@@ -142,7 +142,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       cpcState.get(address2) shouldBe None
     }
     "remove peer" in {
-      val connectedPeersCollection = ConnectedPeersCollection(Map.empty)
+      val connectedPeersCollection = ConnectedPeersCollection()
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
