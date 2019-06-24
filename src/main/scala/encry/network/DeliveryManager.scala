@@ -23,7 +23,7 @@ import encry.network.BlackList.BanReason.SentNetworkMessageWithTooManyModifiers
 import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.{PeersPriorityStatus, Received, Requested}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.Mempool.RequestForTransactions
 import org.encryfoundation.common.modifiers.history.Header
@@ -68,7 +68,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
-  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings, Map.empty)
+  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings, Map.empty[InetSocketAddress, (Requested, Received)])
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(

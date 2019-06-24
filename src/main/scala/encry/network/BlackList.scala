@@ -23,8 +23,7 @@ final case class BlackList(settings: EncryAppSettings,
 
   def findAndMap[T](p: (InetAddress, BanReason, BanTime, BanType) => Boolean,
                     f: (InetAddress, BanReason, BanTime, BanType) => T): Seq[T] = blackList
-    .filter { case (add, (r, t, bt)) => p(add, r, t, bt) }
-    .map { case (add, (r, t, bt)) => f(add, r, t, bt) }
+    .collect { case (add, (r, t, bt)) if p(add, r, t, bt) => f(add, r, t, bt) }
     .toSeq
 }
 

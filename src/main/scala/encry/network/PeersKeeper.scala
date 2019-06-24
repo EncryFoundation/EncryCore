@@ -37,7 +37,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   var connectedPeers: ConnectedPeersCollection = ConnectedPeersCollection(Map.empty[InetSocketAddress, PeerInfo])
 
-  var blackList: BlackList = BlackList(settings, Map.empty)
+  var blackList: BlackList = BlackList(settings, Map.empty[InetAddress, (BanReason, BanTime, BanType)])
 
   var knownPeers: Map[InetSocketAddress, Int] = settings.network.knownPeers
     .collect { case peer if !isSelf(peer) => peer -> 0 }.toMap
