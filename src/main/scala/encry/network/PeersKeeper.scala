@@ -155,15 +155,15 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def networkMessagesProcessingLogic: Receive = {
     case DataFromPeer(message, remote) => message match {
-      case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers => peers
-        .filterNot(p =>
-          blackList.contains(p.getAddress) || connectedPeers.contains(p) || isSelf(p) || knownPeers.contains(p)
-        )
-        .foreach { p =>
-          logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
-          knownPeers = knownPeers.updated(p, 0)
-        }
-        logger.info(s"New available peers collection from $remote are: ${knownPeers.keys.mkString(",")}.")
+      case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers =>
+        logger.info(s"Got peers message from $remote with peers ${peers.mkString(",")}")
+        peers
+          .filterNot(p => blackList.contains(p.getAddress) || connectedPeers.contains(p) || isSelf(p) || knownPeers.contains(p))
+          .foreach { p =>
+            logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
+            knownPeers = knownPeers.updated(p, 0)
+          }
+        logger.info(s"New available peers collection after processing peers from $remote is: ${knownPeers.keys.mkString(",")}.")
 
       case PeersNetworkMessage(_) =>
         logger.info(s"Got PeersNetworkMessage from $remote, but connectWithOnlyKnownPeers: $connectWithOnlyKnownPeers, " +
