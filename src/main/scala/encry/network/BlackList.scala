@@ -21,8 +21,8 @@ final case class BlackList(settings: EncryAppSettings,
 
   def remove(peer: InetAddress): BlackList = BlackList(settings, blackList - peer)
 
-  def findAndMap[T](p: (InetAddress, BanReason, BanTime, BanType) => Boolean,
-                    f: (InetAddress, BanReason, BanTime, BanType) => T): Seq[T] = blackList
+  def collect[T](p: (InetAddress, BanReason, BanTime, BanType) => Boolean,
+                 f: (InetAddress, BanReason, BanTime, BanType) => T): Seq[T] = blackList
     .collect { case (add, (r, t, bt)) if p(add, r, t, bt) => f(add, r, t, bt) }
     .toSeq
 }

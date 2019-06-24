@@ -85,7 +85,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       val priorityStatus = Map(address -> BadNode, address1 -> HighPriority, address2 -> LowPriority)
 
       val newCpc = cpc.updatePriorityStatus(priorityStatus)
-      val cpcState = newCpc.findAndMap((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
+      val cpcState = newCpc.collect((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
       cpcState(address).peerPriorityStatus shouldBe BadNode
       cpcState(address1).peerPriorityStatus shouldBe HighPriority
       cpcState.get(address2) shouldBe None
@@ -135,7 +135,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       val newCpc = peersSeqN.foldLeft(cpc) { case (coll, (p, hc)) =>
         coll.updateHistoryComparisonResult(p, hc)
       }
-      val cpcState = newCpc.findAndMap((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
+      val cpcState = newCpc.collect((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
       cpcState(address).historyComparisonResult shouldBe Older
       cpcState(address1).historyComparisonResult shouldBe Younger
       cpcState(address3).historyComparisonResult shouldBe Unknown
@@ -180,19 +180,19 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       }
 
       val newCpc = cpc.removePeer(address)
-      val cpcState1 = newCpc.findAndMap((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
+      val cpcState1 = newCpc.collect((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
       cpcState1.contains(address1) shouldBe true
       cpcState1.contains(address3) shouldBe true
       cpcState1.contains(address) shouldBe false
 
       val newCpc1 = newCpc.removePeer(address1)
-      val cpcState2 = newCpc1.findAndMap((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
+      val cpcState2 = newCpc1.collect((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
       cpcState2.contains(address1) shouldBe false
       cpcState2.contains(address3) shouldBe true
       cpcState2.contains(address) shouldBe false
 
       val newCpc2 = newCpc1.removePeer(address3)
-      val cpcState3 = newCpc2.findAndMap((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
+      val cpcState3 = newCpc2.collect((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
       cpcState3.contains(address1) shouldBe false
       cpcState3.contains(address3) shouldBe false
       cpcState3.contains(address) shouldBe false

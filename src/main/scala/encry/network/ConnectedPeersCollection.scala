@@ -38,11 +38,10 @@ final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddre
       case None => peers
     })
 
-  def removePeer(address: InetSocketAddress): ConnectedPeersCollection =
-    ConnectedPeersCollection(peers - address)
+  def removePeer(address: InetSocketAddress): ConnectedPeersCollection = ConnectedPeersCollection(peers - address)
 
-  def findAndMap[T](p: (InetSocketAddress, PeerInfo) => Boolean,
-                    f: (InetSocketAddress, PeerInfo) => T): Seq[T] = peers
+  def collect[T](p: (InetSocketAddress, PeerInfo) => Boolean,
+                 f: (InetSocketAddress, PeerInfo) => T): Seq[T] = peers
     .collect { case (peer, info) if p(peer, info) => f(peer, info) }
     .toSeq
 }
@@ -56,5 +55,4 @@ object ConnectedPeersCollection {
                             connectedPeer: ConnectedPeer,
                             connectionType: ConnectionType,
                             lastUptime: LastUptime)
-
 }
