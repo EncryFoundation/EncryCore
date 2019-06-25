@@ -44,7 +44,7 @@ import scala.util.Try
 final case class UtxoStateWithoutAVL(storage: VersionalStorage,
                                      height: Height,
                                      lastBlockTimestamp: Long)
-  extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging with UtxoStateReader {
+  extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging with UtxoStateReader with AutoCloseable {
 
   override type NVCT = this.type
 
@@ -157,9 +157,9 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
       else Right[Invalid, Transaction](tx)
     } else tx.semanticValidity.errors.headOption.map(err => Left[Invalid, Transaction](Invalid(Seq(err)))).getOrElse(Right[Invalid, Transaction](tx))
 
-  override def version: VersionTag = VersionTag @@ Array.emptyByteArray
+  override def version: VersionTag = VersionTag !@@ storage.currentVersion
 
-  def closeStorage(): Unit = storage.close()
+  def close(): Unit = storage.close()
 }
 
 object UtxoStateWithoutAVL extends StrictLogging {
@@ -193,7 +193,7 @@ object UtxoStateWithoutAVL extends StrictLogging {
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
     }
     val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
       .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)

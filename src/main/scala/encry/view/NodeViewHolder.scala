@@ -62,7 +62,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   override def postStop(): Unit = {
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
-    nodeView.state.closeStorage()
   }
 
   override def receive: Receive = {
