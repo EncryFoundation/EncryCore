@@ -7,7 +7,7 @@ import akka.io.{IO, Tcp}
 import akka.io.Tcp._
 import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.InvalidNetworkMessage
+import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction

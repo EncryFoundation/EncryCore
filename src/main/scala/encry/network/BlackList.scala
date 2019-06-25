@@ -1,52 +1,56 @@
 package encry.network
 
 import java.net.InetAddress
+import encry.network.BlackList.BanType.{PermanentBan, TemporaryBan}
 import encry.network.BlackList._
 import encry.settings.EncryAppSettings
 
-final class BlackList(settings: EncryAppSettings) {
-
-  private var blackList: Map[InetAddress, (BanReason, BanTime, BanType)] = Map.empty
-
-  def banPeer(reason: BanReason, peer: InetAddress): Unit = {
-    val banType: BanType = reason match {
-      case _ => TemporaryBan
-    }
-    blackList = blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), banType))
-  }
-
-  def cleanupBlackList(): Unit = blackList = blackList.filterNot { case (_, (_, banTime, banType)) =>
-    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= settings.blackList.banTime.toMillis)
-  }
-
-  def getBannedPeers: Set[InetAddress] = blackList.keySet
-
-  def getBannedPeersAndReasons: Map[InetAddress, BanReason] = blackList.map(p => p._1 -> p._2._1)
+final case class BlackList(settings: EncryAppSettings,
+                           private val blackList: Map[InetAddress, (BanReason, BanTime, BanType)]) {
 
   def contains(peer: InetAddress): Boolean = blackList.contains(peer)
 
-  def remove(peer: InetAddress): Unit = blackList -= peer
+  def banPeer(reason: BanReason, peer: InetAddress): BlackList =
+    BlackList(settings, blackList.updated(peer, (reason, BanTime(System.currentTimeMillis()), reason match {
+      case _ => TemporaryBan
+    })))
 
+  def cleanupBlackList: BlackList = BlackList(settings, blackList.filterNot { case (_, (_, banTime, banType)) =>
+    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= settings.blackList.banTime.toMillis)
+  })
+
+  def remove(peer: InetAddress): BlackList = BlackList(settings, blackList - peer)
+
+  def collect[T](p: (InetAddress, BanReason, BanTime, BanType) => Boolean,
+                 f: (InetAddress, BanReason, BanTime, BanType) => T): Seq[T] = blackList
+    .collect { case (add, (r, t, bt)) if p(add, r, t, bt) => f(add, r, t, bt) }
+    .toSeq
 }
 
 object BlackList {
 
   sealed trait BanReason
-  case object SemanticallyInvalidPersistentModifier extends BanReason
-  case object SyntacticallyInvalidPersistentModifier extends BanReason
-  case object SyntacticallyInvalidTransaction extends BanReason
-  case object CorruptedSerializedBytes extends BanReason
-  case object SpamSender extends BanReason
-  case object SentPeersMessageWithoutRequest extends BanReason
-  case object SentInvForPayload extends BanReason
-  case object SentNetworkMessageWithTooManyModifiers extends BanReason
-  final case class InvalidNetworkMessage(msgName: String) extends BanReason
-  case object ExpiredNumberOfConnections extends BanReason
+  object BanReason {
+    case object SemanticallyInvalidPersistentModifier extends BanReason
+    case object SyntacticallyInvalidPersistentModifier extends BanReason
+    case object SyntacticallyInvalidTransaction extends BanReason
+    case object CorruptedSerializedBytes extends BanReason
+    case object SpamSender extends BanReason
+    case object SentPeersMessageWithoutRequest extends BanReason
+    case object SentInvForPayload extends BanReason
+    case object SentNetworkMessageWithTooManyModifiers extends BanReason
+    case object ExpiredNumberOfConnections extends BanReason
+    final case class InvalidNetworkMessage(msgName: String) extends BanReason
+  }
+
+  sealed trait BanType
+  object BanType {
+    case object PermanentBan extends BanType
+    case object TemporaryBan extends BanType
+  }
 
   final case class BanTime(time: Long) extends AnyVal
 
-  sealed trait BanType
-  case object PermanentBan extends BanType
-  case object TemporaryBan extends BanType
-
+  def apply(settings: EncryAppSettings): BlackList =
+    BlackList(settings, Map.empty[InetAddress, (BanReason, BanTime, BanType)])
 }

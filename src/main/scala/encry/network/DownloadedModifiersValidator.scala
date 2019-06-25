@@ -5,7 +5,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList._
+import encry.network.BlackList.BanReason._
 import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer

@@ -9,7 +9,7 @@ import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History._
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.BlackList.SentInvForPayload
+import encry.network.BlackList.BanReason.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifiers
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}

@@ -1,7 +1,6 @@
 package encry.network.DeliveryManagerTests
 
-import java.net.{InetAddress, InetSocketAddress}
-
+import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import encry.consensus.History
@@ -16,13 +15,13 @@ import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{InitialPriority, PeersPriorityStatus}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.collection.mutable.WrappedArray
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
