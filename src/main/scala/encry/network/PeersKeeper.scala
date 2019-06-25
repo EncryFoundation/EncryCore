@@ -198,8 +198,8 @@ class PeersKeeper(settings: EncryAppSettings,
 
     case SendLocalSyncInfo =>
       logger.debug(s"Received SendLocalSyncInfo from $sender on PK")
-      val peersWithHP: Seq[ConnectedPeer] = connectedPeers.collect(filterByPriority(HighPriority), mapPeersForSyncInfo)
-      val peersWithIP: Seq[ConnectedPeer] = connectedPeers.collect(filterByPriority(InitialPriority), mapPeersForSyncInfo)
+      val peersWithHP: Seq[ConnectedPeer] = connectedPeers.collect(filterByPriority(HighPriority), getConnectedPeers)
+      val peersWithIP: Seq[ConnectedPeer] = connectedPeers.collect(filterByPriority(InitialPriority), getConnectedPeers)
 
       val accumulatedHPPeers = accumulatePeersForSync(peersWithHP, isBlockChainSynced)
       val accumulatedIPPeers = accumulatePeersForSync(peersWithIP, isBlockChainSynced)
@@ -251,8 +251,6 @@ class PeersKeeper(settings: EncryAppSettings,
       s" isNecessaryPriority: $isNecessaryPriority")
     isTimeRangeConserved && isNecessaryPriority
   }
-
-  def mapPeersForSyncInfo(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 
   def getConnectedPeers(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 

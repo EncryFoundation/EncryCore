@@ -50,7 +50,7 @@ final case class PrioritiesCalculator(settings: EncryAppSettings,
         peer -> priority
     }
     logger.info(s"Accumulated peers statistic. Current stats are: ${updatedStatistic.mkString(",")}")
-    (updatedStatistic, PrioritiesCalculator(settings, Map.empty[InetSocketAddress, (Requested, Received)]))
+    (updatedStatistic, PrioritiesCalculator(settings))
   }
 }
 
