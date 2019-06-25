@@ -28,13 +28,13 @@ class BlackListTests extends WordSpecLike
    */
   "Black list" should {
     "temporary ban requested peer correctly" in {
-      val blackList: BlackList = new BlackList(settingsWithKnownPeers, Map.empty)
+      val blackList: BlackList = BlackList(settingsWithKnownPeers)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
       val newBL = blackList.banPeer(SemanticallyInvalidPersistentModifier, peer)
       newBL.contains(peer) shouldBe true
     }
     "clean black list from peers with expired ban time which were banned by temporary ban" in {
-      val blackList: BlackList = new BlackList(settingsWithKnownPeers, Map.empty)
+      val blackList: BlackList = BlackList(settingsWithKnownPeers)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
       val newBL = blackList.banPeer(SyntacticallyInvalidPersistentModifier, peer)
       Thread.sleep(2000)
@@ -42,7 +42,7 @@ class BlackListTests extends WordSpecLike
       newBL1.contains(peer) shouldBe false
     }
     "don't remove peer from black list before ban time expired" in {
-      val blackList: BlackList = new BlackList(settingsWithKnownPeers, Map.empty)
+      val blackList: BlackList = BlackList(settingsWithKnownPeers)
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
       val newBL = blackList.banPeer(SentInvForPayload, peer)
       val newBL1 = newBL.cleanupBlackList

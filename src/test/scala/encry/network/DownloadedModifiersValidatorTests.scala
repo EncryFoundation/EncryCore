@@ -90,11 +90,11 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history1))
 
       /* Header */
-      val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray)
+      val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray.reverse)
       val msg = ModifiersForValidating(connectedPeer, Header.modifierTypeId, mods)
 
       deliveryManager.send(downloadedModifiersValidator, msg)
-      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidPersistentModifier))
+      peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
       nodeViewHolder.expectNoMsg()
       nodeViewSync.expectMsg(InvalidModifiers(Seq(header_second.id)))
     }
@@ -131,12 +131,12 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(historyWith10Blocks._1))
 
       val mods: Seq[(ModifierId, Array[Byte])] = historyWith10Blocks._2.map(b =>
-        b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray
+        b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray.reverse
       ) :+ (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)
 
       deliveryManager.send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
-      peersKeeper.expectMsg(BanPeer(connectedPeer, SemanticallyInvalidPersistentModifier))
+      peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
       nodeViewHolder.expectMsg(ModifiersFromRemote(Seq(payload)))
       nodeViewSync.expectMsg(InvalidModifiers(historyWith10Blocks._2.map(b => b.payload.id)))
     }

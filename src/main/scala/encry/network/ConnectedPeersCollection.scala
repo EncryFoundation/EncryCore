@@ -10,7 +10,7 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 
 final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddress, PeerInfo]) extends StrictLogging {
 
-  def size: Int = peers.size
+  val size: Int = peers.size
 
   def contains(peer: InetSocketAddress): Boolean = peers.contains(peer)
 
@@ -38,12 +38,12 @@ final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddre
       case None => peers
     })
 
-  def removePeer(address: InetSocketAddress): ConnectedPeersCollection =
-    ConnectedPeersCollection(peers - address)
+  def removePeer(address: InetSocketAddress): ConnectedPeersCollection = ConnectedPeersCollection(peers - address)
 
-  def findAndMap[T](p: (InetSocketAddress, PeerInfo) => Boolean,
-                    f: (InetSocketAddress, PeerInfo) => T): Seq[T] =
-    peers.filter(k => p(k._1, k._2)).map(x => f(x._1, x._2)).toSeq
+  def collect[T](p: (InetSocketAddress, PeerInfo) => Boolean,
+                 f: (InetSocketAddress, PeerInfo) => T): Seq[T] = peers
+    .collect { case (peer, info) if p(peer, info) => f(peer, info) }
+    .toSeq
 }
 
 object ConnectedPeersCollection {
@@ -55,4 +55,6 @@ object ConnectedPeersCollection {
                             connectedPeer: ConnectedPeer,
                             connectionType: ConnectionType,
                             lastUptime: LastUptime)
+
+  def apply(): ConnectedPeersCollection = ConnectedPeersCollection(Map.empty[InetSocketAddress, PeerInfo])
 }
