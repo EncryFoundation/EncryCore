@@ -7,7 +7,9 @@ import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
+import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
+import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
@@ -18,7 +20,7 @@ import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
-import encry.view.state.{StateMode, UtxoState, UtxoStateWithoutAVL}
+import encry.view.state.UtxoStateWithoutAVL
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -28,13 +30,9 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
-
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.collection._
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-import Miner._
-import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 
 class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with StrictLogging {
 
@@ -104,8 +102,6 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
-      if (settings.node.stateMode == StateMode.Digest)
-        block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
   }

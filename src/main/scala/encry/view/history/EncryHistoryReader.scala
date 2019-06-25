@@ -146,11 +146,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def getBlock(header: Header): Option[Block] =
     blocksCache.get(ByteArrayWrapper(header.id)).orElse(
-      (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
-        case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
-        case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
-        case _ => None
-      })
+    (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
+      case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
+      case (Some(txs), None) => Some(Block(header, txs, None))
+      case _ => None
+    })
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.

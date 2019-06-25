@@ -323,13 +323,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def genesisState: NodeView = {
-    val stateDir: File = EncryState.getStateDir(settings)
+    val stateDir: File = UtxoStateWithoutAVL.getStateDir(settings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: UtxoStateWithoutAVL = {
 //      if (settings.node.stateMode.isDigest) //EncryState.generateGenesisDigestState(stateDir, settings)
 //      else
-        EncryState.generateGenesisUtxoStateWithoutAVL(stateDir, Some(self), settings, influxRef)
+       UtxoStateWithoutAVL.genesis(stateDir, Some(self), settings, influxRef)
     }
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
@@ -338,10 +338,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def restoreState(): Option[NodeView] = if (EncryHistory.getHistoryIndexDir(settings).listFiles.nonEmpty)
     try {
+      val stateDir: File = UtxoStateWithoutAVL.getStateDir(settings)
+      stateDir.mkdirs()
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val state: UtxoStateWithoutAVL = restoreConsistentState(
-        EncryState.readOrGenerate(settings, Some(self), influxRef).asInstanceOf[UtxoStateWithoutAVL], history
+        UtxoStateWithoutAVL.create(stateDir, Some(self), settings, influxRef).asInstanceOf[UtxoStateWithoutAVL], history
       )
       Some(NodeView(history, state, wallet))
     } catch {
@@ -354,22 +356,23 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): UtxoStateWithoutAVL = {
-    val dir: File = EncryState.getStateDir(settings)
+    val dir: File = UtxoStateWithoutAVL.getStateDir(settings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
 
     {
       (version, digest) match {
-        case (Some(_), Some(_)) if settings.node.stateMode.isDigest =>
-          DigestState.create(version, digest, dir, settings)
-        case _ => EncryState.readOrGenerate(settings, Some(self), influxRef)
+        case _ =>
+          val stateDir: File = UtxoStateWithoutAVL.getStateDir(settings)
+          stateDir.mkdirs()
+          UtxoStateWithoutAVL.create(stateDir, Some(self), settings, influxRef)
       }
     }.asInstanceOf[UtxoStateWithoutAVL]
   }
 
   def restoreConsistentState(stateIn: UtxoStateWithoutAVL, history: EncryHistory): UtxoStateWithoutAVL =
     (stateIn.version, history.bestBlockOpt, stateIn) match {
-      case (stateId, None, _) if stateId sameElements EncryState.genesisStateVersion =>
+      case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
       case (stateId, Some(block), _) if stateId sameElements block.id =>

@@ -216,29 +216,11 @@ object EncryHistory extends StrictLogging {
     }
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
-      case (true, true) =>
-        new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
-          override protected val settings: EncryAppSettings = settingsEncry
-          override protected val nodeSettings: NodeSettings = settings.node
-          override protected val historyStorage: HistoryStorage = storage
-          override protected val timeProvider: NetworkTimeProvider = ntp
-        }
-      case (false, true) =>
-        new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
-          override protected val settings: EncryAppSettings = settingsEncry
-          override protected val nodeSettings: NodeSettings = settings.node
-          override protected val historyStorage: HistoryStorage = storage
-          override protected val timeProvider: NetworkTimeProvider = ntp
-        }
-      case (true, false) =>
-        new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
-          override protected val settings: EncryAppSettings = settingsEncry
-          override protected val nodeSettings: NodeSettings = settings.node
-          override protected val historyStorage: HistoryStorage = storage
-          override protected val timeProvider: NetworkTimeProvider = ntp
-        }
-      case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
+    val history: EncryHistory = new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+      override protected val settings: EncryAppSettings = settingsEncry
+      override protected val nodeSettings: NodeSettings = settings.node
+      override protected val historyStorage: HistoryStorage = storage
+      override protected val timeProvider: NetworkTimeProvider = ntp
     }
     history
   }

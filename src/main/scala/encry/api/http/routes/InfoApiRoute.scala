@@ -55,7 +55,7 @@ case class InfoApiRoute(dataHolder: ActorRef,
 
   private def getConnectedPeers: Future[Int] = (dataHolder ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
 
-  private def getStateType: String = appSettings.node.stateMode.verboseName
+  private def getStateType: String = "UTXO"
 
   private def getNodeName: String = appSettings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)

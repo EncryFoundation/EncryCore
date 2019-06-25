@@ -12,9 +12,9 @@ class EncryStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     println(a.dropWhile(_ != 1))
 
-    val g1: Seq[AssetBox] = EncryState.initialStateBoxes
-    val g2: Seq[AssetBox] = EncryState.initialStateBoxes
-    val g3: Seq[AssetBox] = EncryState.initialStateBoxes
+    val g1: Seq[AssetBox] = UtxoStateWithoutAVL.initialStateBoxes
+    val g2: Seq[AssetBox] = UtxoStateWithoutAVL.initialStateBoxes
+    val g3: Seq[AssetBox] = UtxoStateWithoutAVL.initialStateBoxes
 
     g1.zip(g2).zip(g3).forall { case ((e1, e2), e3) =>
       (e1.bytes sameElements e2.bytes) && (e2.bytes sameElements e3.bytes)

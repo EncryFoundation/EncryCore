@@ -1,31 +1,26 @@
 package encry.view.mempool
 
-import TransactionProto.TransactionProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.HistoryComparisonResult
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
 import encry.utils.NetworkTimeProvider
-import encry.view.NodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.view.mempool.Mempool._
-import encry.view.state.{DigestState, EncryState, UtxoStateWithoutAVL}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import encry.view.state.UtxoStateWithoutAVL
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.HashMap
 import scala.collection.{IndexedSeq, mutable}
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
-import scala.util.Success
 
 class Mempool(settings: EncryAppSettings,
               ntp: NetworkTimeProvider,

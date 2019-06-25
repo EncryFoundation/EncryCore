@@ -3,48 +3,48 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.utils.implicits.Validation._
 import encry.utils.implicits.UTXO._
-import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Transaction}
-import org.encryfoundation.common.modifiers.state.StateModifierSerializer
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
-import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, Height}
-import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
-import org.encryfoundation.common.validation.ValidationResult.{Invalid, Valid}
+import encry.utils.implicits.Validation._
+import io.iohk.iodb.LSMStore
 import cats.data.Validated
 import cats.syntax.validated._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import cats.instances.list._
 import cats.Traverse
-import com.google.common.primitives.Ints
-import encry.avltree.VersionedAVLStorage
-import encry.consensus.EncrySupplyController
-import encry.settings.{EncryAppSettings, LevelDBSettings}
-import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import io.iohk.iodb.LSMStore
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
+import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.validation.ValidationResult.Invalid
+import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
-import scorex.crypto.encode.Base16
 import scorex.crypto.hash.Digest32
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 final case class UtxoStateWithoutAVL(storage: VersionalStorage,
                                      height: Height,
-                                     lastBlockTimestamp: Long) extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging {
+                                     lastBlockTimestamp: Long)
+  extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging with UtxoStateReader {
 
   override type NVCT = this.type
 
@@ -178,8 +178,35 @@ object UtxoStateWithoutAVL extends StrictLogging {
     tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
   )
 
-  def genesis(boxes: List[EncryBaseBox],
-              stateDir: File,
+  def initialStateBoxes: List[AssetBox] = List(AssetBox(EncryProposition.open, -9, 0))
+
+  def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
+
+  def create(stateDir: File,
+             nodeViewHolderRef: Option[ActorRef],
+             settings: EncryAppSettings,
+             statsSenderRef: Option[ActorRef]): UtxoStateWithoutAVL = {
+    val versionalStorage = settings.storage.state match {
+      case VersionalStorage.IODB =>
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 33), keySize = 33))
+    }
+    val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
+      .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)
+    val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
+      .map(d => Longs.fromByteArray(d)).getOrElse(0L)
+    new UtxoStateWithoutAVL(
+      versionalStorage,
+      Height @@ stateHeight,
+      lastBlockTimestamp,
+    )
+  }
+
+  def genesis(stateDir: File,
               nodeViewHolderRef: Option[ActorRef],
               settings: EncryAppSettings,
               statsSenderRef: Option[ActorRef]): UtxoStateWithoutAVL = {
@@ -196,7 +223,7 @@ object UtxoStateWithoutAVL extends StrictLogging {
 
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
-      boxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+      initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
 
     new UtxoStateWithoutAVL(

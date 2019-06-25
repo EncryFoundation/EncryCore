@@ -29,7 +29,7 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
       // just synced with the headers chain - determine first full block to apply
       if (nodeSettings.blocksToKeep < 0) TestNetConstants.GenesisHeight // keep all blocks in history
       // TODO: start with the height of UTXO snapshot applied. Start from genesis until this is implemented
-      else if (!nodeSettings.stateMode.isDigest) TestNetConstants.GenesisHeight
+      //else if (!nodeSettings.stateMode.isDigest) TestNetConstants.GenesisHeight
       // Start from config.blocksToKeep blocks back
       else Math.max(TestNetConstants.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1)
     } else if (nodeSettings.blocksToKeep >= 0) Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalBlockHeightVar)

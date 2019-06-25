@@ -7,7 +7,6 @@ object SwaggerRoute extends SwaggerHttpService {
   override def apiClasses: Set[Class[_]] =
     Set(classOf[HistoryApiRoute],
       classOf[InfoApiRoute],
-      classOf[StateInfoApiRoute],
       classOf[TransactionsApiRoute],
       classOf[WalletInfoApiRoute],
       classOf[PeersApiRoute],

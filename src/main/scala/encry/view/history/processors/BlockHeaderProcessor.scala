@@ -148,8 +148,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
     if (!settings.node.verifyTransactions) Seq.empty
-    else if (settings.node.stateMode.isDigest)
-      Seq((Payload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
+//    else if (settings.node.stateMode.isDigest)
+//      Seq((Payload.modifierTypeId, h.payloadId), (ADProofs.modifierTypeId, h.adProofsId))
     else Seq((Payload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: Header): Boolean =
