@@ -14,8 +14,6 @@ object HeaderUtils {
       s"Modifier's id should be ${TestNetConstants.ModifierIdSize} bytes")
     .demand(header.parentId.size == TestNetConstants.ModifierIdSize,
       s"Parent's id should be ${TestNetConstants.ModifierIdSize} bytes")
-    .demand(header.stateRoot.size == TestConstants.StateRootSize,
-      s"StateRoot's size should be ${TestConstants.StateRootSize} bytes")
     .demand(header.adProofsRoot.size == TestConstants.AdProofsRootSize,
       s"AdProofsRoot's size should be ${TestConstants.AdProofsRootSize} bytes")
     .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize,
