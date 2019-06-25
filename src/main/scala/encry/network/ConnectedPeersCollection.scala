@@ -18,32 +18,34 @@ final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddre
     cp.socketAddress, PeerInfo(Unknown, InitialPriority, cp, Outgoing, LastUptime(0))
   ))
 
-  def updatePriorityStatus(stats: Map[InetSocketAddress, PeersPriorityStatus]): ConnectedPeersCollection =
-    ConnectedPeersCollection(stats.foldLeft(peers) { case (oldPeers, (address, status)) =>
-      oldPeers.get(address) match {
-        case Some(value) => oldPeers.updated(address, value.copy(peerPriorityStatus = status))
-        case None => oldPeers
-      }
-    })
-
-  def updateHistoryComparisonResult(peer: InetSocketAddress, result: HistoryComparisonResult): ConnectedPeersCollection =
-    ConnectedPeersCollection(peers.get(peer) match {
-      case Some(value) => peers.updated(peer, value.copy(historyComparisonResult = result))
-      case None => peers
-    })
-
-  def updateLastUptime(peer: InetSocketAddress): ConnectedPeersCollection =
-    ConnectedPeersCollection(peers.get(peer) match {
-      case Some(value) => peers.updated(peer, value.copy(lastUptime = LastUptime(System.currentTimeMillis())))
-      case None => peers
-    })
-
   def removePeer(address: InetSocketAddress): ConnectedPeersCollection = ConnectedPeersCollection(peers - address)
+
+  def updatePriorityStatus(stats: Map[InetSocketAddress, PeersPriorityStatus]): ConnectedPeersCollection =
+    ConnectedPeersCollection(updateK(stats, updateStatus))
+
+  def updateHistoryComparisonResult(hcr: Map[InetSocketAddress, HistoryComparisonResult]): ConnectedPeersCollection =
+    ConnectedPeersCollection(updateK(hcr, updateComparisonResult))
+
+  def updateLastUptime(lup: Map[InetSocketAddress, LastUptime]): ConnectedPeersCollection =
+    ConnectedPeersCollection(updateK(lup, updateUptime))
 
   def collect[T](p: (InetSocketAddress, PeerInfo) => Boolean,
                  f: (InetSocketAddress, PeerInfo) => T): Seq[T] = peers
     .collect { case (peer, info) if p(peer, info) => f(peer, info) }
     .toSeq
+
+  private def updateK[T](elems: Map[InetSocketAddress, T], f: (PeerInfo, T) => PeerInfo): Map[InetSocketAddress, PeerInfo] = {
+    val newValue: Map[InetSocketAddress, PeerInfo] = for {
+      (key, value) <- elems
+      oldValue     <- peers.get(key)
+    } yield key -> f(oldValue, value)
+    peers ++ newValue
+  }
+
+  private def updateStatus: (PeerInfo, PeersPriorityStatus) => PeerInfo = (i, p) => i.copy(peerPriorityStatus = p)
+  private def updateComparisonResult: (PeerInfo, HistoryComparisonResult) => PeerInfo = (i, h) => i.copy(historyComparisonResult = h)
+  private def updateUptime: (PeerInfo, LastUptime) => PeerInfo = (i, u) => i.copy(lastUptime = u)
+
 }
 
 object ConnectedPeersCollection {

@@ -11,7 +11,7 @@ import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
-import encry.network.ConnectedPeersCollection.PeerInfo
+import encry.network.ConnectedPeersCollection.{LastUptime, PeerInfo}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -184,7 +184,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
   def additionalMessages(isBlockChainSynced: Boolean): Receive = {
     case OtherNodeSyncingStatus(remote, comparison, _) =>
-      connectedPeers.updateHistoryComparisonResult(remote.socketAddress, comparison)
+      connectedPeers = connectedPeers.updateHistoryComparisonResult(Map(remote.socketAddress -> comparison))
 
     case AccumulatedPeersStatistic(statistic) =>
       connectedPeers = connectedPeers.updatePriorityStatus(statistic)
@@ -207,7 +207,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
       accumulatedPeers.foreach { p =>
         logger.debug(s"Update uptime from $p")
-        connectedPeers = connectedPeers.updateLastUptime(p.socketAddress)
+        connectedPeers = connectedPeers.updateLastUptime(Map(p.socketAddress -> LastUptime(System.currentTimeMillis())))
       }
       nodeViewSync ! PeersForSyncInfo(accumulatedPeers)
 

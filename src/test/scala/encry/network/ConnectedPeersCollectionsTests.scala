@@ -133,7 +133,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
       val peersSeqN = Seq(address -> Older, address1 -> Younger, address2 -> Fork)
 
       val newCpc = peersSeqN.foldLeft(cpc) { case (coll, (p, hc)) =>
-        coll.updateHistoryComparisonResult(p, hc)
+        coll.updateHistoryComparisonResult(Map(p -> hc))
       }
       val cpcState = newCpc.collect((_, _) => true, (a: InetSocketAddress, b: PeerInfo) => a -> b).toMap
       cpcState(address).historyComparisonResult shouldBe Older
