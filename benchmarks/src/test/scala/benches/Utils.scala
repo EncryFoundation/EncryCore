@@ -4,8 +4,6 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
-import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings}
 import encry.storage.VersionalStorage

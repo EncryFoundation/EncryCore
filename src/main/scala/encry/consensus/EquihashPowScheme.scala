@@ -22,23 +22,21 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     val difficulty = candidateBlock.difficulty
     val version: Byte = TestNetConstants.Version
     val parentId: ModifierId = candidateBlock.parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
-    val adProofsRoot: Digest32 = ADProofs.proofDigest(candidateBlock.adProofBytes)
     val txsRoot: Digest32 = Payload.rootHash(candidateBlock.transactions.map(_.id))
     val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
     val bytesPerWord: Int = n / 8
     val wordsPerHash: Int = 512 / n
     val digest: Blake2bDigest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
     val header: Header = Header(
-      version, parentId, adProofsRoot, candidateBlock.stateRoot, txsRoot,
+      version, parentId, txsRoot,
       candidateBlock.timestamp, height, 0L, candidateBlock.difficulty, EquihashSolution.empty
     )
     for {
       possibleHeader <- generateHeader(startingNonce, digest, header, difficulty)
       validationResult: Either[String, Boolean] = verify(possibleHeader)
       _ <- Either.cond(validationResult.isRight, (), s"Incorrect possible header cause: $validationResult")
-      adProofs: ADProofs = ADProofs(possibleHeader.id, candidateBlock.adProofBytes)
       payload: Payload = Payload(possibleHeader.id, candidateBlock.transactions)
-    } yield Block(possibleHeader, payload, Some(adProofs))
+    } yield Block(possibleHeader, payload)
   }
 
   private def generateHeader(nonce: Long,

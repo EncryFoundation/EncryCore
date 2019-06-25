@@ -1,6 +1,5 @@
 package encry.view.state
 
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageKey
@@ -15,8 +14,6 @@ trait UtxoStateReader extends StateReader {
   implicit val hf: Algos.HF = Algos.hash
 
   val height: Height
-
-  private lazy val np: NodeParameters = NodeParameters(keySize = EncryBox.BoxIdSize, valueSize = None, labelSize = 32)
 
   protected val storage: VersionalStorage
 

@@ -3,8 +3,6 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
