@@ -40,6 +40,7 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  var isBlockChainSynced: Boolean = false
 
   memoryPoolRef ! UpdatedState(nodeView.state)
   dataHolder ! UpdatedState(nodeView.state)
@@ -112,6 +113,10 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
+
+    case FullBlockChainIsSynced =>
+      logger.info(s"NVH - full block chain is synced")
+      isBlockChainSynced = true
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
@@ -189,11 +194,10 @@ class NodeViewHolder[StateType <: EncryState[StateType]](memoryPoolRef: ActorRef
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Success(stateAfterApply) =>
-              modToApply match {
-                case block: Block if settings.influxDB.isDefined =>
-                  context.system.actorSelection("user/statsSender") ! TxsInBlock(block.payload.txs.size)
+              influxRef.foreach(ref => modToApply match {
+                case b: Block if isBlockChainSynced => ref ! TxsInBlock(b.payload.txs.size)
                 case _ =>
-              }
+              })
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)

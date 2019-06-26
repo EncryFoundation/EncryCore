@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -9,10 +8,9 @@ import encry.avltree.{BatchAVLProver, NodeParameters, PersistentBatchAVLProver, 
 import encry.consensus.EncrySupplyController
 import encry.modifiers.history.ADProofsUtils
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
-import encry.settings.{EncryAppSettings, LevelDBSettings, TestConstants}
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.BalanceCalculator
-import encry.stats.StatsSender.TxsInBlock
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageKey
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -35,7 +33,6 @@ import org.encryfoundation.common.validation.ValidationResult.{Invalid, Valid}
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
 import scala.util.{Failure, Success, Try}
 
 class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLProver[Digest32, HF],
@@ -97,7 +94,6 @@ class UtxoState(override val persistentProver: encry.avltree.PersistentBatchAVLP
       val startTime = System.currentTimeMillis()
       logger.debug(s"Applying block with header ${block.header.encodedId} to UtxoState with " +
         s"root hash ${Algos.encode(rootHash)} at height $height.")
-      statsSenderRef.foreach(_ ! TxsInBlock(block.payload.txs.size))
       applyBlockTransactions(block.payload.txs, block.header.stateRoot).map { _ =>
         val meta: Seq[(Array[Byte], Array[Byte])] = metadata(
           VersionTag !@@ block.id,
