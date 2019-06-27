@@ -15,7 +15,7 @@ import scala.util.{Failure, Try}
 object ModifiersToNetworkUtils extends StrictLogging {
 
   def toProto(modifier: PersistentModifier): Array[Byte] = modifier match {
-    case m: Header   => HeaderProtoSerializer.toProto(m).toByteArray
+    case m: Header   => HeaderProtoSerializer.toProto(m.copy(adProofsRoot = Digest32 @@ Array.emptyByteArray, stateRoot = ADDigest @@ Array.emptyByteArray)).toByteArray
     case m: ADProofs => ADProofsProtoSerializer.toProto(m).toByteArray
     case m: Payload  => PayloadProtoSerializer.toProto(m).toByteArray
     case m           => throw new RuntimeException(s"Try to serialize unknown modifier: $m to proto.")
