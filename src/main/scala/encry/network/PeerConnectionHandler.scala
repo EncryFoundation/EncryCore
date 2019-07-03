@@ -193,7 +193,10 @@ class PeerConnectionHandler(connection: ActorRef,
       connection ! ResumeWriting
       toBuffer(id, msg)
     case CommandFailed(ResumeWriting) => // ignore in ACK mode
-    case WritingResumed => writeFirst()
+    case WritingResumed => {
+      logger.info("WritingResumed!")
+      writeFirst()
+    }
     case Ack(id) =>
       logger.info(s"get ack with id: ${id}")
       outMessagesBuffer -= id
@@ -226,9 +229,12 @@ class PeerConnectionHandler(connection: ActorRef,
     case message => logger.debug(s"Got strange message $message during closing phase")
   }
 
-  def writeFirst(): Unit = outMessagesBuffer.headOption.foreach { case (id, msg) =>
-    logger.info(s"Write to connection of handler $remote msg with id: ${id} and hash: ${Algos.encode(Algos.hash(msg.toArray))}")
-    connection ! Write(msg, Ack(id))
+  def writeFirst(): Unit = {
+    outMessagesBuffer.headOption.foreach { case (id, msg) =>
+      logger.info(s"Write to connection of handler $remote msg with id: ${id} and hash: ${Algos.encode(Algos.hash(msg.toArray))}")
+      connection ! Write(msg, Ack(id))
+      outMessagesBuffer -= id
+    }
   }
 
   def writeAll(): Unit = outMessagesBuffer.foreach { case (id, msg) => connection ! Write(msg, Ack(id)) }
