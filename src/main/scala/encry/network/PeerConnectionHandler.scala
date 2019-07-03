@@ -236,7 +236,6 @@ class PeerConnectionHandler(connection: ActorRef,
   def toBuffer(id: Long, message: ByteString): Unit = {
     logger.info(s"Put to buffer msg by id: ${id} with hash ${Algos.encode(Algos.hash(message.toArray))}")
     outMessagesBuffer += id -> message
-    logger.info(s"in buffer now: ${outMessagesBuffer.keys.mkString("\n ")}")
   }
 
   def workingCycleRemoteInterface: Receive = {
