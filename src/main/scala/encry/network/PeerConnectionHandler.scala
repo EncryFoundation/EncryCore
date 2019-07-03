@@ -18,6 +18,7 @@ import org.encryfoundation.common.utils.Algos
 
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
@@ -27,6 +28,8 @@ class PeerConnectionHandler(connection: ActorRef,
                             remote: InetSocketAddress) extends Actor with StrictLogging {
 
   context watch connection
+
+  implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
   var receivedHandshake: Option[Handshake] = None
   var selfPeer: Option[ConnectedPeer] = None
@@ -186,7 +189,7 @@ class PeerConnectionHandler(connection: ActorRef,
         s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")
       toBuffer(outMessagesCounter, bytes)
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.debug(s"Failed to buffer ${msg.length} bytes to $remote cause ${fail.cause}")
+      logger.debug(s"Failed to buffer msg hash: ${Algos.encode(Algos.hash(msg.toArray))}, with id: ${id}, ${msg.length} bytes to $remote cause ${fail.cause}")
       connection ! ResumeWriting
       toBuffer(id, msg)
     case CommandFailed(ResumeWriting) => // ignore in ACK mode
@@ -233,6 +236,7 @@ class PeerConnectionHandler(connection: ActorRef,
   def toBuffer(id: Long, message: ByteString): Unit = {
     logger.info(s"Put to buffer msg by id: ${id} with hash ${Algos.encode(Algos.hash(message.toArray))}")
     outMessagesBuffer += id -> message
+    logger.info(s"in buffer now: ${outMessagesBuffer.keys.mkString("\n ")}")
   }
 
   def workingCycleRemoteInterface: Receive = {
