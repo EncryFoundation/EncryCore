@@ -110,7 +110,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         case _ =>
       }
       case RequestModifiersNetworkMessage(invData) =>
-        if (chainSynced) {
+        if (chainSynced || settings.node.offlineGeneration) {
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
