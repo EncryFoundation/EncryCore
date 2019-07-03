@@ -14,8 +14,10 @@ import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 import org.encryfoundation.common.utils.Algos
+import cats.instances.long._
+
 import scala.annotation.tailrec
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.{HashMap, SortedMap}
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -34,7 +36,7 @@ class PeerConnectionHandler(connection: ActorRef,
   var handshakeSent = false
   var handshakeTimeoutCancellableOpt: Option[Cancellable] = None
   var chunksBuffer: ByteString = CompactByteString.empty
-  var outMessagesBuffer: HashMap[Long, ByteString] = HashMap.empty
+  var outMessagesBuffer: SortedMap[Long, ByteString] = SortedMap.empty[Long, ByteString]
   var outMessagesCounter: Long = 0
 
   override def preStart: Unit = {
