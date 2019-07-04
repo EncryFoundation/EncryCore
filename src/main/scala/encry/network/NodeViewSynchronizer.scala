@@ -114,7 +114,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
-            logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
+            logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
           sendResponse(remote, invData._1, inRequestCache.values.collect {
             case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
             case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
@@ -127,6 +127,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
               val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
                 case (id, mod) if mod.isDefined => id -> mod.get
               }
+              nonInRequestCache.foreach(id => if (reader.modifierBytesById(id).isEmpty) logger.info(s"Mod with id: ${Algos.encode(id)} is not defined"))
               invData._1 match {
                 case Header.modifierTypeId =>
                   logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
