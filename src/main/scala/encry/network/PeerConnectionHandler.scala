@@ -38,6 +38,7 @@ class PeerConnectionHandler(connection: ActorRef,
   var chunksBuffer: ByteString = CompactByteString.empty
   var outMessagesBuffer: SortedMap[Long, ByteString] = SortedMap.empty[Long, ByteString]
   var outMessagesCounter: Long = 0
+  var sendResumeWriting: Boolean = false
 
   override def preStart: Unit = {
     handshakeTimeoutCancellableOpt = Some(
@@ -170,6 +171,8 @@ class PeerConnectionHandler(connection: ActorRef,
       logger.info(s"Failed to write msg with hash ${Algos.encode(Algos.hash(msg.toArray))}, ack = $id, ${msg.length} bytes to " +
         s"$remote cause ${fail.cause}, switching to buffering mode")
       connection ! ResumeReading
+      connection ! ResumeWriting
+      sendResumeWriting = true
       toBuffer(id, msg)
       context.become(workingCycleBuffering)
     case CloseConnection =>
@@ -190,10 +193,14 @@ class PeerConnectionHandler(connection: ActorRef,
       toBuffer(outMessagesCounter, bytes)
     case fail@CommandFailed(Write(msg, Ack(id))) =>
       logger.info(s"Failed to buffer msg hash: ${Algos.encode(Algos.hash(msg.toArray))}, with id: ${id}, ${msg.length} bytes to $remote cause ${fail.cause}")
-      connection ! ResumeWriting
+      if (!sendResumeWriting) {
+        sendResumeWriting = true
+        connection ! ResumeWriting
+      }
       toBuffer(id, msg)
     case CommandFailed(ResumeWriting) => // ignore in ACK mode
     case WritingResumed => {
+      sendResumeWriting = false
       logger.info("WritingResumed!")
       writeFirst()
     }
