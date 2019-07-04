@@ -157,7 +157,7 @@ class PeerConnectionHandler(connection: ActorRef,
         outMessagesCounter += 1
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
-        logger.debug(s"Sent to $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
+        logger.info(s"Sent to $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
           s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")
         connection ! Write(bytes, Ack(outMessagesCounter))
       }
@@ -167,7 +167,7 @@ class PeerConnectionHandler(connection: ActorRef,
         case None => sendMessage()
       }
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.debug(s"Failed to write msg with hash ${Algos.encode(Algos.hash(msg.toArray))}, ack = $id, ${msg.length} bytes to " +
+      logger.info(s"Failed to write msg with hash ${Algos.encode(Algos.hash(msg.toArray))}, ack = $id, ${msg.length} bytes to " +
         s"$remote cause ${fail.cause}, switching to buffering mode")
       connection ! ResumeReading
       toBuffer(id, msg)
@@ -185,11 +185,11 @@ class PeerConnectionHandler(connection: ActorRef,
       outMessagesCounter += 1
       val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
       val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
-      logger.debug(s"Put to buffer in pch of $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
+      logger.info(s"Put to buffer in pch of $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
         s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")
       toBuffer(outMessagesCounter, bytes)
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.debug(s"Failed to buffer msg hash: ${Algos.encode(Algos.hash(msg.toArray))}, with id: ${id}, ${msg.length} bytes to $remote cause ${fail.cause}")
+      logger.info(s"Failed to buffer msg hash: ${Algos.encode(Algos.hash(msg.toArray))}, with id: ${id}, ${msg.length} bytes to $remote cause ${fail.cause}")
       connection ! ResumeWriting
       toBuffer(id, msg)
     case CommandFailed(ResumeWriting) => // ignore in ACK mode
@@ -205,7 +205,7 @@ class PeerConnectionHandler(connection: ActorRef,
         writeFirst()
       }
       else {
-        logger.debug("Buffered messages processed, exiting buffering mode")
+        logger.info("Buffered messages processed, exiting buffering mode")
         context become workingCycleWriting
       }
     case CloseConnection =>
@@ -216,6 +216,7 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def workingCycleClosingWithNonEmptyBuffer: Receive = {
     case CommandFailed(_: Write) =>
+      logger.info("CommandFailed in workingCycleClosingWithNonEmptyBuffer")
       connection ! ResumeWriting
       context.become({
         case WritingResumed =>
@@ -226,7 +227,7 @@ class PeerConnectionHandler(connection: ActorRef,
     case Ack(id) =>
       outMessagesBuffer -= id
       if (outMessagesBuffer.isEmpty) connection ! Close
-    case message => logger.debug(s"Got strange message $message during closing phase")
+    case message => logger.info(s"Got strange message $message during closing phase")
   }
 
   def writeFirst(): Unit = {
