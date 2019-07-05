@@ -38,7 +38,6 @@ object BlackList {
     case object SpamSender extends BanReason
     case object SentPeersMessageWithoutRequest extends BanReason
     case object SentInvForPayload extends BanReason
-    case object SentNetworkMessageWithTooManyModifiers extends BanReason
     case object ExpiredNumberOfConnections extends BanReason
     final case class InvalidNetworkMessage(msgName: String) extends BanReason
   }

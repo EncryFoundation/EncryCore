@@ -19,11 +19,10 @@ import scala.collection.{IndexedSeq, mutable}
 import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.BlackList.BanReason.SentNetworkMessageWithTooManyModifiers
 import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.{PeersPriorityStatus, Received, Requested}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.Mempool.RequestForTransactions
 import org.encryfoundation.common.modifiers.history.Header
@@ -352,9 +351,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
           logger.info(s"Send to peer $peer inv msg with mods: ${mods.map(Algos.encode).mkString(",")}")
           peer.handlerRef ! InvNetworkMessage(mTid -> mods)
-        case (_, mods) =>
-          context.parent ! BanPeer(peer, SentNetworkMessageWithTooManyModifiers)
-          logger.info(s"Tried to send inv message with size ${mods.size}. Current size is redundant.")
+        case (mTid, mods) =>
+          val modifiers: Seq[ModifierId] = mods.take(settings.network.maxInvObjects)
+          logger.info(s"Send to peer $peer dropped inv msg with mods: ${modifiers.map(Algos.encode).mkString(",")}")
+          peer.handlerRef ! InvNetworkMessage(mTid -> modifiers)
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
   }

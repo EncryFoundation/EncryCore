@@ -93,7 +93,7 @@ class BlackListTests extends WordSpecLike
         Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
       Thread.sleep(4000)
-      peersKeeper ! BanPeer(connectedPeer, SentNetworkMessageWithTooManyModifiers)
+      peersKeeper ! BanPeer(connectedPeer, CorruptedSerializedBytes)
       Thread.sleep(2000)
       peersKeeper.underlyingActor.blackList.contains(address.getAddress) shouldBe true
     }
