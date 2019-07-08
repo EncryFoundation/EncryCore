@@ -137,17 +137,17 @@ object ModifiersCache extends StrictLogging {
       case Some(id) => history.modifierById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
-        case _ if !isChainSynced =>
-          logger.debug(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}.")
-          //first check if best full block in best chain, if not find last full block in best chain and find payload to correct height
-          history.bestBlockOpt match {
-            case Some(bestChainBlock) if history.isInBestChain(bestChainBlock.header) => applicableBestPayloadChain()
-            case Some(nonBestChainBlock) =>
-              history.lastBestBlockRelevantToBestChain(nonBestChainBlock.header.height).map(bestChainBlock =>
-                applicableBestPayloadChain(bestChainBlock.header.height + 1)
-              ).getOrElse(List.empty[Key])
-            case _ => applicableBestPayloadChain()
-          }
+//        case _ if !isChainSynced =>
+//          logger.debug(s"ModsCache no applicable payload at height: ${history.bestBlockHeight + 1}.")
+//          //first check if best full block in best chain, if not find last full block in best chain and find payload to correct height
+//          history.bestBlockOpt match {
+//            case Some(bestChainBlock) if history.isInBestChain(bestChainBlock.header) => applicableBestPayloadChain()
+//            case Some(nonBestChainBlock) =>
+//              history.lastBestBlockRelevantToBestChain(nonBestChainBlock.header.height).map(bestChainBlock =>
+//                applicableBestPayloadChain(bestChainBlock.header.height + 1)
+//              ).getOrElse(List.empty[Key])
+//            case _ => applicableBestPayloadChain()
+//          }
         case _ => exhaustiveSearch
       }
       case None if isChainSynced =>
