@@ -4,16 +4,15 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.view.history.EncryHistory
+import encry.view.history.processors.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.encryfoundation.common.validation.{MalformedModifierError, RecoverableModifierError}
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
-import scala.util.{Failure, Success}
 
 object ModifiersCache extends StrictLogging {
 
@@ -44,10 +43,10 @@ object ModifiersCache extends StrictLogging {
         headersCollection = headersCollection.updated(header.height, updatedHeadersAtCurrentHeight)
       case _ =>
     }
-    if (size > settings.node.modifiersCacheSize) cache.find {
-      case (_, value) => history.testApplicable(value) match {
-        case Success(_) => false
-        case Failure(_: RecoverableModifierError) => false
+
+    if (size > settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
+      history.testApplicable(modifier) match {
+        case Right(_) | Left(_: NonFatalValidationError) => false
         case _ => true
       }
     }.map(mod => remove(mod._1))
@@ -67,12 +66,9 @@ object ModifiersCache extends StrictLogging {
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
-      case Failure(_: RecoverableModifierError) => false
-      case Failure(_: MalformedModifierError) =>
-        remove(key)
-        false
-      case Failure(_) => false
-      case m => m.isSuccess
+      case Left(_: FatalValidationError) => remove(key); false
+      case Right(_) => true
+      case _ => false
     })
 
     def getHeadersKeysAtHeight(height: Int): List[Key] = {
@@ -120,9 +116,9 @@ object ModifiersCache extends StrictLogging {
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
               if ((v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
-                  (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
-                    (v.parentId sameElements Header.GenesisParentId)
-                    ) || history.modifierById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
+                (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
+                  (v.parentId sameElements Header.GenesisParentId)
+                  ) || history.modifierById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }

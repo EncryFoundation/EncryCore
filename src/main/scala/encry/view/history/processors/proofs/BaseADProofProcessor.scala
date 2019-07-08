@@ -1,9 +1,9 @@
 package encry.view.history.processors.proofs
 
 import encry.consensus.History.ProgressInfo
+import encry.view.history.processors.ValidationError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.ADProofs
-import scala.util.Try
 
 trait BaseADProofProcessor {
 
@@ -22,5 +22,5 @@ trait BaseADProofProcessor {
     * @param m - ADProof to validate
     * @return Success() if ADProof is valid from History point of view, Failure(error) otherwise
     */
-  protected def validate(m: ADProofs): Try[Unit]
+  protected def validate(m: ADProofs):  Either[ValidationError, PersistentModifier]
 }

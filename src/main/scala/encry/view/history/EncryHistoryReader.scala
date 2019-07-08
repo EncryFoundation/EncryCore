@@ -4,7 +4,8 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.modifiers.history._
 import encry.settings.NodeSettings
-import encry.view.history.processors.BlockHeaderProcessor
+import encry.view.history.processors.ValidationError.FatalValidationError.ModifierHasIncorrectType
+import encry.view.history.processors.{BlockHeaderProcessor, ValidationError}
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
 import io.iohk.iodb.ByteArrayWrapper
@@ -15,8 +16,9 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
+import cats.syntax.either._
 import scala.annotation.tailrec
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 trait EncryHistoryReader extends BlockHeaderProcessor
   with BlockPayloadProcessor
@@ -99,7 +101,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     @tailrec
     def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
-        .flatMap { h => headerIdsAtHeight(h + 1)}
+        .flatMap { h => headerIdsAtHeight(h + 1) }
         .flatMap { id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)) }
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
@@ -116,11 +118,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     loop(header.height, Seq(Seq(header)))
   }
 
-  def testApplicable(modifier: PersistentModifier): Try[Unit] = modifier match {
+  def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] = modifier match {
     case header: Header     => validate(header)
     case payload: Payload   => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
-    case mod: Any           => Failure(new Exception(s"Modifier $mod is of incorrect type."))
+    case mod                => Either.left(ModifierHasIncorrectType(s"Modifier $mod is of incorrect type."))
   }
 
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
@@ -138,11 +140,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def getBlock(header: Header): Option[Block] =
     blocksCache.get(ByteArrayWrapper(header.id)).orElse(
-    (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
-      case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
-      case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
-      case _ => None
-    })
+      (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
+        case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
+        case (Some(txs), None) if !nodeSettings.stateMode.isDigest => Some(Block(header, txs, None))
+        case _ => None
+      })
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
@@ -192,12 +194,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(b) if b.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-      case Some(b) if b.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
       case None if contains(modifierId) => ModifierSemanticValidity.Unknown
       case None => ModifierSemanticValidity.Absent
-      case m =>
-        logger.error(s"Incorrect validity status: $m")
-        ModifierSemanticValidity.Absent
+      case mod => logger.error(s"Incorrect validity status: $mod"); ModifierSemanticValidity.Absent
     }
 }

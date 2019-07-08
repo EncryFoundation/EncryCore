@@ -1,21 +1,19 @@
 package encry.view.history.processors
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.system
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.history.HeaderChain
-import io.circe.syntax._
+import encry.view.history.processors.ValidationError.FatalValidationError._
+import encry.view.history.processors.ValidationError.NonFatalValidationError.{HistoryDoesNotContainModifiersParent, TooOldModifier}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.encryfoundation.common.validation.ModifierSemanticValidity.Invalid
-import org.encryfoundation.common.validation.{ModifierValidator, RecoverableModifierError, ValidationResult}
-
-import scala.collection.immutable.HashSet
-import scala.util.{Failure, Try}
+import org.encryfoundation.common.validation.ModifierSemanticValidity
+import scala.util.Try
+import cats.syntax.either._
 
 trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
@@ -58,8 +56,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       nonBestBlock
 
   private def processValidFirstBlock: BlockProcessing = {
-    case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _)
-      if isValidFirstBlock(fullBlock.header) =>
+    case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _) if isValidFirstBlock(fullBlock.header) =>
       logger.info(s"Appending ${fullBlock.encodedId} as a valid first block")
       logStatus(Seq(), newBestChain, fullBlock, None)
       updateStorage(newModRow, newBestHeader.id)
@@ -69,25 +66,12 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
-      logger.debug(s"<<<---processBetterChain case isBetterChain--->>>")
       val prevBest: Block = bestBlockOpt.get
-      logger.debug(s"prevBestBlock: $prevBest")
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
-      logger.debug(s"PrevChain and NewChain:")
-      logger.debug(s"${prevChain.headers.mkString(",")}")
-      logger.debug(s"${newChain.headers.mkString(",")}")
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
-      logger.debug(s"toRemove ->>>>>  ${toRemove.mkString(",")}")
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
-      logger.debug(s"toApply ->>>>>  ${toApply.mkString(",")}")
-      if (toApply.lengthCompare(newChain.length - 1) != 0) {
-        logger.debug(s"!!!!!IF!!!!!!")
-        logger.debug(s"${toApply.size} ->>> ${newChain.length - 1} -->>> ${toApply.lengthCompare(newChain.length - 1) != 0}")
-        logger.debug(s"GO TO NON BEST BLOCK FUNCTION::::()()()()")
-        nonBestBlock(toProcess)
-      }
       else {
         //application of this block leads to full chain with higher score
         logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
@@ -135,7 +119,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         blocksCacheIndexes.get(bestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
           val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
           logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
-          blocksCache = blocksCache.filterNot{case (id, _) => wrappedIds.contains(id)}
+          blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
         }
         blocksCacheIndexes = blocksCacheIndexes - (bestBlockHeight - TestNetConstants.MaxRollbackDepth)
       }
@@ -146,19 +130,12 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def nonBestBlock: BlockProcessing = {
     case params =>
       //Orphaned block or full chain is not initialized yet
-      logger.debug(s"<<<<< -----  NON BEST BLOCK  ----->>>>>")
-      logger.debug(s"bestBlock isNonEmpty? -> ${bestBlockOpt.nonEmpty}")
-      logger.debug(s"isBetterChain? -> ${isBetterChain(params.newBestHeader.id)}")
-      logger.debug(s"Appending ${params.fullBlock.encodedId}. Height: ${params.fullBlock.header.height} as a non best block.")
-      logStatus(Seq(), Seq(), params.fullBlock, None)
-      logger.debug(s"params full block: ${params.fullBlock}")
       logStatus(Seq.empty, Seq.empty, params.fullBlock, None)
       historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
-    logger.debug(s"calculateBestFullChain for block: ${block.asJson}")
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
     logger.debug(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
     val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
@@ -185,11 +162,10 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   private def storageVersion(newModRow: PersistentModifier): ModifierId = newModRow.id
 
-  protected def modifierValidation(m: PersistentModifier, headerOpt: Option[Header]): Try[Unit] = {
-    val minimalHeight: Int = blockDownloadProcessor.minimalBlockHeight
-    headerOpt.map(header => PayloadValidator.validate(m, header, minimalHeight).toTry)
-      .getOrElse(Failure(RecoverableModifierError(s"Header for modifier $m is not defined")))
-  }
+  protected def modifierValidation(mod: PersistentModifier,
+                                   headerOpt: Option[Header]): Either[ValidationError, PersistentModifier] =
+    headerOpt.map(header => PayloadValidator.validate(mod, header, blockDownloadProcessor.minimalBlockHeight))
+      .getOrElse(Either.left(HistoryDoesNotContainModifiersParent(s"Header for ${mod.encodedId} doesn't contain in history")))
 
   private def logStatus(toRemove: Seq[Block],
                         toApply: Seq[Block],
@@ -207,21 +183,20 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   /** Validator for `BlockPayload` and `AdProofs` */
-  object PayloadValidator extends ModifierValidator {
+  object PayloadValidator {
 
-    def validate(m: PersistentModifier, header: Header, minimalHeight: Int): ValidationResult = failFast
-      .validate(!historyStorage.containsObject(m.id)) {
-        fatal(s"Modifier ${m.encodedId} is already in history")
-      }
-      .validate(header.isRelated(m)) {
-        fatal(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}")
-      }
-      .validate(isSemanticallyValid(header.id) != Invalid) {
-        fatal(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid")
-      }
-      .validate(header.height >= minimalHeight) {
-        error(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
-      }.result
+    def validate(m: PersistentModifier,
+                 header: Header,
+                 minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
+      _ <- Either.cond(!historyStorage.containsObject(m.id), (),
+        ExistedInHistoryModifier(s"Modifier ${m.encodedId} is already in history"))
+      _ <- Either.cond(header.isRelated(m), (),
+        NonRelatedModifier(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
+      _ <- Either.cond(isSemanticallyValid(header.id) == ModifierSemanticValidity.Valid, (),
+        SemanticallyInvalidModifier(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid"))
+      _ <- Either.cond(header.height >= minimalHeight, (),
+        TooOldModifier(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
+    } yield m
   }
 
 }
