@@ -282,11 +282,13 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  protected def validate(h: Header): Either[ValidationError, Header] = headersCache
-    .get(ByteArrayWrapper(h.parentId))
-    .orElse(typedModifierById[Header](h.parentId))
-    .map(p => HeaderValidator.validate(h, p))
-    .getOrElse(Either.left(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history")))
+  protected def validate(h: Header): Either[ValidationError, Header] =
+    if (h.isGenesis) HeaderValidator.validateGenesisBlockHeader(h)
+    else headersCache
+      .get(ByteArrayWrapper(h.parentId))
+      .orElse(typedModifierById[Header](h.parentId))
+      .map(p => HeaderValidator.validateHeader(h, p))
+      .getOrElse(Either.left(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history")))
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id)
     .flatMap(h => bestHeaderIdAtHeight(h))
@@ -370,11 +372,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   object HeaderValidator {
 
-    def validate(h: Header, p: Header): Either[ValidationError, Header] =
-      if (h.isGenesis) validateGenesisBlockHeader(h)
-      else validateHeader(h, p)
-
-    private def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
+    def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
       _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
         GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
       _ <- Either.cond(bestHeaderIdOpt.isEmpty, (),
@@ -383,7 +381,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
     } yield h
 
-    private def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
+    def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
       _ <- Either.cond(h.timestamp > parent.timestamp, (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
       _ <- Either.cond(h.height == parent.height + 1, (),
@@ -397,8 +395,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
       _ <- Either.cond(powScheme.verify(h), (),
-        HeaderFatalValidationError(s"Wrong proof-of-work solution fin header ${h.encodedId}"))
-      _ <- Either.cond(isSemanticallyValid(h.parentId) == ModifierSemanticValidity.Valid, (),
+        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId}"))
+      _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
         HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
       _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
         HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))

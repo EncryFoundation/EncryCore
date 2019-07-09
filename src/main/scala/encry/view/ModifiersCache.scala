@@ -67,8 +67,8 @@ object ModifiersCache extends StrictLogging {
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
       case Left(_: FatalValidationError) => remove(key); false
-      case Right(_) => true
-      case _ => false
+      case Right(_)                      => true
+      case Left(_)                       => false
     })
 
     def getHeadersKeysAtHeight(height: Int): List[Key] = {

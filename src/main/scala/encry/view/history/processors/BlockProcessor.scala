@@ -192,7 +192,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
       _ <- Either.cond(header.isRelated(m), (),
         PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
-      _ <- Either.cond(isSemanticallyValid(header.id) == ModifierSemanticValidity.Valid, (),
+      _ <- Either.cond(isSemanticallyValid(header.id) != ModifierSemanticValidity.Invalid, (),
         PayloadFatalValidationError(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid"))
       _ <- Either.cond(header.height >= minimalHeight, (),
         PayloadNonFatalValidationError(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
