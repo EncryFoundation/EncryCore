@@ -4,12 +4,10 @@ message HeaderProtoMessage {
 
     bytes version = 1;
     bytes parentId = 2;
-    bytes adProofsRoot = 3;
-    bytes stateRoot = 4;
-    bytes transactionsRoot = 5;
-    uint64 timestamp = 6;
-    uint32 height = 7;
-    uint64 nonce = 8;
-    uint64 difficulty = 9;
-    repeated uint32 ints = 10;
+    bytes transactionsRoot = 3;
+    uint64 timestamp = 4;
+    uint32 height = 5;
+    uint64 nonce = 6;
+    uint64 difficulty = 7;
+    repeated uint32 ints = 8;
 }

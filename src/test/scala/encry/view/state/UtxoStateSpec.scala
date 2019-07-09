@@ -1,32 +1,19 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
-import encry.view.state.UtxoStateWithoutAVL.logger
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.crypto
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Pay2PubKeyAddress, Transaction}
-import org.encryfoundation.common.modifiers.state.box.AssetBox
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.Algos.HF
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADValue, Height, SerializedAdProof}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
-import scorex.crypto.encode.Base16
-import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-import scorex.utils.Random
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
@@ -174,7 +161,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
         timestamp, useBoxes, randomAddress, factory.Props.boxValue - 4300)
     }
 
-    val block = Block(genHeader, Payload(genHeader.id, validTxs), None)
+    val block = Block(genHeader, Payload(genHeader.id, validTxs))
 
     val applyTry = state.applyModifier(block)
 

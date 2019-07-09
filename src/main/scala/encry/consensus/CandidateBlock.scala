@@ -5,7 +5,7 @@ import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Difficulty, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.Difficulty
 
 case class CandidateBlock(parentOpt: Option[Header],
                           version: Byte,

@@ -147,7 +147,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
       .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
-      .flatMap(h => Seq(h.adProofsId, h.payloadId))
+      .flatMap(h => Seq(h.payloadId))
     historyStorage.removeObjects(toRemove)
   }
 

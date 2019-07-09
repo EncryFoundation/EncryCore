@@ -7,7 +7,6 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
 import encry.view.history.processors.payload.BlockPayloadProcessor
-import encry.view.history.processors.proofs.FullStateProofProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -56,7 +55,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       height = TestNetConstants.GenesisHeight,
       transactionsRoot = txsRoot
     )
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
   def paymentTransactionDynamic: Transaction = {
@@ -137,7 +136,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
           val txsRoot = Algos.merkleTreeRoot(txs.map(tx => LeafData @@ tx.id.untag(ModifierId)))
           val header = genHeaderAtHeight(blockHeight, txsRoot)
           val payload = Payload(header.id, txs)
-          Block(header, payload, None)
+          Block(header, payload)
         }
         val newUtxo = block.payload.txs.flatMap(_.newBoxes)
         (fakeBlockchain :+ block) -> newUtxo.collect{case ab: AssetBox => ab}
@@ -162,7 +161,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
 
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, txs))
   }
 
   def genForkOn(qty: Int,
@@ -223,7 +222,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+    new EncryHistory with BlockPayloadProcessor {
       override protected val settings: EncryAppSettings = settingsEncry
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage

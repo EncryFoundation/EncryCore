@@ -7,10 +7,9 @@ import encry.settings.NodeSettings
 import encry.view.history.processors.ValidationError.FatalValidationError.UnknownModifierFatalError
 import encry.view.history.processors.{BlockHeaderProcessor, ValidationError}
 import encry.view.history.processors.payload.BlockPayloadProcessor
-import encry.view.history.processors.proofs.BaseADProofProcessor
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
@@ -22,7 +21,6 @@ import scala.util.Try
 
 trait EncryHistoryReader extends BlockHeaderProcessor
   with BlockPayloadProcessor
-  with BaseADProofProcessor
   with StrictLogging {
 
   protected val nodeSettings: NodeSettings
@@ -122,7 +120,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     val validationResult: Either[ValidationError, PersistentModifier] = modifier match {
       case header: Header     => validate(header)
       case payload: Payload   => validate(payload)
-      case adProofs: ADProofs => validate(adProofs)
       case mod                => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
     }
     validationResult match {
@@ -146,11 +143,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def getBlock(header: Header): Option[Block] =
     blocksCache.get(ByteArrayWrapper(header.id)).orElse(
-    (typedModifierById[Payload](header.payloadId), typedModifierById[ADProofs](header.adProofsId)) match {
-      case (Some(txs), Some(proofs)) => Some(Block(header, txs, Some(proofs)))
-      case (Some(txs), None) => Some(Block(header, txs, None))
-      case _ => None
-    })
+      typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload))
+    )
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.

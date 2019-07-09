@@ -1,33 +1,24 @@
 package benches
 
 import java.io.File
-
-import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings}
-import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.StorageType
-import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.history.processors.payload.BlockPayloadProcessor
-import encry.view.history.processors.proofs.FullStateProofProcessor
 import encry.view.history.storage.HistoryStorage
-//import encry.view.state.{BoxHolder, EncryState, UtxoState}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction._
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.Algos.HF
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
@@ -35,7 +26,6 @@ import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-
 import scala.collection.immutable
 import scala.util.{Random => R}
 
@@ -172,7 +162,7 @@ object Utils extends StrictLogging {
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, txs))
   }
 
   def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
@@ -229,8 +219,6 @@ object Utils extends StrictLogging {
     Header(
       1.toByte,
       ModifierId @@ Random.randomBytes(),
-      Digest32 @@ Random.randomBytes(32),
-      ADDigest @@ Random.randomBytes(33),
       Digest32 @@ Random.randomBytes(),
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
@@ -434,7 +422,7 @@ object Utils extends StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+    new EncryHistory with BlockPayloadProcessor {
       override protected val settings: EncryAppSettings = settingsEncry
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage

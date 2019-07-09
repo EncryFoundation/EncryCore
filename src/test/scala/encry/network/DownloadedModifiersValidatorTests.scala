@@ -63,8 +63,6 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val header_first: Header = Header(
         1.toByte,
         ModifierId @@ Random.randomBytes(),
-        Digest32 @@ Random.randomBytes(32),
-        ADDigest @@ Random.randomBytes(33),
         Digest32 @@ Random.randomBytes(),
         timestamp2,
         2,
@@ -75,8 +73,6 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val header_second: Header = Header(
         1.toByte,
         header_first.id,
-        Digest32 @@ Random.randomBytes(32),
-        ADDigest @@ Random.randomBytes(33),
         Digest32 @@ Random.randomBytes(),
         timestamp1,
         1,

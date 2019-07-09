@@ -56,11 +56,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val firstBlock: Block = Block(genHeader, blockPayload, None)
+    val firstBlock: Block = Block(genHeader, blockPayload)
 
     val blockPayloadWithSpentTx: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
 
-    val secondBlock: Block = Block(genHeader, blockPayloadWithSpentTx, None)
+    val secondBlock: Block = Block(genHeader, blockPayloadWithSpentTx)
 
     wallet.scanPersistent(firstBlock)
 
@@ -97,7 +97,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
 
-    val block: Block = Block(blockHeader, blockPayload, None)
+    val block: Block = Block(blockHeader, blockPayload)
 
     wallet.scanPersistent(block)
 

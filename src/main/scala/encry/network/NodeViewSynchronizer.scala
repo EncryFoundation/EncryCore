@@ -118,7 +118,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           sendResponse(remote, invData._1, inRequestCache.values.collect {
             case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
             case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
-            case adProof: ADProofs => adProof.id -> ADProofsProtoSerializer.toProto(adProof).toByteArray
           }.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {

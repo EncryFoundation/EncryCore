@@ -175,7 +175,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
         generateDataTransactions(box2, 1, 1, 999) ++
         generatePaymentTransactions(box3, 1, 1)
     val payload: Payload = Payload(header.id, transactions)
-    val block = Block(header, payload, None)
+    val block = Block(header, payload)
     val blockToProto: BlockProtoMessage = block.toProtoBlock
     val blockFromProto: Block = BlockProtoSerializer.fromProto(blockToProto).get
     block shouldEqual blockFromProto
