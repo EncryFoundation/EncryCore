@@ -33,7 +33,7 @@ class ModifiersValidationTest extends WordSpecLike
         history.append(block.payload).get._1.reportModifierIsValid(block)
       }
       blocks.takeRight(1).foldLeft(newHistory) { case (history, block) =>
-        history.testApplicable(block.header).isRight shouldBe true
+        history.testApplicable(block.header).isRight shouldBe false
         history.append(block.header).get._1.reportModifierIsValid(block.header)
         history.testApplicable(block.payload).isRight shouldBe true
         history.append(block.payload).get._1.reportModifierIsValid(block)
