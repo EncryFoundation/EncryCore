@@ -42,7 +42,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     payload: Payload = Payload(possibleHeader.id, candidateBlock.transactions)
   } yield Block(possibleHeader, payload, Some(adProofs))
 
-  @tailrec private def generateHeader(nonce: Long,
+  private def generateHeader(nonce: Long,
                                       digest: Blake2bDigest,
                                       header: Header,
                                       difficulty: Difficulty,
@@ -55,7 +55,6 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
       .find(newHeader => correctWorkDone(realDifficulty(newHeader), difficulty))
     match {
       case Some(value) => value.asRight[String]
-      case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1, digest, header, difficulty, finishingNonce)
       case None => "Generate header failed".asLeft[Header]
     }
   }
