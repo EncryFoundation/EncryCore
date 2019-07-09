@@ -388,7 +388,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
       _ <- Either.cond(h.height == parent.height + 1, (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
-      _ <- Either.cond(historyStorage.containsObject(h.id), (),
+      _ <- Either.cond(!historyStorage.containsObject(h.id), (),
         HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
       _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
         HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
