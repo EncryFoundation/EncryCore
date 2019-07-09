@@ -9,7 +9,6 @@ import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Pa
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import scorex.crypto.hash.Digest32
-import scala.annotation.tailrec
 import scala.math.BigInt
 import cats.syntax.either._
 
@@ -19,34 +18,33 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
 
   override def verifyCandidate(candidateBlock: CandidateBlock,
-                               finishingNonce: Long,
-                               startingNonce: Long): Either[String, Block] = for {
-    _ <- Either.cond(finishingNonce >= startingNonce, (), "Incorrect condition: finishingNonce >= startingNonce")
-    difficulty             = candidateBlock.difficulty
-    version: Byte          = TestNetConstants.Version
-    parentId: ModifierId   = candidateBlock.parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
-    adProofsRoot: Digest32 = ADProofs.proofDigest(candidateBlock.adProofBytes)
-    txsRoot: Digest32      = Payload.rootHash(candidateBlock.transactions.map(_.id))
-    height: Int            = candidateBlock.parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
-    bytesPerWord: Int      = n / 8
-    wordsPerHash: Int      = 512 / n
-    digest: Blake2bDigest  = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
-    header: Header = Header(
+                               startingNonce: Long): Either[String, Block] = {
+    val difficulty = candidateBlock.difficulty
+    val version: Byte = TestNetConstants.Version
+    val parentId: ModifierId = candidateBlock.parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
+    val adProofsRoot: Digest32 = ADProofs.proofDigest(candidateBlock.adProofBytes)
+    val txsRoot: Digest32 = Payload.rootHash(candidateBlock.transactions.map(_.id))
+    val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
+    val bytesPerWord: Int = n / 8
+    val wordsPerHash: Int = 512 / n
+    val digest: Blake2bDigest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
+    val header: Header = Header(
       version, parentId, adProofsRoot, candidateBlock.stateRoot, txsRoot,
       candidateBlock.timestamp, height, 0L, candidateBlock.difficulty, EquihashSolution.empty
     )
-    possibleHeader <- generateHeader(startingNonce, digest, header, difficulty, finishingNonce)
-    validationResult: Either[String, Boolean] = verify(possibleHeader)
-    _ <- Either.cond(validationResult.isRight, (), s"Incorrect possible header cause: $validationResult")
-    adProofs: ADProofs = ADProofs(possibleHeader.id, candidateBlock.adProofBytes)
-    payload: Payload = Payload(possibleHeader.id, candidateBlock.transactions)
-  } yield Block(possibleHeader, payload, Some(adProofs))
+    for {
+      possibleHeader <- generateHeader(startingNonce, digest, header, difficulty)
+      validationResult: Either[String, Boolean] = verify(possibleHeader)
+      _ <- Either.cond(validationResult.isRight, (), s"Incorrect possible header cause: $validationResult")
+      adProofs: ADProofs = ADProofs(possibleHeader.id, candidateBlock.adProofBytes)
+      payload: Payload = Payload(possibleHeader.id, candidateBlock.transactions)
+    } yield Block(possibleHeader, payload, Some(adProofs))
+  }
 
   private def generateHeader(nonce: Long,
                              digest: Blake2bDigest,
                              header: Header,
-                             difficulty: Difficulty,
-                             finishingNonce: Long): Either[String, Header] = {
+                             difficulty: Difficulty): Either[String, Header] = {
     val currentDigest = new Blake2bDigest(digest)
     Equihash.hashNonce(currentDigest, nonce)
     val solutions = Equihash.gbpBasic(currentDigest, n, k)
