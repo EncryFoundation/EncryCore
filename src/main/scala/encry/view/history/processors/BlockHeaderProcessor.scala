@@ -282,10 +282,15 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  protected def validate(header: Header): Either[ValidationError, Header] = HeaderValidator.validate(header)
+  protected def validate(h: Header): Either[ValidationError, Header] = headersCache
+    .get(ByteArrayWrapper(h.parentId))
+    .orElse(typedModifierById[Header](h.parentId))
+    .map(p => HeaderValidator.validate(h, p))
+    .getOrElse(Either.left(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history")))
 
-  def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
-    .exists(_ sameElements id)
+  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
+    .flatMap(h => bestHeaderIdAtHeight(h))
+    .exists(_.sameElements(id))
 
   def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
 
@@ -295,7 +300,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
-  def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
+  def heightOf(id: ModifierId): Option[Height] = historyStorage
+    .get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))
 
   /**
@@ -306,11 +312,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.
     */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    historyStorage.store
-      .get(heightIdsKey(height))
-      .map { elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq }
-      .getOrElse(Seq.empty[ModifierId])
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage.store
+    .get(heightIdsKey(height))
+    .map { elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq }
+    .getOrElse(Seq.empty[ModifierId])
 
   /**
     * @param limit       - maximum length of resulting HeaderChain
@@ -365,40 +370,38 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   object HeaderValidator {
 
-    def validate(h: Header): Either[ValidationError, Header] =
+    def validate(h: Header, p: Header): Either[ValidationError, Header] =
       if (h.isGenesis) validateGenesisBlockHeader(h)
-      else headersCache.get(ByteArrayWrapper(h.parentId)).orElse(typedModifierById[Header](h.parentId)).map(parent =>
-        validateHeader(h, parent)
-      ).getOrElse(Either.left(HistoryDoesNotContainModifiersParent(s"Header's ${h.encodedId} parent doesn't contain in history")))
+      else validateHeader(h, p)
 
     private def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
       _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
-        IncorrectGenesisBlockParentId(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
+        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
       _ <- Either.cond(bestHeaderIdOpt.isEmpty, (),
-        GenesisBlockAppendedToNonEmptyHistory(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
+        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
       _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
-        IncorrectModifiersHeight(s"Height of genesis block with header ${h.encodedId} is incorrect"))
+        GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
     } yield h
 
     private def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
       _ <- Either.cond(h.timestamp > parent.timestamp, (),
-        IncorrectHeadersTimestamp(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
+        HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
       _ <- Either.cond(h.height == parent.height + 1, (),
-        IncorrectModifiersHeight(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
+        HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
       _ <- Either.cond(historyStorage.containsObject(h.id), (),
-        ExistedInHistoryModifier(s"Header ${h.encodedId} is already in history"))
+        HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
       _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
-        IncorrectRealBlocksDifficulty(s"Incorrect real difficulty in header ${h.encodedId}"))
+        HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
       _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent), (),
-        IncorrectRequiredBlocksDifficulty(s"Incorrect required difficulty in header ${h.encodedId}"))
+        HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
       _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
-        ModifiersHeightGreaterThanMaxRollBackDepth(s"Header ${h.encodedId} has height greater than max roll back depth"))
+        HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
       _ <- Either.cond(powScheme.verify(h), (),
-        IncorrectProofOfWorkSolution(s"Wrong proof-of-work solution fin header ${h.encodedId}"))
+        HeaderFatalValidationError(s"Wrong proof-of-work solution fin header ${h.encodedId}"))
       _ <- Either.cond(isSemanticallyValid(h.parentId) == ModifierSemanticValidity.Valid, (),
-        SemanticallyInvalidModifier(s"Header ${h.encodedId} is semantically invalid"))
+        HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
       _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
-        TooYoungHeader(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
+        HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
     } yield h
   }
 }

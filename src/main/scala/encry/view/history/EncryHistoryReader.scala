@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.modifiers.history._
 import encry.settings.NodeSettings
-import encry.view.history.processors.ValidationError.FatalValidationError.ModifierHasIncorrectType
+import encry.view.history.processors.ValidationError.FatalValidationError.UnknownModifierFatalError
 import encry.view.history.processors.{BlockHeaderProcessor, ValidationError}
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.processors.proofs.BaseADProofProcessor
@@ -122,7 +122,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case header: Header     => validate(header)
     case payload: Payload   => validate(payload)
     case adProofs: ADProofs => validate(adProofs)
-    case mod                => Either.left(ModifierHasIncorrectType(s"Modifier $mod is of incorrect type."))
+    case mod                => Either.left(UnknownModifierFatalError(s"Modifier $mod is of incorrect type."))
   }
 
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
@@ -189,15 +189,17 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     (currentChain, otherChain.takeAfter(currentChain.head))
   }
 
-  def syncInfo: SyncInfo = if (isEmpty) SyncInfo(Seq.empty)
-  else SyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
+  def syncInfo: SyncInfo =
+    if (isEmpty) SyncInfo(Seq.empty)
+    else SyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
       case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
       case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-      case None if contains(modifierId) => ModifierSemanticValidity.Unknown
-      case None => ModifierSemanticValidity.Absent
-      case mod => logger.error(s"Incorrect validity status: $mod"); ModifierSemanticValidity.Absent
+      case None if contains(modifierId)                   => ModifierSemanticValidity.Unknown
+      case None                                           => ModifierSemanticValidity.Absent
+      case mod                                            => logger.error(s"Incorrect validity status: $mod")
+                                                             ModifierSemanticValidity.Absent
     }
 }

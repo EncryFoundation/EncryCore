@@ -20,7 +20,7 @@ trait BaseADProofProcessor {
 
   /**
     * @param m - ADProof to validate
-    * @return Success() if ADProof is valid from History point of view, Failure(error) otherwise
+    * @return Either.right(modifier) if ADProof is valid from History point of view, Either.left(error) otherwise
     */
   protected def validate(m: ADProofs):  Either[ValidationError, PersistentModifier]
 }

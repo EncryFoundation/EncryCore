@@ -4,7 +4,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import encry.view.history.processors.ValidationError.FatalValidationError._
-import encry.view.history.processors.ValidationError.NonFatalValidationError.{HistoryDoesNotContainModifiersParent, TooOldModifier}
+import encry.view.history.processors.ValidationError.NonFatalValidationError._
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
@@ -165,7 +165,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   protected def modifierValidation(mod: PersistentModifier,
                                    headerOpt: Option[Header]): Either[ValidationError, PersistentModifier] =
     headerOpt.map(header => PayloadValidator.validate(mod, header, blockDownloadProcessor.minimalBlockHeight))
-      .getOrElse(Either.left(HistoryDoesNotContainModifiersParent(s"Header for ${mod.encodedId} doesn't contain in history")))
+      .getOrElse(Either.left(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history")))
 
   private def logStatus(toRemove: Seq[Block],
                         toApply: Seq[Block],
@@ -189,13 +189,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
                  header: Header,
                  minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
       _ <- Either.cond(!historyStorage.containsObject(m.id), (),
-        ExistedInHistoryModifier(s"Modifier ${m.encodedId} is already in history"))
+        PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
       _ <- Either.cond(header.isRelated(m), (),
-        NonRelatedModifier(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
+        PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
       _ <- Either.cond(isSemanticallyValid(header.id) == ModifierSemanticValidity.Valid, (),
-        SemanticallyInvalidModifier(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid"))
+        PayloadFatalValidationError(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid"))
       _ <- Either.cond(header.height >= minimalHeight, (),
-        TooOldModifier(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
+        PayloadNonFatalValidationError(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
     } yield m
   }
 
