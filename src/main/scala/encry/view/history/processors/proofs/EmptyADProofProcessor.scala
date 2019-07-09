@@ -15,5 +15,5 @@ trait EmptyADProofProcessor extends BaseADProofProcessor {
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
 
   override protected def validate(m: ADProofs): Either[ValidationError, PersistentModifier] =
-    Either.left(IncorrectProcessingRegime("Regime that do not process ADProofs"))
+    IncorrectProcessingRegime("Regime that do not process ADProofs").asLeft[PersistentModifier]
 }

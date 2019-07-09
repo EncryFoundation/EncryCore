@@ -123,7 +123,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       case header: Header     => validate(header)
       case payload: Payload   => validate(payload)
       case adProofs: ADProofs => validate(adProofs)
-      case mod                => Either.left(UnknownModifierFatalError(s"Modifier $mod has incorrect type."))
+      case mod                => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
     }
     validationResult match {
       case Left(value) => logger.info(s"Validation result failed: $value"); validationResult

@@ -163,9 +163,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def storageVersion(newModRow: PersistentModifier): ModifierId = newModRow.id
 
   protected def modifierValidation(mod: PersistentModifier,
-                                   headerOpt: Option[Header]): Either[ValidationError, PersistentModifier] =
-    headerOpt.map(header => PayloadValidator.validate(mod, header, blockDownloadProcessor.minimalBlockHeight))
-      .getOrElse(Either.left(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history")))
+                                   headerOpt: Option[Header]): Either[ValidationError, PersistentModifier] = headerOpt
+    .map(header => PayloadValidator.validate(mod, header, blockDownloadProcessor.minimalBlockHeight))
+    .getOrElse(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history").asLeft[PersistentModifier])
 
   private def logStatus(toRemove: Seq[Block],
                         toApply: Seq[Block],

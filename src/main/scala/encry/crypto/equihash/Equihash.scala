@@ -168,7 +168,7 @@ object Equihash {
     * @param personal        Personal bytes for digest
     * @param header          Block header with nonce
     * @param solutionIndices Solution indices
-    * @return Return True if solution is valid, False if not.
+    * @return Either.right(true) if solution is valid, Either.left("error message") if not.
     */
   def validateSolution(n: Char,
                        k: Char,
@@ -179,9 +179,9 @@ object Equihash {
     _ <- Either.cond(k >= 3, (), s"Incorrect k >= 3 parameter: ${k >= 3}")
     _ <- Either.cond(n % 8 == 0, (), s"Incorrect n % 8 == 0 parameter: ${n % 8 == 0}")
     _ <- Either.cond(n % (k + 1) == 0, (), s"Incorrect n % (k + 1) == 0 parameter: ${n % (k + 1) == 0}")
-    solutionLength = Math.pow(2, k).toInt
+    solutionLength: Int = Math.pow(2, k).toInt
     _ <- Either.cond(solutionIndices.size == solutionLength, (), s"Incorrect solution length: ${solutionIndices.size}")
-    _ <- Either.cond(solutionIndices.toSet.size != solutionIndices.size, (), "Duplicate solutions")
+    _ <- Either.cond(solutionIndices.toSet.size == solutionIndices.size, (), "Duplicate solutions")
     _ <- Either.cond({
       val bytesPerWord: Int = n / 8
       val wordsPerHash: Int = 512 / n

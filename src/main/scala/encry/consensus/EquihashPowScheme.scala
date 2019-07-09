@@ -54,7 +54,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
         .map { solution => h.copy(nonce = nonce, equihashSolution = solution) }
         .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
       headerWithSuitableSolution match {
-        case headerWithFoundSolution @ Some(_) => headerWithFoundSolution
+        case headerWithFoundSolution@Some(_) => headerWithFoundSolution
         case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
         case _ => None
       }
@@ -63,7 +63,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     val possibleHeader = generateHeader(startingNonce)
 
     possibleHeader.flatMap(header => {
-      if (verify(header)) {
+      if (verify(header).isRight) {
         val adProofs = ADProofs(header.id, candidateBlock.adProofBytes)
         val payload = Payload(header.id, candidateBlock.transactions)
         Some(Block(header, payload, Some(adProofs)))
@@ -71,14 +71,8 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     })
   }
 
-  def verify(header: Header): Boolean =
-    Equihash.validateSolution(
-      n,
-      k,
-      seed,
-      Equihash.nonceToLeBytes(header.nonce),
-      header.equihashSolution.indexedSeq
-    )
+  def verify(header: Header): Either[String, Boolean] = Equihash
+    .validateSolution(n, k, seed, Equihash.nonceToLeBytes(header.nonce), header.equihashSolution.indexedSeq)
 
   override def getDerivedHeaderFields(parentOpt: Option[Header],
                                       adProofBytes: SerializedAdProof,

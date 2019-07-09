@@ -288,7 +288,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       .get(ByteArrayWrapper(h.parentId))
       .orElse(typedModifierById[Header](h.parentId))
       .map(p => HeaderValidator.validateHeader(h, p))
-      .getOrElse(Either.left(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history")))
+      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id)
     .flatMap(h => bestHeaderIdAtHeight(h))
@@ -394,8 +394,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
       _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
-      _ <- Either.cond(powScheme.verify(h), (),
-        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId}"))
+      powSchemeValidationResult: Either[String, Boolean] = powScheme.verify(h)
+      _ <- Either.cond(powSchemeValidationResult.isRight, (),
+        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
       _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
         HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
       _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
