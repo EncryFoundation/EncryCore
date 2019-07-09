@@ -28,17 +28,23 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
     case MineBlock(candidate: CandidateBlock, nonce: Long) =>
       logger.info(s"Trying nonce: $nonce. Start nonce is: $initialNonce. " +
         s"Iter qty: ${nonce - initialNonce + 1} on worker: $myIdx with diff: ${candidate.difficulty}")
-      ConsensusSchemeReaders.consensusScheme.verifyCandidate(candidate, nonce)
-        .fold(self ! MineBlock(candidate, nonce + 1)) { block =>
-          logger.info(s"New block is found: (${block.header.height}, ${block.header.encodedId}, ${block.payload.txs.size} " +
-            s"on worker $self at ${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
-          miner ! MinedBlock(block, myIdx)
-        }
+      ConsensusSchemeReaders
+        .consensusScheme.verifyCandidate(candidate, nonce)
+        .fold(
+          e => {
+            self ! MineBlock(candidate, nonce + 1)
+            logger.info(s"Mining failed cause: $e")
+          },
+          block => {
+            logger.info(s"New block is found: (${block.header.height}, ${block.header.encodedId}, ${block.payload.txs.size} " +
+              s"on worker $self at ${sdf.format(new Date(System.currentTimeMillis()))}. Iter qty: ${nonce - initialNonce + 1}")
+            miner ! MinedBlock(block, myIdx)
+          })
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())
       logger.info(s"Start next challenge on worker: $myIdx at height " +
         s"${candidate.parentOpt.map(_.height + 1).getOrElse(TestNetConstants.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
-        self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
+      self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
   }
 
 }

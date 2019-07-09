@@ -35,8 +35,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
       version, parentId, adProofsRoot, candidateBlock.stateRoot, txsRoot,
       candidateBlock.timestamp, height, 0L, candidateBlock.difficulty, EquihashSolution.empty
     )
-    possibleHeaderOpt: Either[String, Header] = generateHeader(startingNonce, digest, header, difficulty, finishingNonce)
-    possibleHeader <- possibleHeaderOpt
+    possibleHeader <- generateHeader(startingNonce, digest, header, difficulty, finishingNonce)
     validationResult: Either[String, Boolean] = verify(possibleHeader)
     _ <- Either.cond(validationResult.isRight, (), s"Incorrect possible header cause: $validationResult")
     adProofs: ADProofs = ADProofs(possibleHeader.id, candidateBlock.adProofBytes)
@@ -51,13 +50,13 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     val currentDigest = new Blake2bDigest(digest)
     Equihash.hashNonce(currentDigest, nonce)
     val solutions = Equihash.gbpBasic(currentDigest, n, k)
-    val headerWithSuitableSolution = solutions
-      .map { solution => header.copy(nonce = nonce, equihashSolution = solution) }
-      .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
-    headerWithSuitableSolution match {
+    solutions
+      .map(solution => header.copy(nonce = nonce, equihashSolution = solution))
+      .find(newHeader => correctWorkDone(realDifficulty(newHeader), difficulty))
+    match {
       case Some(value) => value.asRight[String]
       case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1, digest, header, difficulty, finishingNonce)
-      case _ => "Generate header failed".asLeft[Header]
+      case None => "Generate header failed".asLeft[Header]
     }
   }
 
