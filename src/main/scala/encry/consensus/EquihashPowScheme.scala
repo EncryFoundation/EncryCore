@@ -43,10 +43,10 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
   } yield Block(possibleHeader, payload, Some(adProofs))
 
   private def generateHeader(nonce: Long,
-                                      digest: Blake2bDigest,
-                                      header: Header,
-                                      difficulty: Difficulty,
-                                      finishingNonce: Long): Either[String, Header] = {
+                             digest: Blake2bDigest,
+                             header: Header,
+                             difficulty: Difficulty,
+                             finishingNonce: Long): Either[String, Header] = {
     val currentDigest = new Blake2bDigest(digest)
     Equihash.hashNonce(currentDigest, nonce)
     val solutions = Equihash.gbpBasic(currentDigest, n, k)
