@@ -175,10 +175,10 @@ object Equihash {
                        personal: Array[Byte],
                        header: Array[Byte],
                        solutionIndices: IndexedSeq[Int]): Either[String, Boolean] = for {
-    _ <- Either.cond(n > 1, (), s"Incorrect n > 1 parameter: ${n > 1}")
-    _ <- Either.cond(k >= 3, (), s"Incorrect k >= 3 parameter: ${k >= 3}")
-    _ <- Either.cond(n % 8 == 0, (), s"Incorrect n % 8 == 0 parameter: ${n % 8 == 0}")
-    _ <- Either.cond(n % (k + 1) == 0, (), s"Incorrect n % (k + 1) == 0 parameter: ${n % (k + 1) == 0}")
+    _ <- Either.cond(n > 1, (), s"Incorrect n > 1 parameter: $n")
+    _ <- Either.cond(k >= 3, (), s"Incorrect k >= 3 parameter: $k")
+    _ <- Either.cond(n % 8 == 0, (), s"Incorrect n % 8 == 0 parameter: ${n % 8}")
+    _ <- Either.cond(n % (k + 1) == 0, (), s"Incorrect n % (k + 1) == 0 parameter: ${n % (k + 1)}")
     solutionLength: Int = Math.pow(2, k).toInt
     _ <- Either.cond(solutionIndices.size == solutionLength, (), s"Incorrect solution length: ${solutionIndices.size}")
     _ <- Either.cond(solutionIndices.toSet.size == solutionIndices.size, (), "Duplicate solutions")
