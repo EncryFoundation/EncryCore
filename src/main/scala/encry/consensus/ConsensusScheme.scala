@@ -13,7 +13,7 @@ trait ConsensusScheme {
   def realDifficulty(header: Header): BigInt
 
   def getDerivedHeaderFields(parentOpt: Option[Header],
-                             transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int)
+                             transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Int)
 
   def correctWorkDone(realDifficulty: Difficulty, difficulty: BigInt): Boolean = realDifficulty >= difficulty
 }

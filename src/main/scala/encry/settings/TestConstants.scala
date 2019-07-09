@@ -9,8 +9,6 @@ case object TestConstants extends Constants {
 
   val StateRootSize: Int = 33
 
-  val AdProofsRootSize: Int = 32
-
   val TransactionsRootSize: Int = 32
 
   val DigestLength: Int = 32
