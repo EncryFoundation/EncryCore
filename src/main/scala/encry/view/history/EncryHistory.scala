@@ -19,6 +19,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
+import cats.syntax.either._
 
 import scala.util.Try
 
@@ -42,13 +43,10 @@ trait EncryHistory extends EncryHistoryReader {
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: PersistentModifier): Either[Throwable, (EncryHistory, ProgressInfo[PersistentModifier])] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
-    //todo: remove try
-    Try {
-      modifier match {
-        case header: Header => (this, process(header))
-        case payload: Payload => (this, process(payload))
-      }
-    }.toEither
+    Either.catchNonFatal(modifier match {
+      case header: Header => (this, process(header))
+      case payload: Payload => (this, process(payload))
+    })
   }
 
   def reportModifierIsValid(modifier: PersistentModifier): EncryHistory = {
