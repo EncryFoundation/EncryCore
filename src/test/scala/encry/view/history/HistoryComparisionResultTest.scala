@@ -23,7 +23,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.map(_.header.id))
 
       val updatedHistory: EncryHistory = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -36,7 +36,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.map(_.header.id))
 
       val updatedHistory: EncryHistory = blocks.take(50).foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -49,7 +49,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(Seq.empty)
 
       val updatedHistory: EncryHistory = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -63,7 +63,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.take(30).map(_.header.id))
 
       val updatedHistory: EncryHistory = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -80,7 +80,7 @@ class HistoryComparisionResultTest extends WordSpecLike
       )
 
       val updatedHistory: EncryHistory = fork._1.take(30).foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)

@@ -9,7 +9,7 @@ import encry.EncryApp.nodeViewHolder
 import encry.settings.RESTApiSettings
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
-import encry.view.state.UtxoStateWithoutAVL
+import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import scala.concurrent.Future
@@ -24,7 +24,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   override val settings: RESTApiSettings = restApiSettings
 
   private def getWallet: Future[EncryWallet] = (nodeViewHolder ?
-    GetDataFromCurrentView[EncryHistory, UtxoStateWithoutAVL, EncryWallet, EncryWallet](_.vault))
+    GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
   def infoR: Route = (path("info") & get) {

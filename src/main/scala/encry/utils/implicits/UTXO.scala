@@ -2,7 +2,7 @@ package encry.utils.implicits
 
 import cats.kernel.Monoid
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.state.UtxoStateWithoutAVL.StateChange
+import encry.view.state.UtxoState.StateChange
 
 object UTXO {
 

@@ -24,6 +24,8 @@ import cats.syntax.traverse._
 import cats.instances.list._
 import cats.Traverse
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
+import encry.view.NodeViewErrors.ModifierApplyError
+import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -41,23 +43,19 @@ import scorex.crypto.hash.Digest32
 
 import scala.util.Try
 
-final case class UtxoStateWithoutAVL(storage: VersionalStorage,
-                                     height: Height,
-                                     lastBlockTimestamp: Long)
-  extends MinimalState[PersistentModifier, UtxoStateWithoutAVL] with StrictLogging with UtxoStateReader with AutoCloseable {
+final case class UtxoState(storage: VersionalStorage,
+                           height: Height,
+                           lastBlockTimestamp: Long)
+  extends StrictLogging with UtxoStateReader with AutoCloseable {
 
-  override type NVCT = this.type
-
-  override def applyModifier(mod: PersistentModifier): Try[UtxoStateWithoutAVL] = mod match {
+  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = mod match {
     case header: Header =>
       logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      Try (
-        UtxoStateWithoutAVL(
-          storage,
-          Height @@ header.height,
-          header.timestamp
-        )
-      )
+      UtxoState(
+        storage,
+        Height @@ header.height,
+        header.timestamp
+      ).asRight[List[ModifierApplyError]]
     case block: Block =>
       logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
       val lastTxId = block.payload.txs.last.id
@@ -69,36 +67,31 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
         .traverse(Validated.fromEither)
         .toEither
       res.fold(
-        err => {
-          logger.info(s"Error during applying block ${block.encodedId}. Errors: ${err.errors.map(_.message).mkString(",")}")
-          Try(this)
-        },
+        err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
         txsToApply => {
-          val combinedStateChange = combineAll(txsToApply.map(UtxoStateWithoutAVL.tx2StateChange))
+          val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
           storage.insert(
             StorageVersion !@@ block.id,
             combinedStateChange.outputsToDb,
             combinedStateChange.inputsToDb,
           )
-          Try (
-            UtxoStateWithoutAVL(
-              storage,
-              Height @@ block.header.height,
-              block.header.timestamp
-            )
-          )
+          UtxoState(
+            storage,
+            Height @@ block.header.height,
+            block.header.timestamp
+          ).asRight[List[ModifierApplyError]]
         }
       )
   }
 
-  override def rollbackTo(version: VersionTag): Try[UtxoStateWithoutAVL] = Try {
+  def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
     storage.versions.find(_ sameElements version) match {
       case Some(v) =>
         logger.info(s"Rollback to version ${Algos.encode(version)}")
         storage.rollbackTo(StorageVersion !@@ version)
-        val stateHeight: Int = storage.get(StorageKey @@ UtxoStateWithoutAVL.bestHeightKey.untag(Digest32))
+        val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
           .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
-        UtxoStateWithoutAVL(
+        UtxoState(
           storage,
           Height @@ stateHeight,
           lastBlockTimestamp
@@ -157,12 +150,10 @@ final case class UtxoStateWithoutAVL(storage: VersionalStorage,
       else Right[Invalid, Transaction](tx)
     } else tx.semanticValidity.errors.headOption.map(err => Left[Invalid, Transaction](Invalid(Seq(err)))).getOrElse(Right[Invalid, Transaction](tx))
 
-  override def version: VersionTag = VersionTag !@@ storage.currentVersion
-
   def close(): Unit = storage.close()
 }
 
-object UtxoStateWithoutAVL extends StrictLogging {
+object UtxoState extends StrictLogging {
 
   final case class StateChange(inputsToDb: List[StorageKey],
                                outputsToDb: List[(StorageKey, StorageValue)])
@@ -185,7 +176,7 @@ object UtxoStateWithoutAVL extends StrictLogging {
   def create(stateDir: File,
              nodeViewHolderRef: Option[ActorRef],
              settings: EncryAppSettings,
-             statsSenderRef: Option[ActorRef]): UtxoStateWithoutAVL = {
+             statsSenderRef: Option[ActorRef]): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
@@ -199,7 +190,7 @@ object UtxoStateWithoutAVL extends StrictLogging {
       .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)
     val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
-    new UtxoStateWithoutAVL(
+    new UtxoState(
       versionalStorage,
       Height @@ stateHeight,
       lastBlockTimestamp,
@@ -209,7 +200,7 @@ object UtxoStateWithoutAVL extends StrictLogging {
   def genesis(stateDir: File,
               nodeViewHolderRef: Option[ActorRef],
               settings: EncryAppSettings,
-              statsSenderRef: Option[ActorRef]): UtxoStateWithoutAVL = {
+              statsSenderRef: Option[ActorRef]): UtxoState = {
     //check kind of storage
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
@@ -226,7 +217,7 @@ object UtxoStateWithoutAVL extends StrictLogging {
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
 
-    new UtxoStateWithoutAVL(
+    new UtxoState(
       storage,
       TestNetConstants.PreGenesisHeight,
       0L,

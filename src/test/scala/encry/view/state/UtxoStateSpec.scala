@@ -47,7 +47,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings): UtxoStateWithoutAVL = {
+                        settings: EncryAppSettings): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
@@ -61,7 +61,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoStateWithoutAVL(
+    new UtxoState(
       storage,
       TestNetConstants.PreGenesisHeight,
       0L,
@@ -165,6 +165,6 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val applyTry = state.applyModifier(block)
 
-    applyTry.isSuccess shouldBe true
+    applyTry shouldBe true
   }
 }

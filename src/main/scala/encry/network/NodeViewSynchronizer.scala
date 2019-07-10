@@ -22,15 +22,17 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
+import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.Mempool._
-import encry.view.state.StateReader
+import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -242,7 +244,7 @@ object NodeViewSynchronizer {
 
     case class UpdatedHistory(history: EncryHistory)
 
-    case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
+    case class ChangedState(reader: UtxoState) extends NodeViewChange
 
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
 
@@ -250,10 +252,10 @@ object NodeViewSynchronizer {
 
     trait ModificationOutcome extends NodeViewHolderEvent
 
-    case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
+    case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, errors: List[ModifierApplyError])
       extends ModificationOutcome
 
-    case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
+    case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, errors: List[ModifierApplyError])
       extends ModificationOutcome
 
     case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome

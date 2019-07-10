@@ -178,14 +178,14 @@ trait InstanceFactory extends Keys with EncryGenerator {
             val secondHistory = generateDummyHistory(settings)
             blocks._1.foldLeft(secondHistory) {
               case (prevHistory, blockToApply) =>
-                prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1.reportModifierIsValid(blockToApply)
+                prevHistory.append(blockToApply.header).right.get._1.append(blockToApply.payload).right.get._1.reportModifierIsValid(blockToApply)
             }
             val nextBlockInFirstChain = generateNextBlock(histories.head)
             val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
             (
               List(
-                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
-                secondHistory.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
+                secondHistory.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
               ),
               (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
             )
@@ -194,8 +194,8 @@ trait InstanceFactory extends Keys with EncryGenerator {
             val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
             (
               List(
-                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
-                histories.last.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
+                histories.last.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
               ),
               (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
             )
@@ -204,7 +204,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
           val block: Block = generateNextBlock(histories.head)
           (
             List(
-              histories.head.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+              histories.head.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
             ),
             (blocks._1 :+ block) -> blocks._2
           )

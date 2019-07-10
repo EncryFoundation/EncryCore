@@ -20,7 +20,7 @@ import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
-import encry.view.state.UtxoStateWithoutAVL
+import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -153,7 +153,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[EncryHistory, UtxoStateWithoutAVL, EncryWallet],
+  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
@@ -186,7 +186,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoStateWithoutAVL, EncryWallet, CandidateEnvelope] {
+    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime

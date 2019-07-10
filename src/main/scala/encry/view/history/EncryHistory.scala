@@ -40,14 +40,15 @@ trait EncryHistory extends EncryHistoryReader {
     .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Try[(EncryHistory, ProgressInfo[PersistentModifier])] = {
+  def append(modifier: PersistentModifier): Either[Throwable, (EncryHistory, ProgressInfo[PersistentModifier])] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
+    //todo: remove try
     Try {
       modifier match {
         case header: Header => (this, process(header))
         case payload: Payload => (this, process(payload))
       }
-    }
+    }.toEither
   }
 
   def reportModifierIsValid(modifier: PersistentModifier): EncryHistory = {
