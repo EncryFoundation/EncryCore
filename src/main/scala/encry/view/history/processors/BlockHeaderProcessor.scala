@@ -135,8 +135,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   /** Checks, whether it's time to download full chain and return toDownload modifiers */
   protected def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
-    if (!settings.node.verifyTransactions) Seq.empty // Regime that do not download and verify transaction
-    else if (header.height >= blockDownloadProcessor.minimalBlockHeight)
+    if (header.height >= blockDownloadProcessor.minimalBlockHeight)
       requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       // Headers chain is synced after this header. Start downloading full blocks
@@ -147,9 +146,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     } else Seq.empty
 
   private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
-    if (!settings.node.verifyTransactions) Seq.empty
-//    else if (settings.node.stateMode.isDigest)
-    else Seq((Payload.modifierTypeId, h.payloadId))
+    Seq((Payload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
@@ -190,7 +187,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       bestHeaderIdOpt match {
         case Some(bestHeaderId) =>
           val toProcess: Seq[Header] =
-            if (settings.node.verifyTransactions || !(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+            if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
           logger.error("Should always have best header after header application")
