@@ -5,7 +5,7 @@ import encry.crypto.equihash.Equihash
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
-import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import scorex.crypto.hash.Digest32
