@@ -23,7 +23,6 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import cats.instances.list._
 import cats.Traverse
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -40,7 +39,6 @@ import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
@@ -86,7 +84,7 @@ final case class UtxoState(storage: VersionalStorage,
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
     storage.versions.find(_ sameElements version) match {
-      case Some(v) =>
+      case Some(_) =>
         logger.info(s"Rollback to version ${Algos.encode(version)}")
         storage.rollbackTo(StorageVersion !@@ version)
         val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
@@ -141,14 +139,16 @@ final case class UtxoState(storage: VersionalStorage,
 
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
-        Left[Invalid, Transaction](Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))))
+        Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
       }
       else if (bxs.length != tx.inputs.length) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Box not found")
-        Left[Invalid, Transaction](Invalid(Seq(MalformedModifierError(s"Box not found"))))
+        Invalid(Seq(MalformedModifierError(s"Box not found"))).asLeft[Transaction]
       }
-      else Right[Invalid, Transaction](tx)
-    } else tx.semanticValidity.errors.headOption.map(err => Left[Invalid, Transaction](Invalid(Seq(err)))).getOrElse(Right[Invalid, Transaction](tx))
+      else tx.asRight[ValidationResult]
+    } else tx.semanticValidity.errors.headOption
+      .map(err => Invalid(Seq(err)).asLeft[Transaction])
+      .getOrElse(tx.asRight[ValidationResult])
 
   def close(): Unit = storage.close()
 }
