@@ -24,8 +24,7 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings) {
   }
 
   private def minimalBlockHeightAfter(header: Header): Int = {
-    if (!nodeSettings.verifyTransactions) Int.MaxValue // we do not verify transactions at any height
-    else if (minimalBlockHeightVar == Int.MaxValue) {
+    if (minimalBlockHeightVar == Int.MaxValue) {
       // just synced with the headers chain - determine first full block to apply
       if (nodeSettings.blocksToKeep < 0) TestNetConstants.GenesisHeight // keep all blocks in history
       // TODO: start with the height of UTXO snapshot applied. Start from genesis until this is implemented

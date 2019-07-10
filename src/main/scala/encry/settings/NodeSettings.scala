@@ -5,7 +5,8 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 import scala.concurrent.duration.FiniteDuration
 
-case class NodeSettings(modifiersCacheSize: Int,
+case class NodeSettings(blocksToKeep: Int,
+                        modifiersCacheSize: Int,
                         mining: Boolean,
                         numberOfMiningWorkers: Int,
                         miningDelay: FiniteDuration,
@@ -23,6 +24,7 @@ trait NodeSettingsReader {
 
   implicit val nodeSettingsReader: ValueReader[NodeSettings] = { (cfg, path) =>
     NodeSettings(
+      cfg.as[Int](s"$path.blocksToKeep"),
       cfg.as[Int](s"$path.modifiersCacheSize"),
       cfg.as[Boolean](s"$path.mining"),
       cfg.as[Int](s"$path.numberOfMiningWorkers"),
