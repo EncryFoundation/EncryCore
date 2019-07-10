@@ -240,7 +240,7 @@ object NodeViewSynchronizer {
 
     trait NodeViewChange extends NodeViewHolderEvent
 
-    case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
+    case class ChangedHistory(reader: EncryHistoryReader) extends NodeViewChange
 
     case class UpdatedHistory(history: EncryHistory)
 
@@ -252,15 +252,15 @@ object NodeViewSynchronizer {
 
     trait ModificationOutcome extends NodeViewHolderEvent
 
-    case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, errors: List[ModifierApplyError])
+    case class SyntacticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
       extends ModificationOutcome
 
-    case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, errors: List[ModifierApplyError])
+    case class SemanticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
       extends ModificationOutcome
 
     case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome
 
-    case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
+    case class SemanticallySuccessfulModifier(modifier: PersistentNodeViewModifier) extends ModificationOutcome
 
   }
 

@@ -409,7 +409,7 @@ object NodeViewHolder {
 
     case class LocallyGeneratedTransaction(tx: Transaction)
 
-    case class LocallyGeneratedModifier[EncryPersistentModifier <: PersistentModifier](pmod: EncryPersistentModifier)
+    case class LocallyGeneratedModifier(pmod: PersistentModifier)
 
   }
 
