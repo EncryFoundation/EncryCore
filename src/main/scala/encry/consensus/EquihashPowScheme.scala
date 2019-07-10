@@ -6,12 +6,11 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import scorex.crypto.hash.Digest32
-import scala.annotation.tailrec
 import scala.math.BigInt
+import cats.syntax.either._
 
 case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
 
@@ -19,82 +18,50 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
 
   override def verifyCandidate(candidateBlock: CandidateBlock,
-                               finishingNonce: Long,
-                               startingNonce: Long): Option[Block] = {
-    require(finishingNonce >= startingNonce)
-
-    val difficulty: Difficulty = candidateBlock.difficulty
-
-    val (version, parentId, adProofsRoot, txsRoot, height) =
-      getDerivedHeaderFields(candidateBlock.parentOpt, candidateBlock.adProofBytes, candidateBlock.transactions)
-
-    val bytesPerWord = n / 8
-    val wordsPerHash = 512 / n
-
-    val digest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed) // scalastyle:ignore
-    val h = Header(
-      version,
-      parentId,
-      adProofsRoot,
-      candidateBlock.stateRoot,
-      txsRoot,
-      candidateBlock.timestamp,
-      height,
-      0L,
-      candidateBlock.difficulty,
-      EquihashSolution.empty
-    )
-
-    @tailrec
-    def generateHeader(nonce: Long): Option[Header] = {
-      val currentDigest = new Blake2bDigest(digest)
-      Equihash.hashNonce(currentDigest, nonce)
-      val solutions = Equihash.gbpBasic(currentDigest, n, k)
-      val headerWithSuitableSolution = solutions
-        .map { solution => h.copy(nonce = nonce, equihashSolution = solution) }
-        .find { newHeader => correctWorkDone(realDifficulty(newHeader), difficulty) }
-      headerWithSuitableSolution match {
-        case headerWithFoundSolution @ Some(_) => headerWithFoundSolution
-        case None if nonce + 1 < finishingNonce => generateHeader(nonce + 1)
-        case _ => None
-      }
-    }
-
-    val possibleHeader = generateHeader(startingNonce)
-
-    possibleHeader.flatMap(header => {
-      if (verify(header)) {
-        val adProofs = ADProofs(header.id, candidateBlock.adProofBytes)
-        val payload = Payload(header.id, candidateBlock.transactions)
-        Some(Block(header, payload, Some(adProofs)))
-      } else None
-    })
-  }
-
-  def verify(header: Header): Boolean =
-    Equihash.validateSolution(
-      n,
-      k,
-      seed,
-      Equihash.nonceToLeBytes(header.nonce),
-      header.equihashSolution.indexedSeq
-    )
-
-  override def getDerivedHeaderFields(parentOpt: Option[Header],
-                                      adProofBytes: SerializedAdProof,
-                                      transactions: Seq[Transaction]): (Byte, ModifierId, Digest32, Digest32, Int) = {
+                               startingNonce: Long): Either[String, Block] = {
+    val difficulty = candidateBlock.difficulty
     val version: Byte = TestNetConstants.Version
-    val parentId: ModifierId = parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
-    val adProofsRoot: Digest32 = ADProofs.proofDigest(adProofBytes)
-    val txsRoot: Digest32 = Payload.rootHash(transactions.map(_.id))
-    val height: Int = parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
-
-    (version, parentId, adProofsRoot, txsRoot, height)
+    val parentId: ModifierId = candidateBlock.parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
+    val adProofsRoot: Digest32 = ADProofs.proofDigest(candidateBlock.adProofBytes)
+    val txsRoot: Digest32 = Payload.rootHash(candidateBlock.transactions.map(_.id))
+    val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1
+    val bytesPerWord: Int = n / 8
+    val wordsPerHash: Int = 512 / n
+    val digest: Blake2bDigest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
+    val header: Header = Header(
+      version, parentId, adProofsRoot, candidateBlock.stateRoot, txsRoot,
+      candidateBlock.timestamp, height, 0L, candidateBlock.difficulty, EquihashSolution.empty
+    )
+    for {
+      possibleHeader <- generateHeader(startingNonce, digest, header, difficulty)
+      validationResult: Either[String, Boolean] = verify(possibleHeader)
+      _ <- Either.cond(validationResult.isRight, (), s"Incorrect possible header cause: $validationResult")
+      adProofs: ADProofs = ADProofs(possibleHeader.id, candidateBlock.adProofBytes)
+      payload: Payload = Payload(possibleHeader.id, candidateBlock.transactions)
+    } yield Block(possibleHeader, payload, Some(adProofs))
   }
 
-  override def realDifficulty(header: Header): Difficulty = {
+  private def generateHeader(nonce: Long,
+                             digest: Blake2bDigest,
+                             header: Header,
+                             difficulty: Difficulty): Either[String, Header] = {
+    val currentDigest = new Blake2bDigest(digest)
+    Equihash.hashNonce(currentDigest, nonce)
+    val solutions = Equihash.gbpBasic(currentDigest, n, k)
+    solutions
+      .map(solution => header.copy(nonce = nonce, equihashSolution = solution))
+      .find(newHeader => correctWorkDone(realDifficulty(newHeader), difficulty))
+    match {
+      case Some(value) => value.asRight[String]
+      case None => "Generate header failed".asLeft[Header]
+    }
+  }
+
+  def verify(header: Header): Either[String, Boolean] = Equihash
+    .validateSolution(n, k, seed, Equihash.nonceToLeBytes(header.nonce), header.equihashSolution.indexedSeq)
+
+  override def realDifficulty(header: Header): Difficulty =
     Difficulty @@ (TestNetConstants.MaxTarget / BigInt(1, header.powHash))
-  }
 
   override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"
 }

@@ -17,13 +17,15 @@ import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Pa
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.encryfoundation.common.validation.{ModifierSemanticValidity, ModifierValidator, ValidationResult}
+import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scorex.crypto.hash.Digest32
 import supertagged.@@
 import scala.annotation.tailrec
 import scala.collection.immutable
 import scala.collection.immutable.HashSet
-import scala.util.Try
+import encry.view.history.processors.ValidationError.FatalValidationError._
+import encry.view.history.processors.ValidationError.NonFatalValidationError._
+import cats.syntax.either._
 
 trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
@@ -37,6 +39,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
+
   protected def getBlock(h: Header): Option[Block]
 
   /**
@@ -208,7 +211,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         headersCacheIndexes.get(bestHeaderHeight - TestNetConstants.MaxRollbackDepth).foreach { headersIds =>
           val wrappedIds = headersIds.map(ByteArrayWrapper.apply)
           logger.debug(s"Cleanup header cache from headers: ${headersIds.map(Algos.encode).mkString(",")}")
-          headersCache = headersCache.filterNot{case (id, _) => wrappedIds.contains(id)}
+          headersCache = headersCache.filterNot { case (id, _) => wrappedIds.contains(id) }
         }
         headersCacheIndexes = headersCacheIndexes - (bestHeaderHeight - TestNetConstants.MaxRollbackDepth)
       }
@@ -279,10 +282,17 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  protected def validate(header: Header): Try[Unit] = HeaderValidator.validate(header).toTry
+  protected def validate(h: Header): Either[ValidationError, Header] =
+    if (h.isGenesis) HeaderValidator.validateGenesisBlockHeader(h)
+    else headersCache
+      .get(ByteArrayWrapper(h.parentId))
+      .orElse(typedModifierById[Header](h.parentId))
+      .map(p => HeaderValidator.validateHeader(h, p))
+      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
-  def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(h => bestHeaderIdAtHeight(h))
-    .exists(_ sameElements id)
+  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
+    .flatMap(h => bestHeaderIdAtHeight(h))
+    .exists(_.sameElements(id))
 
   def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
 
@@ -292,7 +302,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
 
-  def heightOf(id: ModifierId): Option[Height] = historyStorage.get(headerHeightKey(id))
+  def heightOf(id: ModifierId): Option[Height] = historyStorage
+    .get(headerHeightKey(id))
     .map(d => Height @@ Ints.fromByteArray(d))
 
   /**
@@ -303,11 +314,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.
     */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] =
-    historyStorage.store
-      .get(heightIdsKey(height))
-      .map{elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq}
-      .getOrElse(Seq.empty[ModifierId])
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage.store
+    .get(heightIdsKey(height))
+    .map { elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq }
+    .getOrElse(Seq.empty[ModifierId])
 
   /**
     * @param limit       - maximum length of resulting HeaderChain
@@ -360,56 +370,37 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     difficultyController.getDifficulty(requiredHeaders)
   }
 
-  object HeaderValidator extends ModifierValidator {
+  object HeaderValidator {
 
-    def validate(header: Header): ValidationResult =
-      if (header.isGenesis) validateGenesisBlockHeader(header)
-      else headersCache.get(ByteArrayWrapper(header.parentId)).orElse(typedModifierById[Header](header.parentId)).map { parent =>
-        validateChildBlockHeader(header, parent)
-      } getOrElse error(s"Parent header with id ${Algos.encode(header.parentId)} is not defined")
+    def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
+      _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
+        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
+      _ <- Either.cond(bestHeaderIdOpt.isEmpty, (),
+        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
+      _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
+        GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
+    } yield h
 
-    private def validateGenesisBlockHeader(header: Header): ValidationResult = accumulateErrors
-      .validateEqualIds(header.parentId, Header.GenesisParentId) { detail =>
-        fatal(s"Genesis block should have genesis parent id. $detail")
-      }
-      .validate(bestHeaderIdOpt.isEmpty) {
-        fatal("Trying to append genesis block to non-empty history")
-      }
-      .validate(header.height == TestNetConstants.GenesisHeight) {
-        fatal(s"Height of genesis block $header is incorrect")
-      }.result
-
-    private def validateChildBlockHeader(header: Header, parent: Header): ValidationResult = failFast
-      .validate(header.timestamp > parent.timestamp) {
-        fatal(s"Header timestamp ${header.timestamp} is not greater than parents ${parent.timestamp}")
-      }
-      .validate(header.height == parent.height + 1) {
-        fatal(s"Header height ${header.height} is not greater by 1 than parents ${parent.height}")
-      }
-      .validateNot(historyStorage.containsObject(header.id)) {
-        fatal("Header is already in history")
-      }
-      .validate(realDifficulty(header) >= header.requiredDifficulty) {
-        fatal(s"Block difficulty ${realDifficulty(header)} is less than required " +
-          s"${header.requiredDifficulty}")
-      }
-      .validate(header.difficulty >= requiredDifficultyAfter(parent)) {
-        fatal(s"Incorrect required difficulty in header: " +
-          s"${Algos.encode(header.id)} on height ${header.height}")
-      }
-      .validate(heightOf(header.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth)) {
-        fatal(s"Trying to apply too old block difficulty at height ${heightOf(header.parentId)}")
-      }
-      .validate(powScheme.verify(header)) {
-        fatal(s"Wrong proof-of-work solution for $header")
-      }
-      .validateSemantics(isSemanticallyValid(header.parentId)) {
-        fatal("Parent header is marked as semantically invalid")
-      }
-      .validate(header.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift) {
-        error(s"Header timestamp ${header.timestamp} is too far in future from now " +
-          s"${timeProvider.estimatedTime}")
-      }.result
+    def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
+      _ <- Either.cond(h.timestamp > parent.timestamp, (),
+        HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
+      _ <- Either.cond(h.height == parent.height + 1, (),
+        HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
+      _ <- Either.cond(!historyStorage.containsObject(h.id), (),
+        HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
+      _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
+        HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
+      _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent), (),
+        HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
+      _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
+        HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
+      powSchemeValidationResult: Either[String, Boolean] = powScheme.verify(h)
+      _ <- Either.cond(powSchemeValidationResult.isRight, (),
+        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
+      _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
+        HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
+      _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
+        HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
+    } yield h
   }
-
 }

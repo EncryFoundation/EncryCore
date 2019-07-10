@@ -1,10 +1,9 @@
 package encry.view.history.processors.proofs
 
-import encry.view.history.processors.BlockProcessor
+import encry.view.history.processors.{BlockProcessor, ValidationError}
 import encry.consensus.History.ProgressInfo
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
-import scala.util.Try
 
 trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
 
@@ -21,6 +20,6 @@ trait FullProofProcessor extends BaseADProofProcessor with BlockProcessor {
       typedModifierById[Payload](h.payloadId).map(p => Block(h, p, if (adState) Some(proofs) else None))
     }
 
-  override protected def validate(m: ADProofs): Try[Unit] =
+  override protected def validate(m: ADProofs): Either[ValidationError, PersistentModifier] =
     modifierValidation(m, typedModifierById[Header](m.headerId))
 }

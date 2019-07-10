@@ -1,14 +1,12 @@
 package encry.view.history.processors.payload
 
 import encry.consensus.History.ProgressInfo
-import encry.view.history.processors.BlockProcessor
+import encry.view.history.processors.{BlockProcessor, ValidationError}
 import encry.view.history.storage.HistoryStorage
 import encry.settings.EncryAppSettings
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
-
-import scala.util.Try
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
 
@@ -31,7 +29,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
       else typedModifierById[ADProofs](h.adProofsId).map(ps => Block(h, payload, Some(ps)))
     }
 
-  override protected def validate(m: Payload): Try[Unit] =
+  override protected def validate(m: Payload): Either[ValidationError, PersistentModifier] =
     modifierValidation(m, headersCache.get(ByteArrayWrapper(m.headerId)).orElse(typedModifierById[Header](m.headerId)))
 
   private def putToHistory(payload: Payload): ProgressInfo[PersistentModifier] = {

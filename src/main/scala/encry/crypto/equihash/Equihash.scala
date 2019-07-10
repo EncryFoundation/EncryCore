@@ -15,7 +15,7 @@ object Equihash {
 
   def nonceToLeBytes(nonce: BigInt): Array[Byte] = {
     val res = for (i <- 0 to 7) yield littleEndianIntToByteArray((nonce >> 32 * i).intValue())
-    res.fold(Array.emptyByteArray){case (acc, nextArr) => ArrayUtils.addAll(acc, nextArr)}
+    res.fold(Array.emptyByteArray) { case (acc, nextArr) => ArrayUtils.addAll(acc, nextArr) }
   }
 
 
@@ -126,7 +126,7 @@ object Equihash {
         if (countLeadingZeroes(res) == 8 * hashLength && distinctIndices(x(XSize - 1 - l)._2, x(XSize - 1 - m)._2)) {
           val p: Seq[Int] =
             if (x(XSize - 1 - l)._2.head < x(XSize - 1 - m)._2.head) x(XSize - 1 - l)._2 ++ x(XSize - 1 - m)._2
-          else x(XSize - 1 - m)._2 ++ x(XSize - 1 - l)._2
+            else x(XSize - 1 - m)._2 ++ x(XSize - 1 - l)._2
           solns = solns :+ EquihashSolution(p)
         }
       }
@@ -168,40 +168,39 @@ object Equihash {
     * @param personal        Personal bytes for digest
     * @param header          Block header with nonce
     * @param solutionIndices Solution indices
-    * @return Return True if solution is valid, False if not.
+    * @return Either.right(true) if solution is valid, Either.left("error message") if not.
     */
-  @SuppressWarnings(Array("NullParameter"))
-  def validateSolution(n: Char, k: Char, personal: Array[Byte],
-                       header: Array[Byte], solutionIndices: IndexedSeq[Int]): Boolean = {
-
-    assert(n > 1)
-    assert(k >= 3)
-    assert(n % 8 == 0)
-    assert(n % (k + 1) == 0)
-    val solutionLen: Int = Math.pow(2, k).toInt
-    assert(solutionIndices.size == solutionLen)
-    if (solutionIndices.toSet.size != solutionIndices.size) false
-    else {
+  def validateSolution(n: Char,
+                       k: Char,
+                       personal: Array[Byte],
+                       header: Array[Byte],
+                       solutionIndices: IndexedSeq[Int]): Either[String, Boolean] = for {
+    _ <- Either.cond(n > 1, (), s"Incorrect n > 1 parameter: $n")
+    _ <- Either.cond(k >= 3, (), s"Incorrect k >= 3 parameter: $k")
+    _ <- Either.cond(n % 8 == 0, (), s"Incorrect n % 8 == 0 parameter: ${n % 8}")
+    _ <- Either.cond(n % (k + 1) == 0, (), s"Incorrect n % (k + 1) == 0 parameter: ${n % (k + 1)}")
+    solutionLength: Int = Math.pow(2, k).toInt
+    _ <- Either.cond(solutionIndices.size == solutionLength, (), s"Incorrect solution length: ${solutionIndices.size}")
+    _ <- Either.cond(solutionIndices.toSet.size == solutionIndices.size, (), "Duplicate solutions")
+    _ <- Either.cond({
       val bytesPerWord: Int = n / 8
       val wordsPerHash: Int = 512 / n
-      val outlen: Int = wordsPerHash * bytesPerWord
-      val digest: Blake2bDigest = new Blake2bDigest(null, outlen, null, personal)
+      val outLen: Int = wordsPerHash * bytesPerWord
+      val digest: Blake2bDigest = new Blake2bDigest(null, outLen, null, personal)
       digest.update(header, 0, header.length)
       val pairWiseCheck: Boolean = (0 until k).forall(s => {
         val d: Int = 1 << s
-        (0 until solutionLen by 2 * d).forall(i =>
-          if (solutionIndices(i) >= solutionIndices(i + d)) false
-          else true
-        )
+        (0 until solutionLength by 2 * d)
+          .forall(i => if (solutionIndices(i) >= solutionIndices(i + d)) false else true)
       })
-      val words: ArrayBuffer[BigInteger] = (0 until solutionLen).foldLeft(ArrayBuffer.empty[BigInteger]) {
+      val words: ArrayBuffer[BigInteger] = (0 until solutionLength).foldLeft(ArrayBuffer.empty[BigInteger]) {
         case (buffer, i) => buffer += generateWord(n, digest, solutionIndices(i))
       }
       val xorConditionsCheck: Boolean = {
         val bitsPerStage: Int = n / (k + 1)
         (0 until k).forall(s => {
           val d: Int = 1 << s
-          (0 until solutionLen by 2 * d).forall(i => {
+          (0 until solutionLength by 2 * d).forall(i => {
             val w: BigInteger = words(i).xor(words(i + d))
             if (w.shiftRight(n - (s + 1) * bitsPerStage) != BigInteger.ZERO) false
             else {
@@ -212,8 +211,8 @@ object Equihash {
         })
       }
       words.head == BigInteger.ZERO && pairWiseCheck && xorConditionsCheck
-    }
-  }
+    }, (), "Incorrect condition: words.head == BigInteger.ZERO && pairWiseCheck && xorConditionsCheck")
+  } yield true
 
   def littleEndianIntToByteArray(i: Int): Array[Byte] = {
     val bb = ByteBuffer.allocate(Integer.SIZE / 8)

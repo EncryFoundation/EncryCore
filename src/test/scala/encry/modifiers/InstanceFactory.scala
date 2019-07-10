@@ -21,6 +21,7 @@ import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
+import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
 import scala.util.{Random => Scarand}
@@ -48,9 +49,13 @@ trait InstanceFactory extends Keys with EncryGenerator {
   }
 
   def generateGenesisBlock: Block = {
-
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
-
+    val txs: Seq[Transaction] = Seq(coinbaseTransaction)
+    val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
+    val header = genHeader.copy(
+      parentId = Header.GenesisParentId,
+      height = TestNetConstants.GenesisHeight,
+      transactionsRoot = txsRoot
+    )
     Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
   }
 
@@ -140,7 +145,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
   }._1
 
   def generateNextBlock(history: EncryHistory,
-                        difficultyDiff: BigInt = 1,
+                        difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
                         txsQty: Int = 100,
                         additionalDifficulty: BigInt = 0): Block = {
