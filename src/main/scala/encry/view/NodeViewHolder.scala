@@ -171,7 +171,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                                  alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
                                  suffix: IndexedSeq[PersistentModifier])
     logger.debug(s"\nStarting updating state in updateState function!")
-    val startTime = System.currentTimeMillis()
     requestDownloads(progressInfo, None)
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
@@ -184,9 +183,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       } else Success(state) -> suffixApplied
     stateToApplyTry match {
       case Success(stateToApply) =>
-        logger.debug(s"\nApplied to state successfully! Time of it is: ${System.currentTimeMillis() - startTime}.")
-        logger.debug(s"\nStarting to update UpdateInformation !")
-        val startTime1 = System.currentTimeMillis()
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
@@ -206,7 +202,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
         }
-        logger.debug(s"\n\nFinished UpdateInformation! Time is: ${System.currentTimeMillis() - startTime1}")
         uf.failedMod match {
           case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, uf.state, uf.suffix)
@@ -237,7 +232,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           ref ! ModifierAppendedToHistory(isHeader, success = true)
         }
         logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
-        val startAppState = System.currentTimeMillis()
         if (progressInfo.toApply.nonEmpty) {
           logger.debug(s"\n progress info non empty")
           val startPoint: Long = System.currentTimeMillis()
@@ -245,8 +239,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
           if (settings.influxDB.isDefined)
             context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
-          logger.debug(s"\nTime of applying to state SUCCESS is: ${System.currentTimeMillis() - startAppState}. modId is: ${pmod.encodedId}")
-          logger.debug(s"\nStarting inner updating after succeeded state applying!")
           influxRef.foreach { ref =>
             val isBlock: Boolean = pmod match {
               case _: Payload => true
@@ -254,7 +246,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             if (isBlock) ref ! ModifierAppendedToState(success = true)
           }
-          val startInnerStateApp = System.currentTimeMillis()
           sendUpdatedInfoToMemoryPool(newState, progressInfo.toRemove, blocksApplied)
           if (progressInfo.chainSwitchingNeeded)
             nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
@@ -268,15 +259,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
           }
           updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
-          logger.debug(s"\nTime of applying in inner state is: ${System.currentTimeMillis() - startInnerStateApp}")
         } else {
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-          logger.debug(s"\nProgres info is empty")
+          logger.debug(s"\nProgress info is empty")
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Left(e) =>
-        logger.debug(s"\nTime of applying to history FAILURE is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
         influxRef.foreach { ref =>
           val isHeader: Boolean = pmod match {
             case _: Header => true
@@ -313,11 +302,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     val stateDir: File = UtxoState.getStateDir(settings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: UtxoState = {
-      //      if (settings.node.stateMode.isDigest) //EncryState.generateGenesisDigestState(stateDir, settings)
-      //      else
-      UtxoState.genesis(stateDir, Some(self), settings, influxRef)
-    }
+    val state: UtxoState = UtxoState.genesis(stateDir, Some(self), settings, influxRef)
     val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     NodeView(history, state, wallet)
@@ -330,7 +315,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val state: UtxoState = restoreConsistentState(
-        UtxoState.create(stateDir, Some(self), settings, influxRef).asInstanceOf[UtxoState], history
+        UtxoState.create(stateDir, Some(self), settings, influxRef), history
       )
       Some(NodeView(history, state, wallet))
     } catch {
@@ -346,15 +331,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     val dir: File = UtxoState.getStateDir(settings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
-
-    {
-      (version, digest) match {
-        case _ =>
-          val stateDir: File = UtxoState.getStateDir(settings)
-          stateDir.mkdirs()
-          UtxoState.create(stateDir, Some(self), settings, influxRef)
-      }
-    }.asInstanceOf[UtxoState]
+    val stateDir: File = UtxoState.getStateDir(settings)
+    stateDir.mkdirs()
+    UtxoState.create(stateDir, Some(self), settings, influxRef)
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: EncryHistory): UtxoState =
