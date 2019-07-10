@@ -165,6 +165,6 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     val applyTry = state.applyModifier(block)
 
-    applyTry shouldBe true
+    applyTry.isRight shouldBe true
   }
 }
