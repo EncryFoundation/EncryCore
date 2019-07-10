@@ -7,7 +7,6 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
 import encry.view.history.processors.payload.BlockPayloadProcessor
-import encry.view.history.processors.proofs.FullStateProofProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -56,7 +55,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       height = TestNetConstants.GenesisHeight,
       transactionsRoot = txsRoot
     )
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
   def paymentTransactionDynamic: Transaction = {
@@ -137,7 +136,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
           val txsRoot = Algos.merkleTreeRoot(txs.map(tx => LeafData @@ tx.id.untag(ModifierId)))
           val header = genHeaderAtHeight(blockHeight, txsRoot)
           val payload = Payload(header.id, txs)
-          Block(header, payload, None)
+          Block(header, payload)
         }
         val newUtxo = block.payload.txs.flatMap(_.newBoxes)
         (fakeBlockchain :+ block) -> newUtxo.collect{case ab: AssetBox => ab}
@@ -162,7 +161,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
 
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, txs))
   }
 
   def genForkOn(qty: Int,
@@ -179,14 +178,14 @@ trait InstanceFactory extends Keys with EncryGenerator {
             val secondHistory = generateDummyHistory(settings)
             blocks._1.foldLeft(secondHistory) {
               case (prevHistory, blockToApply) =>
-                prevHistory.append(blockToApply.header).get._1.append(blockToApply.payload).get._1.reportModifierIsValid(blockToApply)
+                prevHistory.append(blockToApply.header).right.get._1.append(blockToApply.payload).right.get._1.reportModifierIsValid(blockToApply)
             }
             val nextBlockInFirstChain = generateNextBlock(histories.head)
             val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
             (
               List(
-                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
-                secondHistory.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
+                secondHistory.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
               ),
               (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
             )
@@ -195,8 +194,8 @@ trait InstanceFactory extends Keys with EncryGenerator {
             val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
             (
               List(
-                histories.head.append(nextBlockInFirstChain.header).get._1.append(nextBlockInFirstChain.payload).get._1.reportModifierIsValid(nextBlockInFirstChain),
-                histories.last.append(nextBlockInSecondChain.header).get._1.append(nextBlockInSecondChain.payload).get._1.reportModifierIsValid(nextBlockInSecondChain)
+                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
+                histories.last.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
               ),
               (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
             )
@@ -205,7 +204,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
           val block: Block = generateNextBlock(histories.head)
           (
             List(
-              histories.head.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+              histories.head.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
             ),
             (blocks._1 :+ block) -> blocks._2
           )
@@ -223,7 +222,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+    new EncryHistory with BlockPayloadProcessor {
       override protected val settings: EncryAppSettings = settingsEncry
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage

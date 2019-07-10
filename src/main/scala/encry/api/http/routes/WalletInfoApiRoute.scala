@@ -5,6 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
+import encry.EncryApp.nodeViewHolder
 import encry.settings.RESTApiSettings
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
@@ -13,7 +14,6 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import scala.concurrent.Future
 import scala.util.Random
-import encry.EncryApp.nodeViewHolder
 
 case class WalletInfoApiRoute(dataHolder: ActorRef,
                               restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)

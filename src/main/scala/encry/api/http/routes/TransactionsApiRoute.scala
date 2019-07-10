@@ -4,15 +4,13 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.view.state.StateMode
-import io.circe.syntax._
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.settings.RESTApiSettings
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 
 case class TransactionsApiRoute(dataHolder: ActorRef,
                                 memoryPoolRef: ActorRef,
-                                restApiSettings: RESTApiSettings, stateMode: StateMode)(implicit val context: ActorRefFactory)
+                                restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("transactions") {

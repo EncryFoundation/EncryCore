@@ -22,15 +22,17 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
+import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.Mempool._
-import encry.view.state.StateReader
+import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -110,15 +112,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         case _ =>
       }
       case RequestModifiersNetworkMessage(invData) =>
-        if (chainSynced) {
+        if (chainSynced || settings.node.offlineGeneration) {
           val inRequestCache: Map[String, NodeViewModifier] =
             invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
           if (invData._1 != Transaction.modifierTypeId)
-            logger.debug(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
+            logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
           sendResponse(remote, invData._1, inRequestCache.values.collect {
             case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
             case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
-            case adProof: ADProofs => adProof.id -> ADProofsProtoSerializer.toProto(adProof).toByteArray
           }.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
@@ -127,6 +128,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
               val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
                 case (id, mod) if mod.isDefined => id -> mod.get
               }
+              nonInRequestCache.foreach(id => if (reader.modifierBytesById(id).isEmpty) logger.info(s"Mod with id: ${Algos.encode(id)} is not defined"))
               invData._1 match {
                 case Header.modifierTypeId =>
                   logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
@@ -205,6 +207,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Payload.modifierTypeId =>
           logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
+            s" Mods length: ${modifiersBytes.map(_._2.length).mkString(",")}" +
             s" \n Payloads are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Transaction.modifierTypeId =>
@@ -237,11 +240,11 @@ object NodeViewSynchronizer {
 
     trait NodeViewChange extends NodeViewHolderEvent
 
-    case class ChangedHistory[HR <: EncryHistoryReader](reader: HR) extends NodeViewChange
+    case class ChangedHistory(reader: EncryHistoryReader) extends NodeViewChange
 
     case class UpdatedHistory(history: EncryHistory)
 
-    case class ChangedState[SR <: StateReader](reader: SR) extends NodeViewChange
+    case class ChangedState(reader: UtxoState) extends NodeViewChange
 
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
 
@@ -249,15 +252,15 @@ object NodeViewSynchronizer {
 
     trait ModificationOutcome extends NodeViewHolderEvent
 
-    case class SyntacticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
+    case class SyntacticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
       extends ModificationOutcome
 
-    case class SemanticallyFailedModification[PMOD <: PersistentNodeViewModifier](modifier: PMOD, error: Throwable)
+    case class SemanticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
       extends ModificationOutcome
 
     case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome
 
-    case class SemanticallySuccessfulModifier[PMOD <: PersistentNodeViewModifier](modifier: PMOD) extends ModificationOutcome
+    case class SemanticallySuccessfulModifier(modifier: PersistentNodeViewModifier) extends ModificationOutcome
 
   }
 

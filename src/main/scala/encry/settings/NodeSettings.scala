@@ -1,14 +1,11 @@
 package encry.settings
 
 import com.typesafe.config.ConfigException
-import encry.view.state.StateMode
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
 import scala.concurrent.duration.FiniteDuration
 
-case class NodeSettings(stateMode: StateMode,
-                        verifyTransactions: Boolean,
-                        blocksToKeep: Int,
+case class NodeSettings(blocksToKeep: Int,
                         modifiersCacheSize: Int,
                         mining: Boolean,
                         numberOfMiningWorkers: Int,
@@ -26,10 +23,7 @@ case class NodeSettings(stateMode: StateMode,
 trait NodeSettingsReader {
 
   implicit val nodeSettingsReader: ValueReader[NodeSettings] = { (cfg, path) =>
-    val stateModeKey = s"$path.stateMode"
-    val stateMode = stateModeFromString(cfg.as[String](stateModeKey), stateModeKey)
-    NodeSettings(stateMode,
-      cfg.as[Boolean](s"$path.verifyTransactions"),
+    NodeSettings(
       cfg.as[Int](s"$path.blocksToKeep"),
       cfg.as[Int](s"$path.modifiersCacheSize"),
       cfg.as[Boolean](s"$path.mining"),
@@ -45,10 +39,5 @@ trait NodeSettingsReader {
       cfg.as[Double](s"$path.bloomFilterFailureProbability"),
       cfg.as[Boolean](s"$path.useCli"),
     )
-  }
-
-  def stateModeFromString(modeName: String, path: String): StateMode = {
-    StateMode.values.find(_.verboseName == modeName)
-      .getOrElse(throw new ConfigException.BadValue(path, modeName))
   }
 }

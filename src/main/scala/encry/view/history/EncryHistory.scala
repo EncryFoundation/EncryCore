@@ -11,15 +11,15 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
-import encry.view.history.processors.payload.{BlockPayloadProcessor, EmptyBlockPayloadProcessor}
-import encry.view.history.processors.proofs.{ADStateProofProcessor, FullStateProofProcessor}
+import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
+import cats.syntax.either._
 
 import scala.util.Try
 
@@ -41,15 +41,12 @@ trait EncryHistory extends EncryHistoryReader {
     .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Try[(EncryHistory, ProgressInfo[PersistentModifier])] = {
+  def append(modifier: PersistentModifier): Either[Throwable, (EncryHistory, ProgressInfo[PersistentModifier])] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
-    Try {
-      modifier match {
-        case header: Header => (this, process(header))
-        case payload: Payload => (this, process(payload))
-        case adProofs: ADProofs => (this, process(adProofs))
-      }
-    }
+    Either.catchNonFatal(modifier match {
+      case header: Header => (this, process(header))
+      case payload: Payload => (this, process(payload))
+    })
   }
 
   def reportModifierIsValid(modifier: PersistentModifier): EncryHistory = {
@@ -69,8 +66,6 @@ trait EncryHistory extends EncryHistoryReader {
   protected def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
     case header: Header => Some(header)
     case block: Block => Some(block.header)
-    case proof: ADProofs =>
-      headersCache.get(ByteArrayWrapper(proof.headerId)).orElse(typedModifierById[Header](proof.headerId))
     case payload: Payload =>
       headersCache.get(ByteArrayWrapper(payload.headerId)).orElse(typedModifierById[Header](payload.headerId))
     case _ => None
@@ -87,7 +82,7 @@ trait EncryHistory extends EncryHistoryReader {
       case Some(invalidatedHeader) =>
         val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
         val validityRow: List[(StorageKey, StorageValue)] = invalidatedHeaders
-          .flatMap(h => Seq(h.id, h.payloadId, h.adProofsId)
+          .flatMap(h => Seq(h.id, h.payloadId)
             .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))).toList
         logger.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
         val bestHeaderIsInvalidated: Boolean = bestHeaderIdOpt.exists(id => invalidatedHeaders.exists(_.id sameElements id))
@@ -149,7 +144,7 @@ trait EncryHistory extends EncryHistoryReader {
   private def markModifierValid(modifier: PersistentModifier): ProgressInfo[PersistentModifier] =
     modifier match {
       case block: Block =>
-        val nonMarkedIds: Seq[ModifierId] = (Seq(block.header.id, block.payload.id) ++ block.adProofsOpt.map(_.id))
+        val nonMarkedIds: Seq[ModifierId] = Seq(block.header.id, block.payload.id)
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
         if (nonMarkedIds.nonEmpty) {
           historyStorage.
@@ -216,29 +211,11 @@ object EncryHistory extends StrictLogging {
     }
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val history: EncryHistory = (settingsEncry.node.stateMode.isDigest, settingsEncry.node.verifyTransactions) match {
-      case (true, true) =>
-        new EncryHistory with ADStateProofProcessor with BlockPayloadProcessor {
-          override protected val settings: EncryAppSettings = settingsEncry
-          override protected val nodeSettings: NodeSettings = settings.node
-          override protected val historyStorage: HistoryStorage = storage
-          override protected val timeProvider: NetworkTimeProvider = ntp
-        }
-      case (false, true) =>
-        new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
-          override protected val settings: EncryAppSettings = settingsEncry
-          override protected val nodeSettings: NodeSettings = settings.node
-          override protected val historyStorage: HistoryStorage = storage
-          override protected val timeProvider: NetworkTimeProvider = ntp
-        }
-      case (true, false) =>
-        new EncryHistory with ADStateProofProcessor with EmptyBlockPayloadProcessor {
-          override protected val settings: EncryAppSettings = settingsEncry
-          override protected val nodeSettings: NodeSettings = settings.node
-          override protected val historyStorage: HistoryStorage = storage
-          override protected val timeProvider: NetworkTimeProvider = ntp
-        }
-      case m => throw new Error(s"Unsupported settings ADState=:${m._1}, verifyTransactions=:${m._2}, ")
+    val history: EncryHistory = new EncryHistory with BlockPayloadProcessor {
+      override protected val settings: EncryAppSettings = settingsEncry
+      override protected val nodeSettings: NodeSettings = settings.node
+      override protected val historyStorage: HistoryStorage = storage
+      override protected val timeProvider: NetworkTimeProvider = ntp
     }
     history
   }

@@ -7,7 +7,6 @@ import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetMinerStatus}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.history.EncryHistoryReader
-import encry.view.state.StateMode
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
@@ -17,8 +16,7 @@ import scala.concurrent.Future
 
 case class HistoryApiRoute(dataHolder: ActorRef,
                            appSettings: EncryAppSettings,
-                           nodeId: Array[Byte],
-                           stateMode: StateMode)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
+                           nodeId: Array[Byte])(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override val route: Route = pathPrefix("history") {
     getBlocksR ~

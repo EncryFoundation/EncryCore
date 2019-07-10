@@ -8,13 +8,17 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{settings, _}
+import encry.EncryApp.{settings, timeProvider}
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
+import org.encryfoundation.common.utils.Algos
+import cats.instances.long._
+
 import scala.annotation.tailrec
-import scala.collection.immutable.HashMap
+import scala.collection.immutable.{HashMap, SortedMap}
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
 
@@ -25,13 +29,16 @@ class PeerConnectionHandler(connection: ActorRef,
 
   context watch connection
 
+  implicit val exCon: ExecutionContextExecutor = context.dispatcher
+
   var receivedHandshake: Option[Handshake] = None
   var selfPeer: Option[ConnectedPeer] = None
   var handshakeSent = false
   var handshakeTimeoutCancellableOpt: Option[Cancellable] = None
   var chunksBuffer: ByteString = CompactByteString.empty
-  var outMessagesBuffer: HashMap[Long, ByteString] = HashMap.empty
+  var outMessagesBuffer: SortedMap[Long, ByteString] = SortedMap.empty[Long, ByteString]
   var outMessagesCounter: Long = 0
+  var sendResumeWriting: Boolean = false
 
   override def preStart: Unit = {
     handshakeTimeoutCancellableOpt = Some(
@@ -148,20 +155,23 @@ class PeerConnectionHandler(connection: ActorRef,
     case message: NetworkMessage =>
       def sendMessage(): Unit = {
         outMessagesCounter += 1
-        logger.debug(s"Sent to $remote msg: ${message.messageName}")
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
+        logger.debug(s"Sent to $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
+          s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")
         connection ! Write(bytes, Ack(outMessagesCounter))
       }
-
       settings.network.addedMaxDelay match {
         case Some(delay) =>
           context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendMessage())
         case None => sendMessage()
       }
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.debug(s"Failed to write ${msg.length} bytes to $remote cause ${fail.cause}, switching to buffering mode")
+      logger.debug(s"Failed to write msg with hash ${Algos.encode(Algos.hash(msg.toArray))}, ack = $id, ${msg.length} bytes to " +
+        s"$remote cause ${fail.cause}, switching to buffering mode")
       connection ! ResumeReading
+      connection ! ResumeWriting
+      sendResumeWriting = true
       toBuffer(id, msg)
       context.become(workingCycleBuffering)
     case CloseConnection =>
@@ -179,11 +189,17 @@ class PeerConnectionHandler(connection: ActorRef,
       val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
       toBuffer(outMessagesCounter, bytes)
     case fail@CommandFailed(Write(msg, Ack(id))) =>
-      logger.debug(s"Failed to buffer ${msg.length} bytes to $remote cause ${fail.cause}")
-      connection ! ResumeWriting
+      logger.debug(s"Failed to buffer msg hash: ${Algos.encode(Algos.hash(msg.toArray))}, with id: ${id}, ${msg.length} bytes to $remote cause ${fail.cause}")
+      if (!sendResumeWriting) {
+        sendResumeWriting = true
+        connection ! ResumeWriting
+      }
       toBuffer(id, msg)
     case CommandFailed(ResumeWriting) => // ignore in ACK mode
-    case WritingResumed => writeFirst()
+    case WritingResumed => {
+      sendResumeWriting = false
+      writeFirst()
+    }
     case Ack(id) =>
       outMessagesBuffer -= id
       if (outMessagesBuffer.nonEmpty) writeFirst()
@@ -199,6 +215,7 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def workingCycleClosingWithNonEmptyBuffer: Receive = {
     case CommandFailed(_: Write) =>
+      logger.info("CommandFailed in workingCycleClosingWithNonEmptyBuffer")
       connection ! ResumeWriting
       context.become({
         case WritingResumed =>
@@ -212,7 +229,13 @@ class PeerConnectionHandler(connection: ActorRef,
     case message => logger.debug(s"Got strange message $message during closing phase")
   }
 
-  def writeFirst(): Unit = outMessagesBuffer.headOption.foreach { case (id, msg) => connection ! Write(msg, Ack(id)) }
+  def writeFirst(): Unit = {
+    outMessagesBuffer.headOption.foreach { case (id, msg) =>
+      logger.debug(s"Write to connection of handler $remote msg with id: ${id} and hash: ${Algos.encode(Algos.hash(msg.toArray))}")
+      connection ! Write(msg, Ack(id))
+      outMessagesBuffer -= id
+    }
+  }
 
   def writeAll(): Unit = outMessagesBuffer.foreach { case (id, msg) => connection ! Write(msg, Ack(id)) }
 
@@ -229,7 +252,7 @@ class PeerConnectionHandler(connection: ActorRef,
             logger.debug("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
-            logger.info(s"Corrupted data from: " + remote + s"$e")
+            logger.debug(s"Corrupted data from: " + remote + s"$e")
             true
         }
       }

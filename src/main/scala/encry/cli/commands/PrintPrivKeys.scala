@@ -2,15 +2,14 @@ package encry.cli.commands
 
 import akka.pattern._
 import akka.util.Timeout
+import encry.EncryApp._
 import encry.cli.Response
 import encry.settings.EncryAppSettings
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.EncryHistory
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
-import encry.EncryApp._
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import org.encryfoundation.common.utils.Algos
-
 import scala.concurrent.Future
 
 //TODO This cmd is unsafe.

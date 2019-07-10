@@ -2,11 +2,14 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
+import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
+import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
@@ -17,7 +20,7 @@ import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
 import encry.view.mempool.Mempool._
-import encry.view.state.{StateMode, UtxoState}
+import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -27,12 +30,9 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.collection._
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
-import Miner._
-import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 
 class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with StrictLogging {
 
@@ -52,7 +52,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier[_]])
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.scheduler.schedule(5.seconds, 1.seconds)(
       influx.foreach(_ ! InfoAboutTxsFromMiner(transactionsPool.size))
     )
@@ -92,7 +92,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
-    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
+    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.timestamp == block.header.timestamp) =>
       logger.info(s"Going to propagate new block (${block.header.height}, ${block.header.encodedId}, ${block.payload.txs.size}" +
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
@@ -102,8 +102,6 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
       }
-      if (settings.node.stateMode == StateMode.Digest)
-        block.adProofsOpt.foreach(adp => nodeViewHolder ! LocallyGeneratedModifier(adp))
       candidateOpt = None
       sleepTime = System.currentTimeMillis()
   }
@@ -157,7 +155,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
   def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isSuccess).distinct
+    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
         if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
@@ -174,23 +172,17 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
 
-    view.state.generateProofs(txs) match {
-      case Success((adProof, adDigest)) =>
-        val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
-          .getOrElse(TestNetConstants.InitialDifficulty)
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+      .getOrElse(TestNetConstants.InitialDifficulty)
 
-        val candidate: CandidateBlock =
-          CandidateBlock(bestHeaderOpt, adProof, adDigest, TestNetConstants.Version, txs, timestamp, difficulty)
+    val candidate: CandidateBlock =
+      CandidateBlock(bestHeaderOpt, TestNetConstants.Version, txs, timestamp, difficulty)
 
-        logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
-          s"and 1 coinbase for height $height.")
+    logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
+      s"and 1 coinbase for height $height.")
 
-        transactionsPool = IndexedSeq.empty[Transaction]
-        candidate
-      case Failure(ex) =>
-        logger.info(s"Failed to gen candidate: ${ex.getMessage}")
-        createCandidate(view, bestHeaderOpt)
-    }
+    transactionsPool = IndexedSeq.empty[Transaction]
+    candidate
   }
 
   def produceCandidate(): Unit =

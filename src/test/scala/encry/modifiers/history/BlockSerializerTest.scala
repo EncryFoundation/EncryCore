@@ -5,7 +5,7 @@ import encry.utils.{EncryGenerator, TestHelper}
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, SerializedAdProof}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
@@ -18,8 +18,6 @@ class BlockSerializerTest extends FunSuite with EncryGenerator {
     val blockHeader = Header(
       99: Byte,
       ModifierId @@ Random.randomBytes(),
-      Digest32 @@ Random.randomBytes(),
-      ADDigest @@ Random.randomBytes(33),
       Digest32 @@ Random.randomBytes(),
       99999L,
       199,
@@ -42,15 +40,11 @@ class BlockSerializerTest extends FunSuite with EncryGenerator {
 
     val blockPayload = Payload(ModifierId @@ Array.fill(32)(19: Byte), txs)
 
-    val adProofs = ADProofs(ModifierId @@ Random.randomBytes(), SerializedAdProof @@ Random.randomBytes())
-
-    val block = Block(blockHeader,blockPayload,Option(adProofs))
+    val block = Block(blockHeader,blockPayload)
 
     val blockSererialized = BlockSerializer.toBytes(block)
 
     val blockDeserealized = BlockSerializer.parseBytes(blockSererialized).get
-
-    assert(block.adProofsOpt.get.bytes sameElements blockDeserealized.adProofsOpt.get.bytes,"ADProofs bytes mismatch.")
 
     assert(Algos.hash(block.bytes) sameElements Algos.hash(blockDeserealized.bytes), "Block bytes mismatch.")
   }

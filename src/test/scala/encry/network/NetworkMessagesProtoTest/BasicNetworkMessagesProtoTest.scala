@@ -21,7 +21,7 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
   val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
     case ((prevHistory, blocks), _) =>
       val block: Block = generateNextBlock(prevHistory)
-      (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
+      (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
         blocks :+ block)
   }._2
   val testedTransaction: Seq[Transaction] = genValidPaymentTxs(10)

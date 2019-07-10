@@ -4,32 +4,28 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
-import encry.avltree
-import encry.avltree.{NodeParameters, PersistentBatchAVLProver, VersionedAVLStorage}
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings}
+import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.StorageType
+import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.history.processors.payload.BlockPayloadProcessor
-import encry.view.history.processors.proofs.FullStateProofProcessor
 import encry.view.history.storage.HistoryStorage
-import encry.view.state.{BoxHolder, EncryState, UtxoState}
+import encry.view.state.{BoxHolder, UtxoState}
+import encry.view.state.UtxoState.{initialStateBoxes, logger}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.modifiers.history.{ADProofs, Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction._
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.Algos.HF
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
@@ -70,20 +66,16 @@ object Utils extends StrictLogging {
 
   def generateGenesisBlockValidForState(state: UtxoState): Block = {
     val txs = Seq(coinbaseTransaction(0))
-    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
-    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
-      adProofsRoot = adPN,
-      stateRoot = adDigest,
       height = TestNetConstants.GenesisHeight
     )
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, txs))
   }
 
   def generateGenesisBlockValidForHistory: Block = {
     val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
   def generateNextBlockValidForState(prevBlock: Block,
@@ -107,13 +99,9 @@ object Utils extends StrictLogging {
         (boxes.drop(numberOfInputsInOneTransaction), transactionsL :+ tx)
     }._2 ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
-    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
-    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
     val header = Header(
       1.toByte,
       prevBlock.id,
-      adPN,
-      adDigest,
       Payload.rootHash(transactions.map(_.id)),
       System.currentTimeMillis(),
       prevBlock.header.height + 1,
@@ -121,7 +109,7 @@ object Utils extends StrictLogging {
       Difficulty @@ BigInt(1),
       EquihashSolution(Seq(1, 3))
     )
-    Block(header, Payload(header.id, transactions), None)
+    Block(header, Payload(header.id, transactions))
   }
 
   def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
@@ -142,15 +130,11 @@ object Utils extends StrictLogging {
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
-    }._2.filter(tx => state.isValid(tx)) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
-    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
-    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
     val header = Header(
       1.toByte,
       prevBlock.id,
-      adPN,
-      adDigest,
       Payload.rootHash(transactions.map(_.id)),
       System.currentTimeMillis(),
       prevBlock.header.height + 1,
@@ -158,7 +142,7 @@ object Utils extends StrictLogging {
       Difficulty @@ (BigInt(1) + addDiff),
       EquihashSolution(Seq(1, 3))
     )
-    Block(header, Payload(header.id, transactions), None)
+    Block(header, Payload(header.id, transactions))
   }
 
   def generateNextBlockValidForHistory(history: EncryHistory,
@@ -174,7 +158,7 @@ object Utils extends StrictLogging {
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
-    Block(header, Payload(header.id, txs), None)
+    Block(header, Payload(header.id, txs))
   }
 
   def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
@@ -194,29 +178,25 @@ object Utils extends StrictLogging {
                         nodeViewHolderRef: Option[ActorRef],
                         settings: EncryAppSettings,
                         storageType: StorageType): UtxoState = {
-    val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-    bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-    val versionalStorage = storageType match {
+    val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
-        IODBWrapper(new LSMStore(dir, keySize = 32, keepVersions = 10))
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
-        val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(reopenedLevelDb, LevelDBSettings(100, 33), keySize = 33))
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
-    val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
-      val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(versionalStorage, np, settings)(Algos.hash)
-      PersistentBatchAVLProver.create(p, storage).get
-    }
+
+    storage.insert(
+      StorageVersion @@ Array.fill(32)(0: Byte),
+      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
+    )
+
     new UtxoState(
-      persistentProver,
-      EncryState.genesisStateVersion,
-      TestNetConstants.GenesisHeight,
-      versionalStorage,
+      storage,
+      TestNetConstants.PreGenesisHeight,
       0L,
-      None,
-      settings,
-      None
     )
   }
 
@@ -231,8 +211,6 @@ object Utils extends StrictLogging {
     Header(
       1.toByte,
       ModifierId @@ Random.randomBytes(),
-      Digest32 @@ Random.randomBytes(32),
-      ADDigest @@ Random.randomBytes(33),
       Digest32 @@ Random.randomBytes(),
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
@@ -436,7 +414,7 @@ object Utils extends StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with FullStateProofProcessor with BlockPayloadProcessor {
+    new EncryHistory with BlockPayloadProcessor {
       override protected val settings: EncryAppSettings = settingsEncry
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage

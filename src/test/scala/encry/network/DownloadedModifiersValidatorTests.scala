@@ -63,8 +63,6 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val header_first: Header = Header(
         1.toByte,
         ModifierId @@ Random.randomBytes(),
-        Digest32 @@ Random.randomBytes(32),
-        ADDigest @@ Random.randomBytes(33),
         Digest32 @@ Random.randomBytes(),
         timestamp2,
         2,
@@ -75,8 +73,6 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val header_second: Header = Header(
         1.toByte,
         header_first.id,
-        Digest32 @@ Random.randomBytes(32),
-        ADDigest @@ Random.randomBytes(33),
         Digest32 @@ Random.randomBytes(),
         timestamp1,
         1,
@@ -85,7 +81,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         EquihashSolution(Seq(1, 3))
       )
 
-      val history1: EncryHistory = history.append(header_first).get._1
+      val history1: EncryHistory = history.append(header_first).right.get._1
 
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history1))
 
@@ -122,7 +118,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val historyWith10Blocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>
           val block: Block = generateNextBlock(prevHistory)
-          (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
+          (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
             blocks :+ block)
       }
 

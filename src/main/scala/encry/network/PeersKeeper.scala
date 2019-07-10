@@ -24,7 +24,7 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Random, Try}
 
 class PeersKeeper(settings: EncryAppSettings,
                   nodeViewSync: ActorRef,
@@ -77,10 +77,10 @@ class PeersKeeper(settings: EncryAppSettings,
         s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.collect((_, _, _, _) => true, mapReason).mkString(",")
         }")
-      scala.util.Random.shuffle(
-        knownPeers
-          .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
-      )
+      val peers = knownPeers
+        .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
+      logger.info(s"peers size: ${peers.size}")
+      Random.shuffle(peers.toSeq)
         .headOption
         .foreach { case (peer, _) =>
           outgoingConnections += peer

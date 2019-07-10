@@ -76,7 +76,6 @@ components:
         - reference
         - version
         - interlinks
-        - adProofsRoot
         - stateRoot
         - transactionsRoot
         - nBits

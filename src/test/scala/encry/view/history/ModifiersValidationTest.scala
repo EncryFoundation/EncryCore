@@ -20,7 +20,7 @@ class ModifiersValidationTest extends WordSpecLike
       val genesisBlock: Block = generateGenesisBlock
       newHistory.testApplicable(genesisBlock.header).isRight shouldBe true
       val updatedHistory: EncryHistory =
-        newHistory.append(genesisBlock.header).get._1.reportModifierIsValid(genesisBlock.header)
+        newHistory.append(genesisBlock.header).right.get._1.reportModifierIsValid(genesisBlock.header)
       updatedHistory.testApplicable(genesisBlock.payload).isRight shouldBe true
     }
     "reject incorrect modifiers" in {
@@ -28,15 +28,15 @@ class ModifiersValidationTest extends WordSpecLike
       val newHistory: EncryHistory = generateDummyHistory(settings)
       blocks.take(1).foldLeft(newHistory) { case (history, block) =>
         history.testApplicable(block.header).isRight shouldBe true
-        history.append(block.header).get._1.reportModifierIsValid(block.header)
+        history.append(block.header).right.get._1.reportModifierIsValid(block.header)
         history.testApplicable(block.payload).isRight shouldBe true
-        history.append(block.payload).get._1.reportModifierIsValid(block)
+        history.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
       blocks.takeRight(1).foldLeft(newHistory) { case (history, block) =>
         history.testApplicable(block.header).isRight shouldBe false
-        history.append(block.header).get._1.reportModifierIsValid(block.header)
+        history.append(block.header).right.get._1.reportModifierIsValid(block.header)
         history.testApplicable(block.payload).isRight shouldBe true
-        history.append(block.payload).get._1.reportModifierIsValid(block)
+        history.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
     }
   }

@@ -22,7 +22,7 @@ class HistoryBenches {
     bh.consume {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
-        historyL.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
+        historyL.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
       history.closeStorage()
     }
@@ -74,7 +74,7 @@ object HistoryBenches {
               generateNextBlockValidForHistory(
                 prevHistory, 0, prevBlock,  Seq.empty[Transaction]
               )
-            (prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block),
+            (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
               Some(block), vector :+ block)
         }
     resultedHistory._1.closeStorage()

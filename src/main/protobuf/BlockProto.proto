@@ -4,12 +4,6 @@ import "PayloadProto.proto";
 
 message BlockProtoMessage {
 
-    message AdProofsProtoMessage {
-        bytes headerId = 1;
-        bytes proofBytes = 2;
-    }
-
     HeaderProtoMessage header = 1;
     PayloadProtoMessage payload = 2;
-    AdProofsProtoMessage adProofsOpt = 3;
 }

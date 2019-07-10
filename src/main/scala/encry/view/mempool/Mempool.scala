@@ -1,31 +1,26 @@
 package encry.view.mempool
 
-import TransactionProto.TransactionProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.HistoryComparisonResult
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MempoolStat
 import encry.utils.NetworkTimeProvider
-import encry.view.NodeViewHolder.ReceivableMessages.{LocallyGeneratedTransaction, ModifiersFromRemote}
+import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
 import encry.view.mempool.Mempool._
-import encry.view.state.{DigestState, EncryState, UtxoState}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import encry.view.state.UtxoState
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId, ModifierTypeId}
-
 import scala.collection.immutable.HashMap
 import scala.collection.{IndexedSeq, mutable}
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
-import scala.util.Success
 
 class Mempool(settings: EncryAppSettings,
               ntp: NetworkTimeProvider,
@@ -61,7 +56,7 @@ class Mempool(settings: EncryAppSettings,
             5.seconds,
             5.seconds)(influx.foreach(_ ! MempoolStat(memoryPool.size)))
           context.become(messagesHandler(utxoState))
-        case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
+        //case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
       }
     case GetMempoolSize => sender() ! memoryPool.size
     case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
@@ -106,7 +101,7 @@ class Mempool(settings: EncryAppSettings,
     case _@UpdatedState(updatedState) =>
       updatedState match {
         case utxoState: UtxoState => context.become(messagesHandler(utxoState))
-        case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
+        //case digestState: DigestState => logger.info(s"Got digest state on MemoryPool actor.")
       }
     case msg => logger.info(s"Got strange message on MemoryPool actor $msg.")
   }
@@ -176,7 +171,7 @@ object Mempool {
 
   case class RolledBackTransactions(txs: IndexedSeq[Transaction])
 
-  case class UpdatedState[StateType <: EncryState[StateType]](state: StateType)
+  case class UpdatedState(state: UtxoState)
 
   case object TickForSendTransactionsToMiner
 

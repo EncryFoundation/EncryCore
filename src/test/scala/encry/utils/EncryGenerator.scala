@@ -136,8 +136,6 @@ trait EncryGenerator {
     Header(
       1.toByte,
       ModifierId @@ Random.randomBytes(),
-      Digest32 @@ Random.randomBytes(32),
-      ADDigest @@ Random.randomBytes(33),
       Digest32 @@ Random.randomBytes(),
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
@@ -152,8 +150,6 @@ trait EncryGenerator {
     Header(
       1.toByte,
       ModifierId @@ Random.randomBytes(),
-      Digest32 @@ Random.randomBytes(32),
-      ADDigest @@ Random.randomBytes(33),
       transactionsRoot,
       Math.abs(random.nextLong()),
       height,

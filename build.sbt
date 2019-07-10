@@ -66,7 +66,7 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
-  "org.encry" %% "encry-common" % "0.8.9",
+  "org.encry" %% "encry-common" % "0.9.0",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
@@ -128,6 +128,8 @@ connectInput in run := true
 assemblyJarName in assembly := "EncryCore.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
+
+scalacOptions += "-Ypartial-unification"
 
 test in assembly := {}
 

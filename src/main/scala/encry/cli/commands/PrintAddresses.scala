@@ -5,10 +5,10 @@ import akka.util.Timeout
 import encry.cli.Response
 import encry.settings.EncryAppSettings
 import encry.view.history.EncryHistory
-import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.state.UtxoState
 import scala.concurrent.Future
 
 object PrintAddresses extends Command {

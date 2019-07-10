@@ -2,7 +2,6 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
-
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
 import benches.Utils._
@@ -26,9 +25,9 @@ class StateBenches {
       val innerState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
       stateBench.chain.foldLeft(innerState) { case (state, block) =>
-        state.applyModifier(block).get
+        state.applyModifier(block).right.get
       }
-      innerState.closeStorage()
+      innerState.close()
     }
   }
 
@@ -37,7 +36,7 @@ class StateBenches {
     bh.consume {
       val localState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder, stateBench.tmpDir, None, stateBench.settings, IODB)
-      localState.closeStorage()
+      localState.close()
     }
   }
 }
@@ -77,7 +76,7 @@ object StateBenches {
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
-    state = state.applyModifier(genesisBlock).get
+    state = state.applyModifier(genesisBlock).right.get
 
     val stateGenerationResults: (Vector[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
       (0 until benchSettings.stateBenchSettings.blocksNumber).foldLeft(Vector[Block](), genesisBlock, state, initialBoxes) {
@@ -93,7 +92,7 @@ object StateBenches {
             benchSettings.stateBenchSettings.numberOfInputsInOneTransaction,
             benchSettings.stateBenchSettings.numberOfOutputsInOneTransaction
           )
-          val stateN: UtxoState = stateL.applyModifier(nextBlock).get
+          val stateN: UtxoState = stateL.applyModifier(nextBlock).right.get
           (blocks :+ nextBlock,
             nextBlock,
             stateN,
@@ -105,6 +104,6 @@ object StateBenches {
 
     val chain: Vector[Block] = genesisBlock +: stateGenerationResults._1
     state = stateGenerationResults._3
-    state.closeStorage()
+    state.close()
   }
 }
