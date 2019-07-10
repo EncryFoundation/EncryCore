@@ -79,7 +79,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     }
       computeApplications()
 
-    case lm: LocallyGeneratedModifier[PersistentModifier]@unchecked =>
+    case lm: LocallyGeneratedModifier =>
       logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
