@@ -1,15 +1,22 @@
 package benches
 
 import java.io.File
+
+import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, NodeSettings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.storage.HistoryStorage
+import encry.view.state.{BoxHolder, UtxoState}
+import encry.view.state.UtxoState.{initialStateBoxes, logger}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -26,6 +33,7 @@ import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
+
 import scala.collection.immutable
 import scala.util.{Random => R}
 
@@ -56,98 +64,86 @@ object Utils extends StrictLogging {
         ) :: acc
     }
 
-//  def generateGenesisBlockValidForState(state: UtxoState): Block = {
-//    val txs = Seq(coinbaseTransaction(0))
-//    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(txs).get
-//    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
-//    val header = genHeader.copy(
-//      parentId = Header.GenesisParentId,
-//      adProofsRoot = adPN,
-//      stateRoot = adDigest,
-//      height = TestNetConstants.GenesisHeight
-//    )
-//    Block(header, Payload(header.id, txs), None)
-//  }
-//
-//  def generateGenesisBlockValidForHistory: Block = {
-//    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
-//    Block(header, Payload(header.id, Seq(coinbaseTransaction)), None)
-//  }
-//
-//  def generateNextBlockValidForState(prevBlock: Block,
-//                                     state: UtxoState,
-//                                     box: Seq[AssetBox],
-//                                     transactionsNumberInEachBlock: Int,
-//                                     numberOfInputsInOneTransaction: Int,
-//                                     numberOfOutputsInOneTransaction: Int): Block = {
-//
-//    val transactions: Seq[Transaction] = (0 until transactionsNumberInEachBlock).foldLeft(box, Seq.empty[Transaction]) {
-//      case ((boxes, transactionsL), _) =>
-//        val tx: Transaction = defaultPaymentTransactionScratch(
-//          privKey,
-//          fee = 111,
-//          timestamp = 11L,
-//          useBoxes = boxes.take(numberOfInputsInOneTransaction).toIndexedSeq,
-//          recipient = randomAddress,
-//          amount = 10000,
-//          numOfOutputs = numberOfOutputsInOneTransaction
-//        )
-//        (boxes.drop(numberOfInputsInOneTransaction), transactionsL :+ tx)
-//    }._2 ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
-//    logger.info(s"Number of generated transactions: ${transactions.size}.")
-//    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
-//    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
-//    val header = Header(
-//      1.toByte,
-//      prevBlock.id,
-//      adPN,
-//      adDigest,
-//      Payload.rootHash(transactions.map(_.id)),
-//      System.currentTimeMillis(),
-//      prevBlock.header.height + 1,
-//      R.nextLong(),
-//      Difficulty @@ BigInt(1),
-//      EquihashSolution(Seq(1, 3))
-//    )
-//    Block(header, Payload(header.id, transactions), None)
-//  }
-//
-//  def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
-//                                                            state: UtxoState,
-//                                                            box: Seq[AssetBox],
-//                                                            splitCoef: Int = 2,
-//                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
-//
-//    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
-//      case ((boxes, transactionsL), _) =>
-//        val tx: Transaction = defaultPaymentTransactionScratch(
-//          privKey,
-//          fee = 1,
-//          timestamp = 11L,
-//          useBoxes = IndexedSeq(boxes.head),
-//          recipient = privKey.publicImage.address.address,
-//          amount = boxes.head.amount - 1,
-//          numOfOutputs = splitCoef
-//        )
-//        (boxes.tail, transactionsL :+ tx)
-//    }._2.filter(tx => state.isValid(tx)) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
-//    logger.info(s"Number of generated transactions: ${transactions.size}.")
-//    val (adProofN: SerializedAdProof, adDigest: ADDigest) = state.generateProofs(transactions).get
-//    val adPN: Digest32 = ADProofs.proofDigest(adProofN)
-//    val header = Header(
-//      1.toByte,
-//      prevBlock.id,
-//      adPN,
-//      adDigest,
-//      Payload.rootHash(transactions.map(_.id)),
-//      System.currentTimeMillis(),
-//      prevBlock.header.height + 1,
-//      R.nextLong(),
-//      Difficulty @@ (BigInt(1) + addDiff),
-//      EquihashSolution(Seq(1, 3))
-//    )
-//    Block(header, Payload(header.id, transactions), None)
-//  }
+  def generateGenesisBlockValidForState(state: UtxoState): Block = {
+    val txs = Seq(coinbaseTransaction(0))
+    val header = genHeader.copy(
+      parentId = Header.GenesisParentId,
+      height = TestNetConstants.GenesisHeight
+    )
+    Block(header, Payload(header.id, txs))
+  }
+
+  def generateGenesisBlockValidForHistory: Block = {
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
+  }
+
+  def generateNextBlockValidForState(prevBlock: Block,
+                                     state: UtxoState,
+                                     box: Seq[AssetBox],
+                                     transactionsNumberInEachBlock: Int,
+                                     numberOfInputsInOneTransaction: Int,
+                                     numberOfOutputsInOneTransaction: Int): Block = {
+
+    val transactions: Seq[Transaction] = (0 until transactionsNumberInEachBlock).foldLeft(box, Seq.empty[Transaction]) {
+      case ((boxes, transactionsL), _) =>
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 111,
+          timestamp = 11L,
+          useBoxes = boxes.take(numberOfInputsInOneTransaction).toIndexedSeq,
+          recipient = randomAddress,
+          amount = 10000,
+          numOfOutputs = numberOfOutputsInOneTransaction
+        )
+        (boxes.drop(numberOfInputsInOneTransaction), transactionsL :+ tx)
+    }._2 ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    logger.info(s"Number of generated transactions: ${transactions.size}.")
+    val header = Header(
+      1.toByte,
+      prevBlock.id,
+      Payload.rootHash(transactions.map(_.id)),
+      System.currentTimeMillis(),
+      prevBlock.header.height + 1,
+      R.nextLong(),
+      Difficulty @@ BigInt(1),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, transactions))
+  }
+
+  def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
+                                                            state: UtxoState,
+                                                            box: Seq[AssetBox],
+                                                            splitCoef: Int = 2,
+                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+
+    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
+      case ((boxes, transactionsL), _) =>
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 1,
+          timestamp = 11L,
+          useBoxes = IndexedSeq(boxes.head),
+          recipient = privKey.publicImage.address.address,
+          amount = boxes.head.amount - 1,
+          numOfOutputs = splitCoef
+        )
+        (boxes.tail, transactionsL :+ tx)
+    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    logger.info(s"Number of generated transactions: ${transactions.size}.")
+    val header = Header(
+      1.toByte,
+      prevBlock.id,
+      Payload.rootHash(transactions.map(_.id)),
+      System.currentTimeMillis(),
+      prevBlock.header.height + 1,
+      R.nextLong(),
+      Difficulty @@ (BigInt(1) + addDiff),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, transactions))
+  }
 
   def generateNextBlockValidForHistory(history: EncryHistory,
                                        difficultyDiff: BigInt = 0,
@@ -177,36 +173,32 @@ object Utils extends StrictLogging {
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
 
-//  def utxoFromBoxHolder(bh: BoxHolder,
-//                        dir: File,
-//                        nodeViewHolderRef: Option[ActorRef],
-//                        settings: EncryAppSettings,
-//                        storageType: StorageType): UtxoState = {
-//    val p = new avltree.BatchAVLProver[Digest32, Algos.HF](keyLength = 32, valueLengthOpt = None)
-//    bh.sortedBoxes.foreach(b => p.performOneOperation(avltree.Insert(b.id, ADValue @@ b.bytes)).ensuring(_.isSuccess))
-//    val versionalStorage = storageType match {
-//      case VersionalStorage.IODB =>
-//        IODBWrapper(new LSMStore(dir, keySize = 32, keepVersions = 10))
-//      case VersionalStorage.LevelDB =>
-//        val reopenedLevelDb = LevelDbFactory.factory.open(dir, new Options)
-//        VLDBWrapper(VersionalLevelDBCompanion(reopenedLevelDb, LevelDBSettings(100, 33), keySize = 33))
-//    }
-//    val persistentProver: avltree.PersistentBatchAVLProver[Digest32, HF] = {
-//      val np: NodeParameters = NodeParameters(keySize = 32, valueSize = None, labelSize = 32)
-//      val storage: VersionedAVLStorage[Digest32] = new VersionedAVLStorage(versionalStorage, np, settings)(Algos.hash)
-//      PersistentBatchAVLProver.create(p, storage).get
-//    }
-//    new UtxoState(
-//      persistentProver,
-//      EncryState.genesisStateVersion,
-//      TestNetConstants.GenesisHeight,
-//      versionalStorage,
-//      0L,
-//      None,
-//      settings,
-//      None
-//    )
-//  }
+  def utxoFromBoxHolder(bh: BoxHolder,
+                        dir: File,
+                        nodeViewHolderRef: Option[ActorRef],
+                        settings: EncryAppSettings,
+                        storageType: StorageType): UtxoState = {
+    val storage = settings.storage.state match {
+      case VersionalStorage.IODB =>
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+    }
+
+    storage.insert(
+      StorageVersion @@ Array.fill(32)(0: Byte),
+      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
+    )
+
+    new UtxoState(
+      storage,
+      TestNetConstants.PreGenesisHeight,
+      0L,
+    )
+  }
 
   def getRandomTempDir: File = {
     val dir = java.nio.file.Files.createTempDirectory("encry_test_" + R.alphanumeric.take(15).mkString).toFile
