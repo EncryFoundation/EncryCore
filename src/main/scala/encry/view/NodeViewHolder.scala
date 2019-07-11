@@ -149,7 +149,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
-
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
 
@@ -171,7 +170,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                                  alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
                                  suffix: IndexedSeq[PersistentModifier])
     logger.debug(s"\nStarting updating state in updateState function!")
-    requestDownloads(progressInfo, None)
+    progressInfo.toApply.foreach{
+      case header: Header => requestDownloads(progressInfo, Some(header.id))
+      case _ => requestDownloads(progressInfo, None)
+    }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
@@ -233,7 +235,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
         if (progressInfo.toApply.nonEmpty) {
-          logger.debug(s"\n progress info non empty")
+          logger.debug(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
