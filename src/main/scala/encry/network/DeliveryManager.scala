@@ -468,7 +468,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (mTid != Transaction.modifierTypeId) receivedModifiers += toKey(mId)
       expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
       if (isBlockChainSynced && mTid == Header.modifierTypeId) {
-        logger.debug(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress}")
+        logger.info(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress}")
         headersForPriorityRequest = headersForPriorityRequest
           .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress)
       }
