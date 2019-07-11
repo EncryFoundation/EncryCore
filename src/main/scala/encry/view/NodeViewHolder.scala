@@ -173,7 +173,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                                  suffix: IndexedSeq[PersistentModifier])
     logger.info(s"\nStarting updating state in updateState function!")
     logger.info("Req download!")
-    requestDownloads(progressInfo, None)
+    progressInfo.toApply.foreach{
+      case header: Header => requestDownloads(progressInfo, Some(header.payloadId))
+      case _ => requestDownloads(progressInfo, None)
+    }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
@@ -233,7 +236,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           }
           ref ! ModifierAppendedToHistory(isHeader, success = true)
         }
-        logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+        logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
         if (progressInfo.toApply.nonEmpty) {
           logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
           val startPoint: Long = System.currentTimeMillis()
@@ -252,7 +255,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           if (progressInfo.chainSwitchingNeeded)
             nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
           blocksApplied.foreach(nodeView.wallet.scanPersistent)
-          logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+          logger.info(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
           if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
             context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
           if (newHistory.isFullChainSynced) {
@@ -267,7 +270,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             requestDownloads(progressInfo, Some(pmod.id))
           }
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-          logger.debug(s"\nProgress info is empty")
+          logger.info(s"\nProgress info is empty")
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Left(e) =>
