@@ -68,7 +68,7 @@ class Mempool(settings: EncryAppSettings,
 
   def mainLogic(state: UtxoState): Receive = {
     case TransactionsFromRemote(txs) =>
-      memoryPool = validateAndPutTransactions(txs.toIndexedSeq, memoryPool, state, fromNetwork = true)
+      memoryPool = validateAndPutTransactions(txs.toIndexedSeq, memoryPool, state, fromNetwork = true)._1
     case TickForRemoveExpired => memoryPool = cleanMemoryPoolFromExpired(memoryPool)
     case GetMempoolSize => sender() ! memoryPool.size
     case TickForCleanupBloomFilter =>
@@ -79,13 +79,19 @@ class Mempool(settings: EncryAppSettings,
       if (unrequestedModifiers.nonEmpty) sender ! RequestForTransactions(peer, Transaction.modifierTypeId, unrequestedModifiers)
     case CompareTransactionsWithUnconfirmed(peer, transactions) =>
       logger.info(s"Mempool got CompareTransactionsWithUnconfirmed but canProcessNewTransactions is: $canProcessNewTransactions")
-    case RolledBackTransactions(txs) =>
-      memoryPool = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
+    case RolledBackTransactions(txs) if canProcessNewTransactions =>
+      val validation = validateAndPutTransactions(txs, memoryPool, state, fromNetwork = false)
+      memoryPool = validation._1
+      currentNumberOfTransactions += validation._2
       logger.info(s"Mempool got RolledBackTransactions. Current mempool size is: ${memoryPool.size}")
+      if (currentNumberOfTransactions >= settings.node.mempoolTransactionsThreshold) {
+        canProcessNewTransactions = false
+        logger.info(s"Threshold has its limit. Stop processing new transactions.")
+      }
     case TransactionsForRemove(txs) =>
       memoryPool = removeOldTransactions(txs, memoryPool)
     case LocallyGeneratedTransaction(tx) =>
-      memoryPool = validateAndPutTransactions(IndexedSeq(tx), memoryPool, state, fromNetwork = true)
+      memoryPool = validateAndPutTransactions(IndexedSeq(tx), memoryPool, state, fromNetwork = true)._1
     case TickForSendTransactionsToMiner =>
       val validatedTxs: (IndexedSeq[Key], IndexedSeq[Transaction]) =
         memoryPool.values.toIndexedSeq.sortBy(_.fee).reverse
@@ -131,23 +137,23 @@ class Mempool(settings: EncryAppSettings,
   def validateAndPutTransactions(inputTransactions: IndexedSeq[Transaction],
                                  currentMemoryPool: HashMap[Key, Transaction],
                                  currentState: UtxoState,
-                                 fromNetwork: Boolean): HashMap[Key, Transaction] = {
+                                 fromNetwork: Boolean): (HashMap[Key, Transaction], Int) = {
     val validatedTransactions: IndexedSeq[Transaction] = inputTransactions.filter(tx =>
       tx.semanticValidity.isSuccess && !currentMemoryPool.contains(toKey(tx.id))
     )
     if (memoryPool.size + validatedTransactions.size <= settings.node.mempoolMaxCapacity)
-      validatedTransactions.foldLeft(memoryPool) { case (pool, tx) =>
+      (validatedTransactions.foldLeft(memoryPool) { case (pool, tx) =>
         if (fromNetwork) context.system.eventStream.publish(SuccessfulTransaction(tx))
         pool.updated(toKey(tx.id), tx)
-      }
+      }, validatedTransactions.size)
     else {
       val filteredMemoryPool: HashMap[Key, Transaction] = cleanMemoryPoolFromExpired(memoryPool)
       val availableNumberOfTransactions: Int = settings.node.mempoolMaxCapacity - filteredMemoryPool.size
       val transactionsForAdding: IndexedSeq[Transaction] = validatedTransactions.take(availableNumberOfTransactions)
-      transactionsForAdding.foldLeft(memoryPool) { case (pool, tx) =>
+      (transactionsForAdding.foldLeft(memoryPool) { case (pool, tx) =>
         if (fromNetwork) context.system.eventStream.publish(SuccessfulTransaction(tx))
         pool.updated(toKey(tx.id), tx)
-      }
+      }, transactionsForAdding.size)
     }
   }
 
@@ -175,8 +181,6 @@ class Mempool(settings: EncryAppSettings,
 }
 
 object Mempool {
-
-  case object StopReceivingTransactions
 
   final case class TransactionsFromRemote(tx: Seq[Transaction]) extends AnyVal
 
