@@ -148,7 +148,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit = {
     logger.info(s"ProgInfo(prevMod: ${previousModifier.map(Algos.encode)}). To download: ${pi.toDownload.map(el => Algos.encode(el._2))}")
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
@@ -172,7 +172,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                                  alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
                                  suffix: IndexedSeq[PersistentModifier])
     logger.info(s"\nStarting updating state in updateState function!")
-    logger.info("Req download!")
     progressInfo.toApply.foreach{
       case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
@@ -236,9 +235,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           }
           ref ! ModifierAppendedToHistory(isHeader, success = true)
         }
-        logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+        logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
         if (progressInfo.toApply.nonEmpty) {
-          logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
+          logger.debug(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
@@ -265,10 +264,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           }
           updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
         } else {
-          if (!isLocallyGenerated) {
-            logger.info(s"Mod: ${Algos.encode(pmod.id)} is not locally generated, so making priority req for mods")
-            requestDownloads(progressInfo, Some(pmod.id))
-          }
+          if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
           logger.info(s"\nProgress info is empty")
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
