@@ -145,14 +145,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     nodeView = newNodeView
   }
 
-  def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit = {
-    logger.info(s"ProgInfo(prevMod: ${previousModifier.map(Algos.encode)}). To download: ${pi.toDownload.map(el => Algos.encode(el._2))}")
+  def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
-  }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
   IndexedSeq[PersistentModifier] = {
