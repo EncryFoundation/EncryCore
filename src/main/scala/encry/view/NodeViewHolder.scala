@@ -174,7 +174,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.info(s"\nStarting updating state in updateState function!")
     logger.info("Req download!")
     progressInfo.toApply.foreach{
-      case header: Header => requestDownloads(progressInfo, Some(header.payloadId))
+      case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
     }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
