@@ -171,7 +171,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                                  failedMod: Option[PersistentModifier],
                                  alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
                                  suffix: IndexedSeq[PersistentModifier])
-    logger.info(s"\nStarting updating state in updateState function!")
+    logger.debug(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach{
       case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
@@ -254,7 +254,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           if (progressInfo.chainSwitchingNeeded)
             nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
           blocksApplied.foreach(nodeView.wallet.scanPersistent)
-          logger.info(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+          logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
           if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
             context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
           if (newHistory.isFullChainSynced) {
@@ -266,7 +266,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         } else {
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-          logger.info(s"\nProgress info is empty")
+          logger.debug(s"\nProgress info is empty")
           updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
         }
       case Left(e) =>
