@@ -235,7 +235,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
         if (progressInfo.toApply.nonEmpty) {
-          logger.debug(s"\n progress info non empty")
+          logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
           val startPoint: Long = System.currentTimeMillis()
           val (newHistory: EncryHistory, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
             updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
