@@ -6,7 +6,7 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SuccessfulTransaction
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.MemoryPoolStatistic
@@ -15,6 +15,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import encry.view.mempool.MemoryPool._
+import org.encryfoundation.common.modifiers.history.Block
 import scala.collection.IndexedSeq
 import scala.concurrent.duration._
 
@@ -43,9 +44,19 @@ class MemoryPool(settings: EncryAppSettings,
     context.system.scheduler.schedule(
       5.seconds, 5.seconds
     )(influxReference.foreach(_ ! MemoryPoolStatistic(memoryPool.size)))
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
   }
 
-  override def receive: Receive = {
+  override def receive: Receive =
+    transactionsProcessor(currentNumberOfProcessedTransactions = 0)
+      .orElse(schedulersMessagesHandler)
+      .orElse(awaitingMinedBlockHandler(MemoryPoolStateType.ProcessingNewTransaction))
+      .orElse(transactionsPropagationHandler)
+      .orElse {
+        case message => logger.info(s"MemoryPool got unhandled message $message.")
+      }
+
+  def transactionsProcessor(currentNumberOfProcessedTransactions: Int): Receive = {
     case NewTransactions(transactions) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransactions: Seq[Transaction]) =
         memoryPool.validateTransactions(transactions)
@@ -53,10 +64,12 @@ class MemoryPool(settings: EncryAppSettings,
       validatedTransactions.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
       logger.info(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}." +
         s"Number of transactions for broadcast is ${validatedTransactions.size}.")
-
-    case RemoveExpiredFromPool =>
-      memoryPool = memoryPool.filter(memoryPool.isExpired)
-      logger.info(s"MemoryPool got RemoveExpiredFromPool message. After cleaning pool size is: ${memoryPool.size}.")
+      if (memoryPool.size > settings.node.mempoolTransactionsThreshold) {
+        logger.info(s"MemoryPool has its threshold number of processed transactions. " +
+          s"Transit to 'disableTransactionsProcessor' state." +
+          s"Current number of processed transactions is ${memoryPool.size}.")
+        context.become(disableTransactionsProcessor)
+      }
 
     case InvMessageWithTransactionsIds(peer, transactions) =>
       val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions)
@@ -67,15 +80,42 @@ class MemoryPool(settings: EncryAppSettings,
       } else logger.info(s"MemoryPool got inv message with ${transactions.size} ids." +
         s" There are no not yet requested ids.")
 
-    case CleanupBloomFilter =>
-      bloomFilterForTransactionsIds = initBloomFilter
-
     case RolledBackTransactions(transactions) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransactions: Seq[Transaction]) =
         memoryPool.validateTransactions(transactions)
       memoryPool = newMemoryPool
       logger.info(s"MemoryPool got rolled back transactions. New pool size is ${memoryPool.size}." +
         s"Number of rolled back transactions is ${validatedTransactions.size}.")
+      if (memoryPool.size > settings.node.mempoolTransactionsThreshold) {
+        logger.info(s"MemoryPool has its threshold number of processed transactions. " +
+          s"Transit to 'disableTransactionsProcessor' state." +
+          s"Current number of processed transactions is ${memoryPool.size}.")
+        context.become(disableTransactionsProcessor)
+      }
+  }
+
+  def disableTransactionsProcessor: Receive =
+    awaitingMinedBlockHandler(MemoryPoolStateType.NotProcessingNewTransactions)
+      .orElse(schedulersMessagesHandler)
+      .orElse(transactionsPropagationHandler)
+      .orElse {
+        case message => logger.info(s"MemoryPool got unhandled message $message.")
+      }
+
+  def awaitingMinedBlockHandler(state: MemoryPoolStateType): Receive = {
+    case SemanticallySuccessfulModifier(modifier) if modifier.modifierTypeId == Block.modifierTypeId =>
+      logger.info(s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
+        s"Transit to a transactionsProcessor state.")
+      context.become(transactionsProcessor(currentNumberOfProcessedTransactions = 0))
+
+    case SemanticallySuccessfulModifier(_) =>
+      logger.info(s"MemoryPool got SemanticallySuccessfulModifier with non block modifier" +
+        s"while $state. Do nothing in this case.")
+  }
+
+  def schedulersMessagesHandler: Receive = {
+    case CleanupBloomFilter =>
+      bloomFilterForTransactionsIds = initBloomFilter
 
     case SendTransactionsToMiner =>
       val (newMemoryPool: MemoryPoolStorage, transactionsForMiner: IndexedSeq[Transaction]) =
@@ -85,6 +125,12 @@ class MemoryPool(settings: EncryAppSettings,
       logger.info(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
         s" New pool size is ${memoryPool.size}.")
 
+    case RemoveExpiredFromPool =>
+      memoryPool = memoryPool.filter(memoryPool.isExpired)
+      logger.info(s"MemoryPool got RemoveExpiredFromPool message. After cleaning pool size is: ${memoryPool.size}.")
+  }
+
+  def transactionsPropagationHandler: Receive = {
     case RequestModifiersForTransactions(remote, ids) =>
       val modifiersIds: Seq[Transaction] = ids
         .map(Algos.encode)
@@ -93,8 +139,6 @@ class MemoryPool(settings: EncryAppSettings,
       sender() ! RequestedModifiersForRemote(remote, modifiersIds)
       logger.info(s"MemoryPool got request modifiers message. Number of requested ids is ${ids.size}." +
         s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote.")
-
-    case message => logger.info(s"MemoryPool got unhandled message $message.")
   }
 
   def initBloomFilter: BloomFilter[String] = BloomFilter.create(
@@ -132,6 +176,16 @@ object MemoryPool {
 
   case object CleanupBloomFilter
 
+  sealed trait MemoryPoolStateType
+
+  object MemoryPoolStateType {
+
+    case object ProcessingNewTransaction extends MemoryPoolStateType
+
+    case object NotProcessingNewTransactions extends MemoryPoolStateType
+
+  }
+
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef, influx: Option[ActorRef]): Props =
     Props(new MemoryPool(settings, ntp, minerRef, influx))
 
@@ -143,4 +197,5 @@ object MemoryPool {
         case InvMessageWithTransactionsIds(_, _) | RequestModifiersForTransactions(_, _) => 2
         case otherwise => 3
       })
+
 }
