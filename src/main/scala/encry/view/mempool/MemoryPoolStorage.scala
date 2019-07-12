@@ -48,21 +48,21 @@ final case class MemoryPoolStorage private(transactions: Map[String, Transaction
     }
   }
 
-  def getTransactionsForMiner: (MemoryPoolStorage, IndexedSeq[Transaction]) = {
-    val (transactionsForMiner: IndexedSeq[Transaction], _) = transactions
+  def getTransactionsForMiner: (MemoryPoolStorage, Seq[Transaction]) = {
+    val (transactionsForMiner: Seq[Transaction], _) = transactions
       .toIndexedSeq
       .sortBy { case (_, tx) => tx.fee }
-      .foldLeft(IndexedSeq.empty[Transaction], Set.empty[String]) {
+      .foldLeft(Seq.empty[Transaction], Set.empty[String]) {
         case ((validated, inputs), (_, transaction)) =>
           val transactionInputsIds: Set[String] = transaction.inputs.map(input => Algos.encode(input.boxId)).toSet
-          if (transactionInputsIds.size == inputs.size && transactionInputsIds.forall(id => !inputs.contains(id)))
+          if (transactionInputsIds.size == transaction.inputs.size && transactionInputsIds.forall(id => !inputs.contains(id)))
             (validated :+ transaction, inputs ++ transactionInputsIds)
           else (validated, inputs)
       }
     (removeSeveral(transactionsForMiner.map(_.encodedId)), transactionsForMiner)
   }
 
-  def isValid: Transaction => Boolean = tx => tx.semanticValidity.isSuccess && contains(tx.encodedId)
+  def isValid: Transaction => Boolean = tx => tx.semanticValidity.isSuccess && !contains(tx.encodedId)
 
   def isExpired: (String, Transaction) => Boolean =
     (_, tx) => (networkTimeProvider.estimatedTime - tx.timestamp) < settings.node.utxMaxAge.toMillis
