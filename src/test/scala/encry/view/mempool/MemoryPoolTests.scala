@@ -63,9 +63,9 @@ class MemoryPoolTests extends WordSpecLike
       val miner = TestProbe()
       val mempool: TestActorRef[MemoryPool] = TestActorRef[MemoryPool](
         MemoryPool.props(settings, timeProvider, miner.ref, Some(TestProbe().ref)))
-      val transactions = genValidPaymentTxs(10)
+      val transactions = genValidPaymentTxs(4)
       mempool ! NewTransactions(transactions.toIndexedSeq)
-      mempool.underlyingActor.memoryPool.size shouldBe 10
+      mempool.underlyingActor.memoryPool.size shouldBe 4
       logger.info(s"generated: ${transactions.map(_.encodedId)}")
       miner.expectMsg(20.seconds, TransactionsForMiner(transactions.toIndexedSeq))
     }

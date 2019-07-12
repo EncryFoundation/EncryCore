@@ -9,7 +9,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.MemoryPoolStatistic
 import encry.utils.NetworkTimeProvider
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
@@ -17,7 +16,9 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
 import scala.collection.IndexedSeq
-import scala.concurrent.duration._
+import encry.EncryApp.nodeViewSynchronizer
+import cats.syntax.either._
+import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
 
 class MemoryPool(settings: EncryAppSettings,
                  networkTimeProvider: NetworkTimeProvider,
@@ -67,6 +68,7 @@ class MemoryPool(settings: EncryAppSettings,
         logger.debug(s"MemoryPool has its threshold number of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is ${memoryPool.size}.")
+        Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
@@ -99,6 +101,7 @@ class MemoryPool(settings: EncryAppSettings,
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
         logger.debug(s"Current number of processed transactions is OK. Continue to process them..." +
           s" Current number is $currentTransactionsNumber.")
+        Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
         context.become(continueProcessing(currentTransactionsNumber))
       }
   }
@@ -115,6 +118,8 @@ class MemoryPool(settings: EncryAppSettings,
     case SemanticallySuccessfulModifier(modifier) if modifier.modifierTypeId == Block.modifierTypeId =>
       logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
         s"Transit to a transactionsProcessor state.")
+      if (state == NotProcessingNewTransactions)
+        Either.catchNonFatal(nodeViewSynchronizer ! StartTransactionsValidation)
       context.become(continueProcessing(currentNumberOfProcessedTransactions = 0))
 
     case SemanticallySuccessfulModifier(_) =>
@@ -184,6 +189,10 @@ object MemoryPool {
   case object RemoveExpiredFromPool
 
   case object CleanupBloomFilter
+
+  case object StopTransactionsValidation
+
+  case object StartTransactionsValidation
 
   sealed trait MemoryPoolStateType
 

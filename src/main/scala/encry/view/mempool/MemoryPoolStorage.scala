@@ -4,7 +4,6 @@ import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import scala.collection.IndexedSeq
 
 final case class MemoryPoolStorage private(transactions: Map[String, Transaction],
                                            settings: EncryAppSettings,

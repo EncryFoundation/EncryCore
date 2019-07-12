@@ -24,7 +24,7 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-import encry.view.mempool.MemoryPool.{RequestModifiersForTransactions, InvMessageWithTransactionsIds, RequestForTransactions, RequestedModifiersForRemote}
+import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
@@ -32,7 +32,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -58,6 +57,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var historyReaderOpt: Option[EncryHistory] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
+
+  var canProcessTransactions: Boolean = true
 
   val downloadedModifiersValidator: ActorRef = context.system
     .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef)
@@ -147,7 +148,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
-          if (chainSynced) memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
+          if (chainSynced && canProcessTransactions)
+            memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
           else logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}") // do nothing
         }
         else if (invData._1 != Payload.modifierTypeId) {
@@ -192,7 +194,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
       peersKeeper ! FullBlockChainIsSynced
-
+    case StopTransactionsValidation =>
+      deliveryManager ! StopTransactionsValidation
+      canProcessTransactions = false
+    case StartTransactionsValidation =>
+      deliveryManager ! StartTransactionsValidation
+      canProcessTransactions = true
     case a: Any => logger.error(s"Strange input(sender: ${sender()}): ${a.getClass}\n" + a)
   }
 
@@ -287,6 +294,10 @@ object NodeViewSynchronizer {
           case _: Transaction => 4
           case _ => 1
         }
+
+        case StopTransactionsValidation => 2
+
+        case StartTransactionsValidation => 2
 
         case SuccessfulTransaction(_) => 4
 
