@@ -19,7 +19,7 @@ import encry.utils.NetworkTime.Time
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.EncryHistory
-import encry.view.mempool.Mempool._
+import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
@@ -31,6 +31,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
+
 import scala.collection._
 import scala.concurrent.duration._
 
@@ -86,7 +87,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
           logger.info("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
-    case TxsForMiner(txs) => transactionsPool = transactionsPool ++ txs
+    case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       killAllWorkers()

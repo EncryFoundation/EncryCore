@@ -24,7 +24,7 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.{EncryHistory, EncryHistoryReader}
-import encry.view.mempool.Mempool._
+import encry.view.mempool.MemoryPool.{RequestModifiersForTransactions, InvMessageWithTransactionsIds, RequestForTransactions, RequestedModifiersForRemote}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
@@ -123,7 +123,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           }.toSeq)
           val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
           if (nonInRequestCache.nonEmpty) {
-            if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! AskTransactionsFromNVS(remote, nonInRequestCache)
+            if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! RequestModifiersForTransactions(remote, nonInRequestCache)
             else Option(history).foreach { reader =>
               val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
                 case (id, mod) if mod.isDefined => id -> mod.get
@@ -147,7 +147,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
-          if (chainSynced) memoryPoolRef ! CompareTransactionsWithUnconfirmed(remote, invData._2.toIndexedSeq)
+          if (chainSynced) memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
           else logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}") // do nothing
         }
         else if (invData._1 != Payload.modifierTypeId) {
@@ -181,7 +181,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
-    case TxsForNVSH(remote, txs) => sendResponse(
+    case RequestedModifiersForRemote(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
@@ -284,7 +284,7 @@ object NodeViewSynchronizer {
         }
 
         case SemanticallySuccessfulModifier(mod) => mod match {
-          case tx: Transaction => 4
+          case _: Transaction => 4
           case _ => 1
         }
 

@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.settings.RESTApiSettings
-import encry.view.NodeViewHolder.ReceivableMessages.LocallyGeneratedTransaction
+import encry.view.mempool.MemoryPool.NewTransactions
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 
 case class TransactionsApiRoute(dataHolder: ActorRef,
@@ -30,7 +30,7 @@ case class TransactionsApiRoute(dataHolder: ActorRef,
     post(entity(as[Transaction]) {
       tx =>
         complete {
-          memoryPoolRef ! LocallyGeneratedTransaction(tx)
+          memoryPoolRef ! NewTransactions(Seq(tx))
           StatusCodes.OK
         }
     })

@@ -13,7 +13,7 @@ import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
-import encry.view.mempool.Mempool.TransactionsFromRemote
+import encry.view.mempool.MemoryPool.NewTransactions
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -78,7 +78,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
 
         if (transactions._1.nonEmpty) {
           logger.debug(s"Sending to node mempool parsed transactions: ${transactions._1.map(_.encodedId)}.")
-          memoryPoolRef ! TransactionsFromRemote(transactions._1)
+          memoryPoolRef ! NewTransactions(transactions._1)
         }
         if (transactions._2.nonEmpty) {
           logger.debug(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
