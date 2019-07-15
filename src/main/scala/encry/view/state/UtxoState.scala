@@ -49,55 +49,36 @@ final case class UtxoState(storage: VersionalStorage,
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = mod match {
     case header: Header =>
-      logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-      val state = UtxoState(
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+      UtxoState(
         storage,
         Height @@ header.height,
         header.timestamp
       ).asRight[List[ModifierApplyError]]
-      logger.info(s"Got updated state on header : ${Algos.encode(mod.id)} to state at height ${header.height}")
-      state
     case block: Block =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
-      val lastTxId: ModifierId = block.payload.txs.last.id
-      logger.info(s"lastTxId: ${Algos.encode(lastTxId)} on block  ${Algos.encode(mod.id)}")
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+      val lastTxId = block.payload.txs.last.id
       val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-      logger.info(s"totalFees: $totalFees on block  ${Algos.encode(mod.id)}")
-      val res = block.payload.txs.map(tx => {
-        if (tx.id sameElements lastTxId) {
-          validate(tx, totalFees + EncrySupplyController.supplyAt(height))
-        }
+      val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+        if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
         else validate(tx)
-      })
-      logger.info(s"Valid stage ready on block  ${Algos.encode(mod.id)}")
-      val res1 = res.toList
-      logger.info(s"to list cast ready on block  ${Algos.encode(mod.id)}")
-      val res2 = res1.traverse(Validated.fromEither)
-      logger.info(s"traverse cast ready on block  ${Algos.encode(mod.id)}")
-      val res3 = res2.toEither
-      logger.info(s"toEither cast ready on block  ${Algos.encode(mod.id)}")
-      res3.fold(
-        err => {
-          val err1 = err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState]
-          logger.info(s"Got error on state: $err1 on block  ${Algos.encode(mod.id)}")
-          err1
-        },
+      }).toList
+        .traverse(Validated.fromEither)
+        .toEither
+      res.fold(
+        err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
         txsToApply => {
           val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
-          logger.info(s"combinedStateChange success on block  ${Algos.encode(mod.id)}")
           storage.insert(
             StorageVersion !@@ block.id,
             combinedStateChange.outputsToDb,
             combinedStateChange.inputsToDb,
           )
-          logger.info(s"insert successfully on block  ${Algos.encode(mod.id)}")
-          val k = UtxoState(
+          UtxoState(
             storage,
             Height @@ block.header.height,
             block.header.timestamp
           ).asRight[List[ModifierApplyError]]
-          logger.info(s"New state created successfully on block  ${Algos.encode(mod.id)}")
-          k
         }
       )
   }
