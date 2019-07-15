@@ -109,7 +109,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isFullChainSynced && modifierTypeId == Payload.modifierTypeId))) sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
+        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
