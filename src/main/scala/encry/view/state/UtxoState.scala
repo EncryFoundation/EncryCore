@@ -58,7 +58,7 @@ final case class UtxoState(storage: VersionalStorage,
       logger.info(s"Got updated state on header : ${Algos.encode(mod.id)} to state at height ${header.height}")
       state
     case block: Block =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${}")
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
       val lastTxId: ModifierId = block.payload.txs.last.id
       logger.info(s"lastTxId: ${Algos.encode(lastTxId)} on block  ${Algos.encode(mod.id)}")
       val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
