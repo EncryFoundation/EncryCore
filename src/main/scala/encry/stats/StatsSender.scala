@@ -55,7 +55,7 @@ class StatsSender extends Actor with StrictLogging {
     case DiffBtwMempoolAndLastBlockTxs(num) =>
       influxDB.write(InfluxPort, s"txsDiff,nodeName=$nodeName value=$num")
 
-    case MempoolStat(size) =>
+    case MemoryPoolStatistic(size) =>
       influxDB.write(InfluxPort, s"txsInMempool,nodeName=$nodeName value=$size")
 
     case TransactionsStatMessage(num, height) =>
@@ -179,7 +179,7 @@ object StatsSender {
 
   case class TransactionsStatMessage(transactionsNum: Int, blockHeight: Int)
 
-  case class MempoolStat(size: Int)
+  case class MemoryPoolStatistic(size: Int)
 
   case class InfoAboutTxsFromMiner(qty: Int)
 

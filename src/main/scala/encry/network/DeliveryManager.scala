@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -13,6 +14,7 @@ import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
+
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
@@ -24,13 +26,14 @@ import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
-import encry.view.mempool.Mempool.RequestForTransactions
+import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -68,6 +71,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
   var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings)
+
+  var canProcessTransactions: Boolean = true
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
@@ -160,7 +165,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         }
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot { case (modId, _) => history.contains(modId) }.toSeq
         //todo check this logic
-        downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
+        if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
+          downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
+
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
 
@@ -183,6 +190,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
 
     case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
+
+    case StopTransactionsValidation => canProcessTransactions = false
+
+    case StartTransactionsValidation => canProcessTransactions = true
 
     case message => logger.debug(s"Got strange message $message(${message.getClass}) on DeliveryManager from $sender")
   }
@@ -529,6 +540,10 @@ object DeliveryManager {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case RequestFromLocal(_, _, _) => 0
+
+        case StopTransactionsValidation => 2
+
+        case StartTransactionsValidation => 2
 
         case OtherNodeSyncingStatus(_, _, _) => 1
 

@@ -8,13 +8,13 @@ import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.history.EncryHistory
+import encry.view.mempool.MemoryPool.NewTransactions
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
-
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -47,7 +47,7 @@ object Transfer extends Command {
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>
-          memoryPool ! LocallyGeneratedTransaction(tx)
+          memoryPool ! NewTransactions(Seq(tx))
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

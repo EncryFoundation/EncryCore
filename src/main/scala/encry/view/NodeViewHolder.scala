@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -17,10 +16,9 @@ import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewHolder._
 import encry.view.NodeViewHolder.ReceivableMessages._
-import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.history.EncryHistory
-import encry.view.mempool.Mempool._
+import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
@@ -29,7 +27,6 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
@@ -45,9 +42,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-  memoryPoolRef ! UpdatedState(nodeView.state)
-  dataHolder ! UpdatedState(nodeView.state)
   dataHolder ! UpdatedHistory(nodeView.history)
+  dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
     ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
@@ -248,7 +244,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             if (isBlock) ref ! ModifierAppendedToState(success = true)
           }
-          sendUpdatedInfoToMemoryPool(newState, progressInfo.toRemove, blocksApplied)
+          sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
           if (progressInfo.chainSwitchingNeeded)
             nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
           blocksApplied.foreach(nodeView.wallet.scanPersistent)
@@ -281,17 +277,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     }
   } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
 
-  def sendUpdatedInfoToMemoryPool(state: UtxoState,
-                                  toRemove: Seq[PersistentModifier],
-                                  blocksApplied: Seq[PersistentModifier]): Unit = {
-    memoryPoolRef ! UpdatedState(state)
-    val rolledBackTxs: IndexedSeq[Transaction] =
-      toRemove.flatMap(extractTransactions).toIndexedSeq
+  def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
+    val rolledBackTxs: IndexedSeq[Transaction] = toRemove
+      .flatMap(extractTransactions)
+      .toIndexedSeq
     if (rolledBackTxs.nonEmpty)
       memoryPoolRef ! RolledBackTransactions(rolledBackTxs)
-    val appliedTransactions: IndexedSeq[Transaction] = blocksApplied.flatMap(extractTransactions).toIndexedSeq
-    if (appliedTransactions.nonEmpty)
-      memoryPoolRef ! TransactionsForRemove(appliedTransactions)
   }
 
   def extractTransactions(mod: PersistentModifier): Seq[Transaction] = mod match {
@@ -387,8 +378,6 @@ object NodeViewHolder {
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
     case class ModifiersFromRemote(serializedModifiers: Seq[PersistentModifier])
-
-    case class LocallyGeneratedTransaction(tx: Transaction)
 
     case class LocallyGeneratedModifier(pmod: PersistentModifier)
 
