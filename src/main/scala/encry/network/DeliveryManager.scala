@@ -26,7 +26,8 @@ import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
-import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
+import encry.view.mempool.Mempool.RequestForTransactions
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
@@ -47,11 +48,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
-  /**
-    * If block chain is synced, we will put all headers ids and peers who sent us this headers to this collection
-    * in order to ask payload directly from peers who sent us appropriate header.
-    */
-  var headersForPriorityRequest: Map[ModifierIdAsKey, Seq[InetSocketAddress]] = Map.empty
+//  /**
+//    * If block chain is synced, we will put all payload ids and peers who sent us this headers to this collection
+//    * in order to ask payload directly from peers who sent us appropriate header.
+//    */
+//  var payloadsForPriorityRequest: Map[ModifierIdAsKey, Seq[InetSocketAddress]] = Map.empty
   /**
     * Collection with spam modifiers.
     * Modifier considered spam if we receive it but it doesn't contain in expected modifiers collection.
@@ -175,10 +176,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (modifierTypeId != Transaction.modifierTypeId)
         logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
-      if (previousModifier.isDefined && isBlockChainSynced) {
-        logger.debug(s"Sending this download request for modifiers: ${Algos.encode(modifiersId)}")
-        priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
-      }
+//      if (previousModifier.isDefined && isBlockChainSynced) {
+//        logger.debug(s"Sending this download request for modifiers: ${Algos.encode(modifiersId)}")
+//        priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
+//      }
       else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
@@ -381,25 +382,25 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param isBlockChainSynced - current block chain status
     * @param isMining           - current mining status
     */
-  def priorityRequest(modifierTypeId: ModifierTypeId,
-                      modifierIds: ModifierId,
-                      headerId: ModifierId,
-                      history: EncryHistory,
-                      isBlockChainSynced: Boolean,
-                      isMining: Boolean): Unit =
-    headersForPriorityRequest.get(toKey(headerId)) match {
-      case Some(addresses) if addresses.nonEmpty =>
-        logger.debug(s"Trying to make priority request to payload for header(${Algos.encode(headerId)}). " +
-          s"Addresses: $addresses")
-        peersCollection.find(_._1 == addresses.head) match {
-          case Some((_, (cp, _, _))) =>
-            logger.debug(s"Find handler for address: ${addresses.head}")
-            headersForPriorityRequest = headersForPriorityRequest - toKey(headerId)
-            requestModifies(history, cp, modifierTypeId, Seq(modifierIds), isBlockChainSynced, isMining)
-          case None => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
-        }
-      case _ => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
-    }
+//  def priorityRequest(modifierTypeId: ModifierTypeId,
+//                      modifierIds: ModifierId,
+//                      headerId: ModifierId,
+//                      history: EncryHistory,
+//                      isBlockChainSynced: Boolean,
+//                      isMining: Boolean): Unit =
+//    payloadsForPriorityRequest.get(toKey(headerId)) match {
+//      case Some(addresses) if addresses.nonEmpty =>
+//        logger.debug(s"Trying to make priority request to payload for header(${Algos.encode(headerId)}). " +
+//          s"Addresses: $addresses")
+//        peersCollection.find(_._1 == addresses.head) match {
+//          case Some((_, (cp, _, _))) =>
+//            logger.debug(s"Find handler for address: ${addresses.head}")
+//            payloadsForPriorityRequest = payloadsForPriorityRequest - toKey(headerId)
+//            requestModifies(history, cp, modifierTypeId, Seq(modifierIds), isBlockChainSynced, isMining)
+//          case None => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
+//        }
+//      case _ => requestDownload(modifierTypeId, Seq(modifierIds), history, isBlockChainSynced, isMining)
+//    }
 
   /**
     * If node is not synced, `requestDownload` sends request for the one peer which will be find by 2 criteria:
@@ -474,11 +475,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
       if (mTid != Transaction.modifierTypeId) receivedModifiers += toKey(mId)
       expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
-      if (isBlockChainSynced && mTid == Header.modifierTypeId) {
-        logger.debug(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress}")
-        headersForPriorityRequest = headersForPriorityRequest
-          .updated(toKey(mId), headersForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress)
-      }
+//      if (isBlockChainSynced && mTid == Payload.modifierTypeId) {
+//        logger.debug(s"Received header with id: ${Algos.encode(mId)} from peer: ${peer.socketAddress}")
+//        payloadsForPriorityRequest = payloadsForPriorityRequest
+//          .updated(toKey(mId), payloadsForPriorityRequest.getOrElse(toKey(mId), Seq.empty) :+ peer.socketAddress)
+//      }
       //if (expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
