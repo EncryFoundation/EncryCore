@@ -390,7 +390,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
       _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
-      powSchemeValidationResult: Either[String, Boolean] = powScheme.verify(h)
+      powSchemeValidationResult = powScheme.verify(h)
       _ <- Either.cond(powSchemeValidationResult.isRight, (),
         HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
       _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),

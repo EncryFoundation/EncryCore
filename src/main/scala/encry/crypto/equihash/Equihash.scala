@@ -7,6 +7,7 @@ import org.bouncycastle.crypto.Digest
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import scala.collection.mutable.ArrayBuffer
+import encry.crypto.equihash.EquihashValidationErrors._
 
 object Equihash {
 
@@ -174,14 +175,20 @@ object Equihash {
                        k: Char,
                        personal: Array[Byte],
                        header: Array[Byte],
-                       solutionIndices: IndexedSeq[Int]): Either[String, Boolean] = for {
-    _ <- Either.cond(n > 1, (), s"Incorrect n > 1 parameter: $n")
-    _ <- Either.cond(k >= 3, (), s"Incorrect k >= 3 parameter: $k")
-    _ <- Either.cond(n % 8 == 0, (), s"Incorrect n % 8 == 0 parameter: ${n % 8}")
-    _ <- Either.cond(n % (k + 1) == 0, (), s"Incorrect n % (k + 1) == 0 parameter: ${n % (k + 1)}")
+                       solutionIndices: IndexedSeq[Int]): Either[EquihashValidationErrors, Boolean] = for {
+    _ <- Either.cond(n > 1, (),
+      SolutionValidationError(s"Incorrect n > 1 parameter: $n"))
+    _ <- Either.cond(k >= 3, (),
+      SolutionValidationError(s"Incorrect k >= 3 parameter: $k"))
+    _ <- Either.cond(n % 8 == 0, (),
+      SolutionValidationError(s"Incorrect n % 8 == 0 parameter: ${n % 8}"))
+    _ <- Either.cond(n % (k + 1) == 0, (),
+      SolutionValidationError(s"Incorrect n % (k + 1) == 0 parameter: ${n % (k + 1)}"))
     solutionLength: Int = Math.pow(2, k).toInt
-    _ <- Either.cond(solutionIndices.size == solutionLength, (), s"Incorrect solution length: ${solutionIndices.size}")
-    _ <- Either.cond(solutionIndices.toSet.size == solutionIndices.size, (), "Duplicate solutions")
+    _ <- Either.cond(solutionIndices.size == solutionLength, (),
+      SolutionValidationError(s"Incorrect solution length: ${solutionIndices.size}"))
+    _ <- Either.cond(solutionIndices.toSet.size == solutionIndices.size, (),
+      SolutionValidationError("Duplicate solutions"))
     _ <- Either.cond({
       val bytesPerWord: Int = n / 8
       val wordsPerHash: Int = 512 / n
@@ -211,7 +218,8 @@ object Equihash {
         })
       }
       words.head == BigInteger.ZERO && pairWiseCheck && xorConditionsCheck
-    }, (), "Incorrect condition: words.head == BigInteger.ZERO && pairWiseCheck && xorConditionsCheck")
+    }, (),
+      SolutionValidationError("Incorrect condition: words.head == BigInteger.ZERO && pairWiseCheck && xorConditionsCheck"))
   } yield true
 
   def littleEndianIntToByteArray(i: Int): Array[Byte] = {
