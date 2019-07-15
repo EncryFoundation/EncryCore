@@ -49,12 +49,9 @@ class MemoryPool(settings: EncryAppSettings,
 
   def continueProcessing(currentNumberOfProcessedTransactions: Int): Receive =
     transactionsProcessor(currentNumberOfProcessedTransactions)
-      .orElse(schedulersMessagesHandler)
-      .orElse(awaitingMinedBlockHandler(MemoryPoolStateType.ProcessingNewTransaction))
-      .orElse(transactionsPropagationHandler)
-      .orElse {
-        case message => logger.debug(s"MemoryPool got unhandled message $message.")
-      }
+      .orElse(auxiliaryReceive(MemoryPoolStateType.ProcessingNewTransaction))
+
+  def disableTransactionsProcessor: Receive = auxiliaryReceive(MemoryPoolStateType.NotProcessingNewTransactions)
 
   def transactionsProcessor(currentNumberOfProcessedTransactions: Int): Receive = {
     case NewTransactions(transactions) =>
@@ -64,10 +61,10 @@ class MemoryPool(settings: EncryAppSettings,
       validatedTransactions.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
       logger.debug(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}." +
         s"Number of transactions for broadcast is ${validatedTransactions.size}.")
-      if (currentNumberOfProcessedTransactions > settings.node.mempoolTransactionsThreshold) {
-        logger.debug(s"MemoryPool has its threshold number of processed transactions. " +
+      if (currentNumberOfProcessedTransactions > settings.node.mempoolTransactionsLimit) {
+        logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
-          s"Current number of processed transactions is ${memoryPool.size}.")
+          s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
         Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
@@ -92,29 +89,21 @@ class MemoryPool(settings: EncryAppSettings,
       memoryPool = newMemoryPool
       logger.debug(s"MemoryPool got rolled back transactions. New pool size is ${memoryPool.size}." +
         s"Number of rolled back transactions is ${validatedTransactions.size}.")
-      if (currentNumberOfProcessedTransactions > settings.node.mempoolTransactionsThreshold) {
-        logger.debug(s"MemoryPool has its threshold number of processed transactions. " +
+      if (currentNumberOfProcessedTransactions > settings.node.mempoolTransactionsLimit) {
+        logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
-          s"Current number of processed transactions is ${memoryPool.size}.")
+          s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
+        Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
         logger.debug(s"Current number of processed transactions is OK. Continue to process them..." +
           s" Current number is $currentTransactionsNumber.")
-        Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
         context.become(continueProcessing(currentTransactionsNumber))
       }
   }
 
-  def disableTransactionsProcessor: Receive =
-    awaitingMinedBlockHandler(MemoryPoolStateType.NotProcessingNewTransactions)
-      .orElse(schedulersMessagesHandler)
-      .orElse(transactionsPropagationHandler)
-      .orElse {
-        case message => logger.debug(s"MemoryPool got unhandled message $message.")
-      }
-
-  def awaitingMinedBlockHandler(state: MemoryPoolStateType): Receive = {
+  def auxiliaryReceive(state: MemoryPoolStateType): Receive = {
     case SemanticallySuccessfulModifier(modifier) if modifier.modifierTypeId == Block.modifierTypeId =>
       logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
         s"Transit to a transactionsProcessor state.")
@@ -125,9 +114,7 @@ class MemoryPool(settings: EncryAppSettings,
     case SemanticallySuccessfulModifier(_) =>
       logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with non block modifier" +
         s"while $state. Do nothing in this case.")
-  }
 
-  def schedulersMessagesHandler: Receive = {
     case CleanupBloomFilter =>
       bloomFilterForTransactionsIds = initBloomFilter
 
@@ -142,9 +129,7 @@ class MemoryPool(settings: EncryAppSettings,
     case RemoveExpiredFromPool =>
       memoryPool = memoryPool.filter(memoryPool.isExpired)
       logger.debug(s"MemoryPool got RemoveExpiredFromPool message. After cleaning pool size is: ${memoryPool.size}.")
-  }
 
-  def transactionsPropagationHandler: Receive = {
     case RequestModifiersForTransactions(remote, ids) =>
       val modifiersIds: Seq[Transaction] = ids
         .map(Algos.encode)
@@ -153,6 +138,8 @@ class MemoryPool(settings: EncryAppSettings,
       sender() ! RequestedModifiersForRemote(remote, modifiersIds)
       logger.debug(s"MemoryPool got request modifiers message. Number of requested ids is ${ids.size}." +
         s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote.")
+
+    case message => logger.debug(s"MemoryPool got unhandled message $message.")
   }
 
   def initBloomFilter: BloomFilter[String] = BloomFilter.create(
