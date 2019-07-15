@@ -33,12 +33,13 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
@@ -48,36 +49,55 @@ final case class UtxoState(storage: VersionalStorage,
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = mod match {
     case header: Header =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      UtxoState(
+      logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
+      val state = UtxoState(
         storage,
         Height @@ header.height,
         header.timestamp
       ).asRight[List[ModifierApplyError]]
+      logger.info(s"Got updated state on header : ${Algos.encode(mod.id)} to state at height ${header.height}")
+      state
     case block: Block =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      val lastTxId = block.payload.txs.last.id
+      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${}")
+      val lastTxId: ModifierId = block.payload.txs.last.id
+      logger.info(s"lastTxId: ${Algos.encode(lastTxId)} on block  ${Algos.encode(mod.id)}")
       val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-      val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-        if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
+      logger.info(s"totalFees: $totalFees on block  ${Algos.encode(mod.id)}")
+      val res = block.payload.txs.map(tx => {
+        if (tx.id sameElements lastTxId) {
+          validate(tx, totalFees + EncrySupplyController.supplyAt(height))
+        }
         else validate(tx)
-      }).toList
-        .traverse(Validated.fromEither)
-        .toEither
-      res.fold(
-        err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
+      })
+      logger.info(s"Valid stage ready on block  ${Algos.encode(mod.id)}")
+      val res1 = res.toList
+      logger.info(s"to list cast ready on block  ${Algos.encode(mod.id)}")
+      val res2 = res1.traverse(Validated.fromEither)
+      logger.info(s"traverse cast ready on block  ${Algos.encode(mod.id)}")
+      val res3 = res2.toEither
+      logger.info(s"toEither cast ready on block  ${Algos.encode(mod.id)}")
+      res3.fold(
+        err => {
+          val err1 = err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState]
+          logger.info(s"Got error on state: $err1 on block  ${Algos.encode(mod.id)}")
+          err1
+        },
         txsToApply => {
           val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
+          logger.info(s"combinedStateChange success on block  ${Algos.encode(mod.id)}")
           storage.insert(
             StorageVersion !@@ block.id,
             combinedStateChange.outputsToDb,
             combinedStateChange.inputsToDb,
           )
-          UtxoState(
+          logger.info(s"insert successfully on block  ${Algos.encode(mod.id)}")
+          val k = UtxoState(
             storage,
             Height @@ block.header.height,
             block.header.timestamp
           ).asRight[List[ModifierApplyError]]
+          logger.info(s"New state created successfully on block  ${Algos.encode(mod.id)}")
+          k
         }
       )
   }
