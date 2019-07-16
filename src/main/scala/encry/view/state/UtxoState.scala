@@ -52,7 +52,7 @@ final case class UtxoState(storage: VersionalStorage,
       logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
       UtxoState(
         storage,
-        Height @@ header.height,
+        height,
         header.timestamp
       ).asRight[List[ModifierApplyError]]
     case block: Block =>
