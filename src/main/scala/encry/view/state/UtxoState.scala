@@ -151,7 +151,10 @@ final case class UtxoState(storage: VersionalStorage,
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
 
-  def close(): Unit = storage.close()
+  def close(): Unit = {
+    println(s"Call close utxo state")
+    storage.close()
+  }
 }
 
 object UtxoState extends StrictLogging {

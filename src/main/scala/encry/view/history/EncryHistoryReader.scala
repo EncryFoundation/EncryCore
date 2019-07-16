@@ -35,7 +35,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
     */
   def bestBlockOpt: Option[Block] =
-    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id).flatMap(getBlock)))
+    bestBlockIdOpt.flatMap(id => typedModifierById[Header](id).flatMap(getBlock))
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -142,9 +142,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   }
 
   def getBlock(header: Header): Option[Block] =
-    blocksCache.get(ByteArrayWrapper(header.id)).orElse(
-      typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload))
-    )
+    typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload))
+
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.

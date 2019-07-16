@@ -56,8 +56,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     System.exit(100)
   }
 
-  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: " +
-    s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
+//  context.system.scheduler.schedule(5.seconds, 10.seconds)(println(s"Modifiers cache from NVH: " +
+//    s"${ModifiersCache.size}. headers size: ${ModifiersCache.headersCollection.size}"))
 
   override def postStop(): Unit = {
     logger.warn(s"Stopping NodeViewHolder...")

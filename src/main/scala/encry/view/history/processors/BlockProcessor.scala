@@ -31,9 +31,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   protected[history] def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]]
 
   //contains last n proccesed blocks
-  var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
+  //var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
-  var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
+  //var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   /** Process full block when we have one.
     *
@@ -46,7 +46,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
     logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
-    addBlockToCacheIfNecessary(fullBlock)
+    //addBlockToCacheIfNecessary(fullBlock)
     processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
   }
 
@@ -108,24 +108,24 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     isBetter getOrElse false
   }
 
-  private def addBlockToCacheIfNecessary(b: Block): Unit =
-    if (b.header.height >= bestBlockHeight - TestNetConstants.MaxRollbackDepth) {
-      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
-      val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
-      blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
-      blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
-      // cleanup cache if necessary
-      if (blocksCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
-        blocksCacheIndexes.get(bestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
-          val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
-          logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
-          blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
-        }
-        blocksCacheIndexes = blocksCacheIndexes - (bestBlockHeight - TestNetConstants.MaxRollbackDepth)
-      }
-      logger.debug(s"headersCache size: ${blocksCache.size}")
-      logger.debug(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")
-    }
+//  private def addBlockToCacheIfNecessary(b: Block): Unit =
+//    if (b.header.height >= bestBlockHeight - TestNetConstants.MaxRollbackDepth) {
+//      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
+//      val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
+//      blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
+//      blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
+//      // cleanup cache if necessary
+//      if (blocksCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
+//        blocksCacheIndexes.get(bestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
+//          val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
+//          logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
+//          blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
+//        }
+//        blocksCacheIndexes = blocksCacheIndexes - (bestBlockHeight - TestNetConstants.MaxRollbackDepth)
+//      }
+//      logger.info(s"headersCache size: ${blocksCache.size}")
+//      logger.info(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")
+//    }
 
   private def nonBestBlock: BlockProcessing = {
     case params =>

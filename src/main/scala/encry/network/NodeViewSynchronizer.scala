@@ -157,7 +157,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
           nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
-        } else peersKeeper ! BanPeer(remote, SentInvForPayload)
+        } else Unit //peersKeeper ! BanPeer(remote, SentInvForPayload)
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case msg@RequestPeersForFirstSyncInfo =>

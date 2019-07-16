@@ -19,7 +19,7 @@ object ModifiersCache extends StrictLogging {
   private type Key = mutable.WrappedArray[Byte]
 
   val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
-  private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
+  var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
 
   private var isChainSynced = false
 
