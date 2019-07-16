@@ -89,7 +89,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         .keys.isEmpty)
       assert(deliveryManager.underlyingActor.receivedModifiers.size == blocks.size)
       assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => headersAsKey.contains(elem)))
-      assert(deliveryManager.underlyingActor.headersForPriorityRequest.forall(x => headersAsKey.contains(x._1)))
+      //assert(deliveryManager.underlyingActor.payloadsForPriorityRequest.forall(x => headersAsKey.contains(x._1)))
       deliveryManager.stop()
     }
     "Delivery manager should not handle repeating modifiers" in {
@@ -106,7 +106,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1)
       assert(deliveryManager.underlyingActor.receivedModifiers.size == headersIds.size)
       assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => headersAsKey.contains(elem)))
-      assert(deliveryManager.underlyingActor.headersForPriorityRequest.forall(x => headersAsKey.contains(x._1)))
+      //assert(deliveryManager.underlyingActor.payloadsForPriorityRequest.forall(x => headersAsKey.contains(x._1)))
       deliveryManager.stop()
     }
     "handle priority request for payload correctly" in {
@@ -123,7 +123,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
           block.id.sameElements(id)).get.payload.id, Some(id)))
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress, Map.empty)
         .size == blocks.size)
-      assert(deliveryManager.underlyingActor.headersForPriorityRequest.isEmpty)
+      //assert(deliveryManager.underlyingActor.payloadsForPriorityRequest.isEmpty)
       deliveryManager.stop()
     }
     "choose correct peer in priority request" in {

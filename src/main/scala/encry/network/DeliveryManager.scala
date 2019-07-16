@@ -26,7 +26,7 @@ import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
-import encry.view.mempool.Mempool.RequestForTransactions
+import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
