@@ -14,35 +14,35 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
 
-final case class ModifiersCache(cache: Map[Key, PersistentModifier],
-                                headersCollection: SortedMap[Int, List[ModifierId]],
+final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
+                                headersCache: SortedMap[Int, List[ModifierId]],
                                 settings: EncryAppSettings) extends StrictLogging {
 
-  val size: Int = cache.size
+  val size: Int = modifiersCache.size
 
   val isEmpty: Boolean = size == 0
 
-  def contains(key: Key): Boolean = cache.contains(key)
+  def contains(key: Key): Boolean = modifiersCache.contains(key)
+
+  private def findUnApplicable(h: EncryHistory): ((Key, PersistentModifier)) => Boolean =
+    elemsTuple => historyTestApplicable(h)(elemsTuple._2)
+
+  private def historyTestApplicable(h: EncryHistory): PersistentModifier => Boolean = mod => h.testApplicable(mod) match {
+    case Right(_) | Left(_: NonFatalValidationError) => false
+    case _ => true
+  }
 
   def put(modifier: PersistentModifier, history: EncryHistory): ModifiersCache =
     if (!contains(key(modifier.id))) {
-      logger.debug(s"Modifier of type ${modifier.modifierTypeId} with id ${modifier.encodedId} putted into cache.")
-      val updatedCache: Map[Key, PersistentModifier] = cache.updated(key(modifier.id), modifier)
-      val updatedHeadersCollection: SortedMap[Int, List[ModifierId]] = modifier match {
+      logger.debug(s"Modifier of type ${modifier.modifierTypeId} with id ${modifier.encodedId} put into modifiersCache.")
+      val updatedCache: Map[Key, PersistentModifier] = modifiersCache.updated(key(modifier.id), modifier)
+      val updatedHeadersCache: SortedMap[Int, List[ModifierId]] = modifier match {
         case header: Header =>
-          val possibleHeadersAtCurrentHeight: List[ModifierId] =
-            headersCollection.getOrElse(header.height, List.empty[ModifierId])
-          logger.debug(s"possibleHeadersAtCurrentHeight(${header.height}):" +
-            s" ${possibleHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
-          val updatedHeadersAtCurrentHeight: List[ModifierId] = header.id :: possibleHeadersAtCurrentHeight
-          logger.debug(s"updatedHeadersAtCurrentHeight(${header.height}):" +
-            s"${updatedHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
-          headersCollection.updated(header.height, updatedHeadersAtCurrentHeight)
-        case _ =>
-          logger.debug(s"Modifiers cache got payload. Don't update headers collection.")
-          headersCollection
+          headersCache
+            .updated(header.height, header.id :: headersCache.getOrElse(header.height, List.empty[ModifierId]))
+        case _ => headersCache
       }
-      val resultedCache: Map[Key, PersistentModifier] =
+      val filteredModifiersCache: Map[Key, PersistentModifier] =
         if (updatedCache.size > settings.node.modifiersCacheSize) updatedCache.find { case (_, mod) =>
           history.testApplicable(mod) match {
             case Right(_) | Left(_: NonFatalValidationError) => false
@@ -52,7 +52,7 @@ final case class ModifiersCache(cache: Map[Key, PersistentModifier],
           case Some(value) => updatedCache - value._1
           case None => updatedCache
         } else updatedCache
-      ModifiersCache(resultedCache, updatedHeadersCollection, settings)
+      ModifiersCache(filteredModifiersCache, updatedHeadersCache, settings)
     } else this
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
@@ -162,14 +162,14 @@ object ModifiersCache extends StrictLogging {
   //val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
   //private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
 
-//  def remove(key: Key): Option[PersistentModifier] = {
-//    logger.debug(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
-//    cache.remove(key)
-//  }
+  //  def remove(key: Key): Option[PersistentModifier] = {
+  //    logger.debug(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
+  //    cache.remove(key)
+  //  }
 
-//  def popCandidate(history: EncryHistory): List[PersistentModifier] = synchronized {
-//    findCandidateKey(history).flatMap(k => remove(k))
-//  }
+  //  def popCandidate(history: EncryHistory): List[PersistentModifier] = synchronized {
+  //    findCandidateKey(history).flatMap(k => remove(k))
+  //  }
 
   //  override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 }
