@@ -101,7 +101,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
-      heightOfThisHeader <- headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
+      heightOfThisHeader <- typedModifierById[Header](id).map(_.height)
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
@@ -146,7 +146,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
-      .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
+      .flatMap(id => typedModifierById[Header](id))
       .flatMap(h => Seq(h.payloadId))
     historyStorage.removeObjects(toRemove)
   }
