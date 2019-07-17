@@ -10,7 +10,7 @@ import encry.settings.RESTApiSettings
 case class CompositeHttpService(system: ActorSystem,
                                 routes: Seq[ApiRoute],
                                 settings: RESTApiSettings,
-                                swaggerConf: String) extends CorsSupport {
+                                swaggerConf: String) {
 
   implicit val actorSystem: ActorSystem = system
 

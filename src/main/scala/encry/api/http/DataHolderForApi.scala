@@ -26,28 +26,42 @@ class DataHolderForApi(settings: EncryAppSettings,
                    history: Option[EncryHistoryReader] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
-                   minerStatus: MinerStatus = MinerStatus(isMining = false, None)): Receive = {
+                   minerStatus: MinerStatus = MinerStatus(isMining = false, None),
+                   blockInfo: BlockInfo = BlockInfo(0, "", 0, ""),
+                   allPeers: Seq[InetSocketAddress] = Seq.empty): Receive = {
     case UpdatingTransactionsNumberForApi(qty) =>
-      context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus))
+      context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
-    case ChangedHistory(reader: EncryHistoryReader@unchecked) if reader.isInstanceOf[EncryHistoryReader] =>
-      context.become(workingCycle(blackList, connectedPeers, Some(reader), state, transactionsOnMinerActor, minerStatus))
+    case ChangedHistory(reader: EncryHistoryReader) =>
+    val info: BlockInfo = BlockInfo(reader.bestHeaderOpt.map(_.height).getOrElse(0), reader.bestHeaderOpt.map(_.encodedId).getOrElse(""),
+      reader.bestBlockOpt.map(_.header.height).getOrElse(0) ,reader.bestBlockOpt.map(_.header.encodedId).getOrElse(""))
+      context.become(workingCycle(blackList, connectedPeers, Some(reader), state, transactionsOnMinerActor, minerStatus,
+        info, allPeers))
 
-    case ChangedState(reader: UtxoStateReader@unchecked) if reader.isInstanceOf[UtxoStateReader] =>
-      context.become(workingCycle(blackList, connectedPeers, history, Some(reader), transactionsOnMinerActor, minerStatus))
+    case ChangedState(reader: UtxoStateReader)  =>
+      context.become(workingCycle(blackList, connectedPeers, history, Some(reader), transactionsOnMinerActor, minerStatus,
+        blockInfo, allPeers))
 
     case UpdatingMinerStatus(status) =>
-      context.become(workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, status))
+      context.become(workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, status,
+        blockInfo, allPeers))
 
     case UpdatingConnectedPeers(peers) =>
-      context.become(workingCycle(blackList, peers, history, state, transactionsOnMinerActor, minerStatus))
+      context.become(workingCycle(blackList, peers, history, state, transactionsOnMinerActor, minerStatus,
+        blockInfo, allPeers))
 
-    case GetConnectedPeers => sender() ! connectedPeers
-    case GetDataFromHistory => history.foreach(sender() ! _)
-    case GetMinerStatus => sender() ! minerStatus
-    case GetReaders => sender() ! Readers(history, state)
-    case GetTransactionsNumber => sender() ! transactionsOnMinerActor
-    case _ =>
+    case UpdatingAllKnownPeers(peers) =>
+      context.become(workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, minerStatus,
+        blockInfo, peers))
+
+    case GetConnectedPeers      => sender() ! connectedPeers
+    case GetDataFromHistory     => history.foreach(sender() ! _)
+    case GetMinerStatus         => sender() ! minerStatus
+    case GetReaders             => sender() ! Readers(history, state)
+    case GetTransactionsNumber  => sender() ! transactionsOnMinerActor
+    case GetBlockInfo           => sender() ! blockInfo
+    case GetAllPeers            => sender() ! allPeers
+    case _                      =>
   }
 }
 
@@ -63,6 +77,10 @@ object DataHolderForApi {
 
   final case class UpdatingConnectedPeers(peers: Seq[ConnectedPeer])
 
+  final case class UpdatingAllKnownPeers(peers: Seq[InetSocketAddress])
+
+  final case class BlockInfo(headerHeight: Int, headerId: String, fullHeight: Int, bestFullHeaderId: String)
+
   case object GetTransactionsNumber
 
   case object GetReaders
@@ -72,6 +90,10 @@ object DataHolderForApi {
   case object GetDataFromHistory
 
   case object GetMinerStatus
+
+  case object GetAllPeers
+
+  case object GetBlockInfo
 
   final case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader])
 

@@ -1,11 +1,12 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.UpdatingConnectedPeers
+import encry.api.http.DataHolderForApi.{UpdatingAllKnownPeers, UpdatingConnectedPeers}
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
@@ -23,6 +24,7 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.{HighPriority, InitialPriority}
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
+
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
@@ -57,9 +59,10 @@ class PeersKeeper(settings: EncryAppSettings,
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
-    context.system.scheduler.schedule(5.seconds, 5.seconds)(
+    context.system.scheduler.schedule(5.seconds, 5.seconds){
       dataHolder ! UpdatingConnectedPeers(connectedPeers.collect(getAllPeers, getConnectedPeers))
-    )
+      dataHolder ! UpdatingAllKnownPeers(knownPeers.keys.toSeq)
+  }
   }
 
   override def receive: Receive = workingBehaviour(isBlockChainSynced = false)
@@ -306,13 +309,9 @@ object PeersKeeper {
 
   final case class UpdatedPeersCollection(peers: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
 
-
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
 
-
   case object GetKnownPeers
-
-  case object GetInfoAboutConnectedPeers
 
   def props(settings: EncryAppSettings,
             nodeViewSync: ActorRef,

@@ -39,20 +39,6 @@ trait EncryBaseApiRoute extends ApiRoute {
     }
   }
 
-  val accountAddress: Directive1[Address] = pathPrefix(Segment).flatMap { addr =>
-    Base58Check.decode(addr) match {
-      case Success(_) => provide(addr)
-      case _ => reject
-    }
-  }
-
-  val boxId: Directive1[ADKey] = pathPrefix(Segment).flatMap { key =>
-    Algos.decode(key) match {
-      case Success(k) => provide(ADKey @@ k)
-      case _ => reject
-    }
-  }
-
   implicit class OkJsonResp(fn: Future[Json]) {
     def okJson(): Route = toJsonResponse(fn)
   }

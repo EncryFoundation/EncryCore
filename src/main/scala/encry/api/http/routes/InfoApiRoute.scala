@@ -6,7 +6,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.local.miner.Miner.MinerStatus
 import encry.settings._
-import encry.api.http.DataHolderForApi.{GetConnectedPeers, GetMinerStatus, GetReaders, GetTransactionsNumber, Readers}
+import encry.api.http.DataHolderForApi.{BlockInfo, GetBlockInfo, GetConnectedPeers, GetMinerStatus, GetReaders, GetTransactionsNumber, Readers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import io.circe.Json
@@ -24,6 +24,17 @@ case class InfoApiRoute(dataHolder: ActorRef,
 
   override val settings: RESTApiSettings = appSettings.restApi
 
+  private val getNodeName: String = appSettings.network.nodeName
+    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
+
+  private val getStateType: String = "UTXO"
+
+  private val storageInfo: String = if (appSettings.postgres.exists(_.enableSave)) "Postgres(write)" else ""
+
+  private val getAddress: Seq[InetSocketAddress] = appSettings.network.knownPeers
+
+  private val getConnectionWithPeers: Boolean = appSettings.network.connectOnlyWithKnownPeers.getOrElse(false)
+
   private val launchTimeFuture: Future[NetworkTime.Time] = timeProvider.time()
 
   override val route: Route = (path("info") & get) {
@@ -31,42 +42,41 @@ case class InfoApiRoute(dataHolder: ActorRef,
     val connectedPeersF: Future[Int] = getConnectedPeers
     val readersF: Future[Readers] = (dataHolder ? GetReaders).mapTo[Readers]
     val mempoolSize: Future[Int] = (dataHolder ? GetTransactionsNumber).mapTo[Int]
+    val blockInfoF: Future[BlockInfo] = (dataHolder ? GetBlockInfo).mapTo[BlockInfo]
     (for {
-      minerInfo      <- minerInfoF
-      connectedPeers <- connectedPeersF
-      readers        <- readersF
-      currentTime    <- timeProvider.time()
-      launchTime     <- launchTimeFuture
-      memSize        <- mempoolSize
-      storage        = storageInfo
-      nodeUptime     = currentTime - launchTime
-    } yield InfoApiRoute.makeInfoJson(nodeId,
+      minerInfo         <- minerInfoF
+      connectedPeers    <- connectedPeersF
+      readers           <- readersF
+      currentTime       <- timeProvider.time()
+      launchTime        <- launchTimeFuture
+      memSize           <- mempoolSize
+      nodeUptime        = currentTime - launchTime
+      bInfo             <- blockInfoF
+      headerHeight      = bInfo.headerHeight
+      headerId          = bInfo.headerId
+      fullHeight        = bInfo.fullHeight
+      bestFullHeaderId  = bInfo.bestFullHeaderId
+    } yield InfoApiRoute.makeInfoJson(
+      nodeId,
       minerInfo,
       connectedPeers,
       readers,
       getStateType,
       getNodeName,
       getAddress,
-      storage,
+      storageInfo,
       nodeUptime,
       memSize,
-      getConnectionWithPeers)).okJson()
+      getConnectionWithPeers,
+      headerHeight,
+      headerId,
+      fullHeight,
+      bestFullHeaderId)).okJson()
   }
 
   private def getConnectedPeers: Future[Int] = (dataHolder ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
 
-  private def getStateType: String = "UTXO"
-
-  private def getNodeName: String = appSettings.network.nodeName
-    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
-
-  private def storageInfo: String = if (appSettings.postgres.exists(_.enableSave)) "Postgres(write)" else ""
-
-  private def getAddress: Seq[InetSocketAddress] = appSettings.network.knownPeers
-
   private def getMinerInfo: Future[MinerStatus] = (dataHolder ? GetMinerStatus).mapTo[MinerStatus]
-
-  private def getConnectionWithPeers: Boolean = appSettings.network.connectOnlyWithKnownPeers.getOrElse(false)
 }
 
 object InfoApiRoute {
@@ -81,17 +91,26 @@ object InfoApiRoute {
                    storage: String,
                    nodeUptime: Long,
                    mempoolSize: Int,
-                   connectWithOnlyKnownPeer: Boolean): Json = {
+                   connectWithOnlyKnownPeer: Boolean,
+                   headerHeight: Int,
+                   headerId: String,
+                   fullHeight: Int,
+                   bestFullHeaderId: String
+                  ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
     val bestHeader: Option[Header] = readers.h.flatMap(_.bestHeaderOpt)
     val bestFullBlock: Option[Block] = readers.h.flatMap(_.bestBlockOpt)
+    val prevFullHeaderId: Option[String] = bestFullBlock.map(_.header.parentId).map(Algos.encode) match {
+      case Some(value) => Some(value)
+      case None => Option("")
+    }
     Map(
       "name"                      -> nodeName.asJson,
-      "headersHeight"             -> bestHeader.map(_.height).getOrElse(0).asJson,
-      "fullHeight"                -> bestFullBlock.map(_.header.height).getOrElse(0).asJson,
-      "bestHeaderId"              -> bestHeader.map(_.encodedId).asJson,
-      "bestFullHeaderId"          -> bestFullBlock.map(_.header.encodedId).asJson,
-      "previousFullHeaderId"      -> bestFullBlock.map(_.header.parentId).map(Algos.encode).asJson,
+      "headersHeight"             -> headerHeight.asJson,
+      "fullHeight"                -> fullHeight.asJson,
+      "bestHeaderId"              -> headerId.asJson,
+      "bestFullHeaderId"          -> bestFullHeaderId.asJson,
+      "previousFullHeaderId"      -> prevFullHeaderId.asJson,
       "difficulty"                -> bestFullBlock.map(block => block.header.difficulty.toString)
         .getOrElse(TestNetConstants.InitialDifficulty.toString).asJson,
       "unconfirmedCount"          -> mempoolSize.asJson,
