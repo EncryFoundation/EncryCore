@@ -268,7 +268,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       else peersCollection.contains(peer.socketAddress)
     if (mTypeId != Transaction.modifierTypeId)
       logger.info(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
-        s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition.")
+        s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition." +
+        s"Mods are: ${modifierIds.map(Algos.encode).mkString(",")}")
     if ((firstCondition || secondCondition) && thirdCondition && expectedModifiers.isEmpty) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
