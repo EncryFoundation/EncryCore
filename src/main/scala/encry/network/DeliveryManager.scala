@@ -119,7 +119,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case _ =>
       }
 
-    case CheckModifiersToDownload =>
+    case CheckModifiersToDownload if expectedModifiers.isEmpty =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
@@ -133,6 +133,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
+      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+
+    case CheckModifiersToDownload =>
+      logger.debug(s"CheckModifiersToDownload expectedModifiers is empty: ${expectedModifiers.isEmpty}")
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
 
     case SemanticallySuccessfulModifier(mod) => receivedModifiers -= toKey(mod.id)
