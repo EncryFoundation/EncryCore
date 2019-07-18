@@ -28,6 +28,8 @@ case class InfoApiRoute(dataHolder: ActorRef,
   private val getNodeName: String = appSettings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
 
+
+  //todo: remove later
   private val getStateType: String = "UTXO"
 
   private val storageInfo: String = if (appSettings.postgres.exists(_.enableSave)) "Postgres(write)" else ""
