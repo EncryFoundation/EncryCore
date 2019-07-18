@@ -58,8 +58,10 @@ class PeersKeeper(settings: EncryAppSettings,
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds){
-      def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType):
-      (InetAddress, (BanReason, BanTime, BanType)) = address -> (r, t, bt)
+      def mapReason(address: InetAddress,
+                    r: BanReason,
+                    t: BanTime,
+                    bt: BanType): (InetAddress, (BanReason, BanTime, BanType)) = address -> (r, t, bt)
       dataHolder ! UpdatingPeersInfo(
         knownPeers.keys.toSeq,
         connectedPeers.collect(getAllPeers, getConnectedPeers),

@@ -83,10 +83,10 @@ object InfoApiRoute {
     val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     Map(
       "name"                      -> nodeName.asJson,
-      "headersHeight"             -> header.map(_.height).asJson,
-      "fullHeight"                -> block.map(_.header.height).asJson,
-      "bestHeaderId"              -> header.map(_.encodedId).asJson,
-      "bestFullHeaderId"          -> block.map(_.encodedId).asJson,
+      "headersHeight"             -> header.map(_.height).getOrElse(0).asJson,
+      "fullHeight"                -> block.map(_.header.height).getOrElse(0).asJson,
+      "bestHeaderId"              -> header.map(_.encodedId).getOrElse("").asJson,
+      "bestFullHeaderId"          -> block.map(_.encodedId).getOrElse("").asJson,
       "previousFullHeaderId"      -> prevFullHeaderId.asJson,
       "difficulty"                -> block.map(_.header.difficulty.toString)
         .getOrElse(TestNetConstants.InitialDifficulty.toString).asJson,
