@@ -4,14 +4,15 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
+import encry.api.http.DataHolderForApi._
 import encry.local.miner.Miner.MinerStatus
-import encry.settings._
-import encry.api.http.DataHolderForApi.{BlockInfo, GetBlockInfo, GetConnectedPeers, GetMinerStatus, GetReaders, GetTransactionsNumber, Readers}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
+import encry.view.history.EncryHistoryReader
 import io.circe.Json
 import io.circe.syntax._
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.concurrent.Future
@@ -38,45 +39,38 @@ case class InfoApiRoute(dataHolder: ActorRef,
   private val launchTimeFuture: Future[NetworkTime.Time] = timeProvider.time()
 
   override val route: Route = (path("info") & get) {
-    val minerInfoF: Future[MinerStatus] = getMinerInfo
-    val connectedPeersF: Future[Int] = getConnectedPeers
-    val readersF: Future[Readers] = (dataHolder ? GetReaders).mapTo[Readers]
-    val mempoolSize: Future[Int] = (dataHolder ? GetTransactionsNumber).mapTo[Int]
-    val blockInfoF: Future[BlockInfo] = (dataHolder ? GetBlockInfo).mapTo[BlockInfo]
+    val askAllF = (dataHolder ? GetAllInfo)
+      .mapTo[(Seq[ConnectedPeer], Option[EncryHistoryReader], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
     (for {
-      minerInfo         <- minerInfoF
-      connectedPeers    <- connectedPeersF
-      readers           <- readersF
-      currentTime       <- timeProvider.time()
-      launchTime        <- launchTimeFuture
-      memSize           <- mempoolSize
-      nodeUptime        = currentTime - launchTime
-      bInfo             <- blockInfoF
-      headerHeight      = bInfo.headerHeight
-      headerId          = bInfo.headerId
-      fullHeight        = bInfo.fullHeight
-      bestFullHeaderId  = bInfo.bestFullHeaderId
+      (connectedPeers, _, minerInfo, state, txsQty, blocksInfo, _) <- askAllF
+      minerInfo1         =  minerInfo
+      connectedPeers1    =  connectedPeers.size
+      readers1           = state
+      currentTime        <- timeProvider.time()
+      launchTime         <- launchTimeFuture
+      memSize1           = txsQty
+      nodeUptime         = currentTime - launchTime
+      headerHeight1      = blocksInfo.header.map(_.height).getOrElse(0)
+      headerId1          = blocksInfo.header.map(_.encodedId).getOrElse("")
+      fullHeight1        = blocksInfo.block.map(_.header.height).getOrElse(0)
+      bestFullHeaderId1  = blocksInfo.block.map(_.encodedId).getOrElse("")
     } yield InfoApiRoute.makeInfoJson(
       nodeId,
-      minerInfo,
-      connectedPeers,
-      readers,
+      minerInfo1,
+      connectedPeers1,
+      readers1,
       getStateType,
       getNodeName,
       getAddress,
       storageInfo,
       nodeUptime,
-      memSize,
+      memSize1,
       getConnectionWithPeers,
-      headerHeight,
-      headerId,
-      fullHeight,
-      bestFullHeaderId)).okJson()
+      headerHeight1,
+      headerId1,
+      fullHeight1,
+      bestFullHeaderId1)).okJson()
   }
-
-  private def getConnectedPeers: Future[Int] = (dataHolder ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map(_.size)
-
-  private def getMinerInfo: Future[MinerStatus] = (dataHolder ? GetMinerStatus).mapTo[MinerStatus]
 }
 
 object InfoApiRoute {

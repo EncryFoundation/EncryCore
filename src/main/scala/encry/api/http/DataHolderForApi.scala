@@ -11,6 +11,7 @@ import encry.view.history.EncryHistoryReader
 import encry.view.state.UtxoStateReader
 import encry.local.miner.Miner.MinerStatus
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 
 class DataHolderForApi(settings: EncryAppSettings,
                        ntp: NetworkTimeProvider) extends Actor with StrictLogging {
@@ -27,14 +28,13 @@ class DataHolderForApi(settings: EncryAppSettings,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
-                   blockInfo: BlockInfo = BlockInfo(0, "", 0, ""),
+                   blockInfo: BlockAndHeaderInfo = BlockAndHeaderInfo(None, None),
                    allPeers: Seq[InetSocketAddress] = Seq.empty): Receive = {
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
     case ChangedHistory(reader: EncryHistoryReader) =>
-    val info: BlockInfo = BlockInfo(reader.bestHeaderOpt.map(_.height).getOrElse(0), reader.bestHeaderOpt.map(_.encodedId).getOrElse(""),
-      reader.bestBlockOpt.map(_.header.height).getOrElse(0) ,reader.bestBlockOpt.map(_.header.encodedId).getOrElse(""))
+    val info: BlockAndHeaderInfo = BlockAndHeaderInfo(reader.bestHeaderOpt, reader.bestBlockOpt)
       context.become(workingCycle(blackList, connectedPeers, Some(reader), state, transactionsOnMinerActor, minerStatus,
         info, allPeers))
 
@@ -61,6 +61,16 @@ class DataHolderForApi(settings: EncryAppSettings,
     case GetTransactionsNumber  => sender() ! transactionsOnMinerActor
     case GetBlockInfo           => sender() ! blockInfo
     case GetAllPeers            => sender() ! allPeers
+    case GetAllInfo =>
+      sender() ! (
+        connectedPeers,
+        history,
+        minerStatus,
+        Readers(history, state),
+        transactionsOnMinerActor,
+        blockInfo,
+        allPeers
+      )
     case _                      =>
   }
 }
@@ -79,7 +89,7 @@ object DataHolderForApi {
 
   final case class UpdatingAllKnownPeers(peers: Seq[InetSocketAddress])
 
-  final case class BlockInfo(headerHeight: Int, headerId: String, fullHeight: Int, bestFullHeaderId: String)
+  final case class BlockAndHeaderInfo(header: Option[Header], block: Option[Block])
 
   case object GetTransactionsNumber
 
@@ -94,6 +104,8 @@ object DataHolderForApi {
   case object GetAllPeers
 
   case object GetBlockInfo
+
+  case object GetAllInfo
 
   final case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader])
 
