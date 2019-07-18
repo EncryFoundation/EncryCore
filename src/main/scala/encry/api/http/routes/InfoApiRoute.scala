@@ -98,12 +98,8 @@ object InfoApiRoute {
                    bestFullHeaderId: String
                   ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
-    val bestHeader: Option[Header] = readers.h.flatMap(_.bestHeaderOpt)
     val bestFullBlock: Option[Block] = readers.h.flatMap(_.bestBlockOpt)
-    val prevFullHeaderId: Option[String] = bestFullBlock.map(_.header.parentId).map(Algos.encode) match {
-      case Some(value) => Some(value)
-      case None => Option("")
-    }
+    val prevFullHeaderId: String = bestFullBlock.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     Map(
       "name"                      -> nodeName.asJson,
       "headersHeight"             -> headerHeight.asJson,
