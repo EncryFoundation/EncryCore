@@ -50,10 +50,7 @@ class DataHolderForApi(settings: EncryAppSettings,
         blockInfo, allPeers))
 
     case UpdatingPeersInfo(allP, connectedP, bannedP) =>
-      def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType):
-      (InetAddress, (BanReason, BanTime, BanType)) = address -> (r, t, bt)
-     val bannedPeers: Seq[(InetAddress, (BanReason, BanTime, BanType))] = bannedP.collect((_, _, _, _) => true, mapReason)
-      context.become(workingCycle(bannedPeers, connectedP, history, state, transactionsOnMinerActor, minerStatus,
+      context.become(workingCycle(bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus,
         blockInfo, allP))
 
     case GetConnectedPeers      => sender() ! connectedPeers
@@ -88,7 +85,10 @@ object DataHolderForApi {
 
   final case class UpdatingMinerStatus(minerStatus: MinerStatus)
 
-  final case class UpdatingPeersInfo(allPeers: Seq[InetSocketAddress], connectedPeers: Seq[ConnectedPeer], blackList: BlackList)
+  final case class UpdatingPeersInfo(
+                                      allPeers: Seq[InetSocketAddress],
+                                      connectedPeers: Seq[ConnectedPeer],
+                                      blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))])
 
   final case class BlockAndHeaderInfo(header: Option[Header], block: Option[Block])
 

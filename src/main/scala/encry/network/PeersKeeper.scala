@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
@@ -24,7 +23,6 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.{HighPriority, InitialPriority}
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
-
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
@@ -60,7 +58,13 @@ class PeersKeeper(settings: EncryAppSettings,
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds){
-      dataHolder ! UpdatingPeersInfo(knownPeers.keys.toSeq, connectedPeers.collect(getAllPeers, getConnectedPeers), blackList)
+      def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType):
+      (InetAddress, (BanReason, BanTime, BanType)) = address -> (r, t, bt)
+      dataHolder ! UpdatingPeersInfo(
+        knownPeers.keys.toSeq,
+        connectedPeers.collect(getAllPeers, getConnectedPeers),
+        blackList.collect((_, _, _, _) => true, mapReason)
+      )
   }
   }
 

@@ -2,7 +2,6 @@ package encry.api.http.routes
 
 import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeers, GetConnectedPeers}
@@ -14,23 +13,19 @@ import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
 import scala.concurrent.Future
-import scala.util.matching.Regex
 
 case class PeersApiRoute(override val settings: RESTApiSettings,
                          dataHolder: ActorRef)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override lazy val route: Route = pathPrefix("peers") {
-    connect ~ connectedPeers ~ allPeers ~ bannedList
+   connectedPeers ~ allPeers ~ bannedList
   }
 
-  private val addressAndPortRegexp: Regex = "\\w+:\\d{1,5}".r
-
   def allPeers: Route = (path("all") & get) {
-    val result: Future[Seq[String]] =
-      (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]].map {
-        _.map(_.toString)
-      }
-    onSuccess(result) { r => complete(r) }
+    val result: Future[Seq[String]] = (dataHolder ? GetAllPeers)
+      .mapTo[Seq[InetSocketAddress]]
+      .map(_.map(_.toString))
+    onSuccess(result)(r => complete(r))
   }
 
   def connectedPeers: Route = (path("connected") & get) {
@@ -50,17 +45,6 @@ case class PeersApiRoute(override val settings: RESTApiSettings,
       _.map(_.toString)
       }
     onSuccess(result) {r => complete(r)}
-  }
-
-  def connect: Route = (path("connect") & post & entity(as[String])) { body =>
-    complete {
-      if (addressAndPortRegexp.findFirstMatchIn(body).isDefined) {
-        val Array(host, port) = body.split(":")
-        val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(host), port.toInt)
-        //networkController ! ConnectTo(add)
-        StatusCodes.OK
-      } else StatusCodes.BadRequest
-    }
   }
 }
 
