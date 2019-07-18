@@ -1,6 +1,7 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi._
@@ -10,6 +11,8 @@ import encry.utils.NetworkTimeProvider
 import encry.view.history.EncryHistoryReader
 import encry.view.state.UtxoStateReader
 import encry.local.miner.Miner.MinerStatus
+import encry.network.BlackList
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 
@@ -22,7 +25,7 @@ class DataHolderForApi(settings: EncryAppSettings,
 
   override def receive: Receive = workingCycle()
 
-  def workingCycle(blackList: Seq[InetAddress] = Seq.empty,
+  def workingCycle(blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
                    history: Option[EncryHistoryReader] = None,
                    state: Option[UtxoStateReader] = None,
@@ -46,13 +49,12 @@ class DataHolderForApi(settings: EncryAppSettings,
       context.become(workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, status,
         blockInfo, allPeers))
 
-    case UpdatingConnectedPeers(peers) =>
-      context.become(workingCycle(blackList, peers, history, state, transactionsOnMinerActor, minerStatus,
-        blockInfo, allPeers))
-
-    case UpdatingAllKnownPeers(peers) =>
-      context.become(workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, minerStatus,
-        blockInfo, peers))
+    case UpdatingPeersInfo(allP, connectedP, bannedP) =>
+      def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType):
+      (InetAddress, (BanReason, BanTime, BanType)) = address -> (r, t, bt)
+     val bannedPeers: Seq[(InetAddress, (BanReason, BanTime, BanType))] = bannedP.collect((_, _, _, _) => true, mapReason)
+      context.become(workingCycle(bannedPeers, connectedP, history, state, transactionsOnMinerActor, minerStatus,
+        blockInfo, allP))
 
     case GetConnectedPeers      => sender() ! connectedPeers
     case GetDataFromHistory     => history.foreach(sender() ! _)
@@ -61,6 +63,7 @@ class DataHolderForApi(settings: EncryAppSettings,
     case GetTransactionsNumber  => sender() ! transactionsOnMinerActor
     case GetBlockInfo           => sender() ! blockInfo
     case GetAllPeers            => sender() ! allPeers
+    case GetBannedPeers         => sender() ! blackList
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
@@ -85,9 +88,7 @@ object DataHolderForApi {
 
   final case class UpdatingMinerStatus(minerStatus: MinerStatus)
 
-  final case class UpdatingConnectedPeers(peers: Seq[ConnectedPeer])
-
-  final case class UpdatingAllKnownPeers(peers: Seq[InetSocketAddress])
+  final case class UpdatingPeersInfo(allPeers: Seq[InetSocketAddress], connectedPeers: Seq[ConnectedPeer], blackList: BlackList)
 
   final case class BlockAndHeaderInfo(header: Option[Header], block: Option[Block])
 
@@ -104,6 +105,8 @@ object DataHolderForApi {
   case object GetAllPeers
 
   case object GetBlockInfo
+
+  case object GetBannedPeers
 
   case object GetAllInfo
 

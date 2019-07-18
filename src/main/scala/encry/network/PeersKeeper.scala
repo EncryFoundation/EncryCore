@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{UpdatingAllKnownPeers, UpdatingConnectedPeers}
+import encry.api.http.DataHolderForApi.{UpdatingPeersInfo}
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.History.HistoryComparisonResult
@@ -60,8 +60,7 @@ class PeersKeeper(settings: EncryAppSettings,
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds){
-      dataHolder ! UpdatingConnectedPeers(connectedPeers.collect(getAllPeers, getConnectedPeers))
-      dataHolder ! UpdatingAllKnownPeers(knownPeers.keys.toSeq)
+      dataHolder ! UpdatingPeersInfo(knownPeers.keys.toSeq, connectedPeers.collect(getAllPeers, getConnectedPeers), blackList)
   }
   }
 

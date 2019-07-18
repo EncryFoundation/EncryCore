@@ -42,34 +42,34 @@ case class InfoApiRoute(dataHolder: ActorRef,
     val askAllF = (dataHolder ? GetAllInfo)
       .mapTo[(Seq[ConnectedPeer], Option[EncryHistoryReader], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
     (for {
-      (connectedPeers, _, minerInfo, state, txsQty, blocksInfo, _) <- askAllF
-      minerInfo1         =  minerInfo
-      connectedPeers1    =  connectedPeers.size
-      readers1           = state
+      (connectedPeers, _, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
+      mInfo              =  minerInfo
+      connectedP         =  connectedPeers.size
+      state              = stateReader
       currentTime        <- timeProvider.time()
       launchTime         <- launchTimeFuture
-      memSize1           = txsQty
+      memSize            = txsQty
       nodeUptime         = currentTime - launchTime
-      headerHeight1      = blocksInfo.header.map(_.height).getOrElse(0)
-      headerId1          = blocksInfo.header.map(_.encodedId).getOrElse("")
-      fullHeight1        = blocksInfo.block.map(_.header.height).getOrElse(0)
-      bestFullHeaderId1  = blocksInfo.block.map(_.encodedId).getOrElse("")
+      headerHeight       = blocksInfo.header.map(_.height).getOrElse(0)
+      headerId           = blocksInfo.header.map(_.encodedId).getOrElse("")
+      fullHeight         = blocksInfo.block.map(_.header.height).getOrElse(0)
+      bestFullHeaderId   = blocksInfo.block.map(_.encodedId).getOrElse("")
     } yield InfoApiRoute.makeInfoJson(
       nodeId,
-      minerInfo1,
-      connectedPeers1,
-      readers1,
+      mInfo,
+      connectedP,
+      state,
       getStateType,
       getNodeName,
       getAddress,
       storageInfo,
       nodeUptime,
-      memSize1,
+      memSize,
       getConnectionWithPeers,
-      headerHeight1,
-      headerId1,
-      fullHeight1,
-      bestFullHeaderId1)).okJson()
+      headerHeight,
+      headerId,
+      fullHeight,
+      bestFullHeaderId)).okJson()
   }
 }
 

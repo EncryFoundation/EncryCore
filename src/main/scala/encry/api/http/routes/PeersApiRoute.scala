@@ -5,8 +5,9 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.DataHolderForApi.{GetAllPeers, GetConnectedPeers}
+import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeers, GetConnectedPeers}
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.RESTApiSettings
@@ -19,7 +20,7 @@ case class PeersApiRoute(override val settings: RESTApiSettings,
                          dataHolder: ActorRef)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override lazy val route: Route = pathPrefix("peers") {
-    connect ~ connectedPeers ~ allPeers
+    connect ~ connectedPeers ~ allPeers ~ bannedList
   }
 
   private val addressAndPortRegexp: Regex = "\\w+:\\d{1,5}".r
@@ -42,6 +43,13 @@ case class PeersApiRoute(override val settings: RESTApiSettings,
       }
     }
     onSuccess(result) { r => complete(r) }
+  }
+
+  def bannedList: Route = (path("banned") & get) {
+    val result = (dataHolder ? GetBannedPeers).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]].map {
+      _.map(_.toString)
+      }
+    onSuccess(result) {r => complete(r)}
   }
 
   def connect: Route = (path("connect") & post & entity(as[String])) { body =>
