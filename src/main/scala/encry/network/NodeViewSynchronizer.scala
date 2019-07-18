@@ -149,7 +149,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
           if (chainSynced && canProcessTransactions)
-            memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
+            ()//memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
           else logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}") // do nothing
         }
         else if (invData._1 != Payload.modifierTypeId) {

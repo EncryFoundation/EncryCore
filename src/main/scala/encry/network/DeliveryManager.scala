@@ -265,7 +265,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     if (mTypeId != Transaction.modifierTypeId)
       logger.info(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
         s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition.")
-    if ((firstCondition || secondCondition) && thirdCondition) {
+    if ((firstCondition || secondCondition) && thirdCondition && expectedModifiers.isEmpty) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
 
