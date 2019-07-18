@@ -25,6 +25,8 @@ final case class BlackList(settings: EncryAppSettings,
                  f: (InetAddress, BanReason, BanTime, BanType) => T): Seq[T] = blackList
     .collect { case (add, (r, t, bt)) if p(add, r, t, bt) => f(add, r, t, bt) }
     .toSeq
+
+  def getAll: Seq[(InetAddress, (BanReason, BanTime, BanType))] = blackList.toSeq
 }
 
 object BlackList {
