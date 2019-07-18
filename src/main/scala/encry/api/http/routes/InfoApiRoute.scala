@@ -12,7 +12,7 @@ import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.history.EncryHistoryReader
 import io.circe.Json
 import io.circe.syntax._
-import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.concurrent.Future
@@ -40,36 +40,26 @@ case class InfoApiRoute(dataHolder: ActorRef,
 
   override val route: Route = (path("info") & get) {
     val askAllF = (dataHolder ? GetAllInfo)
-      .mapTo[(Seq[ConnectedPeer], Option[EncryHistoryReader], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
+      .mapTo[(Seq[ConnectedPeer], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
     (for {
-      (connectedPeers, _, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
-      mInfo              =  minerInfo
-      connectedP         =  connectedPeers.size
-      state              = stateReader
-      currentTime        <- timeProvider.time()
-      launchTime         <- launchTimeFuture
-      memSize            = txsQty
-      nodeUptime         = currentTime - launchTime
-      headerHeight       = blocksInfo.header.map(_.height).getOrElse(0)
-      headerId           = blocksInfo.header.map(_.encodedId).getOrElse("")
-      fullHeight         = blocksInfo.block.map(_.header.height).getOrElse(0)
-      bestFullHeaderId   = blocksInfo.block.map(_.encodedId).getOrElse("")
+      (connectedPeers, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
+      currentTime <- timeProvider.time()
+      launchTime  <- launchTimeFuture
     } yield InfoApiRoute.makeInfoJson(
       nodeId,
-      mInfo,
-      connectedP,
-      state,
+      minerInfo,
+      connectedPeers.size,
+      stateReader,
       getStateType,
       getNodeName,
       getAddress,
       storageInfo,
-      nodeUptime,
-      memSize,
+      currentTime - launchTime,
+      txsQty,
       getConnectionWithPeers,
-      headerHeight,
-      headerId,
-      fullHeight,
-      bestFullHeaderId)).okJson()
+      blocksInfo.header,
+      blocksInfo.block
+    )).okJson()
   }
 }
 
@@ -86,22 +76,19 @@ object InfoApiRoute {
                    nodeUptime: Long,
                    mempoolSize: Int,
                    connectWithOnlyKnownPeer: Boolean,
-                   headerHeight: Int,
-                   headerId: String,
-                   fullHeight: Int,
-                   bestFullHeaderId: String
+                   header: Option[Header],
+                   block: Option[Block]
                   ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
-    val bestFullBlock: Option[Block] = readers.h.flatMap(_.bestBlockOpt)
-    val prevFullHeaderId: String = bestFullBlock.map(b => Algos.encode(b.header.parentId)).getOrElse("")
+    val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     Map(
       "name"                      -> nodeName.asJson,
-      "headersHeight"             -> headerHeight.asJson,
-      "fullHeight"                -> fullHeight.asJson,
-      "bestHeaderId"              -> headerId.asJson,
-      "bestFullHeaderId"          -> bestFullHeaderId.asJson,
+      "headersHeight"             -> header.map(_.height).asJson,
+      "fullHeight"                -> block.map(_.header.height).asJson,
+      "bestHeaderId"              -> header.map(_.encodedId).asJson,
+      "bestFullHeaderId"          -> block.map(_.encodedId).asJson,
       "previousFullHeaderId"      -> prevFullHeaderId.asJson,
-      "difficulty"                -> bestFullBlock.map(block => block.header.difficulty.toString)
+      "difficulty"                -> block.map(_.header.difficulty.toString)
         .getOrElse(TestNetConstants.InitialDifficulty.toString).asJson,
       "unconfirmedCount"          -> mempoolSize.asJson,
       "stateType"                 -> stateType.asJson,

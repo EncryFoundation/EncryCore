@@ -28,23 +28,23 @@ case class PeersApiRoute(override val settings: RESTApiSettings,
     onSuccess(result)(r => complete(r))
   }
 
-  def connectedPeers: Route = (path("connected") & get) {
-    val result: Future[Seq[PeerInfoResponse]] = (dataHolder ? GetConnectedPeers).mapTo[Seq[ConnectedPeer]].map {
-      _.map { peer =>
-        PeerInfoResponse(
-          address = peer.socketAddress.toString,
-          name = Some(peer.handshake.nodeName),
-          connectionType = Some(peer.direction.toString))
-      }
-    }
-    onSuccess(result) { r => complete(r) }
-  }
+  def connectedPeers: Route = (path("connected") & get) (
+    onSuccess(
+      (dataHolder ? GetConnectedPeers)
+        .mapTo[Seq[ConnectedPeer]]
+        .map(_.map(peer => PeerInfoResponse(
+          peer.socketAddress.toString,
+          Some(peer.handshake.nodeName),
+          Some(peer.direction.toString))
+        )))
+    (r => complete(r))
+  )
 
   def bannedList: Route = (path("banned") & get) {
-    val result = (dataHolder ? GetBannedPeers).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]].map {
-      _.map(_.toString)
-      }
-    onSuccess(result) {r => complete(r)}
+    val result = (dataHolder ? GetBannedPeers)
+      .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
+      .map(_.map(_.toString))
+    onSuccess(result)(r => complete(r))
   }
 }
 
