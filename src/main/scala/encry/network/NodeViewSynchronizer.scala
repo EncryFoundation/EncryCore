@@ -92,6 +92,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>
         broadcastModifierInv(block.header)
+        broadcastModifierInv(block.payload)
         modifiersRequestCache = Map(
           Algos.encode(block.id) -> block.header,
           Algos.encode(block.payload.id) -> block.payload
@@ -152,12 +153,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
           else logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}") // do nothing
         }
-        else if (invData._1 != Payload.modifierTypeId) {
+        else {
           logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
           nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
-        } else peersKeeper ! BanPeer(remote, SentInvForPayload)
+        }
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case msg@RequestPeersForFirstSyncInfo =>
