@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging

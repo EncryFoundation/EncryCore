@@ -14,17 +14,10 @@ case class TransactionsApiRoute(dataHolder: ActorRef,
   extends EncryBaseApiRoute with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("transactions") {
-    //getUnconfirmedTransactionsR ~
       defaultTransferTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
-
- // private def getMempool: Future[MempoolReader] = (readersHolder ? GetReaders).mapTo[Readers].map(_.m.get)
-
-//  private def getUnconfirmedTransactions(limit: Int, offset: Int = 0): Future[Json] = getMempool.map {
-//    _.unconfirmed.values.slice(offset, offset + limit)
-//  }.map(_.map(_.asJson).asJson)
 
   def defaultTransferTransactionR: Route = path("send") {
     post(entity(as[Transaction]) {
@@ -35,8 +28,4 @@ case class TransactionsApiRoute(dataHolder: ActorRef,
         }
     })
   }
-
-//  def getUnconfirmedTransactionsR: Route = (path("unconfirmed") & get & paging) { (offset, limit) =>
-//    getUnconfirmedTransactions(limit, offset).okJson()
-//  }
 }
