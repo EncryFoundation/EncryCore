@@ -27,8 +27,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
-import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
@@ -132,7 +131,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
 
-    case SemanticallySuccessfulModifier(mod) => receivedModifiers -= toKey(mod.id)
+    case SemanticallySuccessfulModifier(mod) =>
+      mod match {
+        case block: Block => receivedModifiers -= toKey(block.payload.id)
+        case _ => receivedModifiers -= toKey(mod.id)
+      }
 
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
 
