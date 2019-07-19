@@ -436,7 +436,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
       if (mTid != Transaction.modifierTypeId) receivedModifiers += toKey(mId)
       expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
-      if (expectedModifiers.isEmpty) context.parent ! SendLocalSyncInfo
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       priorityCalculator = priorityCalculator.decrementRequest(peer.socketAddress)
