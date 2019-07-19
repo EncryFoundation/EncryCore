@@ -173,14 +173,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     }
 
     case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
-      if (modifierTypeId != Transaction.modifierTypeId)
-        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
-          s"${previousModifier.map(Algos.encode)}")
-//      if (previousModifier.isDefined && isBlockChainSynced) {
-//        logger.debug(s"Sending this download request for modifiers: ${Algos.encode(modifiersId)}")
-//        priorityRequest(modifierTypeId, modifiersId, previousModifier.get, history, isBlockChainSynced, isMining)
-//      }
-      else requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
+      requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
