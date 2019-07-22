@@ -122,6 +122,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
       if (receivedModifiers.isEmpty && currentQueue.isEmpty) {
         val newIds: Seq[(ModifierTypeId, ModifierId)] =
           history.modifiersToDownload(
