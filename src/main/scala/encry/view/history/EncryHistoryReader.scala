@@ -132,7 +132,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
-    .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
+//    .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
