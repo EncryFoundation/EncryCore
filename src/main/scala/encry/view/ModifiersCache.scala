@@ -10,9 +10,15 @@ import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import encry.view.ModifiersCache._
+
 import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
+import cats.data.EitherT
+import cats.implicits._
+import cats.syntax.either._
+import encry.view.history.processors.ValidationError
+
 
 final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
                                 headersCache: SortedMap[Int, List[ModifierId]],
@@ -20,21 +26,11 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
 
   val size: Int = modifiersCache.size
 
-  val isEmpty: Boolean = size == 0
-
   def contains(key: Key): Boolean = modifiersCache.contains(key)
-
-  private def findUnApplicable(h: EncryHistory): ((Key, PersistentModifier)) => Boolean =
-    elemsTuple => historyTestApplicable(h)(elemsTuple._2)
-
-  private def historyTestApplicable(h: EncryHistory): PersistentModifier => Boolean = mod => h.testApplicable(mod) match {
-    case Right(_) | Left(_: NonFatalValidationError) => false
-    case _ => true
-  }
 
   def put(modifier: PersistentModifier, history: EncryHistory): ModifiersCache =
     if (!contains(key(modifier.id))) {
-      logger.debug(s"Modifier of type ${modifier.modifierTypeId} with id ${modifier.encodedId} put into modifiersCache.")
+      logger.debug(s"Modifier of type ${modifier.modifierTypeId} with id ${modifier.encodedId} placed into modifiersCache.")
       val updatedCache: Map[Key, PersistentModifier] = modifiersCache.updated(key(modifier.id), modifier)
       val updatedHeadersCache: SortedMap[Int, List[ModifierId]] = modifier match {
         case header: Header =>
@@ -43,32 +39,36 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
         case _ => headersCache
       }
       val filteredModifiersCache: Map[Key, PersistentModifier] =
-        if (updatedCache.size > settings.node.modifiersCacheSize) updatedCache.find { case (_, mod) =>
-          history.testApplicable(mod) match {
-            case Right(_) | Left(_: NonFatalValidationError) => false
-            case _ => true
+        if (updatedCache.size > settings.node.modifiersCacheSize)
+          updatedCache.find(elem => isModifiersUnApplicable(history, elem._2)) match {
+            case Some(value) => updatedCache - value._1
+            case None => updatedCache
           }
-        } match {
-          case Some(value) => updatedCache - value._1
-          case None => updatedCache
-        } else updatedCache
+        else updatedCache
       ModifiersCache(filteredModifiersCache, updatedHeadersCache, settings)
     } else this
 
-  def findCandidateKey(history: EncryHistory): List[Key] = {
-
-    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
-      case Left(_: FatalValidationError) => remove(key); false
-      case Right(_) => true
-      case Left(_) => false
-    })
-
-    def getHeadersKeysAtHeight(height: Int): List[Key] = headersCollection.get(height) match {
-      case Some(headersIds) => headersIds.map(key).collect { case headerKey if isApplicable(headerKey) => headerKey }
-      case None =>
+  private def getHeadersIdsAtHeight(height: Int, h: EncryHistory): (Map[Key, PersistentModifier], List[Key]) =
+    headersCache.get(height) match {
+      case Some(headersIds) => headersIds
+        .map(key)
+        .foldLeft(modifiersCache, List.empty[Key]) { case ((updatedCache, applicable), modifierId) => modifiersCache
+          .get(modifierId)
+          .map(kds => h.testApplicable(kds))
+          .map {
+            case Left(_: FatalValidationError) => (updatedCache - modifierId, applicable)
+            case Left(_) => (updatedCache, applicable)
+            case Right(_) => (updatedCache, applicable :+ modifierId)
+          }.getOrElse((modifiersCache, List.empty[Key]))
+        }
+      case _ =>
         logger.debug(s"Can't find headers at height $height in cache")
-        List.empty[Key]
+        (modifiersCache, List.empty[Key])
     }
+
+  //def isApplicable(modifierId: Key) =
+
+  def findCandidateKey(history: EncryHistory): List[Key] = {
 
     def findApplicablePayloadAtHeight(height: Int): List[Key] = history
       .headerIdsAtHeight(height)
@@ -147,6 +147,22 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 
+  private def isModifiersUnApplicable(h: EncryHistory, m: PersistentModifier): Boolean = h.testApplicable(m) match {
+    case Right(_) | Left(_: NonFatalValidationError) => false
+    case _ => true
+  }
+
+  private def takeIfApplicable(modifierId: Key, h: EncryHistory) =
+    modifiersCache
+      .get(modifierId)
+      .map(m => h.testApplicable(m))
+      .map {
+        case Left(_: FatalValidationError) => (Option.empty[PersistentModifier], modifiersCache - modifierId)
+        case Left(_) => (Option.empty[PersistentModifier], modifiersCache)
+        case Right(mod) => (mod.some, modifiersCache)
+      }
+      .getOrElse((Option.empty[PersistentModifier], modifiersCache))
+
 }
 
 object ModifiersCache extends StrictLogging {
@@ -158,6 +174,8 @@ object ModifiersCache extends StrictLogging {
   def setChainSynced(): Unit = isChainSynced = true
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
+
+  sealed trait ModifiersCacheErrors
 
   //val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
   //private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
