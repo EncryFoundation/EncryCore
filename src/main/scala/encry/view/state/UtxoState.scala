@@ -40,7 +40,7 @@ import org.encryfoundation.common.validation.{MalformedModifierError, Validation
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 final case class UtxoState(storage: VersionalStorage,
                            height: Height,
@@ -102,9 +102,20 @@ final case class UtxoState(storage: VersionalStorage,
   def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)
-        .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
-        .map(_.toOption -> input))
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap {input =>
+        logger.info(s"Retrievenig bytes for box ${Algos.encode(input.boxId)}")
+        storage.get(StorageKey !@@ input.boxId)
+        .map { bytes =>
+          logger.info(s"Retrieved bytes for box ${Algos.encode(input.boxId)}")
+          StateModifierSerializer.parseBytes(bytes, input.boxId.head)
+        }
+        .map { tr =>
+          tr match {
+            case Success(v) => logger.info(s"Deserialized value for box ${Algos.encode(input.boxId)}")
+            case Failure(exception) => logger.warn(s"Failed to deserialize value for box ${Algos.encode(input.boxId)}", exception)
+          }
+          tr.toOption -> input
+        }}
         .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
