@@ -22,7 +22,11 @@ import cats.syntax.validated._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import cats.instances.list._
+import cats.instances.future._
 import cats.Traverse
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration.{FiniteDuration, _}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -40,6 +44,7 @@ import org.encryfoundation.common.validation.{MalformedModifierError, Validation
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 
+import scala.concurrent.{Await, Future}
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
@@ -65,6 +70,13 @@ final case class UtxoState(storage: VersionalStorage,
       }).toList
         .traverse(Validated.fromEither)
         .toEither
+//      val res1 = block.payload.txs.map(tx => {
+//        if (tx.id sameElements lastTxId) Future(validate(tx, totalFees + EncrySupplyController.supplyAt(height)))
+//        else Future(validate(tx))
+//      }).toList.sequence[Future, Either[ValidationResult, Transaction]]
+//      val res: Either[ValidationResult, List[Transaction]] = Await.result(res1, 5 minutes)
+//        .traverse(Validated.fromEither)
+//        .toEither
       res.fold(
         err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
         txsToApply => {

@@ -36,7 +36,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
       val modifiers = filteredModifiers.foldLeft(Seq.empty[PersistentModifier], Seq.empty[ModifierId]) {
         case ((modsColl, forRemove), (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
-            logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
+            logger.info(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
             (modsColl :+ modifier, forRemove)
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
@@ -50,7 +50,8 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
       }
 
       if (modifiers._1.nonEmpty) {
-        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size}.")
+        logger.info(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
+          s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
         nodeViewHolder ! ModifiersFromRemote(modifiers._1)
       }
       if (modifiers._2.nonEmpty) {

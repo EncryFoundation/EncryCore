@@ -27,6 +27,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
@@ -63,6 +64,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * Modifier considered expected if we sent request for it.
     */
   var expectedModifiers: Map[InetSocketAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = Map.empty
+
+  var expectedTransactions: HashSet[ModifierIdAsKey] = HashSet.empty[ModifierIdAsKey]
 
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
@@ -119,15 +122,17 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
-      val newIds: Seq[(ModifierTypeId, ModifierId)] =
-        history.modifiersToDownload(
-          settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
-          currentQueue.map(elem => ModifierId @@ elem.toArray)
-        ).filterNot(modId => currentQueue.contains(toKey(modId._2)))
-      logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
-      if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
-        case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
-          requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
+      if (receivedModifiers.isEmpty && currentQueue.isEmpty) {
+        val newIds: Seq[(ModifierTypeId, ModifierId)] =
+          history.modifiersToDownload(
+            settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
+            currentQueue.map(elem => ModifierId @@ elem.toArray)
+          ).filterNot(modId => currentQueue.contains(toKey(modId._2)))
+        logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
+        if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
+          case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
+            requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
+        }
       }
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
 
@@ -273,13 +278,15 @@ class DeliveryManager(influxRef: Option[ActorRef],
           logger.info(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator = priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
-        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
-          notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
-            rYet.updated(toKey(id),
-              context.system
-                .scheduler.scheduleOnce(settings.network.deliveryTimeout)(self ! CheckDelivery(peer, mTypeId, id)) -> 1)
-          }
-        expectedModifiers = expectedModifiers.updated(peer.socketAddress, requestedModIds)
+        if (mTypeId != Transaction.modifierTypeId) {
+          val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
+            notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
+              rYet.updated(toKey(id),
+                context.system
+                  .scheduler.scheduleOnce(settings.network.deliveryTimeout)(self ! CheckDelivery(peer, mTypeId, id)) -> 1)
+            }
+          expectedModifiers = expectedModifiers.updated(peer.socketAddress, requestedModIds)
+        } else expectedTransactions = expectedTransactions ++ modifierIds.map(toKey)
       }
     }
   }
@@ -438,7 +445,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
         .getOrElse(peer.socketAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
       if (mTid != Transaction.modifierTypeId) receivedModifiers += toKey(mId)
-      expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
+      if (mTid != Transaction.modifierTypeId) expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
+      else expectedTransactions = expectedTransactions - toKey(mId)
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       priorityCalculator = priorityCalculator.decrementRequest(peer.socketAddress)

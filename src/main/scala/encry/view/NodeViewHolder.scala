@@ -71,7 +71,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (isInHistory || isInCache)
         logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      else {
+        logger.info(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
+        ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      }
     }
       computeApplications()
 
@@ -384,15 +387,15 @@ object NodeViewHolder {
 
   }
 
-  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
-    extends UnboundedStablePriorityMailbox(
-      PriorityGenerator {
-        case CompareViews(_, _, _) => 0
-
-        case PoisonPill => 2
-
-        case otherwise => 1
-      })
+//  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+//    extends UnboundedStablePriorityMailbox(
+//      PriorityGenerator {
+//        case CompareViews(_, _, _) => 0
+//
+//        case PoisonPill => 2
+//
+//        case otherwise => 1
+//      })
 
   def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef): Props =
     Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder))

@@ -178,7 +178,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         s"updates block ${prevBest.map(_.encodedId).getOrElse("None")} " +
         s"with height ${prevBest.map(_.header.height).getOrElse(-1)}"
     }
-    logger.info(s"Full block ${appliedBlock.encodedId} appended, " +
+    logger.info(s"Full block ${appliedBlock.encodedId} appended (txs: ${appliedBlock.payload.txs.length}), " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
 
