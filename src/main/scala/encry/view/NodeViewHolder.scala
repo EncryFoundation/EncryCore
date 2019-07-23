@@ -1,14 +1,16 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.{nodeViewSynchronizer, settings, miner, timeProvider}
 import encry.consensus.History.ProgressInfo
+import encry.modifiers.history.HeaderChain
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -29,13 +31,15 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
                      dataHolder: ActorRef) extends Actor with StrictLogging {
+
+  implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
   case class NodeView(history: EncryHistory, state: UtxoState, wallet: EncryWallet)
 
@@ -56,7 +60,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     System.exit(100)
   }
 
-  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: " +
+  context.system.scheduler.schedule(1.seconds, 3.seconds)(logger.info(s"Modifiers cache from NVH: " +
     s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -72,7 +76,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else {
-        logger.info(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
+        //logger.info(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
         ModifiersCache.put(key(mod.id), mod, nodeView.history)
       }
     }
@@ -387,15 +391,15 @@ object NodeViewHolder {
 
   }
 
-//  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
-//    extends UnboundedStablePriorityMailbox(
-//      PriorityGenerator {
-//        case CompareViews(_, _, _) => 0
-//
-//        case PoisonPill => 2
-//
-//        case otherwise => 1
-//      })
+  class NodeViewHolderPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      PriorityGenerator {
+        case CompareViews(_, _, _) => 0
+
+        case PoisonPill => 2
+
+        case otherwise => 1
+      })
 
   def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef): Props =
     Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder))

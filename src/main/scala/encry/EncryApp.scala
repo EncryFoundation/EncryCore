@@ -54,7 +54,7 @@ object EncryApp extends App with StrictLogging {
   lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner, influxRef)
     .withDispatcher("mempool-dispatcher"))
    val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
-    , "nodeViewHolder")
+    .withDispatcher("nvh-dispatcher"), "nodeViewHolder")
 
   val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
     .props(influxRef, nodeViewHolder, settings, memoryPool, dataHolderForApi)

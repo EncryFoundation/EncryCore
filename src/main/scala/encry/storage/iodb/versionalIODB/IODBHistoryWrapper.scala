@@ -36,4 +36,6 @@ case class IODBHistoryWrapper(store: Store, objectStore: Store) extends Versiona
     iodbWrapper.close()
     objectStore.close()
   }
+
+  override def contains(key: StorageKey): Boolean = iodbWrapper.contains(key)
 }

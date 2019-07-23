@@ -26,6 +26,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   protected def getBlock(h: Header): Option[Block]
 
+  protected def isBlockDefined(h: Header): Boolean
+
   protected def commonBlockThenSuffixes(header1: Header, header2: Header): (HeaderChain, HeaderChain)
 
   protected[history] def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]]
@@ -137,9 +139,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
-    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.tail)
     logger.debug(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
-    val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    val chains: Seq[Seq[Block]] = continuations.map(_.filter(isBlockDefined).flatMap(getBlock))
     logger.debug(s"Chains: ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }

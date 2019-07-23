@@ -168,8 +168,8 @@ final case class UtxoState(storage: VersionalStorage,
 
 object UtxoState extends StrictLogging {
 
-  final case class StateChange(inputsToDb: List[StorageKey],
-                               outputsToDb: List[(StorageKey, StorageValue)])
+  final case class StateChange(inputsToDb: Vector[StorageKey],
+                               outputsToDb: Vector[(StorageKey, StorageValue)])
 
   private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 

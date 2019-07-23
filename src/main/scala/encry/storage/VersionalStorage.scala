@@ -10,6 +10,8 @@ trait VersionalStorage {
 
   def get(key: StorageKey): Option[StorageValue]
 
+  def contains(key: StorageKey): Boolean
+
   def getAll(maxQty: Int): Iterator[(StorageKey, StorageValue)]
 
   def currentVersion: StorageVersion
