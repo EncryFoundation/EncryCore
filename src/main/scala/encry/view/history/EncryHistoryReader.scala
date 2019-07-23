@@ -28,7 +28,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   /** Is there's no history, even genesis block */
   def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
 
-  def contains(id: ModifierId): Boolean = modifierById(id).isDefined
+  def contains(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   /**
     * Complete block of the best chain with transactions.
@@ -196,7 +196,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def syncInfo: SyncInfo =
     if (isEmpty) SyncInfo(Seq.empty)
-    else SyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
+    else SyncInfo(bestHeaderOpt.map(header =>
+      ((header.height - settings.network.maxInvObjects) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
+      ).getOrElse(Seq.empty)
+    )
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
