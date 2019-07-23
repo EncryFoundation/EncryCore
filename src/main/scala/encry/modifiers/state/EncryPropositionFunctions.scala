@@ -24,7 +24,8 @@ object EncryPropositionFunctions {
             .getOrElse(throw new Exception("Not enough arguments for contact")) }
         Evaluator.initializedWith(args).eval[Boolean](cc.script)
       } else false,
-      rc => RegularContractEvaluator.eval(rc, ctx, proofs)
+      rc => if (sameHash(proposition.contractHash, rc.contract.hash)) RegularContractEvaluator.eval(rc, ctx, proofs)
+            else false
   )
 
   def sameHash(h1: Array[Byte], h2: Array[Byte]): Boolean = ByteArrayWrapper(h1) == ByteArrayWrapper(h2)
