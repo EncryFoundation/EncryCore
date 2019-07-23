@@ -67,7 +67,7 @@ trait EncryHistory extends EncryHistoryReader {
     case header: Header => Some(header)
     case block: Block => Some(block.header)
     case payload: Payload =>
-      headersCache.get(ByteArrayWrapper(payload.headerId)).orElse(typedModifierById[Header](payload.headerId))
+      lastAppliedHeadersCache.get(ByteArrayWrapper(payload.headerId)).orElse(typedModifierById[Header](payload.headerId))
     case _ => None
   }
 

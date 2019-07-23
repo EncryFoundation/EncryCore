@@ -127,7 +127,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         history.modifiersToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
           currentQueue.map(elem => ModifierId @@ elem.toArray)
-        ).filterNot(modId => currentQueue.contains(toKey(modId._2)))
+        ).filterNot(modId => currentQueue.contains(toKey(modId._2)) || receivedModifiers.contains(toKey(modId._2)))
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
       if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>

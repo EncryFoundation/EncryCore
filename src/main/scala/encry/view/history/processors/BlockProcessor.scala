@@ -71,6 +71,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
+      toApply.foreach(addBlockToCacheIfNecessary)
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
@@ -101,7 +102,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
-      heightOfThisHeader <- headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
+      heightOfThisHeader <- lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
@@ -146,7 +147,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
-      .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
+      .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
       .flatMap(h => Seq(h.payloadId))
     historyStorage.removeObjects(toRemove)
   }
