@@ -34,6 +34,13 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     }
   }
 
+  def containsMod(id: ModifierId): Boolean = store match {
+    case iodb: IODBHistoryWrapper =>
+      iodb.objectStore.get(ByteArrayWrapper(id)).isDefined
+    case _: VLDBWrapper =>
+      store.contains(StorageKey @@ id.untag(ModifierId))
+  }
+
   def modifiersBytesById(id: ModifierId): Option[Array[Byte]] = store match {
     case iodb: IODBHistoryWrapper =>
       iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.tail)

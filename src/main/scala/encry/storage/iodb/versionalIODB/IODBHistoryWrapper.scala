@@ -14,6 +14,8 @@ case class IODBHistoryWrapper(store: Store, objectStore: Store) extends Versiona
 
   private val iodbWrapper = IODBWrapper(store)
 
+  override def contains(key: StorageKey): Boolean = iodbWrapper.contains(key)
+
   override def get(key: StorageKey): Option[StorageValue] = iodbWrapper.get(key)
 
   //always return all elems

@@ -22,6 +22,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   protected val auxHistory: Boolean = false
 
   /** Id of header that contains transactions and proofs */
+  //todo change description
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   protected def getBlock(h: Header): Option[Block]
@@ -49,7 +50,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
     addBlockToCacheIfNecessary(fullBlock)
-    processing(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
+    if (isValidFirstBlock(fullBlock.header)) {
+      processValidFirstBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
+    } else if (bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id)) {
+      processBetterChain(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
+    } else {
+      nonBestBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
+    }
   }
 
   private def processing: BlockProcessing =
@@ -65,11 +72,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
   }
 
+  //todo toRemove will be fixed later
   private def processBetterChain: BlockProcessing = {
     case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
       if bestBlockOpt.nonEmpty && isBetterChain(newBestHeader.id) =>
-      val prevBest: Block = bestBlockOpt.get
-      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(prevBest.header, newBestHeader)
+      //todo remove .get
+      val headerOfPrevBestBlock: Header = headerOfBestBlock.get
+      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(headerOfPrevBestBlock, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
@@ -78,7 +87,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       else {
         //application of this block leads to full chain with higher score
         logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
-        logStatus(toRemove, toApply, fullBlock, Some(prevBest))
+        logStatus(toRemove, toApply, fullBlock, Some(headerOfPrevBestBlock))
         val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
         val updateBestHeader: Boolean =
           (fullBlock.header.height > bestHeaderHeight) || (
@@ -91,7 +100,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         if (blocksToKeep >= 0) {
           val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
           val bestHeight: Int = toApply.last.header.height
-          val diff: Int = bestHeight - prevBest.header.height
+          val diff: Int = bestHeight - headerOfPrevBestBlock.height
           clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
         }
         ProgressInfo(branchPoint, toRemove, toApply, Seq.empty)
@@ -104,7 +113,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
-      heightOfThisHeader <- lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
+      heightOfThisHeader <- lastAppliedHeadersCache.get(ByteArrayWrapper(id)).map(_.height).orElse(headerHeight(id))
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
@@ -138,6 +147,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
+
   private def calculateBestFullChain(block: Block): Seq[Block] = {
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.tail)
     logger.debug(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
@@ -150,7 +160,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
       .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
-      .flatMap(h => Seq(h.payloadId))
+      .map(h => h.payloadId)
     historyStorage.removeObjects(toRemove)
   }
 
@@ -173,13 +183,13 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def logStatus(toRemove: Seq[Block],
                         toApply: Seq[Block],
                         appliedBlock: Block,
-                        prevBest: Option[Block]): Unit = {
+                        prevBest: Option[Header]): Unit = {
     val toRemoveStr: String = if (toRemove.isEmpty) "" else s" and to remove ${toRemove.length}"
     val newStatusStr: String = if (toApply.isEmpty) "" else {
       s" New best block is ${toApply.last.header.encodedId} " +
         s"with height ${toApply.last.header.height} " +
         s"updates block ${prevBest.map(_.encodedId).getOrElse("None")} " +
-        s"with height ${prevBest.map(_.header.height).getOrElse(-1)}"
+        s"with height ${prevBest.map(_.height).getOrElse(-1)}"
     }
     logger.info(s"Full block ${appliedBlock.encodedId} appended (txs: ${appliedBlock.payload.txs.length}), " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")

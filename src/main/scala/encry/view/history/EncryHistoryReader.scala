@@ -37,6 +37,12 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def bestBlockOpt: Option[Block] =
     bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id).flatMap(getBlock)))
 
+  def headerOfBestBlock: Option[Header] =
+    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header).orElse(typedModifierById[Header](id)))
+
+  def isBlockDefined(header: Header): Boolean =
+    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
+
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
     .flatMap(h => headerIdsAtHeight(h).headOption)
@@ -56,11 +62,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
 
     /* Other history is empty, or our history contains last id from other history */
-    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(contains) => Younger
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isModifierDefined) => Younger
 
     case Some(_) =>
       //Our history contains some ids from other history
-      if (si.lastHeaderIds.exists(contains)) Fork
+      if (si.lastHeaderIds.exists(isModifierDefined)) Fork
       //Unknown comparison result
       else Unknown
 
@@ -142,10 +148,9 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
-  def getBlock(header: Header): Option[Block] =
-    blocksCache.get(ByteArrayWrapper(header.id)).orElse(
-      typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload))
-    )
+  def getBlock(header: Header): Option[Block] = blocksCache
+    .get(ByteArrayWrapper(header.id))
+    .orElse(typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload)))
 
   def isBlockDefined(header: Header): Boolean =
     blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
@@ -197,14 +202,14 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     if (isEmpty) SyncInfo(Seq.empty)
     else SyncInfo(bestHeaderOpt.map(header =>
       ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
-      ).getOrElse(Seq.empty)
+    ).getOrElse(Seq.empty)
     )
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
       case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
       case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-      case None if contains(modifierId)                   => ModifierSemanticValidity.Unknown
+      case None if isModifierDefined(modifierId)          => ModifierSemanticValidity.Unknown
       case None                                           => ModifierSemanticValidity.Absent
       case mod                                            => logger.error(s"Incorrect validity status: $mod")
                                                              ModifierSemanticValidity.Absent

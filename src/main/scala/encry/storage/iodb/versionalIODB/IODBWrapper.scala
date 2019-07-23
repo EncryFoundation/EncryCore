@@ -15,6 +15,8 @@ case class IODBWrapper(store: Store) extends VersionalStorage with StrictLogging
   override def get(key: StorageKey): Option[StorageValue] =
     store.get(ByteArrayWrapper(key)).map(StorageValue @@ _.data)
 
+  override def contains(key: StorageKey): Boolean = get(key).isDefined
+
   override def currentVersion: StorageVersion =
     store.lastVersionID.map(StorageVersion @@ _.data).getOrElse(IODBWrapper.initVer)
 

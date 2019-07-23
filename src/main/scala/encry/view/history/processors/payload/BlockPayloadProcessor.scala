@@ -14,15 +14,17 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val historyStorage: HistoryStorage
 
-  override protected def process(payload: Payload): ProgressInfo[PersistentModifier] =
-    getBlockByPayload(payload)
-      .flatMap(block =>
-        if (block.header.height - bestBlockHeight >= 2 + settings.network.maxInvObjects) None
-        else Some(processBlock(block, payload))
-      ).getOrElse(putToHistory(payload))
+  override protected def process(payload: Payload): ProgressInfo[PersistentModifier] = getBlockByPayload(payload)
+    .flatMap(block =>
+      if (block.header.height - bestBlockHeight >= 2 + settings.network.maxInvObjects) None
+      else Some(processBlock(block, payload))
+    )
+    .getOrElse(putToHistory(payload))
 
-  private def getBlockByPayload(payload: Payload): Option[Block] = lastAppliedHeadersCache.get(ByteArrayWrapper(payload.headerId))
-    .orElse(typedModifierById[Header](payload.headerId)).flatMap { h => Some(Block(h, payload))}
+  private def getBlockByPayload(payload: Payload): Option[Block] = lastAppliedHeadersCache
+    .get(ByteArrayWrapper(payload.headerId))
+    .orElse(typedModifierById[Header](payload.headerId))
+    .flatMap(h => Some(Block(h, payload)))
 
   override protected def validate(m: Payload): Either[ValidationError, PersistentModifier] =
     modifierValidation(m, lastAppliedHeadersCache.get(ByteArrayWrapper(m.headerId)).orElse(typedModifierById[Header](m.headerId)))

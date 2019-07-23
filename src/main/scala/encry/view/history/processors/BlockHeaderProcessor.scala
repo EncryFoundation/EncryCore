@@ -52,6 +52,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   var lastAppliedHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
 
+  var blockHeadersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
+
   var lastAppliedBlockHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
 
   /**
@@ -61,56 +63,60 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     */
   def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(typedModifierById[Header])
 
+  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
+
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
   def modifiersToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
     @tailrec
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
       if (acc.lengthCompare(howMany) >= 0) acc
-      else {
-        headerIdsAtHeight(height).headOption
-          .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
-          case Some(bestHeaderAtThisHeight) =>
-            logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
-              s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
-            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-
-            val b = toDownload.filter(m => !excluding.exists(_ sameElements m._2))
-
-            val c = b.filter(m => !contains(m._2)) //todo can we combine this 2 filter?
-
-            continuation(Height @@ (height + 1), acc ++ c)
-          case None => acc
-        }
+      else headerIdsAtHeight(height)
+        .headOption
+        .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
+        case Some(bestHeaderAtThisHeight) =>
+          logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
+            s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
+          val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+            .filterNot(m => excluding.exists(_ sameElements m._2) && isModifierDefined(m._2))
+          continuation(Height @@ (height + 1), acc ++ toDownload)
+        case None => acc
       }
 
-    logger.info(s"BEST BLOCK OPT ${bestBlockOpt.map(x => Algos.encode(x.id))}")
-    bestBlockOpt match {
-      case _ if !isHeadersChainSynced =>
-        Seq.empty
-      case Some(fb) =>
-        //if best block in best chain, just process all blocks after that
-        if (isInBestChain(fb.header)) continuation(Height @@ (fb.header.height + 1), Seq.empty)
+    val bestBlockHeader: Option[Header] = for {
+      bestBlockId <- bestBlockIdOpt
+      headerLinkedToBestBlock <- typedModifierById[Header](bestBlockId) //todo can be also found in cache
+    } yield headerLinkedToBestBlock
+    bestBlockHeader match {
+      case _ if !isHeadersChainSynced => Seq.empty
+      case Some(header) => //if best block in best chain, just process all blocks after that
+        //todo how header of best block can be nonBest
+        if (isInBestChain(header)) continuation(Height @@ (header.height + 1), Seq.empty)
         //if not, we should find last full block from best chain, and start processing all blocks after that
         else {
-          val lastFullBlock = lastBestBlockRelevantToBestChain(fb.header.height)
-          logger.info(s"Last full block in best chain is block: ${lastFullBlock.map(block => Algos.encode(block.id))}")
-          lastFullBlock.map(block => continuation(Height @@ (block.header.height + 1), Seq.empty))
+          //logger.info(s"Last full block in best chain is block: ${lastFullBlock.map(block => Algos.encode(block.id))}")
+          lastBestBlockHeightRelevantToBestChain(header.height)
+            .map(height => continuation(Height @@ (height + 1), Seq.empty))
             .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
         }
-      case None =>
-        continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
   def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block] = {
-    val blocksAtHeight: Option[Block] = for {
+    val bestBlockAtHeight: Option[Block] = for {
       headerId <- bestHeaderIdAtHeight(atHeight)
       header <- typedModifierById[Header](headerId)
       block <- getBlock(header)
     } yield block
-    blocksAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
+    bestBlockAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
   }
+
+  def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
+    headerId <- bestHeaderIdAtHeight(probablyAt)
+    header <- typedModifierById[Header](headerId) if isModifierDefined(header.payloadId)
+  } yield header.height)
+    .orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
 
   def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
@@ -122,15 +128,15 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
           lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
           case Some(bestHeaderAtThisHeight) =>
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !contains(m._2))
+              .filter(m => !isModifierDefined(m._2))
             continuation(Height @@ (height + 1), acc ++ toDownload)
           case None => acc
         }
       }
 
-    bestBlockOpt match {
+    bestBlockIdOpt match {
       case _ if !isHeadersChainSynced => Seq.empty
-      case Some(fb) => continuation(Height @@ (fb.header.height + 1), Seq.empty)
+      case Some(v) if isHeadersChainSynced => continuation(Height @@ (bestBlockHeight(v) + 1), Seq.empty)
       case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
@@ -158,7 +164,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
-  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
+
+  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage
+    .get(BestHeaderKey)
+    .map(ModifierId @@ _)
 
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
@@ -173,23 +182,31 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected def validityKey(id: Array[Byte]): StorageKey =
     StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-  def contains(id: ModifierId): Boolean
-
   def bestBlockOpt: Option[Block]
+
+  def headerOfBestBlock: Option[Header]
 
   def bestBlockIdOpt: Option[ModifierId]
 
-  def bestHeaderHeight: Int = bestHeaderOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight)
+  def bestHeaderHeight: Int = bestHeaderIdOpt
+    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
+    .getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def bestBlockHeight: Int = bestBlockOpt.map(_.header.height).getOrElse(TestNetConstants.PreGenesisHeight)
+  def bestBlockHeight: Int = bestBlockIdOpt
+    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
+    .getOrElse(TestNetConstants.PreGenesisHeight)
+
+  def headerHeight(id: ModifierId): Option[Int] = historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray)
+
+  def bestBlockHeight(bestBlockId: ModifierId): Int = Ints.fromByteArray(headerHeightKey(bestBlockId))
+
 
   protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
       historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
       bestHeaderIdOpt match {
         case Some(bestHeaderId) =>
-          val toProcess: Seq[Header] =
-            if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+          val toProcess: Seq[Header] = if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
           ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
         case None =>
           logger.error("Should always have best header after header application")
@@ -225,29 +242,25 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
         heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
         headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
-        headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray) -> header)
-    } else {
-      scoreOf(header.parentId).map { parentScore =>
-        val score: BigInt @@ Difficulty.Tag =
-          Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
-        val bestRow: Seq[(StorageKey, StorageValue)] =
-          if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
-            Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
-          } else Seq.empty
-        val scoreRow: (StorageKey, StorageValue) =
-          headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
-        val heightRow: (StorageKey, StorageValue) =
-          headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
-        val headerIdsRow: Seq[(StorageKey, StorageValue)] =
-          if ((header.height > bestHeaderHeight) ||
-            (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
-            val row = bestBlockHeaderIdsRow(header, score)
-            row
-          }
-          else orphanedBlockHeaderIdsRow(header, score)
-        (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
-      }
+        headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray
+      ) -> header)
+    } else scoreOf(header.parentId).map { parentScore =>
+      val score: BigInt @@ Difficulty.Tag =
+        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
+      val bestRow: Seq[(StorageKey, StorageValue)] =
+        if ((header.height > bestHeaderHeight) ||
+          (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
+          Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
+        } else Seq.empty
+      val scoreRow: (StorageKey, StorageValue) =
+        headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
+      val heightRow: (StorageKey, StorageValue) =
+        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
+      val headerIdsRow: Seq[(StorageKey, StorageValue)] =
+        if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
+          bestBlockHeaderIdsRow(header, score)
+        else orphanedBlockHeaderIdsRow(header, score)
+      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
     }
   }
 
@@ -255,16 +268,17 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
   private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    val prevHeight = bestHeaderHeight
+    val prevHeight: Int = bestHeaderHeight
     logger.info(s"New best header ${h.encodedId} with score: $score." +
       s" New height: ${h.height}, old height: $prevHeight")
     val self: (StorageKey, StorageValue) =
-      heightIdsKey(h.height) -> StorageValue @@ (Seq(h.id) ++
-        headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)
-        ).flatten.toArray
-    val parentHeaderOpt: Option[Header] =
-      lastAppliedHeadersCache.get(ByteArrayWrapper(h.parentId)).orElse(typedModifierById[Header](h.parentId))
-    val forkHeaders: Seq[Header] = parentHeaderOpt.toSeq
+      heightIdsKey(h.height) ->
+        StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
+    val parentHeaderOpt: Option[Header] = lastAppliedHeadersCache
+      .get(ByteArrayWrapper(h.parentId))
+      .orElse(typedModifierById[Header](h.parentId))
+    val forkHeaders: Seq[Header] = parentHeaderOpt
+      .toSeq
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
       .filter(h => !isInBestChain(h))
     val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
@@ -275,6 +289,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   }
 
   /** Row to storage, that put this orphaned block id to the end of header ids at this height */
+  //todo why return type is Seq instead tuple2?
   private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
     logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
@@ -296,9 +311,12 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
+  //todo remove .get
   private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage.get(headerScoreKey(id)).map(d => BigInt(d))
+  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
+    .get(headerScoreKey(id))
+    .map(d => BigInt(d))
 
   def heightOf(id: ModifierId): Option[Height] = historyStorage
     .get(headerHeightKey(id))
@@ -312,9 +330,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         multiple ids if there are forks at chosen height.
     *         First id is always from the best headers chain.
     */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage.store
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
+    .store
     .get(heightIdsKey(height))
-    .map { elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq }
+    .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
     .getOrElse(Seq.empty[ModifierId])
 
   /**
@@ -325,17 +344,16 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     *         Note now it includes one header satisfying until condition!
     */
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
-    logger.info(s"limit: $limit. startHeader: ${startHeader.height}")
     @tailrec
     def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
       else lastAppliedHeadersCache.get(ByteArrayWrapper(header.parentId))
         .orElse(lastAppliedBlockHeadersCache.get(ByteArrayWrapper(header.parentId)))
         .orElse(typedModifierById[Header](header.parentId)) match {
-          case Some(parent: Header) => loop(parent, acc :+ parent)
-          case None if acc.contains(header) => acc
-          case _ => acc :+ header
-        }
+        case Some(parent: Header) => loop(parent, acc :+ parent)
+        case None if acc.contains(header) => acc
+        case _ => acc :+ header
+      }
     }
 
     if (bestHeaderIdOpt.isEmpty || (limit == 0)) HeaderChain(Seq())
@@ -350,22 +368,23 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     * @return found header
     */
   @tailrec
-  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = {
-    headerIdsAtHeight(height).find(id => p(id))
-      .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
-      case Some(header) => Some(header)
-      case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
-      case None => None
-    }
+  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
+    .find(id => p(id))
+    .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
+    case Some(header) => Some(header)
+    case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
+    case None => None
   }
 
+  //todo remove asset + ensuring
   def requiredDifficultyAfter(parent: Header): Difficulty = {
-    val parentHeight: Int = parent.height
-    val requiredHeights: Seq[Height] = difficultyController.getHeightsForRetargetingAt(Height @@ (parentHeight + 1))
-      .ensuring(_.last == parentHeight, "Incorrect heights sequence!")
+    //val parentHeight: Int = parent.height
+    val requiredHeights: Seq[Height] = difficultyController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
+      .ensuring(_.last == parent.height, "Incorrect heights sequence!")
     val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
-    val requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
-      .zip(chain.headers).filter(p => requiredHeights.contains(p._1))
+    val requiredHeaders: IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
+      .zip(chain.headers)
+      .filter(p => requiredHeights.contains(p._1))
     assert(requiredHeights.length == requiredHeaders.length,
       s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
     difficultyController.getDifficulty(requiredHeaders)

@@ -175,7 +175,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
-        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot { case (modId, _) => history.contains(modId) }.toSeq
+        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm
+          .filterNot { case (modId, _) => history.isModifierDefined(modId) }
+          .toSeq
         //todo check this logic
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
@@ -277,8 +279,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
 
-      val notYetRequested: Seq[ModifierId] = modifierIds.filter(id => !history.contains(id)
-        && !requestedModifiersFromPeer.contains(toKey(id)) && !receivedModifiers.contains(toKey(id)))
+      val notYetRequested: Seq[ModifierId] = modifierIds
+        .filter(id =>
+          !history.isModifierDefined(id) &&
+            !requestedModifiersFromPeer.contains(toKey(id)) &&
+            !receivedModifiers.contains(toKey(id))
+        )
 
       if (notYetRequested.nonEmpty) {
         if (mTypeId != Transaction.modifierTypeId)
