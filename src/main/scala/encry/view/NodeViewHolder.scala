@@ -5,10 +5,11 @@ import java.io.File
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
+import cats.data.EitherT
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp.{nodeViewSynchronizer, settings, miner, timeProvider}
+import encry.EncryApp.{miner, nodeViewSynchronizer, settings, timeProvider}
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import encry.network.DeliveryManager.FullBlockChainIsSynced
@@ -29,11 +30,13 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+import cats.instances.future._
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
@@ -162,7 +165,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
-  @tailrec
   private def updateState(history: EncryHistory,
                           state: UtxoState,
                           progressInfo: ProgressInfo[PersistentModifier],
@@ -252,19 +254,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             if (isBlock) ref ! ModifierAppendedToState(success = true)
           }
-          sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
-          if (progressInfo.chainSwitchingNeeded)
-            nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
-          blocksApplied.foreach(nodeView.wallet.scanPersistent)
-          logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-          if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
-            context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
-          if (newHistory.isFullChainSynced) {
-            logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
-            ModifiersCache.setChainSynced()
-            Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
-          }
-          updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
         } else {
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
@@ -374,6 +363,12 @@ object NodeViewHolder {
                                    previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
+
+  case class UpdateInformation(history: EncryHistory,
+                               state: UtxoState,
+                               failedMod: Option[PersistentModifier],
+                               alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
+                               suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {
 
