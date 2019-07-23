@@ -83,8 +83,8 @@ final case class UtxoState(storage: VersionalStorage,
           val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
           storage.insert(
             StorageVersion !@@ block.id,
-            combinedStateChange.outputsToDb,
-            combinedStateChange.inputsToDb,
+            combinedStateChange.outputsToDb.toList,
+            combinedStateChange.inputsToDb.toList
           )
           UtxoState(
             storage,
