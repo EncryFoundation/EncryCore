@@ -178,8 +178,8 @@ object UtxoState extends StrictLogging {
   private val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
 
   def tx2StateChange(tx: Transaction): StateChange = StateChange(
-    tx.inputs.map(input => StorageKey !@@ input.boxId).toList,
-    tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
+    tx.inputs.map(input => StorageKey !@@ input.boxId).toVector,
+    tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toVector
   )
 
   def initialStateBoxes: List[AssetBox] = List(AssetBox(EncryProposition.open, -9, 0))
