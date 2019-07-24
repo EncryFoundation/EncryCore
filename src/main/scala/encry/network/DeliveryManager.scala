@@ -135,6 +135,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
 
     case SemanticallySuccessfulModifier(mod) =>
+      logger.info(s"get ssm with id: ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} on dm")
       mod match {
         case block: Block => receivedModifiers -= toKey(block.payload.id)
         case _ => receivedModifiers -= toKey(mod.id)

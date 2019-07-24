@@ -41,10 +41,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            dataHolder: ActorRef) extends Actor with StrictLogging {
 
   val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
-    , "PeersKeeper")
+    .withDispatcher("peers-keeper-dispatcher"), "PeersKeeper")
 
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper, self)
-    , "NetworkController")
+    .withDispatcher("network-dispatcher"), "NetworkController")
 
   networkController ! RegisterMessagesHandler(Seq(
     InvNetworkMessage.NetworkMessageTypeID -> "InvNetworkMessage",
@@ -62,12 +62,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   val downloadedModifiersValidator: ActorRef = context.system
     .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef)
-      , "DownloadedModifiersValidator")
+      .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
     DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings,
       memoryPoolRef, self, downloadedModifiersValidator)
-      , "DeliveryManager")
+      .withDispatcher("delivery-manager-dispatcher"), "DeliveryManager")
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])

@@ -52,13 +52,13 @@ object EncryApp extends App with StrictLogging {
 
   lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
   lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner, influxRef)
-    )
+    .withDispatcher("mempool-dispatcher"))
    val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
-    , "nodeViewHolder")
+     .withDispatcher("nvh-dispatcher"), "nodeViewHolder")
 
   val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
     .props(influxRef, nodeViewHolder, settings, memoryPool, dataHolderForApi)
-    , "nodeViewSynchronizer")
+    .withDispatcher("nvsh-dispatcher"), "nodeViewSynchronizer")
 
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)

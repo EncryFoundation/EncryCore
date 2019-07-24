@@ -96,7 +96,7 @@ class NetworkController(settings: EncryAppSettings,
       logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
       val peerConnectionHandler: ActorRef = context.actorOf(
         PeerConnectionHandler.props(remoteConnection, connectionType, externalSocketAddress, remote)
-
+          .withDispatcher("network-dispatcher")
       )
       peerConnectionHandler ! StartInteraction
 

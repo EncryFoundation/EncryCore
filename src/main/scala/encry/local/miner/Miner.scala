@@ -77,7 +77,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
       self ! StartMining
     case StartMining if syncingDone =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[Worker], i, numberOfWorkers).withMailbox("mining-mailbox"))
+        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           logger.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
