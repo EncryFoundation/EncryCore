@@ -40,7 +40,7 @@ import cats.instances.future._
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
-                     dataHolder: ActorRef) extends Actor with StrictLogging {
+                     dataHolder: ActorRef) extends Actor with StrictLogging with AutoCloseable {
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
@@ -354,6 +354,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).right.get }
     }
+
+  override def close(): Unit = {
+    nodeView.history.close()
+    nodeView.state.close()
+    nodeView.wallet.close()
+  }
 }
 
 object NodeViewHolder {

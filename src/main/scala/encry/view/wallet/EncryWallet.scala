@@ -1,6 +1,7 @@
 package encry.view.wallet
 
 import java.io.File
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
@@ -16,7 +17,7 @@ import org.iq80.leveldb.{DB, Options}
 
 import scala.util.Try
 
-case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager) extends StrictLogging {
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager) extends StrictLogging with AutoCloseable{
 
   val publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 
@@ -54,6 +55,8 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
   def getBalances: Seq[(String, Long)] = walletStorage.getBalances.toSeq
+
+  override def close(): Unit = walletStorage.close()
 }
 
 object EncryWallet extends StrictLogging {
