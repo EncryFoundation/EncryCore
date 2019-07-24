@@ -85,12 +85,16 @@ final case class UtxoState(storage: VersionalStorage,
         res.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
           txsToApply => {
+            val combineTimeStart = System.currentTimeMillis()
             val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
+            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart)/1000L} s")
+            val insertTimestart = System.currentTimeMillis()
             storage.insert(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
               combinedStateChange.inputsToDb.toList
             )
+            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
             UtxoState(
               storage,
               Height @@ block.header.height,
