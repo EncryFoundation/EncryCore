@@ -17,7 +17,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
 import encry.utils.implicits.Validation._
 import io.iohk.iodb.LSMStore
-import cats.data.Validated
+import cats.data.{EitherT, Validated}
 import cats.syntax.validated._
 import cats.syntax.either._
 import cats.syntax.traverse._
@@ -29,6 +29,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.{FiniteDuration, _}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import monix.eval.Task
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -44,55 +45,60 @@ import org.encryfoundation.common.validation.{MalformedModifierError, Validation
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
                            height: Height,
-                           lastBlockTimestamp: Long)
+                           lastBlockTimestamp: Long)(implicit val exCon: ExecutionContextExecutor)
   extends StrictLogging with UtxoStateReader with AutoCloseable {
 
-  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = mod match {
-    case header: Header =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      UtxoState(
-        storage,
-        height,
-        header.timestamp
-      ).asRight[List[ModifierApplyError]]
-    case block: Block =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      val lastTxId = block.payload.txs.last.id
-      val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-      val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-        if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
-        else validate(tx)
-      }).toList
-        .traverse(Validated.fromEither)
-        .toEither
-//      val res1 = block.payload.txs.map(tx => {
-//        if (tx.id sameElements lastTxId) Future(validate(tx, totalFees + EncrySupplyController.supplyAt(height)))
-//        else Future(validate(tx))
-//      }).toList.sequence[Future, Either[ValidationResult, Transaction]]
-//      val res: Either[ValidationResult, List[Transaction]] = Await.result(res1, 5 minutes)
-//        .traverse(Validated.fromEither)
-//        .toEither
-      res.fold(
-        err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
-        txsToApply => {
-          val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
-          storage.insert(
-            StorageVersion !@@ block.id,
-            combinedStateChange.outputsToDb.toList,
-            combinedStateChange.inputsToDb.toList
-          )
-          UtxoState(
-            storage,
-            Height @@ block.header.height,
-            block.header.timestamp
-          ).asRight[List[ModifierApplyError]]
-        }
-      )
+  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
+    val startTime = System.currentTimeMillis()
+    val result = mod match {
+      case header: Header =>
+        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+        UtxoState(
+          storage,
+          height,
+          header.timestamp
+        ).asRight[List[ModifierApplyError]]
+      case block: Block =>
+        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+        val lastTxId = block.payload.txs.last.id
+        val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
+        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
+          else validate(tx)
+        }).toList
+          .traverse(Validated.fromEither)
+          .toEither
+        //      val res1 = block.payload.txs.map(tx => {
+        //        if (tx.id sameElements lastTxId) Future(validate(tx, totalFees + EncrySupplyController.supplyAt(height)))
+        //        else Future(validate(tx))
+        //      }).toList.sequence[Future, Either[ValidationResult, Transaction]]
+        //      val res: Either[ValidationResult, List[Transaction]] = Await.result(res1, 5 minutes)
+        //        .traverse(Validated.fromEither)
+        //        .toEither
+        res.fold(
+          err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
+          txsToApply => {
+            val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
+            storage.insert(
+              StorageVersion !@@ block.id,
+              combinedStateChange.outputsToDb.toList,
+              combinedStateChange.inputsToDb.toList
+            )
+            UtxoState(
+              storage,
+              Height @@ block.header.height,
+              block.header.timestamp
+            ).asRight[List[ModifierApplyError]]
+          }
+        )
+    }
+    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime)/1000L} s)")
+    result
   }
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
@@ -189,7 +195,7 @@ object UtxoState extends StrictLogging {
   def create(stateDir: File,
              nodeViewHolderRef: Option[ActorRef],
              settings: EncryAppSettings,
-             statsSenderRef: Option[ActorRef]): UtxoState = {
+             statsSenderRef: Option[ActorRef])(implicit exCon: ExecutionContextExecutor): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
@@ -213,7 +219,7 @@ object UtxoState extends StrictLogging {
   def genesis(stateDir: File,
               nodeViewHolderRef: Option[ActorRef],
               settings: EncryAppSettings,
-              statsSenderRef: Option[ActorRef]): UtxoState = {
+              statsSenderRef: Option[ActorRef])(implicit exCon: ExecutionContextExecutor): UtxoState = {
     //check kind of storage
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
