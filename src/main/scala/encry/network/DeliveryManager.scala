@@ -87,15 +87,18 @@ class DeliveryManager(influxRef: Option[ActorRef],
         priorityCalculator = newStat
         context.parent ! AccumulatedPeersStatistic(accumulatedStatistic)
       }
-      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
+      val checkModsSch = context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
         self ! CheckModifiersToDownload
       )
       nodeViewSync ! SendLocalSyncInfo
-      context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
+      context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining, checkModsSch))
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }
 
-  def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
+  def basicMessageHandler(history: EncryHistory,
+                          isBlockChainSynced: Boolean,
+                          isMining: Boolean,
+                          checkModSch: Cancellable): Receive = {
     case InvalidModifiers(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
 
     case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
@@ -132,7 +135,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
-      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+      val nextCheckModsSche =
+        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+      context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsSche))
 
     case SemanticallySuccessfulModifier(mod) =>
       logger.info(s"get ssm with id: ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} on dm")
@@ -140,7 +145,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case block: Block => receivedModifiers -= toKey(block.payload.id)
         case _ => receivedModifiers -= toKey(mod.id)
       }
-
+      if (!isBlockChainSynced && expectedModifiers.isEmpty && receivedModifiers.isEmpty) {
+        checkModSch.cancel()
+        self ! CheckModifiersToDownload
+      }
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
 
     case SyntacticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
@@ -183,13 +191,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
-    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
+    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining, checkModSch))
 
-    case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
+    case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true, checkModSch))
 
-    case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
+    case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false, checkModSch))
 
-    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
+    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining, checkModSch))
 
     case StopTransactionsValidation => canProcessTransactions = false
 
