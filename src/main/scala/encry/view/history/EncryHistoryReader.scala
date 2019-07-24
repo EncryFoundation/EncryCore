@@ -200,9 +200,9 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def syncInfo: SyncInfo =
     if (isEmpty) SyncInfo(Seq.empty)
     else SyncInfo(bestHeaderOpt.map(header =>
-      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
-    ).getOrElse(Seq.empty)
-    )
+      ((header.height - settings.network.maxInvObjects + 1) to header.height)
+        .flatMap(height => headerIdsAtHeight(height).headOption)
+    ).getOrElse(Seq.empty))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {

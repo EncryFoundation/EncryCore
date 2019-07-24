@@ -75,10 +75,10 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         .headOption
         .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
         case Some(bestHeaderAtThisHeight) =>
-          logger.info(s"requiredModifiersForHeader($bestHeaderAtThisHeight) ->" +
-            s"${requiredModifiersForHeader(bestHeaderAtThisHeight).map(x => Algos.encode(x._2))}")
-          val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+          val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
             .filterNot(m => excluding.exists(_ sameElements m._2) && isModifierDefined(m._2))
+          logger.info(s"modifiersToDownload($bestHeaderAtThisHeight) ->" +
+            s"${toDownload.map(k => Algos.encode(k._2))}")
           continuation(Height @@ (height + 1), acc ++ toDownload)
         case None => acc
       }
