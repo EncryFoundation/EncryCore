@@ -197,7 +197,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def syncInfo: SyncInfo =
     if (isEmpty) SyncInfo(Seq.empty)
     else SyncInfo(bestHeaderOpt.map(header =>
-      ((header.height - settings.network.maxInvObjects) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
+      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
       ).getOrElse(Seq.empty)
     )
 
