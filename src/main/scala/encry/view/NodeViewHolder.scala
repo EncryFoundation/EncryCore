@@ -79,7 +79,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else {
-        //logger.info(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
+        logger.info(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
         ModifiersCache.put(key(mod.id), mod, nodeView.history)
       }
     }
