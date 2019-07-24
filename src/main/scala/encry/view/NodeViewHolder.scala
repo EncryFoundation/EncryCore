@@ -254,6 +254,19 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             if (isBlock) ref ! ModifierAppendedToState(success = true)
           }
+          sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
+          if (progressInfo.chainSwitchingNeeded)
+            nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
+          blocksApplied.foreach(nodeView.wallet.scanPersistent)
+          logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+          if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
+            context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
+          if (newHistory.isFullChainSynced) {
+            logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+            ModifiersCache.setChainSynced()
+            Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
+          }
+          updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
         } else {
           if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
           context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
