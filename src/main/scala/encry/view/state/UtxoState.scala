@@ -67,6 +67,7 @@ final case class UtxoState(storage: VersionalStorage,
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
+        val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
           if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
           else validate(tx)
@@ -80,6 +81,7 @@ final case class UtxoState(storage: VersionalStorage,
         //      val res: Either[ValidationResult, List[Transaction]] = Await.result(res1, 5 minutes)
         //        .traverse(Validated.fromEither)
         //        .toEither
+        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime)/1000L} s")
         res.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
           txsToApply => {
