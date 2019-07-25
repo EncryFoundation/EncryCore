@@ -41,6 +41,4 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
     }.toIterator
 
   override def close(): Unit = vldb.close()
-
-  override def contains(key: StorageKey): Boolean = vldb.contains(VersionalLevelDbKey @@ key.untag(StorageKey))
 }

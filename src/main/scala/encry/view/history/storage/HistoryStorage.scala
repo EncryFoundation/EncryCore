@@ -10,9 +10,7 @@ import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.util.{Failure, Random, Success}
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
@@ -46,13 +44,6 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
       iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.tail)
     case _: VLDBWrapper =>
       store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
-  }
-
-  def containsMod(id: ModifierId): Boolean = store match {
-    case iodb: IODBHistoryWrapper =>
-      iodb.objectStore.get(ByteArrayWrapper(id)).isDefined
-    case _: VLDBWrapper =>
-      store.contains(StorageKey @@ id.untag(ModifierId))
   }
 
   def insertObjects(objectsToInsert: Seq[PersistentModifier]): Unit =

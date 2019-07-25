@@ -18,8 +18,6 @@ trait VersionalStorage {
 
   def versions: List[StorageVersion]
 
-  def contains(key: StorageKey): Boolean
-
   def rollbackTo(to: StorageVersion)
 
   def insert(version: StorageVersion,

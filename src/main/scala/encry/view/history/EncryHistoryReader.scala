@@ -146,14 +146,9 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case _ => None
   }
 
-  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
-
   def getBlock(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
     .orElse(typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload)))
-
-  def isBlockDefined(header: Header): Boolean =
-    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
