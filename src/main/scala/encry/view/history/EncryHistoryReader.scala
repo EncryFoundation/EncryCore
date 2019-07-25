@@ -28,7 +28,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   /** Is there's no history, even genesis block */
   def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
 
-  def contains(id: ModifierId): Boolean = modifierById(id).isDefined
+  def contains(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   /**
     * Complete block of the best chain with transactions.
@@ -76,7 +76,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = headersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
+      val startHeader: Header = lastAppliedHeadersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
           "Should always contain genesis header.")
@@ -87,7 +87,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
       val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = headersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
+      val startHeader: Header = lastAppliedHeadersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
       headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers.map(h => Header.modifierTypeId -> h.id)
     }
@@ -100,7 +100,7 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
         .flatMap { h => headerIdsAtHeight(h + 1) }
-        .flatMap { id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)) }
+        .flatMap { id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)) }
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
       else {
@@ -132,7 +132,6 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
-    .ensuring(_.forall(_.id sameElements id), s"Modifier ${Algos.encode(id)} id mismatch")
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
@@ -141,10 +140,15 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case _ => None
   }
 
+  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
+
   def getBlock(header: Header): Option[Block] =
     blocksCache.get(ByteArrayWrapper(header.id)).orElse(
       typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload))
     )
+
+  def isBlockDefined(header: Header): Boolean =
+    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
@@ -191,7 +195,10 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def syncInfo: SyncInfo =
     if (isEmpty) SyncInfo(Seq.empty)
-    else SyncInfo(lastHeaders(settings.network.syncPacketLength).headers.map(_.id))
+    else SyncInfo(bestHeaderOpt.map(header =>
+      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
+      ).getOrElse(Seq.empty)
+    )
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {

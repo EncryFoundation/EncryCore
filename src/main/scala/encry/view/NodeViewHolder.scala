@@ -7,16 +7,16 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp._
+import encry.EncryApp.{miner, nodeViewSynchronizer, settings, timeProvider}
 import encry.consensus.History.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.NodeViewHolder._
-import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
+import encry.view.NodeViewHolder.ReceivableMessages._
+import encry.view.NodeViewHolder._
 import encry.view.history.EncryHistory
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -27,15 +27,16 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.concurrent.Future
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
-                     dataHolder: ActorRef) extends Actor with StrictLogging {
+                     dataHolder: ActorRef) extends Actor with StrictLogging with AutoCloseable {
+
+  implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
   case class NodeView(history: EncryHistory, state: UtxoState, wallet: EncryWallet)
 
@@ -56,7 +57,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     System.exit(100)
   }
 
-  context.system.scheduler.schedule(5.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: " +
+  context.system.scheduler.schedule(1.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: " +
     s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -71,7 +72,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (isInHistory || isInCache)
         logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      else {
+        logger.info(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
+        ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      }
     }
       computeApplications()
 
@@ -155,17 +159,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
-  @tailrec
   private def updateState(history: EncryHistory,
                           state: UtxoState,
                           progressInfo: ProgressInfo[PersistentModifier],
                           suffixApplied: IndexedSeq[PersistentModifier]):
   (EncryHistory, UtxoState, Seq[PersistentModifier]) = {
-    case class UpdateInformation(history: EncryHistory,
-                                 state: UtxoState,
-                                 failedMod: Option[PersistentModifier],
-                                 alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
-                                 suffix: IndexedSeq[PersistentModifier])
     logger.debug(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach{
       case header: Header => requestDownloads(progressInfo, Some(header.id))
@@ -358,6 +356,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).right.get }
     }
+
+  override def close(): Unit = {
+    nodeView.history.close()
+    nodeView.state.close()
+    nodeView.wallet.close()
+  }
 }
 
 object NodeViewHolder {
@@ -367,6 +371,12 @@ object NodeViewHolder {
                                    previousModifier: Option[ModifierId] = None) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
+
+  case class UpdateInformation(history: EncryHistory,
+                               state: UtxoState,
+                               failedMod: Option[PersistentModifier],
+                               alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
+                               suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {
 

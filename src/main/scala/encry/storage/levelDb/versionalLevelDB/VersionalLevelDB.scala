@@ -22,6 +22,15 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
 
   def currentVersion: LevelDBVersion = LevelDBVersion @@ db.get(CURRENT_VERSION_KEY)
 
+  def contains(elemKey: VersionalLevelDbKey): Boolean = {
+    val readOptions = new ReadOptions()
+    readOptions.snapshot(db.getSnapshot)
+    try {
+      val map: Array[Byte] = db.get(userKey(elemKey), readOptions)
+      map != null && map.headOption.contains(ACCESSIBLE_KEY_PREFIX)
+    } finally readOptions.snapshot().close()
+  }
+
   /**
     * @param elemKey
     * @return

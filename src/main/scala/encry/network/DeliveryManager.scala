@@ -27,14 +27,13 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
-import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import org.encryfoundation.common.modifiers.history.Header
+import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -65,6 +64,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   var expectedModifiers: Map[InetSocketAddress, Map[ModifierIdAsKey, (Cancellable, Int)]] = Map.empty
 
+  var expectedTransactions: HashSet[ModifierIdAsKey] = HashSet.empty[ModifierIdAsKey]
+
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
   var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings)
@@ -86,15 +87,18 @@ class DeliveryManager(influxRef: Option[ActorRef],
         priorityCalculator = newStat
         context.parent ! AccumulatedPeersStatistic(accumulatedStatistic)
       }
-      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
+      val checkModsSch = context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(
         self ! CheckModifiersToDownload
       )
       nodeViewSync ! SendLocalSyncInfo
-      context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining))
+      context.become(basicMessageHandler(historyReader, isBlockChainSynced = false, isMining = settings.node.mining, checkModsSch))
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }
 
-  def basicMessageHandler(history: EncryHistory, isBlockChainSynced: Boolean, isMining: Boolean): Receive = {
+  def basicMessageHandler(history: EncryHistory,
+                          isBlockChainSynced: Boolean,
+                          isMining: Boolean,
+                          checkModScheduler: Cancellable): Receive = {
     case InvalidModifiers(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
 
     case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
@@ -120,20 +124,31 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
       val newIds: Seq[(ModifierTypeId, ModifierId)] =
         history.modifiersToDownload(
-          settings.network.networkChunkSize - currentQueue.size,
+          settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
           currentQueue.map(elem => ModifierId @@ elem.toArray)
-        ).filterNot(modId => currentQueue.contains(toKey(modId._2)))
+        ).filterNot(modId => currentQueue.contains(toKey(modId._2)) || receivedModifiers.contains(toKey(modId._2)))
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
       if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
-      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+      val nextCheckModsSche =
+        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckModifiersToDownload)
+      context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsSche))
 
-    case SemanticallySuccessfulModifier(mod) => receivedModifiers -= toKey(mod.id)
-
+    case SemanticallySuccessfulModifier(mod) =>
+      logger.info(s"get ssm with id: ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} on dm")
+      mod match {
+        case block: Block => receivedModifiers -= toKey(block.payload.id)
+        case _ => receivedModifiers -= toKey(mod.id)
+      }
+      if (!isBlockChainSynced && expectedModifiers.isEmpty && receivedModifiers.isEmpty) {
+        checkModScheduler.cancel()
+        self ! CheckModifiersToDownload
+      }
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
 
     case SyntacticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
@@ -176,13 +191,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
-    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining))
+    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining, checkModScheduler))
 
-    case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true))
+    case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true, checkModScheduler))
 
-    case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false))
+    case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false, checkModScheduler))
 
-    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining))
+    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining, checkModScheduler))
 
     case StopTransactionsValidation => canProcessTransactions = false
 
@@ -270,13 +285,15 @@ class DeliveryManager(influxRef: Option[ActorRef],
           logger.info(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator = priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
-        val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
-          notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
-            rYet.updated(toKey(id),
-              context.system
-                .scheduler.scheduleOnce(settings.network.deliveryTimeout)(self ! CheckDelivery(peer, mTypeId, id)) -> 1)
-          }
-        expectedModifiers = expectedModifiers.updated(peer.socketAddress, requestedModIds)
+        if (mTypeId != Transaction.modifierTypeId) {
+          val requestedModIds: Map[ModifierIdAsKey, (Cancellable, Int)] =
+            notYetRequested.foldLeft(requestedModifiersFromPeer) { case (rYet, id) =>
+              rYet.updated(toKey(id),
+                context.system
+                  .scheduler.scheduleOnce(settings.network.deliveryTimeout)(self ! CheckDelivery(peer, mTypeId, id)) -> 1)
+            }
+          expectedModifiers = expectedModifiers.updated(peer.socketAddress, requestedModIds)
+        } else expectedTransactions = expectedTransactions ++ modifierIds.map(toKey)
       }
     }
   }
@@ -322,8 +339,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param peer - peer from which we possibly expecting modifier
     * @return 'true' if we are expecting this modifier from this peer otherwise 'false'
     */
-  def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean =
-    expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
+  def isExpecting(mId: ModifierId, modifierTypeId: ModifierTypeId, peer: ConnectedPeer): Boolean =
+    if (modifierTypeId != Transaction.modifierTypeId)
+      expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
+    else expectedTransactions.contains(toKey(mId))
 
   /**
     * Clear the 'receivedSpamModifiers' collection
@@ -427,7 +446,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
               mId: ModifierId,
               peer: ConnectedPeer,
               isBlockChainSynced: Boolean): Unit =
-    if (isExpecting(mId, peer)) {
+    if (isExpecting(mId, mTid, peer)) {
       if (mTid != Transaction.modifierTypeId)
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
@@ -435,7 +454,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
         .getOrElse(peer.socketAddress, Map.empty)
       peerExpectedModifiers.get(toKey(mId)).foreach(_._1.cancel())
       if (mTid != Transaction.modifierTypeId) receivedModifiers += toKey(mId)
-      expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
+      if (mTid != Transaction.modifierTypeId) expectedModifiers = clearExpectedModifiersCollection(peerExpectedModifiers, toKey(mId), peer.socketAddress)
+      else expectedTransactions = expectedTransactions - toKey(mId)
     } else {
       receivedSpamModifiers = receivedSpamModifiers - toKey(mId) + (toKey(mId) -> peer)
       priorityCalculator = priorityCalculator.decrementRequest(peer.socketAddress)

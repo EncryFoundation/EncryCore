@@ -5,10 +5,8 @@ import PayloadProto.PayloadProtoMessage
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.{HeaderUtils, PayloadUtils}
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierTypeId}
-import scorex.crypto.hash.Digest32
-
+import org.encryfoundation.common.modifiers.history.{Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierTypeId
 import scala.util.{Failure, Try}
 
 object ModifiersToNetworkUtils extends StrictLogging {

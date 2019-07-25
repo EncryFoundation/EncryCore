@@ -26,6 +26,8 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   protected def getBlock(h: Header): Option[Block]
 
+  protected def isBlockDefined(h: Header): Boolean
+
   protected def commonBlockThenSuffixes(header1: Header, header2: Header): (HeaderChain, HeaderChain)
 
   protected[history] def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]]
@@ -71,6 +73,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
       val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlock)
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlock(h))
+      toApply.foreach(addBlockToCacheIfNecessary)
       if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
       else {
         //application of this block leads to full chain with higher score
@@ -101,7 +104,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- bestBlockIdOpt
-      heightOfThisHeader <- headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
+      heightOfThisHeader <- lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)).map(_.height)
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
@@ -136,9 +139,9 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
-    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => getBlock(h).nonEmpty).map(_.tail)
+    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.tail)
     logger.debug(s"continuations: ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
-    val chains: Seq[Seq[Block]] = continuations.map(_.map(getBlock).takeWhile(_.nonEmpty).flatten)
+    val chains: Seq[Seq[Block]] = continuations.map(_.filter(isBlockDefined).flatMap(getBlock))
     logger.debug(s"Chains: ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains.map(c => block +: c).maxBy(c => scoreOf(c.last.id).get)
   }
@@ -146,7 +149,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   private def clipBlockDataAt(heights: Seq[Int]): Try[Unit] = Try {
     val toRemove: Seq[ModifierId] = heights
       .flatMap(h => headerIdsAtHeight(h))
-      .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
+      .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)))
       .flatMap(h => Seq(h.payloadId))
     historyStorage.removeObjects(toRemove)
   }
@@ -178,7 +181,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
         s"updates block ${prevBest.map(_.encodedId).getOrElse("None")} " +
         s"with height ${prevBest.map(_.header.height).getOrElse(-1)}"
     }
-    logger.info(s"Full block ${appliedBlock.encodedId} appended, " +
+    logger.info(s"Full block ${appliedBlock.encodedId} appended (txs: ${appliedBlock.payload.txs.length}), " +
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
 

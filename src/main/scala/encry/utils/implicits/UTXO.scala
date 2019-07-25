@@ -11,7 +11,7 @@ object UTXO {
 
   implicit def utxoStateChanges: Monoid[StateChange] = new Monoid[StateChange] {
 
-    override def empty: StateChange = StateChange(List.empty[StorageKey], List.empty[(StorageKey, StorageValue)])
+    override def empty: StateChange = StateChange(Vector.empty[StorageKey], Vector.empty[(StorageKey, StorageValue)])
 
     override def combine(x: StateChange, y: StateChange): StateChange =
       StateChange(x.inputsToDb ++ y.inputsToDb, x.outputsToDb ++ y.outputsToDb)

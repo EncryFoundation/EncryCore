@@ -54,7 +54,7 @@ object EncryApp extends App with StrictLogging {
   lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner, influxRef)
     .withDispatcher("mempool-dispatcher"))
    val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
-    .withMailbox("nvh-mailbox"), "nodeViewHolder")
+     .withDispatcher("nvh-dispatcher"), "nodeViewHolder")
 
   val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
     .props(influxRef, nodeViewHolder, settings, memoryPool, dataHolderForApi)
@@ -65,8 +65,6 @@ object EncryApp extends App with StrictLogging {
     Kamon.addReporter(new InfluxDBReporter())
     SystemMetrics.startCollecting()
   }
-  if (settings.kafka.exists(_.sendToKafka))
-    system.actorOf(Props[KafkaActor].withDispatcher("kafka-dispatcher"), "kafkaActor")
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")

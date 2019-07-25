@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -16,30 +15,30 @@ import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
 import encry.utils.implicits.Validation._
-import io.iohk.iodb.LSMStore
-import cats.data.Validated
-import cats.syntax.validated._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.Traverse
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import io.iohk.iodb.LSMStore
+import cats.data.Validated
+import cats.Traverse
+import cats.syntax.traverse._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.validated._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
@@ -47,40 +46,51 @@ final case class UtxoState(storage: VersionalStorage,
                            lastBlockTimestamp: Long)
   extends StrictLogging with UtxoStateReader with AutoCloseable {
 
-  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = mod match {
-    case header: Header =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      UtxoState(
-        storage,
-        height,
-        header.timestamp
-      ).asRight[List[ModifierApplyError]]
-    case block: Block =>
-      logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
-      val lastTxId = block.payload.txs.last.id
-      val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-      val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-        if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
-        else validate(tx)
-      }).toList
-        .traverse(Validated.fromEither)
-        .toEither
-      res.fold(
-        err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
-        txsToApply => {
-          val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
-          storage.insert(
-            StorageVersion !@@ block.id,
-            combinedStateChange.outputsToDb,
-            combinedStateChange.inputsToDb,
-          )
-          UtxoState(
-            storage,
-            Height @@ block.header.height,
-            block.header.timestamp
-          ).asRight[List[ModifierApplyError]]
-        }
-      )
+  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
+    val startTime = System.currentTimeMillis()
+    val result = mod match {
+      case header: Header =>
+        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+        UtxoState(
+          storage,
+          height,
+          header.timestamp
+        ).asRight[List[ModifierApplyError]]
+      case block: Block =>
+        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+        val lastTxId = block.payload.txs.last.id
+        val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
+        val validstartTime = System.currentTimeMillis()
+        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
+          else validate(tx)
+        }).toList
+          .traverse(Validated.fromEither)
+          .toEither
+        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime)/1000L} s")
+        res.fold(
+          err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
+          txsToApply => {
+            val combineTimeStart = System.currentTimeMillis()
+            val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
+            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart)/1000L} s")
+            val insertTimestart = System.currentTimeMillis()
+            storage.insert(
+              StorageVersion !@@ block.id,
+              combinedStateChange.outputsToDb.toList,
+              combinedStateChange.inputsToDb.toList
+            )
+            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
+            UtxoState(
+              storage,
+              Height @@ block.header.height,
+              block.header.timestamp
+            ).asRight[List[ModifierApplyError]]
+          }
+        )
+    }
+    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime)/1000L} s)")
+    result
   }
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
@@ -156,8 +166,8 @@ final case class UtxoState(storage: VersionalStorage,
 
 object UtxoState extends StrictLogging {
 
-  final case class StateChange(inputsToDb: List[StorageKey],
-                               outputsToDb: List[(StorageKey, StorageValue)])
+  final case class StateChange(inputsToDb: Vector[StorageKey],
+                               outputsToDb: Vector[(StorageKey, StorageValue)])
 
   private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 
@@ -166,8 +176,8 @@ object UtxoState extends StrictLogging {
   private val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
 
   def tx2StateChange(tx: Transaction): StateChange = StateChange(
-    tx.inputs.map(input => StorageKey !@@ input.boxId).toList,
-    tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
+    tx.inputs.map(input => StorageKey !@@ input.boxId).toVector,
+    tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toVector
   )
 
   def initialStateBoxes: List[AssetBox] = List(AssetBox(EncryProposition.open, -9, 0))
