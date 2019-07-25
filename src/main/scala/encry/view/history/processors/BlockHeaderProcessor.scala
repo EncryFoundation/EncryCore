@@ -39,7 +39,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   protected val historyStorage: HistoryStorage
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
-  var headersForSyncInfo: IndexedSeq[ModifierId] = IndexedSeq.empty[ModifierId]
 
   protected def getBlock(h: Header): Option[Block]
 
@@ -52,8 +51,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   var headersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   var lastAppliedHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
-
-  var blockHeadersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   var lastAppliedBlockHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
 
