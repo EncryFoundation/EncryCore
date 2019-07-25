@@ -339,8 +339,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param peer - peer from which we possibly expecting modifier
     * @return 'true' if we are expecting this modifier from this peer otherwise 'false'
     */
-  def isExpecting(mId: ModifierId, peer: ConnectedPeer): Boolean =
-    expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
+  def isExpecting(mId: ModifierId, modifierTypeId: ModifierTypeId, peer: ConnectedPeer): Boolean =
+    if (modifierTypeId != Transaction.modifierTypeId)
+      expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
+    else expectedTransactions.contains(toKey(mId))
 
   /**
     * Clear the 'receivedSpamModifiers' collection
@@ -444,7 +446,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
               mId: ModifierId,
               peer: ConnectedPeer,
               isBlockChainSynced: Boolean): Unit =
-    if (isExpecting(mId, peer)) {
+    if (isExpecting(mId, mTid, peer)) {
       if (mTid != Transaction.modifierTypeId)
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
