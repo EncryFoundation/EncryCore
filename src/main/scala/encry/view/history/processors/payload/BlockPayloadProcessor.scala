@@ -21,13 +21,11 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
     )
     .getOrElse(putToHistory(payload))
 
-  private def getBlockByPayload(payload: Payload): Option[Block] = lastAppliedHeadersCache
-    .get(ByteArrayWrapper(payload.headerId))
-    .orElse(typedModifierById[Header](payload.headerId))
+  private def getBlockByPayload(payload: Payload): Option[Block] = getHeaderById(payload.headerId)
     .flatMap(h => Some(Block(h, payload)))
 
   override protected def validate(m: Payload): Either[ValidationError, PersistentModifier] =
-    modifierValidation(m, lastAppliedHeadersCache.get(ByteArrayWrapper(m.headerId)).orElse(typedModifierById[Header](m.headerId)))
+    modifierValidation(m, getHeaderById(m.headerId))
 
   private def putToHistory(payload: Payload): ProgressInfo[PersistentModifier] = {
     historyStorage.insertObjects(Seq(payload))

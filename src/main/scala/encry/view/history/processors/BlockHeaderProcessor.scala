@@ -41,6 +41,8 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected def getBlock(h: Header): Option[Block]
 
+  def getHeaderById(id: ModifierId): Option[Header]
+
   /**
     * headersCacheIndexes & headersCache contains headers from (currentBestHeaderHeight - maxRollBackDepth) to
     * headersCacheIndexes contains info about heights & headers ids
@@ -50,10 +52,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   var headersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   var lastAppliedHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
-
-  var blockHeadersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
-
-  var lastAppliedBlockHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
 
   /**
     * Header of best Header chain. Empty if no genesis block is applied yet.
@@ -72,7 +70,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       if (acc.lengthCompare(howMany) >= 0) acc
       else headerIdsAtHeight(height)
         .headOption
-        .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
+        .flatMap(getHeaderById) match {
         case Some(bestHeaderAtThisHeight) =>
           val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
             .filterNot(m => excluding.exists(_ sameElements m._2) && isModifierDefined(m._2))
@@ -122,8 +120,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else {
-        headerIdsAtHeight(height).headOption.flatMap(id =>
-          lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
+        headerIdsAtHeight(height).headOption.flatMap(getHeaderById) match {
           case Some(bestHeaderAtThisHeight) =>
             val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
               .filter(m => !isModifierDefined(m._2))
@@ -270,9 +267,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     val self: (StorageKey, StorageValue) =
       heightIdsKey(h.height) ->
         StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
-    val parentHeaderOpt: Option[Header] = lastAppliedHeadersCache
-      .get(ByteArrayWrapper(h.parentId))
-      .orElse(typedModifierById[Header](h.parentId))
+    val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
     val forkHeaders: Seq[Header] = parentHeaderOpt
       .toSeq
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
@@ -293,9 +288,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   protected def validate(h: Header): Either[ValidationError, Header] =
     if (h.isGenesis) HeaderValidator.validateGenesisBlockHeader(h)
-    else lastAppliedHeadersCache
-      .get(ByteArrayWrapper(h.parentId))
-      .orElse(typedModifierById[Header](h.parentId))
+    else getHeaderById(h.parentId)
       .map(p => HeaderValidator.validateHeader(h, p))
       .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
@@ -343,9 +336,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     @tailrec
     def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
-      else lastAppliedHeadersCache.get(ByteArrayWrapper(header.parentId))
-        .orElse(lastAppliedBlockHeadersCache.get(ByteArrayWrapper(header.parentId)))
-        .orElse(typedModifierById[Header](header.parentId)) match {
+      else getHeaderById(header.parentId) match {
         case Some(parent: Header) => loop(parent, acc :+ parent)
         case None if acc.contains(header) => acc
         case _ => acc :+ header
@@ -366,7 +357,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   @tailrec
   protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
     .find(id => p(id))
-    .flatMap(id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id))) match {
+    .flatMap(getHeaderById) match {
     case Some(header) => Some(header)
     case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
     case None => None

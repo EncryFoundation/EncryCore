@@ -66,8 +66,7 @@ trait EncryHistory extends EncryHistoryReader with AutoCloseable {
   protected def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
     case header: Header => Some(header)
     case block: Block => Some(block.header)
-    case payload: Payload =>
-      lastAppliedHeadersCache.get(ByteArrayWrapper(payload.headerId)).orElse(typedModifierById[Header](payload.headerId))
+    case payload: Payload => getHeaderById(payload.headerId)
     case _ => None
   }
 
