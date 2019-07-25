@@ -65,8 +65,6 @@ object EncryApp extends App with StrictLogging {
     Kamon.addReporter(new InfluxDBReporter())
     SystemMetrics.startCollecting()
   }
-  if (settings.kafka.exists(_.sendToKafka))
-    system.actorOf(Props[KafkaActor], "kafkaActor")
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
     system.actorOf(Props[ConsoleListener], "cliListener")

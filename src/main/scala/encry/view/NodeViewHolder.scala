@@ -164,11 +164,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                           progressInfo: ProgressInfo[PersistentModifier],
                           suffixApplied: IndexedSeq[PersistentModifier]):
   (EncryHistory, UtxoState, Seq[PersistentModifier]) = {
-    case class UpdateInformation(history: EncryHistory,
-                                 state: UtxoState,
-                                 failedMod: Option[PersistentModifier],
-                                 alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
-                                 suffix: IndexedSeq[PersistentModifier])
     logger.debug(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach{
       case header: Header => requestDownloads(progressInfo, Some(header.id))

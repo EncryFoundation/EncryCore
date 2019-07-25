@@ -98,7 +98,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def basicMessageHandler(history: EncryHistory,
                           isBlockChainSynced: Boolean,
                           isMining: Boolean,
-                          checkModSch: Cancellable): Receive = {
+                          checkModScheduler: Cancellable): Receive = {
     case InvalidModifiers(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
 
     case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
@@ -146,7 +146,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case _ => receivedModifiers -= toKey(mod.id)
       }
       if (!isBlockChainSynced && expectedModifiers.isEmpty && receivedModifiers.isEmpty) {
-        checkModSch.cancel()
+        checkModScheduler.cancel()
         self ! CheckModifiersToDownload
       }
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
@@ -191,13 +191,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
-    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining, checkModSch))
+    case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining, checkModScheduler))
 
-    case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true, checkModSch))
+    case StartMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = true, checkModScheduler))
 
-    case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false, checkModSch))
+    case DisableMining => context.become(basicMessageHandler(history, isBlockChainSynced, isMining = false, checkModScheduler))
 
-    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining, checkModSch))
+    case UpdatedHistory(historyReader) => context.become(basicMessageHandler(historyReader, isBlockChainSynced, isMining, checkModScheduler))
 
     case StopTransactionsValidation => canProcessTransactions = false
 

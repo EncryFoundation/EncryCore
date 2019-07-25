@@ -22,8 +22,6 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
 
   val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
-  var boxesInStorage: Map[ByteArrayWrapper, EncryBaseBox] = walletStorage.getAllBoxes().map(bx => ByteArrayWrapper(bx.id) -> bx).toMap
-
   def scanPersistent(modifier: PersistentModifier): EncryWallet = modifier match {
     case block: Block =>
       logger.info(s"Keys during sync: $publicKeys")
@@ -37,12 +35,10 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
             val spendBxsIdsL: Seq[EncryBaseBox] = tx.inputs
               .filter(input => walletStorage.containsBox(input.boxId))
               .foldLeft(Seq.empty[EncryBaseBox]) { case (boxes, input) =>
-                boxesInStorage.find(_._1 == ByteArrayWrapper(input.boxId)).map(_._2)
-                  .orElse(walletStorage.getBoxById(input.boxId))
+                walletStorage.getBoxById(input.boxId)
                   .map(bx => boxes :+ bx)
                   .getOrElse(boxes)
               }
-            boxesInStorage = (boxesInStorage ++ newBxsL.map(bx => ByteArrayWrapper(bx.id) -> bx)) -- spendBxsIdsL.map(bx => ByteArrayWrapper(bx.id))
             (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
         }
       walletStorage.updateWallet(modifier.id, newBxs, spentBxs)
