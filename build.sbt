@@ -15,6 +15,7 @@ val akkaHttpVersion = "10.0.9"
 val doobieVersion = "0.5.2"
 val logbackVersion = "1.2.3"
 val kamonVersion = "1.1.0"
+val circeVersion = "0.9.3"
 
 val databaseDependencies = Seq(
   "org.tpolecat" %% "doobie-core" % doobieVersion,
@@ -105,7 +106,7 @@ logLevel := Level.Info
 val opts = Seq(
   "-server",
   "-Xms3G",
-  "-Xmx6G",
+  "-Xmx10G",
   "-XX:+ExitOnOutOfMemoryError",
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
