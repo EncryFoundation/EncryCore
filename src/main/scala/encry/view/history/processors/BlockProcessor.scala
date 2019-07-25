@@ -57,11 +57,6 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     else nonBestBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
   }
 
-  private def processing: BlockProcessing =
-    processValidFirstBlock orElse
-      processBetterChain orElse
-      nonBestBlock
-
   private def processValidFirstBlock: BlockProcessing = {
     case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _) if isValidFirstBlock(fullBlock.header) =>
       logger.info(s"Appending ${fullBlock.encodedId} as a valid first block")
