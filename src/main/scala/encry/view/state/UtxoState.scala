@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -16,41 +15,35 @@ import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
 import encry.utils.implicits.Validation._
-import io.iohk.iodb.LSMStore
-import cats.data.{EitherT, Validated}
-import cats.syntax.validated._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.instances.future._
-import cats.Traverse
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.{FiniteDuration, _}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
-import monix.eval.Task
+import io.iohk.iodb.LSMStore
+import cats.data.Validated
+import cats.Traverse
+import cats.syntax.traverse._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.validated._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
                            height: Height,
-                           lastBlockTimestamp: Long)(implicit val exCon: ExecutionContextExecutor)
+                           lastBlockTimestamp: Long)
   extends StrictLogging with UtxoStateReader with AutoCloseable {
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
@@ -74,13 +67,6 @@ final case class UtxoState(storage: VersionalStorage,
         }).toList
           .traverse(Validated.fromEither)
           .toEither
-        //      val res1 = block.payload.txs.map(tx => {
-        //        if (tx.id sameElements lastTxId) Future(validate(tx, totalFees + EncrySupplyController.supplyAt(height)))
-        //        else Future(validate(tx))
-        //      }).toList.sequence[Future, Either[ValidationResult, Transaction]]
-        //      val res: Either[ValidationResult, List[Transaction]] = Await.result(res1, 5 minutes)
-        //        .traverse(Validated.fromEither)
-        //        .toEither
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime)/1000L} s")
         res.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
@@ -201,7 +187,7 @@ object UtxoState extends StrictLogging {
   def create(stateDir: File,
              nodeViewHolderRef: Option[ActorRef],
              settings: EncryAppSettings,
-             statsSenderRef: Option[ActorRef])(implicit exCon: ExecutionContextExecutor): UtxoState = {
+             statsSenderRef: Option[ActorRef]): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
@@ -225,7 +211,7 @@ object UtxoState extends StrictLogging {
   def genesis(stateDir: File,
               nodeViewHolderRef: Option[ActorRef],
               settings: EncryAppSettings,
-              statsSenderRef: Option[ActorRef])(implicit exCon: ExecutionContextExecutor): UtxoState = {
+              statsSenderRef: Option[ActorRef]): UtxoState = {
     //check kind of storage
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>

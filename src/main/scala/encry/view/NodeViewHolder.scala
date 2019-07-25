@@ -1,25 +1,22 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
-import cats.data.EitherT
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp.{miner, nodeViewSynchronizer, settings, timeProvider}
 import encry.consensus.History.ProgressInfo
-import encry.modifiers.history.HeaderChain
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.NodeViewHolder._
-import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
+import encry.view.NodeViewHolder.ReceivableMessages._
+import encry.view.NodeViewHolder._
 import encry.view.history.EncryHistory
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -30,13 +27,10 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
-import scala.annotation.tailrec
 import scala.collection.{IndexedSeq, Seq, mutable}
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
-import cats.instances.future._
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],

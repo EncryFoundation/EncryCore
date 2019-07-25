@@ -34,9 +34,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val accountManager: AccountManager = AccountManager(accountManagerStore)
 
-    val walletStorage = WalletVersionalLevelDBCompanion.apply(db, dummyLevelDBSettings)
-
-    val wallet: EncryWallet = EncryWallet(walletStorage, accountManager)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddr(4, accountManager.mandatoryAccount.publicImage.address.address)
 
@@ -75,8 +73,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins + tokens)") {
 
+    val dir = FileHelper.getRandomTempDir
+
     val db: DB = {
-      val dir = FileHelper.getRandomTempDir
       if (!dir.exists()) dir.mkdirs()
       LevelDbFactory.factory.open(dir, new Options)
     }
@@ -91,7 +90,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val walletStorage = WalletVersionalLevelDBCompanion(db, dummyLevelDBSettings)
 
-    val wallet: EncryWallet = EncryWallet(walletStorage, keyManager)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
 
     val validTxs: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManager.mandatoryAccount.publicImage.address.address)
 
