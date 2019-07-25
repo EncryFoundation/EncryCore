@@ -21,7 +21,6 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scorex.crypto.hash.Digest32
 import supertagged.@@
 import scala.annotation.tailrec
-import scala.collection.immutable
 import scala.collection.immutable.HashSet
 import encry.view.history.processors.ValidationError.FatalValidationError._
 import encry.view.history.processors.ValidationError.NonFatalValidationError._
@@ -77,7 +76,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         case Some(bestHeaderAtThisHeight) =>
           val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
             .filterNot(m => excluding.exists(_ sameElements m._2) && isModifierDefined(m._2))
-          logger.info(s"modifiersToDownload($bestHeaderAtThisHeight) ->" +
+          logger.debug(s"modifiersToDownload($bestHeaderAtThisHeight) ->" +
             s"${toDownload.map(k => Algos.encode(k._2))}")
           continuation(Height @@ (height + 1), acc ++ toDownload)
         case None => acc
@@ -90,11 +89,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     bestBlockHeader match {
       case _ if !isHeadersChainSynced => Seq.empty
       case Some(header) => //if best block in best chain, just process all blocks after that
-        //todo how header of best block can be nonBest
+        //todo how header of the best block can be nonBest?
         if (isInBestChain(header)) continuation(Height @@ (header.height + 1), Seq.empty)
         //if not, we should find last full block from best chain, and start processing all blocks after that
         else {
-          //logger.info(s"Last full block in best chain is block: ${lastFullBlock.map(block => Algos.encode(block.id))}")
+          logger.debug(s"Last full block in best chain is block: ${bestBlockHeader.map(h => Algos.encode(h.id))}")
           lastBestBlockHeightRelevantToBestChain(header.height)
             .map(height => continuation(Height @@ (height + 1), Seq.empty))
             .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
@@ -115,8 +114,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
     headerId <- bestHeaderIdAtHeight(probablyAt)
     header <- typedModifierById[Header](headerId) if isModifierDefined(header.payloadId)
-  } yield header.height)
-    .orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
+  } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
 
   def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
@@ -164,8 +162,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
-
-  protected def bestHeaderIdOpt: Option[ModifierId] = historyStorage
+  def bestHeaderIdOpt: Option[ModifierId] = historyStorage
     .get(BestHeaderKey)
     .map(ModifierId @@ _)
 
@@ -199,7 +196,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   def headerHeight(id: ModifierId): Option[Int] = historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray)
 
   def bestBlockHeight(bestBlockId: ModifierId): Int = Ints.fromByteArray(headerHeightKey(bestBlockId))
-
 
   protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
@@ -378,7 +374,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
   //todo remove asset + ensuring
   def requiredDifficultyAfter(parent: Header): Difficulty = {
-    //val parentHeight: Int = parent.height
     val requiredHeights: Seq[Height] = difficultyController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
       .ensuring(_.last == parent.height, "Incorrect heights sequence!")
     val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)

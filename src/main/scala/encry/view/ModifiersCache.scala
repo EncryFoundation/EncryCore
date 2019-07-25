@@ -92,7 +92,7 @@ object ModifiersCache extends StrictLogging {
 
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
       v match {
-        case _: Header if history.bestHeaderOpt.exists(header => header.id sameElements v.parentId) => true
+        case _: Header if history.bestHeaderIdOpt.exists(headerId => headerId sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
           logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
@@ -115,7 +115,7 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"Drop height ${history.bestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
-              if ((v.parentId sameElements history.bestHeaderOpt.map(_.id).getOrElse(Array.emptyByteArray)) ||
+              if ((v.parentId sameElements history.bestHeaderIdOpt.getOrElse(Array.emptyByteArray)) ||
                 (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
                   ) || history.modifierById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>

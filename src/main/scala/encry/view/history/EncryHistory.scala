@@ -37,8 +37,8 @@ import scala.util.Try
   *   2. Be ignored by history (verifyTransactions == false) */
 trait EncryHistory extends EncryHistoryReader with AutoCloseable {
 
-  def isFullChainSynced: Boolean = bestHeaderOpt
-    .exists(bestHeader => bestBlockOpt.exists(b => ByteArrayWrapper(b.header.id) == ByteArrayWrapper(bestHeader.id)))
+  def isFullChainSynced: Boolean = bestHeaderIdOpt
+    .exists(bestHeaderId => bestBlockIdOpt.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: PersistentModifier): Either[Throwable, (EncryHistory, ProgressInfo[PersistentModifier])] = {

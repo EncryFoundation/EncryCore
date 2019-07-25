@@ -134,7 +134,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   }
 
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
-    .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
+    .getOrElse(HeaderChain.empty)
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
 

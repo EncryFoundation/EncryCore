@@ -50,13 +50,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
     logger.debug(s"best full chain contains: ${bestFullChain.length}")
     val newBestAfterThis: Header = bestFullChain.last.header
     addBlockToCacheIfNecessary(fullBlock)
-    if (isValidFirstBlock(fullBlock.header)) {
+    if (isValidFirstBlock(fullBlock.header))
       processValidFirstBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
-    } else if (bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id)) {
+    else if (bestBlockOpt.nonEmpty && isBetterChain(newBestAfterThis.id))
       processBetterChain(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
-    } else {
-      nonBestBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
-    }
+    else nonBestBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
   }
 
   private def processing: BlockProcessing =
@@ -223,5 +221,4 @@ object BlockProcessor {
                        newBestHeader: Header,
                        newBestChain: Seq[Block],
                        blocksToKeep: Int)
-
 }
