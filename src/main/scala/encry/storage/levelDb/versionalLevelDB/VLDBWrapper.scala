@@ -15,6 +15,8 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
   override def versions: List[StorageVersion] =
     vldb.versionsList.map(StorageVersion @@ _.untag(LevelDBVersion))
 
+  override def contains(key: StorageKey): Boolean = vldb.contains(VersionalLevelDbKey @@ key.untag(StorageKey))
+
   override def rollbackTo(to: StorageVersion): Unit =
     vldb.rollbackTo(LevelDBVersion @@ to.untag(StorageVersion))
 
@@ -39,6 +41,4 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
     }.toIterator
 
   override def close(): Unit = vldb.close()
-
-  override def contains(key: StorageKey): Boolean = vldb.contains(VersionalLevelDbKey @@ key.untag(StorageKey))
 }

@@ -11,11 +11,11 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.network.SyncInfo
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
+
 import scala.annotation.tailrec
 import scala.util.Try
 
@@ -32,10 +32,20 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   /**
     * Complete block of the best chain with transactions.
-    * Always None for an SPV mode, Some(fullBLock) for fullnode regime after initial bootstrap.
+    * Always None for an SPV mode, Some(fullBLock) for full node regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] =
-    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id).flatMap(getBlock)))
+  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => getBlock(id))
+
+  def headerOfBestBlock: Option[Header] =
+    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header).orElse(typedModifierById[Header](id)))
+
+  def getHeaderById(id: ModifierId): Option[Header] = lastAppliedHeadersCache
+    .get(ByteArrayWrapper(id))
+    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+    .orElse(typedModifierById[Header](id))
+
+  def isBlockDefined(header: Header): Boolean =
+    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -56,11 +66,11 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
 
     /* Other history is empty, or our history contains last id from other history */
-    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(contains) => Younger
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isModifierDefined) => Younger
 
     case Some(_) =>
       //Our history contains some ids from other history
-      if (si.lastHeaderIds.exists(contains)) Fork
+      if (si.lastHeaderIds.exists(isModifierDefined)) Fork
       //Unknown comparison result
       else Unknown
 
@@ -76,7 +86,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = lastAppliedHeadersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
+      //todo remove .get
+      val startHeader: Header = getHeaderById(startId).get
       val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
         .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
           "Should always contain genesis header.")
@@ -87,7 +98,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
       val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
       val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
       val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      val startHeader: Header = lastAppliedHeadersCache.get(ByteArrayWrapper(startId)).orElse(typedModifierById[Header](startId)).get
+      //todo remove .get
+      val startHeader: Header = getHeaderById(startId).get
       headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers.map(h => Header.modifierTypeId -> h.id)
     }
@@ -99,8 +111,8 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     @tailrec
     def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
-        .flatMap { h => headerIdsAtHeight(h + 1) }
-        .flatMap { id => lastAppliedHeadersCache.get(ByteArrayWrapper(id)).orElse(typedModifierById[Header](id)) }
+        .flatMap(h => headerIdsAtHeight(h + 1))
+        .flatMap(getHeaderById)
         .filter(filterCond)
       if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
       else {
@@ -118,18 +130,19 @@ trait EncryHistoryReader extends BlockHeaderProcessor
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] = {
     val validationResult: Either[ValidationError, PersistentModifier] = modifier match {
-      case header: Header     => validate(header)
-      case payload: Payload   => validate(payload)
-      case mod                => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
+      case header: Header => validate(header)
+      case payload: Payload => validate(payload)
+      case mod => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
     }
     validationResult match {
       case Left(value) => logger.info(s"Validation result failed: $value"); validationResult
-      case Right(m)    => logger.info(s"Validation result successful for ${m.encodedId}"); validationResult
+      case Right(m) => logger.info(s"Validation result successful for ${m.encodedId}"); validationResult
     }
   }
 
   def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
-    .map(bestHeader => headerChainBack(count, bestHeader, _ => false)).getOrElse(HeaderChain.empty)
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
+    .getOrElse(HeaderChain.empty)
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
 
@@ -140,15 +153,13 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     case _ => None
   }
 
-  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
+  def getBlock(header: Header): Option[Block] = blocksCache
+    .get(ByteArrayWrapper(header.id))
+    .orElse(typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload)))
 
-  def getBlock(header: Header): Option[Block] =
-    blocksCache.get(ByteArrayWrapper(header.id)).orElse(
-      typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload))
-    )
-
-  def isBlockDefined(header: Header): Boolean =
-    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
+  def getBlock(id: ModifierId): Option[Block] = blocksCache
+    .get(ByteArrayWrapper(id))
+    .orElse(typedModifierById[Header](id).flatMap(h => typedModifierById[Payload](h.payloadId).map(p => Block(h, p))))
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
@@ -196,17 +207,17 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def syncInfo: SyncInfo =
     if (isEmpty) SyncInfo(Seq.empty)
     else SyncInfo(bestHeaderOpt.map(header =>
-      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap(height => headerIdsAtHeight(height).headOption)
-      ).getOrElse(Seq.empty)
-    )
+      ((header.height - settings.network.maxInvObjects + 1) to header.height)
+        .flatMap(height => headerIdsAtHeight(height).headOption)
+    ).getOrElse(Seq.empty))
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {
       case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
       case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-      case None if contains(modifierId)                   => ModifierSemanticValidity.Unknown
-      case None                                           => ModifierSemanticValidity.Absent
-      case mod                                            => logger.error(s"Incorrect validity status: $mod")
-                                                             ModifierSemanticValidity.Absent
+      case None if isModifierDefined(modifierId) => ModifierSemanticValidity.Unknown
+      case None => ModifierSemanticValidity.Absent
+      case mod => logger.error(s"Incorrect validity status: $mod")
+        ModifierSemanticValidity.Absent
     }
 }
