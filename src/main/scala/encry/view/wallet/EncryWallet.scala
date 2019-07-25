@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
