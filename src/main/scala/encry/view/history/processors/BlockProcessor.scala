@@ -23,11 +23,11 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
 
   /** Id of header that contains transactions and proofs */
   //todo change description
-  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
+//  override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
   //protected def getBlock(h: Header): Option[Block]
 
-  protected def isBlockDefined(h: Header): Boolean
+//  protected def isBlockDefined(h: Header): Boolean
 
   protected def commonBlockThenSuffixes(header1: Header, header2: Header): (HeaderChain, HeaderChain)
 

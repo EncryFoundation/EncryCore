@@ -95,20 +95,6 @@ trait HistoryExtension extends HistoryAPI {
     }.getOrElse(Seq.empty)
   }
 
-  def processHeader(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
-    case dataToUpdate: Seq[_] if dataToUpdate.nonEmpty =>
-      history.bulkInsert(h.id, dataToUpdate, Seq(h)) //side effect
-      getBestHeaderIdOpt match {
-        case Some(bestHeaderId) =>
-          val toProcess: Seq[Header] = if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
-          ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
-        case None =>
-          logger.error("Should always have best header after header application")
-          forceStopApplication() //todo possibly remove this
-      }
-    case _ => ProgressInfo(None, Seq.empty, Seq.empty, none)
-  }
-
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
   //todo check description

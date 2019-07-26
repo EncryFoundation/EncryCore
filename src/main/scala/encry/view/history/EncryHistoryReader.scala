@@ -26,26 +26,26 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   protected val nodeSettings: NodeSettings
 
   /** Is there's no history, even genesis block */
-  def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
-
-  def contains(id: ModifierId): Boolean = historyStorage.containsMod(id)
+//  def isEmpty: Boolean = bestHeaderIdOpt.isEmpty
+//
+//  def contains(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   /**
     * Complete block of the best chain with transactions.
     * Always None for an SPV mode, Some(fullBLock) for full node regime after initial bootstrap.
     */
-  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => getBlock(id))
+//  def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => getBlock(id))
 
   def headerOfBestBlock: Option[Header] =
     bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header).orElse(typedModifierById[Header](id)))
 
-  def getHeaderById(id: ModifierId): Option[Header] = lastAppliedHeadersCache
-    .get(ByteArrayWrapper(id))
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-    .orElse(typedModifierById[Header](id))
+//  def getHeaderById(id: ModifierId): Option[Header] = lastAppliedHeadersCache
+//    .get(ByteArrayWrapper(id))
+//    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+//    .orElse(typedModifierById[Header](id))
 
-  def isBlockDefined(header: Header): Boolean =
-    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
+//  def isBlockDefined(header: Header): Boolean =
+//    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
 
   /** @return ids of count headers starting from offset */
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
@@ -144,22 +144,22 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
     .getOrElse(HeaderChain.empty)
 
-  def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
-
+//  def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
+//
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
-  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
-    case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
-    case _ => None
-  }
+//  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
+//    case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
+//    case _ => None
+//  }
 
-  def getBlock(header: Header): Option[Block] = blocksCache
-    .get(ByteArrayWrapper(header.id))
-    .orElse(typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload)))
-
-  def getBlock(id: ModifierId): Option[Block] = blocksCache
-    .get(ByteArrayWrapper(id))
-    .orElse(typedModifierById[Header](id).flatMap(h => typedModifierById[Payload](h.payloadId).map(p => Block(h, p))))
+//  def getBlock(header: Header): Option[Block] = blocksCache
+//    .get(ByteArrayWrapper(header.id))
+//    .orElse(typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload)))
+//
+//  def getBlock(id: ModifierId): Option[Block] = blocksCache
+//    .get(ByteArrayWrapper(id))
+//    .orElse(typedModifierById[Header](id).flatMap(h => typedModifierById[Payload](h.payloadId).map(p => Block(h, p))))
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
@@ -211,13 +211,13 @@ trait EncryHistoryReader extends BlockHeaderProcessor
         .flatMap(height => headerIdsAtHeight(height).headOption)
     ).getOrElse(Seq.empty))
 
-  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
-    historyStorage.store.get(validityKey(modifierId)) match {
-      case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-      case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-      case None if isModifierDefined(modifierId) => ModifierSemanticValidity.Unknown
-      case None => ModifierSemanticValidity.Absent
-      case mod => logger.error(s"Incorrect validity status: $mod")
-        ModifierSemanticValidity.Absent
-    }
+//  override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
+//    historyStorage.store.get(validityKey(modifierId)) match {
+//      case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+//      case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+//      case None if isModifierDefined(modifierId) => ModifierSemanticValidity.Unknown
+//      case None => ModifierSemanticValidity.Absent
+//      case mod => logger.error(s"Incorrect validity status: $mod")
+//        ModifierSemanticValidity.Absent
+//    }
 }
