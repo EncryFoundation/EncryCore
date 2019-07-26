@@ -85,6 +85,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     }
   }
 
+  //todo redundant
   def containsObject(id: ModifierId): Boolean =
     store match {
       case iodb: IODBHistoryWrapper =>

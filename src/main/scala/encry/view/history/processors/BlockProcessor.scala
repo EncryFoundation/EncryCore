@@ -25,7 +25,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   //todo change description
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
-  protected def getBlock(h: Header): Option[Block]
+  //protected def getBlock(h: Header): Option[Block]
 
   protected def isBlockDefined(h: Header): Boolean
 

@@ -39,9 +39,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
 
-  protected def getBlock(h: Header): Option[Block]
+//  protected def getBlock(h: Header): Option[Block]
 
-  def getHeaderById(id: ModifierId): Option[Header]
+//  def getHeaderById(id: ModifierId): Option[Header]
 
   /**
     * headersCacheIndexes & headersCache contains headers from (currentBestHeaderHeight - maxRollBackDepth) to
@@ -58,155 +58,155 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     * Transactions for this Header may be missed, to get block from best full chain (in mode that support
     * it) call bestFullBlockOpt.
     */
-  def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(typedModifierById[Header])
+//  def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(typedModifierById[Header])
 
-  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
+//  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
-  def modifiersToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
-    @tailrec
-    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
-      if (acc.lengthCompare(howMany) >= 0) acc
-      else headerIdsAtHeight(height)
-        .headOption
-        .flatMap(getHeaderById) match {
-        case Some(bestHeaderAtThisHeight) =>
-          val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
-            .filterNot(m => excluding.exists(_ sameElements m._2) && isModifierDefined(m._2))
-          logger.debug(s"modifiersToDownload($bestHeaderAtThisHeight) ->" +
-            s"${toDownload.map(k => Algos.encode(k._2))}")
-          continuation(Height @@ (height + 1), acc ++ toDownload)
-        case None => acc
-      }
+//  def modifiersToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[(ModifierTypeId, ModifierId)] = {
+//    @tailrec
+//    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
+//      if (acc.lengthCompare(howMany) >= 0) acc
+//      else headerIdsAtHeight(height)
+//        .headOption
+//        .flatMap(getHeaderById) match {
+//        case Some(bestHeaderAtThisHeight) =>
+//          val toDownload: Seq[(ModifierTypeId, ModifierId)] = requiredModifiersForHeader(bestHeaderAtThisHeight)
+//            .filterNot(m => excluding.exists(_ sameElements m._2) && isModifierDefined(m._2))
+//          logger.debug(s"modifiersToDownload($bestHeaderAtThisHeight) ->" +
+//            s"${toDownload.map(k => Algos.encode(k._2))}")
+//          continuation(Height @@ (height + 1), acc ++ toDownload)
+//        case None => acc
+//      }
+//
+//    val bestBlockHeader: Option[Header] = for {
+//      bestBlockId <- bestBlockIdOpt
+//      headerLinkedToBestBlock <- typedModifierById[Header](bestBlockId) //todo can be also found in cache
+//    } yield headerLinkedToBestBlock
+//    bestBlockHeader match {
+//      case _ if !isHeadersChainSynced => Seq.empty
+//      case Some(header) => //if best block in best chain, just process all blocks after that
+//        //todo how header of the best block can be nonBest?
+//        if (isInBestChain(header)) continuation(Height @@ (header.height + 1), Seq.empty)
+//        //if not, we should find last full block from best chain, and start processing all blocks after that
+//        else {
+//          logger.debug(s"Last full block in best chain is block: ${bestBlockHeader.map(h => Algos.encode(h.id))}")
+//          lastBestBlockHeightRelevantToBestChain(header.height)
+//            .map(height => continuation(Height @@ (height + 1), Seq.empty))
+//            .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
+//        }
+//      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+//    }
+//  }
 
-    val bestBlockHeader: Option[Header] = for {
-      bestBlockId <- bestBlockIdOpt
-      headerLinkedToBestBlock <- typedModifierById[Header](bestBlockId) //todo can be also found in cache
-    } yield headerLinkedToBestBlock
-    bestBlockHeader match {
-      case _ if !isHeadersChainSynced => Seq.empty
-      case Some(header) => //if best block in best chain, just process all blocks after that
-        //todo how header of the best block can be nonBest?
-        if (isInBestChain(header)) continuation(Height @@ (header.height + 1), Seq.empty)
-        //if not, we should find last full block from best chain, and start processing all blocks after that
-        else {
-          logger.debug(s"Last full block in best chain is block: ${bestBlockHeader.map(h => Algos.encode(h.id))}")
-          lastBestBlockHeightRelevantToBestChain(header.height)
-            .map(height => continuation(Height @@ (height + 1), Seq.empty))
-            .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
-        }
-      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
-    }
-  }
+//  def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block] = {
+//    val bestBlockAtHeight: Option[Block] = for {
+//      headerId <- bestHeaderIdAtHeight(atHeight)
+//      header <- typedModifierById[Header](headerId)
+//      block <- getBlock(header)
+//    } yield block
+//    bestBlockAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
+//  }
 
-  def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block] = {
-    val bestBlockAtHeight: Option[Block] = for {
-      headerId <- bestHeaderIdAtHeight(atHeight)
-      header <- typedModifierById[Header](headerId)
-      block <- getBlock(header)
-    } yield block
-    bestBlockAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
-  }
-
-  def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
-    headerId <- bestHeaderIdAtHeight(probablyAt)
-    header <- typedModifierById[Header](headerId) if isModifierDefined(header.payloadId)
-  } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
+//  def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
+//    headerId <- bestHeaderIdAtHeight(probablyAt)
+//    header <- typedModifierById[Header](headerId) if isModifierDefined(header.payloadId)
+//  } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
 
-  def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
-    @tailrec
-    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
-      if (acc.lengthCompare(howMany) >= 0) acc
-      else {
-        headerIdsAtHeight(height).headOption.flatMap(getHeaderById) match {
-          case Some(bestHeaderAtThisHeight) =>
-            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
-              .filter(m => !isModifierDefined(m._2))
-            continuation(Height @@ (height + 1), acc ++ toDownload)
-          case None => acc
-        }
-      }
-
-    bestBlockIdOpt match {
-      case _ if !isHeadersChainSynced => Seq.empty
-      case Some(v) if isHeadersChainSynced => continuation(Height @@ (bestBlockHeight(v) + 1), Seq.empty)
-      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
-    }
-  }
+//  def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
+//    @tailrec
+//    def continuation(height: Height, acc: Seq[(ModifierTypeId, ModifierId)]): Seq[(ModifierTypeId, ModifierId)] =
+//      if (acc.lengthCompare(howMany) >= 0) acc
+//      else {
+//        headerIdsAtHeight(height).headOption.flatMap(getHeaderById) match {
+//          case Some(bestHeaderAtThisHeight) =>
+//            val toDownload = requiredModifiersForHeader(bestHeaderAtThisHeight)
+//              .filter(m => !isModifierDefined(m._2))
+//            continuation(Height @@ (height + 1), acc ++ toDownload)
+//          case None => acc
+//        }
+//      }
+//
+//    bestBlockIdOpt match {
+//      case _ if !isHeadersChainSynced => Seq.empty
+//      case Some(v) if isHeadersChainSynced => continuation(Height @@ (bestBlockHeight(v) + 1), Seq.empty)
+//      case None => continuation(Height @@ blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+//    }
+//  }
 
   /** Checks, whether it's time to download full chain and return toDownload modifiers */
-  protected def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
-    if (header.height >= blockDownloadProcessor.minimalBlockHeight)
-      requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
-      // Headers chain is synced after this header. Start downloading full blocks
-      logger.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
-      isHeadersChainSyncedVar = true
-      blockDownloadProcessor.updateBestBlock(header)
-      Seq.empty
-    } else Seq.empty
+//  protected def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
+//    if (header.height >= blockDownloadProcessor.minimalBlockHeight)
+//      requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
+//    else if (!isHeadersChainSynced && isNewHeader(header)) {
+//      // Headers chain is synced after this header. Start downloading full blocks
+//      logger.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
+//      isHeadersChainSyncedVar = true
+//      blockDownloadProcessor.updateBestBlock(header)
+//      Seq.empty
+//    } else Seq.empty
 
-  private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
-    Seq((Payload.modifierTypeId, h.payloadId))
+//  private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
+//    Seq((Payload.modifierTypeId, h.payloadId))
 
-  private def isNewHeader(header: Header): Boolean =
-    timeProvider.estimatedTime - header.timestamp <
-      TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
+//  private def isNewHeader(header: Header): Boolean =
+//    timeProvider.estimatedTime - header.timestamp <
+//      TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
 
-  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T]
+//  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T]
 
-  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
+//  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
-  def bestHeaderIdOpt: Option[ModifierId] = historyStorage
-    .get(BestHeaderKey)
-    .map(ModifierId @@ _)
+//  def bestHeaderIdOpt: Option[ModifierId] = historyStorage
+//    .get(BestHeaderKey)
+//    .map(ModifierId @@ _)
 
-  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
+//  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
-  private def heightIdsKey(height: Int): StorageKey = StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
+//  private def heightIdsKey(height: Int): StorageKey = StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
 
-  protected def headerScoreKey(id: ModifierId): StorageKey =
-    StorageKey @@ Algos.hash("score".getBytes(Algos.charset) ++ id).untag(Digest32)
+//  protected def headerScoreKey(id: ModifierId): StorageKey =
+//    StorageKey @@ Algos.hash("score".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-  protected def headerHeightKey(id: ModifierId): StorageKey =
-    StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
+//  protected def headerHeightKey(id: ModifierId): StorageKey =
+//    StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-  protected def validityKey(id: Array[Byte]): StorageKey =
-    StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
+//  protected def validityKey(id: Array[Byte]): StorageKey =
+//    StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-  def bestBlockOpt: Option[Block]
+//  def bestBlockOpt: Option[Block]
 
   def headerOfBestBlock: Option[Header]
+//
+//  def bestBlockIdOpt: Option[ModifierId]
 
-  def bestBlockIdOpt: Option[ModifierId]
+//  def bestHeaderHeight: Int = bestHeaderIdOpt
+//    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
+//    .getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def bestHeaderHeight: Int = bestHeaderIdOpt
-    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
-    .getOrElse(TestNetConstants.PreGenesisHeight)
+//  def bestBlockHeight: Int = bestBlockIdOpt
+//    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
+//    .getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def bestBlockHeight: Int = bestBlockIdOpt
-    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
-    .getOrElse(TestNetConstants.PreGenesisHeight)
+//  def headerHeight(id: ModifierId): Option[Int] = historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray)
 
-  def headerHeight(id: ModifierId): Option[Int] = historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray)
+//  def bestBlockHeight(bestBlockId: ModifierId): Int = Ints.fromByteArray(headerHeightKey(bestBlockId))
 
-  def bestBlockHeight(bestBlockId: ModifierId): Int = Ints.fromByteArray(headerHeightKey(bestBlockId))
-
-  protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
-    case Some(dataToUpdate) =>
-      historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
-      bestHeaderIdOpt match {
-        case Some(bestHeaderId) =>
-          val toProcess: Seq[Header] = if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
-          ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
-        case None =>
-          logger.error("Should always have best header after header application")
-          forceStopApplication()
-      }
-    case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
-  }
+//  protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
+//    case Some(dataToUpdate) =>
+//      historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
+//      bestHeaderIdOpt match {
+//        case Some(bestHeaderId) =>
+//          val toProcess: Seq[Header] = if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
+//          ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
+//        case None =>
+//          logger.error("Should always have best header after header application")
+//          forceStopApplication()
+//      }
+//    case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+//  }
 
   private def addHeaderToCacheIfNecessary(h: Header): Unit =
     if (h.height >= bestHeaderHeight - TestNetConstants.MaxRollbackDepth) {
@@ -227,186 +227,186 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       logger.debug(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
     }
 
-  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], PersistentModifier)] = {
-    addHeaderToCacheIfNecessary(header)
-    if (header.isGenesis) {
-      logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
-      Option(Seq(
-        BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
-        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
-        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
-        headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray
-      ) -> header)
-    } else scoreOf(header.parentId).map { parentScore =>
-      val score: BigInt @@ Difficulty.Tag =
-        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
-      val bestRow: Seq[(StorageKey, StorageValue)] =
-        if ((header.height > bestHeaderHeight) ||
-          (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
-          Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
-        } else Seq.empty
-      val scoreRow: (StorageKey, StorageValue) =
-        headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
-      val heightRow: (StorageKey, StorageValue) =
-        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
-      val headerIdsRow: Seq[(StorageKey, StorageValue)] =
-        if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
-          bestBlockHeaderIdsRow(header, score)
-        else orphanedBlockHeaderIdsRow(header, score)
-      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
-    }
-  }
+//  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], PersistentModifier)] = {
+//    addHeaderToCacheIfNecessary(header)
+//    if (header.isGenesis) {
+//      logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
+//      Option(Seq(
+//        BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
+//        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
+//        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
+//        headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray
+//      ) -> header)
+//    } else scoreOf(header.parentId).map { parentScore =>
+//      val score: BigInt @@ Difficulty.Tag =
+//        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
+//      val bestRow: Seq[(StorageKey, StorageValue)] =
+//        if ((header.height > bestHeaderHeight) ||
+//          (header.height == bestHeaderHeight && score > bestHeadersChainScore)) {
+//          Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
+//        } else Seq.empty
+//      val scoreRow: (StorageKey, StorageValue) =
+//        headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
+//      val heightRow: (StorageKey, StorageValue) =
+//        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
+//      val headerIdsRow: Seq[(StorageKey, StorageValue)] =
+//        if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
+//          bestBlockHeaderIdsRow(header, score)
+//        else orphanedBlockHeaderIdsRow(header, score)
+//      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
+//    }
+//  }
 
 
-  /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
-    * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    val prevHeight: Int = bestHeaderHeight
-    logger.info(s"New best header ${h.encodedId} with score: $score." +
-      s" New height: ${h.height}, old height: $prevHeight")
-    val self: (StorageKey, StorageValue) =
-      heightIdsKey(h.height) ->
-        StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
-    val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
-    val forkHeaders: Seq[Header] = parentHeaderOpt
-      .toSeq
-      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
-      .filter(h => !isInBestChain(h))
-    val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
-      val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
-      heightIdsKey(header.height) -> StorageValue @@ (Seq(header.id) ++ otherIds).flatten.toArray
-    }
-    forkIds :+ self
-  }
+//  /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
+//    * header ids at this height */
+//  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
+//    val prevHeight: Int = bestHeaderHeight
+//    logger.info(s"New best header ${h.encodedId} with score: $score." +
+//      s" New height: ${h.height}, old height: $prevHeight")
+//    val self: (StorageKey, StorageValue) =
+//      heightIdsKey(h.height) ->
+//        StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
+//    val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
+//    val forkHeaders: Seq[Header] = parentHeaderOpt
+//      .toSeq
+//      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
+//      .filter(h => !isInBestChain(h))
+//    val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
+//      val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
+//      heightIdsKey(header.height) -> StorageValue @@ (Seq(header.id) ++ otherIds).flatten.toArray
+//    }
+//    forkIds :+ self
+//  }
 
-  /** Row to storage, that put this orphaned block id to the end of header ids at this height */
-  //todo why return type is Seq instead tuple2?
-  private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
-    Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
-  }
+//  /** Row to storage, that put this orphaned block id to the end of header ids at this height */
+//  //todo why return type is Seq instead tuple2?
+//  private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
+//    logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
+//    Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
+//  }
 
-  protected def validate(h: Header): Either[ValidationError, Header] =
-    if (h.isGenesis) HeaderValidator.validateGenesisBlockHeader(h)
-    else getHeaderById(h.parentId)
-      .map(p => HeaderValidator.validateHeader(h, p))
-      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
+//  protected def validate(h: Header): Either[ValidationError, Header] =
+//    if (h.isGenesis) HeaderValidator.validateGenesisBlockHeader(h)
+//    else getHeaderById(h.parentId)
+//      .map(p => HeaderValidator.validateHeader(h, p))
+//      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
-  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
-    .flatMap(h => bestHeaderIdAtHeight(h))
-    .exists(_.sameElements(id))
+//  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
+//    .flatMap(h => bestHeaderIdAtHeight(h))
+//    .exists(_.sameElements(id))
+//
+//  def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
 
-  def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
-
-  private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
+//  private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
 
   //todo remove .get
-  private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
+  //private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
 
-  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
-    .get(headerScoreKey(id))
-    .map(d => BigInt(d))
+//  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
+//    .get(headerScoreKey(id))
+//    .map(d => BigInt(d))
+//
+//  def heightOf(id: ModifierId): Option[Height] = historyStorage
+//    .get(headerHeightKey(id))
+//    .map(d => Height @@ Ints.fromByteArray(d))
 
-  def heightOf(id: ModifierId): Option[Height] = historyStorage
-    .get(headerHeightKey(id))
-    .map(d => Height @@ Ints.fromByteArray(d))
+//  /**
+//    * @param height - block height
+//    * @return ids of headers on chosen height.
+//    *         Seq.empty we don't have any headers on this height
+//    *         single id if no forks on this height
+//    *         multiple ids if there are forks at chosen height.
+//    *         First id is always from the best headers chain.
+//    */
+//  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
+//    .store
+//    .get(heightIdsKey(height))
+//    .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
+//    .getOrElse(Seq.empty[ModifierId])
 
-  /**
-    * @param height - block height
-    * @return ids of headers on chosen height.
-    *         Seq.empty we don't have any headers on this height
-    *         single id if no forks on this height
-    *         multiple ids if there are forks at chosen height.
-    *         First id is always from the best headers chain.
-    */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
-    .store
-    .get(heightIdsKey(height))
-    .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
-    .getOrElse(Seq.empty[ModifierId])
+//  /**
+//    * @param limit       - maximum length of resulting HeaderChain
+//    * @param startHeader - header to start
+//    * @param until       - stop condition
+//    * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
+//    *         Note now it includes one header satisfying until condition!
+//    */
+//  def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
+//    @tailrec
+//    def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
+//      if (acc.length == limit || until(header)) acc
+//      else getHeaderById(header.parentId) match {
+//        case Some(parent: Header) => loop(parent, acc :+ parent)
+//        case None if acc.contains(header) => acc
+//        case _ => acc :+ header
+//      }
+//    }
+//
+//    if (bestHeaderIdOpt.isEmpty || (limit == 0)) HeaderChain(Seq())
+//    else HeaderChain(loop(startHeader, Seq(startHeader)).reverse)
+//  }
+//
+//  /**
+//    * Find first header with the best height <= $height which id satisfies condition $p
+//    *
+//    * @param height - start height
+//    * @param p      - condition to satisfy
+//    * @return found header
+//    */
+//  @tailrec
+//  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
+//    .find(id => p(id))
+//    .flatMap(getHeaderById) match {
+//    case Some(header) => Some(header)
+//    case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
+//    case None => None
+//  }
 
-  /**
-    * @param limit       - maximum length of resulting HeaderChain
-    * @param startHeader - header to start
-    * @param until       - stop condition
-    * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
-    *         Note now it includes one header satisfying until condition!
-    */
-  def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
-    @tailrec
-    def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
-      if (acc.length == limit || until(header)) acc
-      else getHeaderById(header.parentId) match {
-        case Some(parent: Header) => loop(parent, acc :+ parent)
-        case None if acc.contains(header) => acc
-        case _ => acc :+ header
-      }
-    }
+//  //todo remove asset + ensuring
+//  def requiredDifficultyAfter(parent: Header): Difficulty = {
+//    val requiredHeights: Seq[Height] = difficultyController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
+//      .ensuring(_.last == parent.height, "Incorrect heights sequence!")
+//    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
+//    val requiredHeaders: IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
+//      .zip(chain.headers)
+//      .filter(p => requiredHeights.contains(p._1))
+//    assert(requiredHeights.length == requiredHeaders.length,
+//      s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
+//    difficultyController.getDifficulty(requiredHeaders)
+//  }
 
-    if (bestHeaderIdOpt.isEmpty || (limit == 0)) HeaderChain(Seq())
-    else HeaderChain(loop(startHeader, Seq(startHeader)).reverse)
-  }
-
-  /**
-    * Find first header with the best height <= $height which id satisfies condition $p
-    *
-    * @param height - start height
-    * @param p      - condition to satisfy
-    * @return found header
-    */
-  @tailrec
-  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
-    .find(id => p(id))
-    .flatMap(getHeaderById) match {
-    case Some(header) => Some(header)
-    case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
-    case None => None
-  }
-
-  //todo remove asset + ensuring
-  def requiredDifficultyAfter(parent: Header): Difficulty = {
-    val requiredHeights: Seq[Height] = difficultyController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
-      .ensuring(_.last == parent.height, "Incorrect heights sequence!")
-    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
-    val requiredHeaders: IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
-      .zip(chain.headers)
-      .filter(p => requiredHeights.contains(p._1))
-    assert(requiredHeights.length == requiredHeaders.length,
-      s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
-    difficultyController.getDifficulty(requiredHeaders)
-  }
-
-  object HeaderValidator {
-
-    def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
-      _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
-        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
-      _ <- Either.cond(bestHeaderIdOpt.isEmpty, (),
-        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
-      _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
-        GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
-    } yield h
-
-    def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
-      _ <- Either.cond(h.timestamp > parent.timestamp, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
-      _ <- Either.cond(h.height == parent.height + 1, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
-      _ <- Either.cond(!historyStorage.containsObject(h.id), (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
-      _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
-        HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-      _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent), (),
-        HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
-      _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
-      powSchemeValidationResult = powScheme.verify(h)
-      _ <- Either.cond(powSchemeValidationResult.isRight, (),
-        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
-      _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
-      _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
-        HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
-    } yield h
-  }
+//  object HeaderValidator {
+//
+//    def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
+//      _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
+//        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
+//      _ <- Either.cond(bestHeaderIdOpt.isEmpty, (),
+//        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
+//      _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
+//        GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
+//    } yield h
+//
+//    def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
+//      _ <- Either.cond(h.timestamp > parent.timestamp, (),
+//        HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
+//      _ <- Either.cond(h.height == parent.height + 1, (),
+//        HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
+//      _ <- Either.cond(!historyStorage.containsObject(h.id), (),
+//        HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
+//      _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
+//        HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
+//      _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent), (),
+//        HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
+//      _ <- Either.cond(heightOf(h.parentId).exists(h => bestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
+//        HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
+//      powSchemeValidationResult = powScheme.verify(h)
+//      _ <- Either.cond(powSchemeValidationResult.isRight, (),
+//        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
+//      _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
+//        HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
+//      _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
+//        HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
+//    } yield h
+//  }
 }
