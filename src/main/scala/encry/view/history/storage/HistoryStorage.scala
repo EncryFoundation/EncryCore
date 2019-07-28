@@ -63,26 +63,21 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def bulkInsert(version: Array[Byte],
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                 objectsToInsert: Seq[PersistentModifier]): Unit = {
-    store match {
-      case _: IODBHistoryWrapper =>
-        insertObjects(objectsToInsert)
-        insert(
-          StorageVersion @@ version,
-          indexesToInsert.map{ case (key, value) =>
-            StorageKey @@ key -> StorageValue @@ value
-          }.toList
-        )
-      case _: VLDBWrapper =>
-        insert(
-          StorageVersion @@ version,
-          (indexesToInsert.map{case (key, value) =>
-            StorageKey @@ key -> StorageValue @@ value
-          } ++ objectsToInsert.map(obj =>
+                 objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+    case _: IODBHistoryWrapper =>
+      insertObjects(objectsToInsert)
+      insert(
+        StorageVersion @@ version,
+        indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
+      )
+    case _: VLDBWrapper =>
+      insert(
+        StorageVersion @@ version,
+        (indexesToInsert.map { case (key, value) =>  StorageKey @@ key -> StorageValue @@ value } ++
+          objectsToInsert.map(obj =>
             StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
-          )).toList
-        )
-    }
+        )).toList
+      )
   }
 
   //todo redundant

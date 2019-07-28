@@ -1,6 +1,6 @@
 package encry.view.history
 
-import encry.consensus.History.ProgressInfo
+import encry.consensus.History.{Equal, Fork, HistoryComparisonResult, ModifierIds, Older, ProgressInfo, Unknown, Younger}
 import encry.modifiers.history.HeaderChain
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.history.processors.ValidationError
@@ -21,7 +21,10 @@ import encry.consensus.{ConsensusSchemeReaders, EquihashPowScheme, PowLinearCont
 import encry.view.history.HistoryValidationResult.HistoryDifficultyError
 import encry.view.history.processors.ValidationError.FatalValidationError.{GenesisBlockFatalValidationError, HeaderFatalValidationError}
 import encry.view.history.processors.ValidationError.NonFatalValidationError.HeaderNonFatalValidationError
+import org.encryfoundation.common.network.SyncInfo
 import supertagged.@@
+
+import scala.util.Try
 
 trait HistoryExtension extends HistoryAPI {
 
@@ -104,8 +107,8 @@ trait HistoryExtension extends HistoryAPI {
       heightIdKey(h.height) -> StorageValue @@ (h.id :+ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)) //todo check :+
     val forkIds: Seq[(StorageKey, StorageValue)] = getHeaderById(h.parentId)
       .toSeq.view //todo check view
-      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
-      .filter(h => !isInBestChain(h))
+      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers) //todo here we need only header.id and header.height
+      .filterNot(isInBestChain)
       .map(h =>
         heightIdKey(h.height) -> StorageValue @@ (h.id :+ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id))
       ) //todo check :+
@@ -126,7 +129,7 @@ trait HistoryExtension extends HistoryAPI {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  //todo check do we realy need full header or can use just part of it
+  //todo check do we really need full header or can use just part of it
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
     @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] =
       if (acc.length == limit || until(header)) acc
@@ -155,21 +158,7 @@ trait HistoryExtension extends HistoryAPI {
     case n@None => n
   }
 
-  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
-    history.get(validityKey(modifierId)) match {
-      case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-      case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-      case None if isModifierDefined(modifierId) => ModifierSemanticValidity.Unknown
-      case None => ModifierSemanticValidity.Absent
-      case mod => logger.error(s"Incorrect validity status: $mod")
-        ModifierSemanticValidity.Absent
-    }
 
-  def validate(h: Header): Either[ValidationError, Header] =
-    if (h.isGenesis) HeadersValidator.validateGenesisBlockHeader(h)
-    else getHeaderById(h.parentId)
-      .map(p => HeadersValidator.validateHeader(h, p))
-      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
   //def addHeaderToCacheIfNecessary(h: Header): Unit
 
@@ -192,45 +181,151 @@ trait HistoryExtension extends HistoryAPI {
     } yield result
   }
 
+
+  /** @return all possible forks, that contains specified header */
+  protected[history] def continuationHeaderChains(header: Header,
+                                                  filterCond: Header => Boolean): Seq[Seq[Header]] = {
+    @tailrec
+    def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
+      val nextLevelHeaders: Seq[Header] = Seq(currentHeight)
+        .flatMap(h => headerIdsAtHeight(h + 1))
+        .flatMap(getHeaderById)
+        .filter(filterCond)
+      if (nextLevelHeaders.isEmpty) acc.map(_.reverse)
+      else {
+        val updatedChains: Seq[Seq[Header]] = nextLevelHeaders.flatMap { h =>
+          acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
+        }
+        val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain =>
+          !nextLevelHeaders.exists(_.parentId sameElements chain.head.id))
+        loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
+      }
+    }
+
+    loop(header.height, Seq(Seq(header)))
+  }
+
+  def continuationIds(info: SyncInfo, size: Int): Option[ModifierIds] = Try {
+    if (isEmpty) info.startingPoints
+    else if (info.lastHeaderIds.isEmpty) {
+      val heightFrom: Int = Math.min(bestHeaderHeight, size - 1)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      //todo remove .get
+      val startHeader: Header = getHeaderById(startId).get
+      val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
+        .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
+          "Should always contain genesis header.")
+      headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
+    } else {
+      val ids: Seq[ModifierId] = info.lastHeaderIds
+      val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
+      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
+      val heightFrom: Int = Math.min(bestHeaderHeight, theirHeight + size)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      //todo remove .get
+      val startHeader: Header = getHeaderById(startId).get
+      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+        .headers.map(h => Header.modifierTypeId -> h.id)
+    }
+  }.toOption
+
+  /**
+    * Whether another's node syncInfo shows that another node is ahead or behind ours
+    *
+    * @param si other's node sync info
+    * @return Equal if nodes have the same history, Younger if another node is behind, Older if a new node is ahead
+    */
+  def compare(si: SyncInfo): HistoryComparisonResult = bestHeaderIdOpt match {
+
+    //Our best header is the same as other history best header
+    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
+
+    //Our best header is in other history best chain, but not at the last position
+    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
+
+    /* Other history is empty, or our history contains last id from other history */
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isModifierDefined) => Younger
+
+    case Some(_) =>
+      //Our history contains some ids from other history
+      if (si.lastHeaderIds.exists(isModifierDefined)) Fork
+      //Unknown comparison result
+      else Unknown
+
+    //Both nodes do not keep any blocks
+    case None if si.lastHeaderIds.isEmpty => Equal
+
+    //Our history is empty, other contain some headers
+    case None => Older
+  }
+
+  /** @return ids of count headers starting from offset */
+  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
+    .flatMap(h => headerIdsAtHeight(h).headOption)
+
+  def lastHeaders(count: Int): HeaderChain = bestHeaderOpt
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
+    .getOrElse(HeaderChain.empty)
+
+  def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
+
+  /**
+    * Return headers, required to apply to reach header2 if you are at header1 position.
+    *
+    * @param fromHeaderOpt - initial position
+    * @param toHeader      - header you should reach
+    * @return (Modifier required to rollback first, header chain to apply)
+    */
+  def getChainToHeader(fromHeaderOpt: Option[Header],
+                       toHeader: Header): (Option[ModifierId], HeaderChain) = fromHeaderOpt match {
+    case Some(h1) =>
+      val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
+      (prevChain.headOption.map(_.id), newChain.tail)
+    case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
+  }
+
+  /** Finds common block and sub-chains from common block to header1 and header2. */
+  protected[history] def commonBlockThenSuffixes(header1: Header,
+                                                 header2: Header): (HeaderChain, HeaderChain) = {
+    val heightDelta: Int = Math.max(header1.height - header2.height, 0)
+
+    def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
+      val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
+      if (chains._1.head == chains._2.head) chains
+      else {
+        val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
+        if (!otherChain.head.isGenesis) loop(biggerOther.length, biggerOther)
+        else throw new Exception(s"Common point not found for headers $header1 and $header2")
+      }
+    }
+
+    loop(2, HeaderChain(Seq(header2)))
+  }
+
+  /** Finds common block and sub-chains with `otherChain`. */
+  protected[history] def commonBlockThenSuffixes(otherChain: HeaderChain,
+                                                 startHeader: Header,
+                                                 limit: Int): (HeaderChain, HeaderChain) = {
+    def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
+
+    val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
+    (currentChain, otherChain.takeAfter(currentChain.head))
+  }
+
+  def syncInfo: SyncInfo =
+    if (isEmpty) SyncInfo(Seq.empty)
+    else SyncInfo(bestHeaderOpt.map(header =>
+      ((header.height - settings.network.maxInvObjects + 1) to header.height)
+        .flatMap(height => headerIdsAtHeight(height).headOption)
+    ).getOrElse(Seq.empty))
+
   def realDifficulty(h: Header): Difficulty
 
   def isNewHeader(header: Header): Boolean
 
   //def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block]
 
-  object HeadersValidator {
-    def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
-      _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
-        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
-      _ <- Either.cond(getBestHeaderIdOpt.isEmpty, (),
-        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
-      _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
-        GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
-    } yield h
 
-    def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
-      _ <- Either.cond(h.timestamp > parent.timestamp, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
-      _ <- Either.cond(h.height == parent.height + 1, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
-      _ <- Either.cond(!history.containsMod(h.id), (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
-      _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
-        HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-
-      _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent).getOrElse(0), (),
-        HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
-      _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
-      powSchemeValidationResult = powScheme.verify(h)
-      _ <- Either.cond(powSchemeValidationResult.isRight, (),
-        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
-      _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
-      _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
-        HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
-    } yield h
-  }
 
 }
 

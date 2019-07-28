@@ -8,12 +8,15 @@ case class HeaderChain(headers: IndexedSeq[Header]) {
 
   def exists(f: Header => Boolean): Boolean = headers.exists(f)
 
+  //todo remove .head
   def head: Header = headers.head
 
   def headOption: Option[Header] = headers.headOption
 
+  //todo remove .tail
   def tail: HeaderChain = HeaderChain(headers.tail)
 
+  //todo remove .take
   def take(i: Int): HeaderChain = HeaderChain(headers.take(i))
 
   def takeAfter(h: Header): HeaderChain = {

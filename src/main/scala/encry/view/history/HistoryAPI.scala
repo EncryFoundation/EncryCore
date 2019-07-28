@@ -3,7 +3,6 @@ package encry.view.history
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.StorageKey
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.VersionalLevelDbValue
 import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
@@ -13,19 +12,21 @@ import scorex.crypto.hash.Digest32
 
 trait HistoryAPI extends StrictLogging {
 
+  val history: HistoryStorage
+
   val BestHeaderKey: StorageKey =
     StorageKey @@ Array.fill(TestNetConstants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
   val BestBlockKey: StorageKey =
     StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
-
-  val history: HistoryStorage
 
   /**
     * @param id - modifier's id
     * @tparam T - type of modifier which want to take
     * @return - Some(Modifier: T) if modifier with id 'id' and type 'T' contains in history otherwise None
     */
-  private def getModifierById[T](id: ModifierId): Option[T] = history.modifierById(id).collect { case m: T => m }
+  private def getModifierById[T](id: ModifierId): Option[T] = history
+    .modifierById(id)
+    .collect { case m: T => m }
 
   /**
     * @param id - id of modifier which height want to find
@@ -48,7 +49,6 @@ trait HistoryAPI extends StrictLogging {
     */
   def getHeaderById(id: ModifierId): Option[Header] = getModifierById[Header](id)
 
-
   def getBestBlockIdOpt: Option[ModifierId] = history.get(BestBlockKey).map(ModifierId @@ _)
   def getBestBlockOpt: Option[Block] = getBestBlockIdOpt.flatMap(getBlockById)
   def getBestBlockHeight: Int = getBestBlockIdOpt
@@ -70,7 +70,6 @@ trait HistoryAPI extends StrictLogging {
     .map(n => Height @@ Ints.fromByteArray(n))
 
   def isModifierDefined(id: ModifierId): Boolean = history.containsMod(id)
-  //def isBlockDefined(id: ModifierId): Boolean = ???
 
   def bestHeaderIdAtHeight(height: Int): Option[ModifierId] = headerIdsAtHeight(height).headOption
 
@@ -88,7 +87,7 @@ trait HistoryAPI extends StrictLogging {
     .map(elem => elem.grouped(32).map(ModifierId @@ _).toSeq)
     .getOrElse(Seq.empty)
 
-  def getPayloadByIdOpt(id: ModifierId): Option[Payload]
+  def getHeaderOfBestBlock: Option[Header] = getBestBlockIdOpt.flatMap(getHeaderById)
 
   def getBestHeadersChainScore: BigInt = scoreOf(getBestHeaderIdOpt.get).getOrElse(BigInt(0)) //todo check getOrElse
 
