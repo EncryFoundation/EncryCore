@@ -23,7 +23,7 @@ import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.NodeViewErrors.ModifierApplyError
-import encry.view.history.{EncryHistory, EncryHistoryReader}
+import encry.view.history.EncryHistory
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}

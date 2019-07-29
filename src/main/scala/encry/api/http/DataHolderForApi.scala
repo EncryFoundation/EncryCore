@@ -7,7 +7,6 @@ import encry.api.http.DataHolderForApi._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.history.EncryHistoryReader
 import encry.view.state.UtxoStateReader
 import encry.local.miner.Miner.MinerStatus
 import encry.network.BlackList.{BanReason, BanTime, BanType}

@@ -92,7 +92,7 @@ trait HistoryExtension extends HistoryAPI {
     * @param p      - condition to satisfy
     * @return found header
     */
-  @tailrec private def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
+  @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
     .find(id => p(id))
     .flatMap(getHeaderById) match {
     case h@Some(_) => h

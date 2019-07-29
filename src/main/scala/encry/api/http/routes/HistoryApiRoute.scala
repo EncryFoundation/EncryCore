@@ -6,7 +6,6 @@ import akka.pattern.ask
 import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetMinerStatus}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{EncryAppSettings, RESTApiSettings}
-import encry.view.history.EncryHistoryReader
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
