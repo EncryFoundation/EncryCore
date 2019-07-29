@@ -154,7 +154,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
       val score: Difficulty =
         Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
       val bestHeaderHeight: Int = getBestHeaderHeight
-      val bestHeadersChainScore: BigInt = getBestHeadersChainScore
+      val bestHeadersChainScore: BigInt = getBestHeadersChainScore.getOrElse(BigInt(0)) //todo check getOrElse
       val bestRow: Seq[(StorageKey, StorageValue)] =
         if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
           Seq(BestHeaderKey -> StorageValue @@ header.id)

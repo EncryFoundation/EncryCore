@@ -19,34 +19,25 @@ trait HistoryAPI extends StrictLogging {
   val BestBlockKey: StorageKey =
     StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
 
-  /**
-    * @param id - modifier's id
-    * @tparam T - type of modifier which want to take
-    * @return - Some(Modifier: T) if modifier with id 'id' and type 'T' contains in history otherwise None
-    */
   private def getModifierById[T](id: ModifierId): Option[T] = history
     .modifierById(id)
     .collect { case m: T => m }
 
   /**
-    * @param id - id of modifier which height want to find
-    * @return Some(height: Int) if such modifier's height key contains in history otherwise None
+    * @param id - id of modifier whose height want to get
+    * @return some(height: Int) if such modifier's height key contains in history otherwise none
     */
   def getModifierHeightById(id: ModifierId): Option[Int] = history
     .get(modifierHeightKey(id))
     .map(Ints.fromByteArray)
 
   /**
-    * @param id - block's id
-    * @return Some(Block) if header and payload of desired block contains in history otherwise None
+    * @param id - header's id which linked to desired block
+    * @return some(Block) if header and payload of desired block contains in history otherwise none
     */
   def getBlockById(id: ModifierId): Option[Block] = getModifierById[Header](id)
     .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
 
-  /**
-    * @param id - header's id
-    * @return Some(Header) if desired header contains in history otherwise None
-    */
   def getHeaderById(id: ModifierId): Option[Header] = getModifierById[Header](id)
 
   def getBestBlockIdOpt: Option[ModifierId] = history.get(BestBlockKey).map(ModifierId @@ _)
@@ -61,10 +52,18 @@ trait HistoryAPI extends StrictLogging {
     .flatMap(getModifierHeightById)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
+  /**
+    * @param id - header's id which linked to block whose score want to get
+    * @return some(score: BigInt) if such param contains in history otherwise none
+    */
   def scoreOf(id: ModifierId): Option[BigInt] = history
     .get(headerScoreKey(id))
     .map(n => BigInt(n))
 
+  /**
+    * @param id - header's id which height want to get
+    * @return some(height: Height) if such header contains in history otherwise none
+    */
   def heightOf(id: ModifierId): Option[Height] = history
     .get(modifierHeightKey(id))
     .map(n => Height @@ Ints.fromByteArray(n))
@@ -74,25 +73,26 @@ trait HistoryAPI extends StrictLogging {
   def bestHeaderIdAtHeight(height: Int): Option[ModifierId] = headerIdsAtHeight(height).headOption
 
   /**
-    * @param height - block height
+    * @param height - height where want to get all modifiers ids
     * @return ids of headers on chosen height.
-    *         Seq.empty we don't have any headers on this height
+    *         Seq.empty if don't have any headers on this height
     *         single id if no forks on this height
     *         multiple ids if there are forks at chosen height.
-    *         First id is always from the best headers chain.
+    *
+    *         !First id is always from the best headers chain!
     */
 
   def headerIdsAtHeight(height: Int): Seq[ModifierId] = history
     .get(heightIdKey(height))
-    .map(elem => elem.grouped(32).map(ModifierId @@ _).toSeq)
+    .map(elem => elem.grouped(TestNetConstants.ModifierIdSize).map(ModifierId @@ _).toSeq)
     .getOrElse(Seq.empty)
 
   def getHeaderOfBestBlock: Option[Header] = getBestBlockIdOpt.flatMap(getHeaderById)
 
-  def getBestHeadersChainScore: BigInt = scoreOf(getBestHeaderIdOpt.get).getOrElse(BigInt(0)) //todo check getOrElse
+  def getBestHeadersChainScore: Option[BigInt] = getBestHeaderIdOpt.flatMap(scoreOf)
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id)
-    .flatMap(h => bestHeaderIdAtHeight(h))
+    .flatMap(bestHeaderIdAtHeight)
     .exists(_.sameElements(id))
 
   def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
