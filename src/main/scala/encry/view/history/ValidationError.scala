@@ -1,4 +1,4 @@
-package encry.view.history.processors
+package encry.view.history
 
 sealed trait ValidationError
 

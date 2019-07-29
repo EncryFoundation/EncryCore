@@ -13,8 +13,7 @@ case class HeaderChain(headers: IndexedSeq[Header]) {
 
   def headOption: Option[Header] = headers.headOption
 
-  //todo remove .tail
-  def tail: HeaderChain = HeaderChain(headers.tail)
+  def tail: HeaderChain = HeaderChain(headers.drop(1))
 
   //todo remove .take
   def take(i: Int): HeaderChain = HeaderChain(headers.take(i))

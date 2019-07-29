@@ -1,7 +1,7 @@
 package encry.view.history.processors.payload
 
 import encry.consensus.History.ProgressInfo
-import encry.view.history.processors.{BlockProcessor, ValidationError}
+import encry.view.history.processors.BlockProcessor
 import encry.view.history.storage.HistoryStorage
 import encry.settings.EncryAppSettings
 import io.iohk.iodb.ByteArrayWrapper

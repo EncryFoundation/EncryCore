@@ -1,7 +1,7 @@
 package encry.view.history.processors.payload
 
 import encry.consensus.History
-import encry.view.history.processors.ValidationError
+import encry.view.history.ValidationError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Payload
 

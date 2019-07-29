@@ -20,11 +20,13 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scorex.crypto.hash.Digest32
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 import encry.view.history.processors.ValidationError.FatalValidationError._
 import encry.view.history.processors.ValidationError.NonFatalValidationError._
 import cats.syntax.either._
+import encry.view.history.BlockDownloadProcessor
 
 trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 

@@ -1,15 +1,19 @@
 package encry.view.history
 
-import encry.view.history.processors.ValidationError
-import encry.view.history.processors.ValidationError.FatalValidationError.{GenesisBlockFatalValidationError, HeaderFatalValidationError, PayloadFatalValidationError, UnknownModifierFatalError}
-import encry.view.history.processors.ValidationError.NonFatalValidationError.{HeaderNonFatalValidationError, PayloadNonFatalValidationError}
+import encry.view.history.ValidationError.FatalValidationError._
+import encry.view.history.ValidationError.NonFatalValidationError._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
+import cats.syntax.either._
+import encry.utils.NetworkTimeProvider
 
-trait HistoryModifiersValidations {
+
+trait HistoryModifiersValidations extends HistoryExtension {
+
+  val timeProvider = new NetworkTimeProvider(settings.ntp)
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] = {
     val validationResult: Either[ValidationError, PersistentModifier] = modifier match {
@@ -39,7 +43,7 @@ trait HistoryModifiersValidations {
       .map(p => HeadersValidator.validateHeader(h, p))
       .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
-  override protected def validate(m: Payload): Either[ValidationError, PersistentModifier] =
+  protected def validate(m: Payload): Either[ValidationError, PersistentModifier] =
     modifierValidation(m, getHeaderById(m.headerId))
 
   protected def modifierValidation(mod: PersistentModifier,
@@ -67,7 +71,10 @@ trait HistoryModifiersValidations {
       _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
         HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
 
-      _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent).getOrElse(0), (),
+      _ <- Either.cond(h.difficulty >= (requiredDifficultyAfter(parent) match {
+        case Left(_) => 0
+        case Right(value) => value
+      }), (),
         HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
       _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
@@ -86,7 +93,7 @@ trait HistoryModifiersValidations {
     def validate(m: PersistentModifier,
                  header: Header,
                  minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
-      _ <- Either.cond(!historyStorage.containsObject(m.id), (),
+      _ <- Either.cond(!history.containsMod(m.id), (),
         PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
       _ <- Either.cond(header.isRelated(m), (),
         PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))

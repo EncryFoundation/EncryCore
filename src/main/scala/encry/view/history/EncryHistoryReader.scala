@@ -4,8 +4,8 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
 import encry.modifiers.history._
 import encry.settings.NodeSettings
-import encry.view.history.processors.ValidationError.FatalValidationError.UnknownModifierFatalError
-import encry.view.history.processors.{BlockHeaderProcessor, ValidationError}
+import encry.view.history.ValidationError.FatalValidationError.UnknownModifierFatalError
+import encry.view.history.processors.BlockHeaderProcessor
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier

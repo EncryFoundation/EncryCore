@@ -80,15 +80,6 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
       )
   }
 
-  //todo redundant
-  def containsObject(id: ModifierId): Boolean =
-    store match {
-      case iodb: IODBHistoryWrapper =>
-        iodb.objectStore.get(ByteArrayWrapper(id)).isDefined
-      case _: VLDBWrapper =>
-        store.get(StorageKey @@ id.untag(ModifierId)).isDefined
-    }
-
   def removeObjects(ids: Seq[ModifierId]): Unit =
     store match {
       case iodb: IODBHistoryWrapper =>

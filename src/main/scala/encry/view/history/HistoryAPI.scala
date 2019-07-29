@@ -102,6 +102,8 @@ trait HistoryAPI extends StrictLogging {
     header   <- getHeaderById(headerId) if isModifierDefined(header.payloadId)
   } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
+  def getModifierBytesByIdOpt(id: ModifierId): Option[Array[Byte]] = history.modifiersBytesById(id)
+
   def heightIdKey(height: Int): StorageKey =
     StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
   def headerScoreKey(id: ModifierId): StorageKey =

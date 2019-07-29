@@ -212,7 +212,7 @@ object EncryHistory extends StrictLogging {
     }
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val history: EncryHistory = new EncryHistory with BlockPayloadProcessor {
+    val history: EncryHistory = new EncryHistory {
       override protected val settings: EncryAppSettings = settingsEncry
       override protected val nodeSettings: NodeSettings = settings.node
       override protected val historyStorage: HistoryStorage = storage
