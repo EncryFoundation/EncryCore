@@ -1,9 +1,9 @@
 package encry.view.history
 
-sealed trait ValidationError
+sealed trait HistoryValidationError
 
-object ValidationError {
-  sealed trait FatalValidationError extends ValidationError
+object HistoryValidationError {
+  sealed trait FatalValidationError extends HistoryValidationError
   object FatalValidationError {
     case class GenesisBlockFatalValidationError(error: String) extends FatalValidationError
     case class HeaderFatalValidationError(error: String)       extends FatalValidationError
@@ -11,9 +11,10 @@ object ValidationError {
     case class UnknownModifierFatalError(error: String)        extends FatalValidationError
     case class IncorrectProcessingRegime(error: String)        extends FatalValidationError
   }
-  sealed trait NonFatalValidationError extends ValidationError
+  sealed trait NonFatalValidationError extends HistoryValidationError
   object NonFatalValidationError {
     case class HeaderNonFatalValidationError(error: String)  extends NonFatalValidationError
     case class PayloadNonFatalValidationError(error: String) extends NonFatalValidationError
   }
+  final case class HistoryExtensionError(error: String) extends HistoryValidationError
 }

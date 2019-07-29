@@ -6,7 +6,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Digest32
-
+import scala.language.implicitConversions
 import scala.util.Try
 
 trait EncryStorage extends AutoCloseable with StrictLogging {
@@ -26,7 +26,9 @@ trait EncryStorage extends AutoCloseable with StrictLogging {
 
   def get(key: StorageKey): Option[Array[Byte]] = store.get(key)
 
-  def rollbackTo(version: VersionTag): Try[Unit] = Try{store.rollbackTo(StorageVersion @@ version.untag(VersionTag))}
+  def rollbackTo(version: VersionTag): Try[Unit] = Try {
+    store.rollbackTo(StorageVersion @@ version.untag(VersionTag))
+  }
 
   override def close(): Unit = {
     logger.info("Closing storage")

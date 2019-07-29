@@ -1,7 +1,6 @@
 package encry.view.history
 
 import encry.settings.NodeSettings
-import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.constants.TestNetConstants
 
 /**
@@ -11,26 +10,32 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
   * with the network and no full blocks download needed
   *
   **/
-final case class BlockDownloadProcessor(minimalBlockHeight: Int, nodeSettings: NodeSettings) {
+final case class BlockDownloadProcessor(minimalBlockHeight: Int,
+                                        isHeadersChainSynced: Boolean,
+                                        nodeSettings: NodeSettings) {
 
   /** Update minimal full block height
     *
-    * @param header - header of new best full block
+    * @param headerHeight - header of new best full block
     * @return minimal height to process best full block */
-  def updateBestBlock(header: Header): (Int, BlockDownloadProcessor) = {
+  def updateBestBlock(headerHeight: Int): (Int, BlockDownloadProcessor) = {
     val newHeight: Int =
       if (minimalBlockHeight == Int.MaxValue) {
         // just synced with the headers chain - determine first full block to apply
         // TODO: start with the height of UTXO snapshot applied. Start from genesis until this is implemented
         if (nodeSettings.blocksToKeep < 0) TestNetConstants.GenesisHeight // keep all blocks in history
         // Start from config.blocksToKeep blocks back
-        else Math.max(TestNetConstants.GenesisHeight, header.height - nodeSettings.blocksToKeep + 1)
-      } else if (nodeSettings.blocksToKeep >= 0) Math.max(header.height - nodeSettings.blocksToKeep + 1, minimalBlockHeight)
+        else Math.max(TestNetConstants.GenesisHeight, headerHeight - nodeSettings.blocksToKeep + 1)
+      } else if (nodeSettings.blocksToKeep >= 0) Math.max(headerHeight - nodeSettings.blocksToKeep + 1, minimalBlockHeight)
       else TestNetConstants.GenesisHeight
-    (newHeight, BlockDownloadProcessor(newHeight, nodeSettings))
+    (newHeight, BlockDownloadProcessor(newHeight, isHeadersChainSynced, nodeSettings))
   }
+
+  def chainIsSynced: BlockDownloadProcessor =
+    BlockDownloadProcessor(minimalBlockHeight, isHeadersChainSynced = true, nodeSettings)
 }
 
 object BlockDownloadProcessor {
-  def empty(nodeSettings: NodeSettings): BlockDownloadProcessor = BlockDownloadProcessor(Int.MaxValue, nodeSettings)
+  def empty(nodeSettings: NodeSettings): BlockDownloadProcessor =
+    BlockDownloadProcessor(Int.MaxValue, isHeadersChainSynced = false, nodeSettings)
 }

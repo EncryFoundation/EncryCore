@@ -15,7 +15,7 @@ class PowLinearControllerSpec extends PropSpec with Matchers {
     val expected: immutable.Seq[Int] = (0 to TestNetConstants.RetargetingEpochsQty).reverse
       .map(i => (retargetingAtHeight - 1) - i * TestNetConstants.EpochLength).filter(_ >= TestNetConstants.GenesisHeight)
 
-    val heights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ retargetingAtHeight)
+    val heights: Seq[Height] = PowLinearController.getHeightsForReTargetingAt(Height @@ retargetingAtHeight)
 
     heights sameElements expected shouldBe true
   }

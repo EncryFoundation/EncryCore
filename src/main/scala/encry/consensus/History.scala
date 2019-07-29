@@ -28,19 +28,32 @@ object History {
     * @param toApply     - modifiers to apply to current node view
     * @param toDownload  - modifiers to download from other nodes
     */
-  case class ProgressInfo(branchPoint: Option[ModifierId],
-                          toRemove: Seq[PersistentModifier],
-                          toApply: Seq[PersistentModifier],
-                          toDownload: Option[(ModifierTypeId, ModifierId)]) //todo Seq or Opt!?
-  {
+  final case class ProgressInfo(branchPoint: Option[ModifierId],
+                                toRemove: Seq[PersistentModifier],
+                                toApply: Seq[PersistentModifier],
+                                toDownload: Option[(ModifierTypeId, ModifierId)]) { //todo Seq or Opt!?
 
-    require(branchPoint.isDefined == toRemove.nonEmpty, s"Branch point should be defined for non-empty toRemove," +
-      s" ${branchPoint.isDefined} == ${toRemove.nonEmpty} given")
+    //todo rewrite with .initialize
+    //todo add error description
 
-    lazy val chainSwitchingNeeded: Boolean = toRemove.nonEmpty
+    //    require(branchPoint.isDefined == toRemove.nonEmpty, s"Branch point should be defined for non-empty toRemove," +
+    //      s" ${branchPoint.isDefined} == ${toRemove.nonEmpty} given")
+
+    def chainSwitchingNeeded: Boolean = toRemove.nonEmpty
 
     override def toString: String = s"ProgressInfo(BranchPoint: ${branchPoint.map(Algos.encode)}, " +
       s" to remove: ${toRemove.map(_.encodedId)}, to apply: ${toApply.map(_.encodedId)})"
+  }
+
+  object ProgressInfo {
+    def initialize(branchPoint: Option[ModifierId],
+                   toRemove: Seq[PersistentModifier],
+                   toApply: Seq[PersistentModifier],
+                   toDownload: Option[(ModifierTypeId, ModifierId)]): Either[String, ProgressInfo] = for {
+      _ <- Either.cond(branchPoint.isDefined == toRemove.nonEmpty, (),
+        s"ProgressInfo(BranchPoint: ${branchPoint.map(Algos.encode)}, " +
+          s" to remove: ${toRemove.map(_.encodedId)}, to apply: ${toApply.map(_.encodedId)})")
+    } yield ProgressInfo(branchPoint, toRemove, toApply, toDownload)
   }
 
 }

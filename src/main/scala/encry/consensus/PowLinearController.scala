@@ -28,7 +28,7 @@ object PowLinearController {
     }
 
   /** Used to provide `getDifficulty()` with the sequence of headers of correct heights. */
-  def getHeightsForRetargetingAt(height: Height): Seq[Height] = {
+  def getHeightsForReTargetingAt(height: Height): Seq[Height] = {
     if ((height - 1) % chainParams.EpochLength == 0 && height > chainParams.EpochLength * chainParams.RetargetingEpochsQty)
       (0 to chainParams.RetargetingEpochsQty).reverse.map(i => (height - 1) - i * chainParams.EpochLength)
     else Seq(height - 1)

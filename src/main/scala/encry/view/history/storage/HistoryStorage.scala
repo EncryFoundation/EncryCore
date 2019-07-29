@@ -1,6 +1,5 @@
 package encry.view.history.storage
 
-import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.VLDBWrapper
@@ -13,7 +12,7 @@ import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSeriali
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.util.{Failure, Random, Success}
 
-case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
+final case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage {
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = {
     val modBytesWithTypeId = store match {

@@ -34,11 +34,8 @@ import cats.syntax.option._
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false) */
 
-final case class EncryHistoryStorage(storage: HistoryStorage, settingsN: EncryAppSettings)
+final case class EncryHistoryStorage(override val history: HistoryStorage, override val settings: EncryAppSettings)
   extends HistoryModifiersValidations with HistoryModifiersProcessor with AutoCloseable {
-
-  override val settings: EncryAppSettings = settingsN
-  override val history: HistoryStorage = storage
 
   def isFullChainSynced: Boolean = getBestHeaderIdOpt
     .exists(bestHeaderId => getBestBlockIdOpt.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))

@@ -317,6 +317,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
         Some(genesisState)
     } else {
+    //todo add finally
     None
   }
 

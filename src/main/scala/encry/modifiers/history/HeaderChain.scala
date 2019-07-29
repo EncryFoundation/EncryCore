@@ -31,7 +31,7 @@ case class HeaderChain(headers: IndexedSeq[Header]) {
 
 object HeaderChain {
 
-  lazy val empty = HeaderChain(IndexedSeq.empty[Header])
+  def empty: HeaderChain = HeaderChain(IndexedSeq.empty[Header])
 
   def apply(seq: Seq[Header]): HeaderChain = HeaderChain(seq.toIndexedSeq)
 }

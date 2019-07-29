@@ -5,61 +5,62 @@ import encry.modifiers.history.HeaderChain
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 import cats.syntax.option._
-import encry.consensus.{EquihashPowScheme, PowLinearController}
+import encry.consensus.PowLinearController
 import encry.settings.EncryAppSettings
-import encry.view.history.HistoryValidationResult.HistoryDifficultyError
+import encry.view.history.HistoryValidationError.HistoryExtensionError
 import org.encryfoundation.common.network.SyncInfo
-
-import scala.util.Try
+import cats.syntax.either._
 
 trait HistoryExtension extends HistoryAPI {
 
   val settings: EncryAppSettings
 
-  val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
   var blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor.empty(settings.node)
-  private var isHeadersChainSynced: Boolean = false
 
   def payloadsToDownload(howMany: Int, excluding: HashSet[ModifierId]): (ModifierTypeId, Seq[ModifierId]) = {
-    @tailrec def continuation(height: Height, acc: Seq[ModifierId]): Seq[ModifierId] =
+    @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else bestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
         case Some(h) if !excluding.exists(_ sameElements h.payloadId) && !isModifierDefined(h.payloadId) =>
           continuation(Height @@ (height + 1), acc :+ h.payloadId)
-        case Some(_) => continuation(Height @@ (height + 1), acc)
-        case None => acc
+        case Some(_) =>
+          continuation(Height @@ (height + 1), acc)
+        case None =>
+          acc
       }
 
     (for {
-      bestBlockId <- getBestBlockIdOpt
-      headerLinkedToBestBlock <- getHeaderById(bestBlockId) //todo can be also found in cache
+      bestBlockId             <- getBestBlockIdOpt
+      headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-      case _ if !isHeadersChainSynced => (Payload.modifierTypeId, Seq.empty)
+      case _ if !blockDownloadProcessor.isHeadersChainSynced =>
+        (Payload.modifierTypeId, Seq.empty)
       case Some(header) if isInBestChain(header) =>
-        (Payload.modifierTypeId, continuation(Height @@ (header.height + 1), Seq.empty))
-      case Some(header) => (Payload.modifierTypeId,
-        lastBestBlockHeightRelevantToBestChain(header.height)
-          .map(height => continuation(Height @@ (height + 1), Seq.empty))
-          .getOrElse(continuation(Height @@ blockDownloadProcessor.minimalBlockHeight, Seq.empty)))
+        (Payload.modifierTypeId, continuation(header.height + 1, Seq.empty))
+      case Some(header) =>
+        (Payload.modifierTypeId, lastBestBlockHeightRelevantToBestChain(header.height)
+          .map(height => continuation(height + 1, Seq.empty))
+          .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeight, Seq.empty)))
       case None =>
-        (Payload.modifierTypeId, continuation(Height @@ blockDownloadProcessor.minimalBlockHeight, Seq.empty))
+        (Payload.modifierTypeId, continuation(blockDownloadProcessor.minimalBlockHeight, Seq.empty))
     }
   }
 
-  /** Checks, whether it's time to download full chain and return toDownload modifiers */
+  /**
+    * Checks, whether it's time to download full chain and return toDownload modifiers
+    */
   def toDownload(header: Header): Option[(ModifierTypeId, ModifierId)] =
-  // Already synced and header is not too far back. Download required modifiers
+    // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId, header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && HistoryUtils.isNewHeader(header)) {
-      logger.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
-      isHeadersChainSynced = true
+    else if (!blockDownloadProcessor.isHeadersChainSynced && HistoryUtils.isNewHeader(header)) {
+      val updatedBlockDownloadProcessor: BlockDownloadProcessor =
+        blockDownloadProcessor.chainIsSynced
       val (_, newBlockDownloadProcessor: BlockDownloadProcessor) =
-        blockDownloadProcessor.updateBestBlock(header)
+        updatedBlockDownloadProcessor.updateBestBlock(header.height)
       blockDownloadProcessor = newBlockDownloadProcessor
       none
     } else none
@@ -76,12 +77,12 @@ trait HistoryExtension extends HistoryAPI {
     @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] =
       if (acc.length == limit || until(header)) acc
       else getHeaderById(header.parentId) match {
-        case Some(parent) => loop(parent, acc :+ parent)
+        case Some(parent)                 => loop(parent, acc :+ parent)
         case None if acc.contains(header) => acc
-        case _ => acc :+ header
+        case _                            => acc :+ header
       }
 
-    if (getBestHeaderIdOpt.isEmpty || (limit == 0)) HeaderChain(Seq.empty)
+    if (getBestHeaderIdOpt.isEmpty || (limit == 0)) HeaderChain.empty
     else HeaderChain(loop(startHeader, Seq(startHeader)).reverse)
   }
 
@@ -93,37 +94,31 @@ trait HistoryExtension extends HistoryAPI {
     * @return found header
     */
   @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
-    .find(id => p(id))
+    .find(p)
     .flatMap(getHeaderById) match {
-    case h@Some(_) => h
-    case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
-    case n@None => n
+      case h@Some(_)                                       => h
+      case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
+      case n@None                                          => n
   }
 
-
-  //todo to utils object anything below
-
-  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
-
-  def requiredDifficultyAfter(parent: Header): Either[HistoryDifficultyError, Difficulty] = {
-    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
+  def requiredDifficultyAfter(parent: Header): Either[HistoryExtensionError, Difficulty] = {
+    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForReTargetingAt(Height @@ (parent.height + 1))
     for {
       _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
-        HistoryDifficultyError("Incorrect heights sequence!"))
-      chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
-      requiredHeaders: Seq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
+        HistoryExtensionError("Incorrect heights sequence!"))
+      chain           = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
+      requiredHeaders = (requiredHeights.min to requiredHeights.max)
         .zip(chain.headers)
         .filter(p => requiredHeights.contains(p._1))
       _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
-        HistoryDifficultyError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
-      result: Difficulty = PowLinearController.getDifficulty(requiredHeaders)
+        HistoryExtensionError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
+      result = PowLinearController.getDifficulty(requiredHeaders)
     } yield result
   }
 
 
   /** @return all possible forks, that contains specified header */
-  def continuationHeaderChains(header: Header,
-                               filterCond: Header => Boolean): Seq[Seq[Header]] = {
+  def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]] = {
     @tailrec def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1)
         .flatMap(getHeaderById)
@@ -131,11 +126,9 @@ trait HistoryExtension extends HistoryAPI {
       if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[Header]] = nextHeightHeaders
-          .flatMap(h => acc
-            .find(chain =>
-              chain.nonEmpty && h.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray))
-            ).map(h +: _)
-          )
+          .flatMap(h => acc.find(chain =>
+            chain.nonEmpty && h.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray))
+          ).map(h +: _)) //todo don't understand
         val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain =>
           !nextHeightHeaders.exists(_.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray)))
         )
@@ -146,29 +139,31 @@ trait HistoryExtension extends HistoryAPI {
     loop(header.height, Seq(Seq(header)))
   }
 
-  def continuationIds(info: SyncInfo, size: Int): Option[ModifierIds] = Try {
-    if (getBestHeaderIdOpt.isEmpty) info.startingPoints
+  def continuationIds(info: SyncInfo, size: Int): Either[HistoryExtensionError, Seq[(ModifierTypeId, ModifierId)]] =
+    if (getBestHeaderIdOpt.isEmpty) info.startingPoints.asRight[HistoryExtensionError]
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
-      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      //todo remove .get
-      val startHeader: Header = getHeaderById(startId).get
-      val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
-        .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
-          "Should always contain genesis header.")
-      headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
+      val headers: Option[HeaderChain] = for {
+        startId     <- headerIdsAtHeight(heightFrom).headOption
+        startHeader <- getHeaderById(startId)
+      } yield headerChainBack(size, startHeader, _ => false)
+      Either.cond(
+        headers.nonEmpty && headers.exists(_.headers.exists(_.height == TestNetConstants.GenesisHeight)),
+        headers.getOrElse(HeaderChain.empty).headers.map(h => Header.modifierTypeId -> h.id),
+        HistoryExtensionError("Should always contain genesis header")
+      )
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
-      val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
-      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
-      val heightFrom: Int = Math.min(getBestHeaderHeight, theirHeight + size)
-      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
-      //todo remove .get
-      val startHeader: Header = getHeaderById(startId).get
-      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
-        .headers.map(h => Header.modifierTypeId -> h.id)
+      (for {
+        lastHeaderInOurBestChain <- ids.view.reverse.find(isInBestChain)
+        theirHeight              <- heightOf(lastHeaderInOurBestChain)
+        heightFrom = Math.min(getBestHeaderHeight, theirHeight + size)
+        startId                  <- headerIdsAtHeight(heightFrom).headOption
+        startHeader              <- getHeaderById(startId)
+        res = headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+          .headers.map(h => Header.modifierTypeId -> h.id)
+      } yield res).getOrElse(Seq.empty).asRight[HistoryExtensionError]
     }
-  }.toOption
 
   /**
     * Whether another's node syncInfo shows that another node is ahead or behind ours
@@ -243,8 +238,8 @@ trait HistoryExtension extends HistoryAPI {
 
   /** Finds common block and sub-chains with `otherChain`. */
   def commonBlockThenSuffixes(otherChain: HeaderChain,
-                                                 startHeader: Header,
-                                                 limit: Int): (HeaderChain, HeaderChain) = {
+                              startHeader: Header,
+                              limit: Int): (HeaderChain, HeaderChain) = {
     def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
 
     val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
