@@ -34,7 +34,7 @@ import cats.syntax.option._
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false) */
 
-final case class EncryHistory(storage: HistoryStorage, settingsN: EncryAppSettings)
+final case class EncryHistoryStorage(storage: HistoryStorage, settingsN: EncryAppSettings)
   extends HistoryModifiersValidations with HistoryModifiersProcessor with AutoCloseable {
 
   override val settings: EncryAppSettings = settingsN
@@ -52,14 +52,14 @@ final case class EncryHistory(storage: HistoryStorage, settingsN: EncryAppSettin
     })
   }
 
-  def reportModifierIsValid(modifier: PersistentModifier): EncryHistoryNew = {
+  def reportModifierIsValid(modifier: PersistentModifier): EncryHistoryStorage = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     markModifierValid(modifier)
     this
   }
 
   /** Report some modifier as valid or invalid semantically */
-  def reportModifierIsInvalid(modifier: PersistentModifier, progressInfo: ProgressInfo): (EncryHistoryNew, ProgressInfo) = {
+  def reportModifierIsInvalid(modifier: PersistentModifier, progressInfo: ProgressInfo): (EncryHistoryStorage, ProgressInfo) = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
@@ -182,7 +182,7 @@ final case class EncryHistory(storage: HistoryStorage, settingsN: EncryAppSettin
   def closeStorage(): Unit = history.close()
 }
 
-object EncryHistory extends StrictLogging {
+object EncryHistoryStorage extends StrictLogging {
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {
     val dir: File = new File(s"${settings.directory}/history/index")
@@ -196,7 +196,7 @@ object EncryHistory extends StrictLogging {
     dir
   }
 
-  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
+  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistoryStorage = {
 
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
     //Check what kind of storage in settings:
@@ -214,12 +214,7 @@ object EncryHistory extends StrictLogging {
     }
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val history: EncryHistory = new EncryHistory {
-      override protected val settings: EncryAppSettings = settingsEncry
-      override protected val nodeSettings: NodeSettings = settings.node
-      override protected val historyStorage: HistoryStorage = storage
-      override protected val timeProvider: NetworkTimeProvider = ntp
-    }
+    val history: EncryHistoryStorage = EncryHistoryStorage(storage, settingsEncry)
     history
   }
 }
