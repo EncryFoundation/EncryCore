@@ -43,6 +43,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
+  val modCache = ModifiersCache(settings)
+
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
 
@@ -58,7 +60,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   context.system.scheduler.schedule(1.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: " +
-    s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
+    s"${modCache.size}. Elems: ${modCache.modifiersCache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
     logger.warn(s"Stopping NodeViewHolder...")
@@ -68,13 +70,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   override def receive: Receive = {
     case ModifiersFromRemote(modifiers) => modifiers.foreach { mod =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+      val isInCache: Boolean = modCache.contains(key(mod.id))
       if (isInHistory || isInCache)
         logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else {
         logger.debug(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
-        ModifiersCache.put(key(mod.id), mod, nodeView.history)
+        modCache.put(mod, nodeView.history)
       }
     }
       computeApplications()
@@ -108,7 +110,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds
-          .filterNot(mid => nodeView.history.isModifierDefined(mid) || ModifiersCache.contains(key(mid)))
+          .filterNot(mid => nodeView.history.isModifierDefined(mid) || modCache.contains(key(mid)))
       }
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
@@ -123,7 +125,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   //todo refactor loop
   def computeApplications(): Unit = {
-    val mods = ModifiersCache.popCandidate(nodeView.history)
+    val mods = modCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
       mods.foreach(mod => pmodModify(mod))
       computeApplications()
