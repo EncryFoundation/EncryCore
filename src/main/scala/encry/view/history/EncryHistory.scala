@@ -35,7 +35,7 @@ final case class EncryHistory(override val history: HistoryStorage, override val
   def append(modifier: PersistentModifier): Either[Throwable, (EncryHistory, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
-      case header: Header => this -> process(header)
+      case header: Header   => this -> process(header)
       case payload: Payload => this -> process(payload)
     })
   }
@@ -54,9 +54,9 @@ final case class EncryHistory(override val history: HistoryStorage, override val
 
   /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
-    case header: Header => header.some
+    case header: Header   => header.some
     case payload: Payload => getHeaderById(payload.headerId)
-    case block: Block => block.header.some
+    case block: Block     => block.header.some
   }
 
   /**
