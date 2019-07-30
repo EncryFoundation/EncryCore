@@ -52,7 +52,7 @@ trait HistoryExtension extends HistoryAPI {
   }
 
   /**
-    * Checks, whether it's time to download full chain and return toDownload modifiers
+    * Checks, whether it's time to download full chain and return toDownload modifier
     */
   def toDownload(header: Header): Option[(ModifierTypeId, ModifierId)] =
     // Already synced and header is not too far back. Download required modifiers
@@ -74,7 +74,6 @@ trait HistoryExtension extends HistoryAPI {
     * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
     *         Note now it includes one header satisfying until condition!
     */
-  //todo check do we really need full header or can use just part of it
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
     @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] =
       if (acc.length == limit || until(header)) acc
@@ -89,7 +88,7 @@ trait HistoryExtension extends HistoryAPI {
   }
 
   /**
-    * Find first header with the best height <= $height which id satisfies condition $p
+    * Find first header with the best height <= $height which id satisfies predicate p
     *
     * @param height - start height
     * @param p      - condition to satisfy
@@ -114,12 +113,13 @@ trait HistoryExtension extends HistoryAPI {
         .filter(p => requiredHeights.contains(p._1))
       _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
         HistoryExtensionError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
-      result = PowLinearController.getDifficulty(requiredHeaders)
-    } yield result
+    } yield PowLinearController.getDifficulty(requiredHeaders)
   }
 
 
-  /** @return all possible forks, that contains specified header */
+  /**
+    * @return all possible forks, that contains specified header
+    **/
   def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]] = {
     @tailrec def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
       val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1)
@@ -130,7 +130,7 @@ trait HistoryExtension extends HistoryAPI {
         val updatedChains: Seq[Seq[Header]] = nextHeightHeaders
           .flatMap(h => acc.find(chain =>
             chain.nonEmpty && h.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray))
-          ).map(h +: _)) //todo don't understand
+          ).map(h +: _))
         val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain =>
           !nextHeightHeaders.exists(_.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray)))
         )
@@ -145,13 +145,13 @@ trait HistoryExtension extends HistoryAPI {
     if (getBestHeaderIdOpt.isEmpty) info.startingPoints.asRight[HistoryExtensionError]
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
-      val headers: Option[HeaderChain] = for {
+      val headerChainOpt: Option[HeaderChain] = for {
         startId     <- headerIdsAtHeight(heightFrom).headOption
         startHeader <- getHeaderById(startId)
       } yield headerChainBack(size, startHeader, _ => false)
       Either.cond(
-        headers.nonEmpty && headers.exists(_.headers.exists(_.height == TestNetConstants.GenesisHeight)),
-        headers.getOrElse(HeaderChain.empty).headers.map(h => Header.modifierTypeId -> h.id),
+        headerChainOpt.nonEmpty && headerChainOpt.exists(_.headers.exists(_.height == TestNetConstants.GenesisHeight)),
+        headerChainOpt.getOrElse(HeaderChain.empty).headers.map(h => Header.modifierTypeId -> h.id),
         HistoryExtensionError("Should always contain genesis header")
       )
     } else {
@@ -160,11 +160,12 @@ trait HistoryExtension extends HistoryAPI {
         lastHeaderInOurBestChain <- ids.view.reverse.find(isInBestChain)
         theirHeight              <- heightOf(lastHeaderInOurBestChain)
         heightFrom = Math.min(getBestHeaderHeight, theirHeight + size)
-        startId                  <- headerIdsAtHeight(heightFrom).headOption
+        startId                  <- bestHeaderIdAtHeight(heightFrom)
         startHeader              <- getHeaderById(startId)
-        res = headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
-          .headers.map(h => Header.modifierTypeId -> h.id)
-      } yield res).getOrElse(Seq.empty).asRight[HistoryExtensionError]
+      } yield headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+          .headers
+          .map(h => Header.modifierTypeId -> h.id))
+        .getOrElse(Seq.empty).asRight[HistoryExtensionError]
     }
 
   /**
@@ -192,7 +193,7 @@ trait HistoryExtension extends HistoryAPI {
   }
 
   def lastHeaders(count: Int): HeaderChain = getBestHeaderOpt
-    .map(bestHeader => headerChainBack(count, bestHeader, _ => false)) //todo do we need fill header or just id
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
     .getOrElse(HeaderChain.empty)
 
   /**
@@ -209,7 +210,7 @@ trait HistoryExtension extends HistoryAPI {
       chains
         .map { case (prevChain, newChain) => (prevChain.headOption.map(_.id), newChain.tail) }
         .getOrElse((none, HeaderChain.empty))
-    case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
+    case None => (none, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
   /** Finds common block and sub-chains from common block to header1 and header2. */
@@ -230,17 +231,17 @@ trait HistoryExtension extends HistoryAPI {
       }
     }
 
+    /** Finds common block and sub-chains with `otherChain`. */
+    def commonBlockThenSuffixes(otherChain: HeaderChain,
+                                startHeader: Header,
+                                limit: Int): (HeaderChain, HeaderChain) = {
+      def until: Header => Boolean = h => otherChain.exists(_.id sameElements h.id)
+
+      val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
+      (currentChain, otherChain.takeAfter(currentChain.head))
+    }
+
     loop(numberBack = 2, HeaderChain(Seq(header2)))
-  }
-
-  /** Finds common block and sub-chains with `otherChain`. */
-  def commonBlockThenSuffixes(otherChain: HeaderChain,
-                              startHeader: Header,
-                              limit: Int): (HeaderChain, HeaderChain) = {
-    def until: Header => Boolean = h => otherChain.exists(_.id sameElements h.id)
-
-    val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
-    (currentChain, otherChain.takeAfter(currentChain.head))
   }
 
   def syncInfo: SyncInfo =
@@ -251,7 +252,7 @@ trait HistoryExtension extends HistoryAPI {
       ).getOrElse(Seq.empty)
     )
 
-  def isNewHeader(header: Header): Boolean =
+  private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
       TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
 }

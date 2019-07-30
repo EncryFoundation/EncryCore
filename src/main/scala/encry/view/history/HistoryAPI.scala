@@ -23,32 +23,19 @@ trait HistoryAPI extends StrictLogging {
     .modifierById(id)
     .collect { case m: T => m }
 
-  /**
-    * @param id - id of modifier whose height want to get
-    * @return some(height: Int) if such modifier's height key contains in history otherwise none
-    */
-  def getModifierHeightById(id: ModifierId): Option[Int] = history
-    .get(modifierHeightKey(id))
-    .map(Ints.fromByteArray)
-
-  /**
-    * @param id - header's id which linked to desired block
-    * @return some(Block) if header and payload of desired block contains in history otherwise none
-    */
-  def getBlockById(id: ModifierId): Option[Block] = getModifierById[Header](id)
-    .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
-
   def getHeaderById(id: ModifierId): Option[Header] = getModifierById[Header](id)
-
-  def getBestBlockIdOpt: Option[ModifierId] = history.get(BestBlockKey).map(ModifierId @@ _)
-  def getBestBlockOpt: Option[Block] = getBestBlockIdOpt.flatMap(getBlockById)
-  def getBestBlockHeight: Int = getBestBlockIdOpt
-    .flatMap(getModifierHeightById)
-    .getOrElse(TestNetConstants.PreGenesisHeight)
+  def getBlockById(id: ModifierId): Option[Block] = getHeaderById(id)
+    .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
 
   def getBestHeaderIdOpt: Option[ModifierId] = history.get(BestHeaderKey).map(ModifierId @@ _)
   def getBestHeaderOpt: Option[Header] = getBestHeaderIdOpt.flatMap(getHeaderById)
   def getBestHeaderHeight: Int = getBestHeaderIdOpt
+    .flatMap(getModifierHeightById)
+    .getOrElse(TestNetConstants.PreGenesisHeight)
+
+  def getBestBlockIdOpt: Option[ModifierId] = history.get(BestBlockKey).map(ModifierId @@ _)
+  def getBestBlockOpt: Option[Block] = getBestBlockIdOpt.flatMap(getBlockById)
+  def getBestBlockHeight: Int = getBestBlockIdOpt
     .flatMap(getModifierHeightById)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
@@ -67,6 +54,10 @@ trait HistoryAPI extends StrictLogging {
   def heightOf(id: ModifierId): Option[Height] = history
     .get(modifierHeightKey(id))
     .map(n => Height @@ Ints.fromByteArray(n))
+
+  def getModifierHeightById(id: ModifierId): Option[Int] = history
+    .get(modifierHeightKey(id))
+    .map(Ints.fromByteArray)
 
   def isModifierDefined(id: ModifierId): Boolean = history.containsMod(id)
 
