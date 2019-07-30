@@ -6,11 +6,13 @@ import akka.pattern.ask
 import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetMinerStatus}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.view.history.EncryHistory
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.concurrent.Future
 
 case class HistoryApiRoute(dataHolder: ActorRef,
@@ -29,7 +31,7 @@ case class HistoryApiRoute(dataHolder: ActorRef,
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private def getHistory: Future[EncryHistoryReader] = (dataHolder ? GetDataFromHistory).mapTo[EncryHistoryReader]
+  private def getHistory: Future[EncryHistory] = (dataHolder ? GetDataFromHistory).mapTo[EncryHistory]
 
   private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map {
     _.headerIdsAtHeight(h).map(Algos.encode).asJson
@@ -41,11 +43,11 @@ case class HistoryApiRoute(dataHolder: ActorRef,
 
   private def getHeaderIds(offset: Int, limit: Int): Future[Json] =
     getHistory.map {
-      _.getHeaderIds(limit, offset).map(Algos.encode).asJson
+      _.getBestHeaderIds(limit, offset).map(Algos.encode).asJson
     }
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[Block]] = getHistory.map { history =>
-    history.typedModifierById[Header](headerId).flatMap(history.getBlock)
+    history.getBlockById(headerId)
   }
 
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) => getHeaderIds(offset, limit).okJson() }

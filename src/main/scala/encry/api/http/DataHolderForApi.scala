@@ -11,6 +11,7 @@ import encry.view.state.UtxoStateReader
 import encry.local.miner.Miner.MinerStatus
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.view.history.EncryHistory
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 
 class DataHolderForApi(settings: EncryAppSettings,
@@ -24,7 +25,7 @@ class DataHolderForApi(settings: EncryAppSettings,
 
   def workingCycle(blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
-                   history: Option[EncryHistoryReader] = None,
+                   history: Option[EncryHistory] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
@@ -33,7 +34,7 @@ class DataHolderForApi(settings: EncryAppSettings,
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
-    case ChangedHistory(reader: EncryHistoryReader) =>
+    case ChangedHistory(reader: EncryHistory) =>
       context.become(workingCycle(
         blackList,
         connectedPeers,
@@ -41,7 +42,7 @@ class DataHolderForApi(settings: EncryAppSettings,
         state,
         transactionsOnMinerActor,
         minerStatus,
-        BlockAndHeaderInfo(reader.bestHeaderOpt, reader.bestBlockOpt),
+        BlockAndHeaderInfo(reader.getBestHeaderOpt, reader.getBestBlockOpt),
         allPeers))
 
     case ChangedState(reader: UtxoStateReader)  =>
@@ -113,7 +114,7 @@ object DataHolderForApi {
 
   case object GetAllInfo
 
-  final case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader])
+  final case class Readers(h: Option[EncryHistory], s: Option[UtxoStateReader])
 
   def props(settings: EncryAppSettings,
             ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))

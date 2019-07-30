@@ -6,7 +6,6 @@ import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -149,14 +148,15 @@ trait InstanceFactory extends Keys with EncryGenerator {
                         txsQty: Int = 100,
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
-      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
-    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+      prevId.getOrElse(history.getBestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
+    val requiredDifficulty: Difficulty = history.getBestHeaderOpt.map(parent =>
+      history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
-      height = history.bestHeaderHeight + 1,
+      height = history.getBestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff + additionalDifficulty),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
@@ -222,11 +222,6 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with BlockPayloadProcessor {
-      override protected val settings: EncryAppSettings = settingsEncry
-      override protected val nodeSettings: NodeSettings = settings.node
-      override protected val historyStorage: HistoryStorage = storage
-      override protected val timeProvider: NetworkTimeProvider = ntp
-    }
+    new EncryHistory(storage, settingsEncry)
   }
 }

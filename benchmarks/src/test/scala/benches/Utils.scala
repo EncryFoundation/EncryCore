@@ -13,10 +13,8 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDB
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
-import encry.view.state.UtxoState.{initialStateBoxes, logger}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -150,11 +148,12 @@ object Utils extends StrictLogging {
                                        prevBlock: Option[Block],
                                        txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
-    val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
+    val requiredDifficulty: Difficulty = prevBlock.map(b =>
+      history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
-      height = history.bestHeaderHeight + 1,
+      height = history.getBestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
@@ -414,12 +413,7 @@ object Utils extends StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with BlockPayloadProcessor {
-      override protected val settings: EncryAppSettings = settingsEncry
-      override protected val nodeSettings: NodeSettings = settings.node
-      override protected val historyStorage: HistoryStorage = storage
-      override protected val timeProvider: NetworkTimeProvider = ntp
-    }
+    new EncryHistory(storage, settingsEncry)
   }
 
 }

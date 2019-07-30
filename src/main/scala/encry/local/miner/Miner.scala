@@ -172,7 +172,8 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
 
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+    val difficulty: Difficulty = bestHeaderOpt.map(parent =>
+      view.history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(1)))
       .getOrElse(TestNetConstants.InitialDifficulty)
 
     val candidate: CandidateBlock =
@@ -190,7 +191,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
-        val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
+        val bestHeaderOpt: Option[Header] = nodeView.history.getHeaderOfBestBlock
         bestHeaderOpt match {
           case Some(h) => logger.info(s"Best header at height ${h.height}")
           case None => logger.info(s"No best header opt")

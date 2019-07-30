@@ -93,8 +93,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
   }
 
   private def failWithError(msg: String): Nothing = {
-    logger.error(s"Stop application due to malformed configuration file: $msg")
-    EncryApp.forceStopApplication()
+    EncryApp.forceStopApplication(errorMessage = s"Stop application due to malformed configuration file: $msg")
   }
 }
 

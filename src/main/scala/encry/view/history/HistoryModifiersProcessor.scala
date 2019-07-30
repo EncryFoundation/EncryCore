@@ -13,7 +13,6 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import scala.annotation.tailrec
 
 trait HistoryModifiersProcessor extends HistoryExtension {
 
@@ -85,6 +84,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
                                  newBestChain: Seq[Block],
                                  blocksToKeep: Int): ProgressInfo = getHeaderOfBestBlock.map { header =>
     val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(header, newBestHeader)
+      .getOrElse(HeaderChain.empty, HeaderChain.empty)
     val toRemove: Seq[Block] = prevChain
       .tail
       .headers
@@ -120,7 +120,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
       updateStorage(newModRow, newBestHeader.id, updateBestHeader) //side effect
       if (blocksToKeep >= 0) { //side effects //todo never used setting blocksToKeep
         val (lastKept: Int, newBlockDownloadProcessor: BlockDownloadProcessor) =
-          blockDownloadProcessor.updateBestBlock(block.header)
+          blockDownloadProcessor.updateBestBlock(block.header.height)
         blockDownloadProcessor = newBlockDownloadProcessor
         val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(-1) //todo check getOrElse
         val diff: Int = bestHeight - header.height
@@ -200,7 +200,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
 
   private def clipBlockDataAt(heights: Seq[Int]): Either[Throwable, Unit] = Either.catchNonFatal {
     val toRemove: Seq[ModifierId] = heights
-      .flatMap(h => headerIdsAtHeight(h))
+      .flatMap(headerIdsAtHeight)
       .flatMap(getHeaderById)
       .map(h => h.payloadId)
     history.removeObjects(toRemove)
@@ -215,7 +215,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
     logger.debug(s"Chains are ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains
       .map(c => block +: c) //todo don't understand this logic
-      .maxBy(c => scoreOf(c.lastOption.map(_.id).getOrElse(Array.emptyByteArray))) //todo check height
+      .maxBy(c => scoreOf(c.lastOption.map(_.id).getOrElse(ModifierId @@ Array.emptyByteArray)).getOrElse(BigInt(0))) //todo check height
   }
 
   def isValidFirstBlock(header: Header): Boolean =
@@ -229,34 +229,6 @@ trait HistoryModifiersProcessor extends HistoryExtension {
     bestBlockHeight = getBestBlockHeight
   } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore))
     .getOrElse(false)
-
-  /** Finds common block and sub-chains from common block to header1 and header2. */
-  //todo remove exception
-  private def commonBlockThenSuffixes(firstHeader: Header,
-                                      secondHeader: Header): (HeaderChain, HeaderChain) = {
-    @tailrec def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
-      val (firstChains, secondChains): (HeaderChain, HeaderChain) =
-        commonBlockThenSuffixes(otherChain, firstHeader, numberBack + Math.max(firstHeader.height - secondHeader.height, 0))
-      if (firstChains.head == secondChains.head) (firstChains, secondChains)
-      else {
-        val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
-        if (!otherChain.head.isGenesis) loop(biggerOther.length, biggerOther)
-        else throw new Exception(s"Common point not found for headers $firstHeader and $secondHeader")
-      }
-    }
-
-    loop(2, HeaderChain(Seq(secondHeader)))
-  }
-
-  /** Finds common block and sub-chains with `otherChain`. */
-  private def commonBlockThenSuffixes(otherChain: HeaderChain,
-                                      startHeader: Header,
-                                      limit: Int): (HeaderChain, HeaderChain) = {
-    def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
-
-    val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
-    (currentChain, otherChain.takeAfter(currentChain.head))
-  }
 
   private def updateStorage(newModRow: PersistentModifier,
                             bestFullHeaderId: ModifierId,

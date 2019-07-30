@@ -9,7 +9,7 @@ import scala.concurrent.Future
 object NodeShutdown extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
-    EncryApp.forceStopApplication()
+    EncryApp.forceStopApplication(errorMessage = "Stopped by cli command 'node shutdown'")
     Future(None)
   }
 }

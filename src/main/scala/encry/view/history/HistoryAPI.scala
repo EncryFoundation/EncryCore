@@ -70,8 +70,6 @@ trait HistoryAPI extends StrictLogging {
 
   def isModifierDefined(id: ModifierId): Boolean = history.containsMod(id)
 
-  def bestHeaderIdAtHeight(height: Int): Option[ModifierId] = headerIdsAtHeight(height).headOption
-
   /**
     * @param height - height where want to get all modifiers ids
     * @return ids of headers on chosen height.
@@ -86,6 +84,12 @@ trait HistoryAPI extends StrictLogging {
     .get(heightIdKey(height))
     .map(elem => elem.grouped(TestNetConstants.ModifierIdSize).map(ModifierId @@ _).toSeq)
     .getOrElse(Seq.empty)
+
+  def bestHeaderIdAtHeight(height: Int): Option[ModifierId] = headerIdsAtHeight(height).headOption
+
+  /** @return ids of count headers starting from offset */
+  def getBestHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
+    .flatMap(bestHeaderIdAtHeight)
 
   def getHeaderOfBestBlock: Option[Header] = getBestBlockIdOpt.flatMap(getHeaderById)
 

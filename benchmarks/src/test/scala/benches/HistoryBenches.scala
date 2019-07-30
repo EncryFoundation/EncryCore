@@ -24,7 +24,7 @@ class HistoryBenches {
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
         historyL.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
-      history.closeStorage()
+      history.close()
     }
   }
 
@@ -32,7 +32,7 @@ class HistoryBenches {
   def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
-      history.closeStorage()
+      history.close()
     }
   }
 }
@@ -77,7 +77,7 @@ object HistoryBenches {
             (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
               Some(block), vector :+ block)
         }
-    resultedHistory._1.closeStorage()
+    resultedHistory._1.close()
 
     val blocks: Vector[Block] = resultedHistory._3
   }

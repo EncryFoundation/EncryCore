@@ -23,7 +23,7 @@ import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.NodeViewErrors.ModifierApplyError
-import encry.view.history.EncryHistory
+import encry.view.history.{EncryHistory, HistoryValidationError}
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
@@ -32,6 +32,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -103,14 +104,15 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case DataFromPeer(message, remote) => message match {
       case SyncInfoNetworkMessage(syncInfo) => Option(history) match {
         case Some(historyReader) =>
-          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
-          val ext: ModifierIds = extensionOpt.getOrElse(Seq())
+          val extensionOpt: Either[HistoryValidationError.HistoryExtensionError, Seq[(ModifierTypeId, ModifierId)]] =
+            historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
+          val ext: ModifierIds = extensionOpt.getOrElse(Seq.empty)
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
-          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
-          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
+          if (!(extensionOpt.isRight || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
+          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, ext)
+          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, ext)
         case _ =>
       }
       case RequestModifiersNetworkMessage(invData) =>
@@ -127,10 +129,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           if (nonInRequestCache.nonEmpty) {
             if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! RequestModifiersForTransactions(remote, nonInRequestCache)
             else Option(history).foreach { reader =>
-              val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
+              val mods = nonInRequestCache.map(id => (id, reader.getModifierBytesByIdOpt(id))).collect {
                 case (id, mod) if mod.isDefined => id -> mod.get
               }
-              nonInRequestCache.foreach(id => if (reader.modifierBytesById(id).isEmpty) logger.info(s"Mod with id: ${Algos.encode(id)} is not defined"))
+              nonInRequestCache.foreach(id => if (reader.getModifierBytesByIdOpt(id).isEmpty) logger.info(s"Mod with id: ${Algos.encode(id)} is not defined"))
               invData._1 match {
                 case Header.modifierTypeId =>
                   logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
@@ -238,7 +240,7 @@ object NodeViewSynchronizer {
 
     final case class OtherNodeSyncingStatus(remote: ConnectedPeer,
                                             status: encry.consensus.History.HistoryComparisonResult,
-                                            extension: Option[Seq[(ModifierTypeId, ModifierId)]])
+                                            extension: Seq[(ModifierTypeId, ModifierId)])
 
     final case class RequestFromLocal(source: ConnectedPeer,
                                       modifierTypeId: ModifierTypeId,
@@ -248,7 +250,7 @@ object NodeViewSynchronizer {
 
     trait NodeViewChange extends NodeViewHolderEvent
 
-    case class ChangedHistory(reader: EncryHistoryReader) extends NodeViewChange
+    case class ChangedHistory(reader: EncryHistory) extends NodeViewChange
 
     case class UpdatedHistory(history: EncryHistory)
 

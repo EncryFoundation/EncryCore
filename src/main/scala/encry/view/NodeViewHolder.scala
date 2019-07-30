@@ -47,7 +47,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-    ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+    ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
   })
 
   override def preStart(): Unit = logger.info(s"Node view holder started.")
@@ -62,7 +62,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   override def postStop(): Unit = {
     logger.warn(s"Stopping NodeViewHolder...")
-    nodeView.history.closeStorage()
+    nodeView.history.close()
   }
 
   override def receive: Receive = {
@@ -114,7 +114,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
+      if (ids.nonEmpty &&
+        (modifierTypeId == Header.modifierTypeId ||
+          (nodeView.history.blockDownloadProcessor.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)
+          ))
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
@@ -147,7 +150,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     nodeView = newNodeView
   }
 
-  def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
+  def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
@@ -162,7 +165,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   private def updateState(history: EncryHistory,
                           state: UtxoState,
-                          progressInfo: ProgressInfo[PersistentModifier],
+                          progressInfo: ProgressInfo,
                           suffixApplied: IndexedSeq[PersistentModifier]): (EncryHistory, UtxoState, Seq[PersistentModifier]) = {
     logger.debug(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
@@ -193,7 +196,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
+              val (newHis: EncryHistory, newProgressInfo: ProgressInfo) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
@@ -204,9 +207,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case None => (uf.history, uf.state, uf.suffix)
         }
       case Failure(e) =>
-        logger.error(s"Rollback failed: $e")
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
-        EncryApp.forceStopApplication(500)
+        EncryApp.forceStopApplication(500, s"Rollback failed: $e")
     }
   }
 
@@ -249,10 +251,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
             logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-            if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
+            if (settings.influxDB.isDefined) newHistory.getBestHeaderOpt.foreach(header =>
               context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
             if (newHistory.isFullChainSynced) {
-              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
               ModifiersCache.setChainSynced()
               Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
             }
@@ -331,7 +333,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: EncryHistory): UtxoState =
-    (stateIn.version, history.bestBlockOpt, stateIn) match {
+    (stateIn.version, history.getBestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
@@ -343,7 +345,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (stateId, Some(historyBestBlock), state: UtxoState) =>
-        val stateBestHeaderOpt = history.typedModifierById[Header](ModifierId !@@ stateId)
+        val stateBestHeaderOpt = history.getHeaderById(ModifierId !@@ stateId)
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
@@ -351,7 +353,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>
-          history.getBlock(h) match {
+          history.getBlockById(h.id) match {
             case Some(fb) => fb
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
@@ -377,7 +379,7 @@ object NodeViewHolder {
   case class UpdateInformation(history: EncryHistory,
                                state: UtxoState,
                                failedMod: Option[PersistentModifier],
-                               alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
+                               alternativeProgressInfo: Option[ProgressInfo],
                                suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {
