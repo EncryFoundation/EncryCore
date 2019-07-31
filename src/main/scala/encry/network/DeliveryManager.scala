@@ -125,11 +125,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
-      val newIds: Seq[ModifierId] =
+      val newIds1: (ModifierTypeId, Seq[ModifierId]) =
         history.payloadsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
           currentQueue.map(elem => ModifierId @@ elem.toArray)
-        )._2.filterNot(modId => currentQueue.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId)))
+        )
+      logger.debug(s"CheckModifiersToDownload -> Request newIds1: ${newIds1._2.map(Algos.encode)}")
+      val newIds = newIds1._2.filterNot(modId => currentQueue.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId)))
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
       if (newIds.nonEmpty) requestDownload(Payload.modifierTypeId, newIds, history, isBlockChainSynced, isMining)
       val nextCheckModsSche =

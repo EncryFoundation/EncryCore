@@ -50,14 +50,14 @@ final case class UtxoState(storage: VersionalStorage,
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
-        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+        logger.info(s"\n\nStarting to applyModifier as a Header: ${Algos.encode(mod.id)} to state at height ${header.height}")
         UtxoState(
           storage,
           height,
           header.timestamp
         ).asRight[List[ModifierApplyError]]
       case block: Block =>
-        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height")
+        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()

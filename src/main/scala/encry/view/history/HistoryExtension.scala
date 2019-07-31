@@ -14,6 +14,7 @@ import encry.view.history.HistoryValidationError.HistoryExtensionError
 import org.encryfoundation.common.network.SyncInfo
 import cats.syntax.either._
 import encry.utils.NetworkTimeProvider
+import org.encryfoundation.common.utils.Algos
 
 trait HistoryExtension extends HistoryAPI {
 
@@ -27,10 +28,14 @@ trait HistoryExtension extends HistoryAPI {
       if (acc.lengthCompare(howMany) >= 0) acc
       else bestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
         case Some(h) if !excluding.exists(_ sameElements h.payloadId) && !isModifierDefined(h.payloadId) =>
+          logger.debug(s"Find new payload id ${Algos.encode(h.payloadId)} for best header at height $height")
           continuation(height + 1, acc :+ h.payloadId)
-        case Some(_) =>
+        case Some(h) =>
+          logger.debug(s"Found payload id ${Algos.encode(h.payloadId)} for header at height $height " +
+            s"with id ${h.encodedId} already contains in history or in excluding set")
           continuation(height + 1, acc)
         case None =>
+          logger.debug(s"No best header at height $height. Returning all found payload ids")
           acc
       }
 
@@ -39,14 +44,21 @@ trait HistoryExtension extends HistoryAPI {
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
       case _ if !blockDownloadProcessor.isHeadersChainSynced =>
+        logger.debug(s"Header chain is not synced. Do not start asking payloads.")
         (Payload.modifierTypeId, Seq.empty)
       case Some(header) if isInBestChain(header) =>
+        logger.debug(s"Found best header ${header.encodedId} at height ${header.height}. " +
+          s"Start calculating payloads for download")
         (Payload.modifierTypeId, continuation(header.height + 1, Seq.empty))
       case Some(header) =>
+        logger.debug(s"Found header is not from best chain. " +
+          s"Starting process of finding last best height and calculating payloads for download")
         (Payload.modifierTypeId, lastBestBlockHeightRelevantToBestChain(header.height)
           .map(height => continuation(height + 1, Seq.empty))
           .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeight, Seq.empty)))
       case None =>
+        logger.debug(s"No best header linked to best block. Start asking payload from genesis height." +
+          s" Current minimalBlockHeight is ${blockDownloadProcessor.minimalBlockHeight}")
         (Payload.modifierTypeId, continuation(blockDownloadProcessor.minimalBlockHeight, Seq.empty))
     }
   }
@@ -64,6 +76,7 @@ trait HistoryExtension extends HistoryAPI {
       val (_, newBlockDownloadProcessor: BlockDownloadProcessor) =
         updatedBlockDownloadProcessor.updateBestBlock(header.height)
       blockDownloadProcessor = newBlockDownloadProcessor
+      logger.info(s"Header chain is now synced. Best block height is ${blockDownloadProcessor.minimalBlockHeight}")
       none
     } else none
 
@@ -125,14 +138,16 @@ trait HistoryExtension extends HistoryAPI {
       val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1)
         .flatMap(getHeaderById)
         .filter(filterCond)
-      if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
+      if (nextHeightHeaders.isEmpty) {
+        logger.debug(s"Next height ${currentHeight + 1} headers are empty. Return acc of size ${acc.size}")
+        acc.map(_.reverse)
+      }
       else {
-        val updatedChains: Seq[Seq[Header]] = nextHeightHeaders
-          .flatMap(h => acc.find(chain =>
-            chain.nonEmpty && h.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray))
-          ).map(h +: _))
+        val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(h =>
+          acc.find(chain => chain.nonEmpty && h.parentId.sameElements(chain.head.id)).map(h +: _) //todo remove .head
+        )
         val nonUpdatedChains: Seq[Seq[Header]] = acc.filter(chain =>
-          !nextHeightHeaders.exists(_.parentId.sameElements(chain.headOption.map(_.id).getOrElse(Array.emptyByteArray)))
+          !nextHeightHeaders.exists(_.parentId.sameElements(chain.head.id)) //todo remove .head
         )
         loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
       }

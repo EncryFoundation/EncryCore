@@ -53,7 +53,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
     //addBlockToCacheIfNecessary
     bestFullChain.lastOption.map(_.header) match {
       case Some(header) if isValidFirstBlock(block.header) =>
-        logger.debug(s"Processing block is genesis")
+        logger.debug(s"Processing block is genesis. Next best header is ${header.encodedId} at height ${header.height}")
         processValidFirstBlock(block, block.payload, header, bestFullChain, settings.node.blocksToKeep)
       case Some(header) if getBestBlockIdOpt.nonEmpty && isBetterChain(header.id) =>
         logger.debug(s"Processing block is from best chain")
@@ -72,7 +72,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
                                      newBestHeader: Header,
                                      newBestChain: Seq[Block],
                                      blocksToKeep: Int): ProgressInfo = {
-    logger.info(s"Appending ${fullBlock.encodedId} as a valid first block")
+    logger.info(s"Appending ${fullBlock.encodedId} as a valid first block with height ${fullBlock.header.height}")
     logStatus(toRemoveLength = 0, none, newBestChain.length, fullBlock.encodedId, fullBlock.payload.txs.size, none)
     updateStorage(newModRow, newBestHeader.id) //side effect
     ProgressInfo(none, Seq.empty, newBestChain, none)
@@ -208,10 +208,10 @@ trait HistoryModifiersProcessor extends HistoryExtension {
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
     logger.debug(s"Starting calculateBestFullChain for block with id ${block.encodedId} and height ${block.header.height}")
-    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isModifierDefined(h.id))
-      .map(_.drop(1))
+    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, _ => true).map(_.drop(1))
+    //todo Continuations are Seq contains 15435
     logger.debug(s"Continuations are ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
-    val chains: Seq[Seq[Block]] = continuations.map(_.flatMap(h => getBlockById(h.id))) //todo removed filter. Make attention
+    val chains: Seq[Seq[Block]] = continuations.map(_.flatMap(h => getBlockByHeader(h))) //todo removed filter. Make attention
     logger.debug(s"Chains are ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains
       .map(c => block +: c) //todo don't understand this logic

@@ -47,6 +47,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
+    println(s"getBestHeaderHeight ${nodeView.history.getBestHeaderHeight} ," +
+      s" getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
   })
 
@@ -73,7 +75,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else {
-        logger.debug(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
+        //logger.debug(s"Get mods with ids: ${modifiers.map(mod => Algos.encode(mod.id)).mkString(",")} on nvh")
         ModifiersCache.put(key(mod.id), mod, nodeView.history)
       }
     }
@@ -110,10 +112,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         case _ => modifierIds
           .filterNot(mid => nodeView.history.isModifierDefined(mid) || ModifiersCache.contains(key(mid)))
       }
-      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
-        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
-        s" Sending RequestFromLocal with ids to $sender." +
-        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
+//      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
+//        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
+//        s" Sending RequestFromLocal with ids to $sender." +
+//        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty &&
         (modifierTypeId == Header.modifierTypeId ||
           (nodeView.history.blockDownloadProcessor.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)

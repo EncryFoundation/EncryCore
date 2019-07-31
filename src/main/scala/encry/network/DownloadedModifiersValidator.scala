@@ -50,8 +50,8 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
       }
 
       if (modifiers._1.nonEmpty) {
-        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
-          s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
+//        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
+//          s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
         nodeViewHolder ! ModifiersFromRemote(modifiers._1)
       }
       if (modifiers._2.nonEmpty) {

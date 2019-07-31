@@ -26,6 +26,8 @@ trait HistoryAPI extends StrictLogging {
   def getHeaderById(id: ModifierId): Option[Header] = getModifierById[Header](id)
   def getBlockById(id: ModifierId): Option[Block] = getHeaderById(id)
     .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
+  def getBlockByHeader(header: Header): Option[Block] =
+    getModifierById[Payload](header.payloadId).map(p => Block(header, p))
 
   def getBestHeaderIdOpt: Option[ModifierId] = history.get(BestHeaderKey).map(ModifierId @@ _)
   def getBestHeaderOpt: Option[Header] = getBestHeaderIdOpt.flatMap(getHeaderById)
