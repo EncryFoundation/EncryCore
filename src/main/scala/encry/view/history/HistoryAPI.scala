@@ -63,6 +63,8 @@ trait HistoryAPI extends StrictLogging {
 
   def isModifierDefined(id: ModifierId): Boolean = history.containsMod(id)
 
+  def isBlockDefined(header: Header): Boolean = history.containsMod(header.payloadId)
+
   /**
     * @param height - height where want to get all modifiers ids
     * @return ids of headers on chosen height.

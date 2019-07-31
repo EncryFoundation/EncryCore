@@ -88,11 +88,11 @@ trait HistoryModifiersProcessor extends HistoryExtension {
     val toRemove: Seq[Block] = prevChain
       .tail
       .headers
-      .flatMap(h => getBlockById(h.id))
+      .flatMap(getBlockByHeader)
     val toApply: Seq[Block] = newChain
       .tail
       .headers
-      .flatMap(h => if (h == block.header) block.some else getBlockById(h.id))
+      .flatMap(h => if (h == block.header) block.some else getBlockByHeader(h))
     //toApply.foreach(addBlockToCacheIfNecessary)
     if (toApply.lengthCompare(newChain.length - 1) != 0)
       processNonBestBlock(block, header, Seq.empty, settings.node.blocksToKeep)
@@ -208,8 +208,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
     logger.debug(s"Starting calculateBestFullChain for block with id ${block.encodedId} and height ${block.header.height}")
-    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, _ => true).map(_.drop(1))
-    //todo Continuations are Seq contains 15435
+    val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.drop(1))
     logger.debug(s"Continuations are ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
     val chains: Seq[Seq[Block]] = continuations.map(_.flatMap(h => getBlockByHeader(h))) //todo removed filter. Make attention
     logger.debug(s"Chains are ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")

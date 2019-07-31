@@ -83,7 +83,7 @@ final case class EncryHistory(override val history: HistoryStorage, override val
           limit = bestFullHeader.height - block.header.height
         } yield headerChainBack(limit, bestFullHeader, h => h.parentId sameElements block.header.id))
           .getOrElse(HeaderChain.empty)
-        val blockToApply: Option[Block] = chainBack.headOption.flatMap(opt => getBlockById(opt.id))
+        val blockToApply: Option[Block] = chainBack.headOption.flatMap(header => getBlockByHeader(header))
         val toApply: Either[HistoryValidationError, Block] = for {
           _ <- Either.cond(blockToApply.isDefined, (),
             HistoryExtensionError(s"Should have next block to apply, failed for ${block.header}"))
@@ -138,14 +138,14 @@ final case class EncryHistory(override val history: HistoryStorage, override val
             val invalidatedChain: Seq[Block] = getBestBlockOpt
               .toSeq
               .flatMap(f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
-              .flatMap(h => getBlockById(h.id))
+              .flatMap(h => getBlockByHeader(h))
               //.ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
             //todo add check condition
             val branchPoint: Block = invalidatedChain.head //todo remove .head
             val validChain: Seq[Block] =
-              continuationHeaderChains(branchPoint.header, h => getBlockById(h.id).isDefined && !invalidatedHeaders.contains(h))
+              continuationHeaderChains(branchPoint.header, h => getBlockByHeader(h).isDefined && !invalidatedHeaders.contains(h))
                 .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0))) //todo remove .last
-                .flatMap(h => getBlockById(h.id))
+                .flatMap(getBlockByHeader)
 
             val changedLinks: Seq[(StorageKey, StorageValue)] = newBestHeaderOpt.map(h => List(
               BestBlockKey  -> StorageValue @@ validChain.last.id,

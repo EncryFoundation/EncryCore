@@ -355,7 +355,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>
-          history.getBlockById(h.id) match {
+          history.getBlockByHeader(h) match {
             case Some(fb) => fb
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
