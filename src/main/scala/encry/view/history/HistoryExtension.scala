@@ -135,6 +135,7 @@ trait HistoryExtension extends HistoryAPI {
     **/
   def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]] = {
     @tailrec def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
+      logger.debug(s"continuationHeaderChains currentHeight: $currentHeight")
       val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1)
         .flatMap(getHeaderById)
         .filter(filterCond)

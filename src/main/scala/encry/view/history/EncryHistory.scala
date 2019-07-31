@@ -74,7 +74,7 @@ final case class EncryHistory(override val history: HistoryStorage, override val
         nonMarkedIds.map(id => validityKey(id) -> StorageValue @@ Array(1.toByte)).toList
       )
       if (getBestBlockIdOpt.exists(_ sameElements block.id))
-      // Applies best header to the history
+        // Applies best header to the history
         ProgressInfo(none, Seq.empty, Seq.empty, none)
       else {
         // Marks non-best full block as valid. Should have more blocks to apply to sync state and history.
