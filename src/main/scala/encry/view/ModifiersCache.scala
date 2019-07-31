@@ -63,20 +63,29 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
 
   def remove(key: Key): (ModifiersCache, Option[PersistentModifier]) = {
     logger.debug(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${modifiersCache.get(key).isDefined}.")
-    val modCache =  ModifiersCache(modifiersCache - key, headersCache, settings)
+    val modCache = ModifiersCache(modifiersCache - key, headersCache, settings)
     (modCache, modifiersCache.get(key))
   }
 
-  def popCandidate(history: EncryHistory): List[PersistentModifier] =
-    findCandidateKey(history).flatMap(k => remove(k)._2)
+  def popCandidate(history: EncryHistory): (List[PersistentModifier], ModifiersCache) = {
+    val a: List[Key] = findCandidateKey(history)
+    val b: (Map[Key, PersistentModifier], List[PersistentModifier]) =
+      a.foldLeft(modifiersCache, List.empty[PersistentModifier]) { case ((cache, modifiers), modsKey) =>
+        cache.get(modsKey) match {
+          case Some(value) => (cache - modsKey) -> (modifiers :+ value)
+          case None => cache -> modifiers
+        }
+      }
+    b._2 -> ModifiersCache(b._1, headersCache, settings)
+  }
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
 
     def isApplicable(modifierId: Key): Boolean = modifiersCache.get(modifierId).exists(mod => history.testApplicable(mod) match {
-      case Left(_: FatalValidationError) => remove(modifierId) ; false
-      case Right(_)                      => true
-      case Left(_)                       => false
+      case Left(_: FatalValidationError) => remove(modifierId); false
+      case Right(_) => true
+      case Left(_) => false
     })
 
 
