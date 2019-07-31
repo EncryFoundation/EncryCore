@@ -30,7 +30,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
       logger.debug(s"While processing header, header info update is non empty. Inserting new data to db")
       history.bulkInsert(h.id, dataToUpdate, Seq(h)) //side effect
       getBestHeaderIdOpt match {
-        case Some(bestHeaderId) => //todo do we need seq(h) toDownload
+        case Some(bestHeaderId) =>
           logger.debug(s"New best header is in history. Updating ended successfully. New best header id is ${Algos.encode(bestHeaderId)}")
           ProgressInfo(none, Seq.empty, if (!bestHeaderId.sameElements(h.id)) Seq.empty else Seq(h), toDownload(h))
         case _ => forceStopApplication(errorMessage = "Should always has best header after header application")
@@ -73,7 +73,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
                                      newBestChain: Seq[Block],
                                      blocksToKeep: Int): ProgressInfo = {
     logger.info(s"Appending ${fullBlock.encodedId} as a valid first block with height ${fullBlock.header.height}")
-    logStatus(toRemoveLength = 0, none, newBestChain.length, fullBlock.encodedId, fullBlock.payload.txs.size, none)
+    //logStatus(toRemoveLength = 0, none, newBestChain.length, fullBlock.encodedId, fullBlock.payload.txs.size, none)
     updateStorage(newModRow, newBestHeader.id) //side effect
     ProgressInfo(none, Seq.empty, newBestChain, none)
   }
@@ -99,15 +99,15 @@ trait HistoryModifiersProcessor extends HistoryExtension {
     else {
       //application of this block leads to full chain with higher score
       logger.info(s"Appending block with id ${block.encodedId} and height ${block.header.height} as a better chain")
-      logStatus(
-        toRemove.size,
-        toApply.lastOption.map(_.header),
-        toApply.size,
-        block.encodedId,
-        block.payload.txs.size,
-        header.some
-      )
-      val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
+//      logStatus(
+//        toRemove.size,
+//        toApply.lastOption.map(_.header),
+//        toApply.size,
+//        block.encodedId,
+//        block.payload.txs.size,
+//        header.some
+//      )
+      val branchPoint: Option[ModifierId] = toRemove.headOption.flatMap(_ => prevChain.headOption.map(_.id))
       val bestHeaderHeight: Int = getBestHeaderHeight
       val updateBestHeader: Boolean =
         (block.header.height > bestHeaderHeight) ||
@@ -135,7 +135,7 @@ trait HistoryModifiersProcessor extends HistoryExtension {
                                   newBestChain: Seq[Block],
                                   blocksToKeep: Int): ProgressInfo = {
     //Orphaned block or full chain is not initialized yet
-    logStatus(toRemoveLength = 0, none, newBestChain.length, fullBlock.encodedId, fullBlock.payload.txs.size, none)
+    //logStatus(toRemoveLength = 0, none, newBestChain.length, fullBlock.encodedId, fullBlock.payload.txs.size, none)
     history.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload))
     ProgressInfo(none, Seq.empty, Seq.empty, none)
   }
@@ -210,8 +210,8 @@ trait HistoryModifiersProcessor extends HistoryExtension {
     logger.debug(s"Starting calculateBestFullChain for block with id ${block.encodedId} and height ${block.header.height}")
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.drop(1))
     logger.debug(s"Continuations are ${continuations.map(seq => s"Seq contains: ${seq.length}").mkString(",")}")
-    val chains: Seq[Seq[Block]] = continuations.map(_.flatMap(h => getBlockByHeader(h))) //todo removed filter. Make attention
-    logger.debug(s"Chains are ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
+    val chains: Seq[Seq[Block]] = continuations.map(_.filter(isBlockDefined).flatMap(getBlockByHeader))
+    //logger.debug(s"Chains are ${chains.map(chain => s"chain contain: ${chain.length}").mkString(",")}")
     chains
       .map(c => block +: c) //todo don't understand this logic
       .maxBy(c => scoreOf(c.lastOption.map(_.id).getOrElse(ModifierId @@ Array.emptyByteArray)).getOrElse(BigInt(0))) //todo check height
