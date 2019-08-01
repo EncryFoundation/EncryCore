@@ -22,7 +22,7 @@ import encry.view.history.processors.ValidationError.FatalValidationError._
 import encry.view.history.processors.ValidationError.NonFatalValidationError._
 import cats.syntax.either._
 
-trait HistoryExtension extends HistoryApi {
+trait HistoryApiExternal extends HistoryApiInternal {
 
   val settings: EncryAppSettings
 
@@ -30,13 +30,23 @@ trait HistoryExtension extends HistoryApi {
 
   var headersCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
-  var lastAppliedHeadersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
+  var headersCache: Map[ByteArrayWrapper, Header] = Map.empty[ByteArrayWrapper, Header]
+
+  var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
+
+  var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
 
-  def getHeaderByIdThroughHeadersCache(id: ModifierId): Option[Header] = lastAppliedHeadersCache
+  def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
-    .orElse(getHeaderById(id))
+    .orElse(getHeaderByIdInternal(id))
+  def getBlockByHeader(header: Header): Option[Block] = blocksCache
+    .get(ByteArrayWrapper(header.id))
+    .orElse(getPayloadByIdInternal(header.payloadId).map(p => Block(header, p)))
+  def getBlockByHeaderId(id: ModifierId): Option[Block] = blocksCache
+    .get(ByteArrayWrapper(id))
+    .orElse(getHeaderById(id).flatMap(h => getPayloadByIdInternal(h.payloadId).map(p => Block(h, p))))
 
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
@@ -52,7 +62,7 @@ trait HistoryExtension extends HistoryApi {
 
     (for {
       bestBlockId             <- getBestBlockId
-      headerLinkedToBestBlock <- getHeaderByIdThroughHeadersCache(bestBlockId)
+      headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
         case _ if !isHeadersChainSynced =>
           Seq.empty
@@ -182,17 +192,17 @@ trait HistoryExtension extends HistoryApi {
       logger.debug(s"Should add ${Algos.encode(h.id)} to header cache")
       val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, Seq.empty[ModifierId]) :+ h.id
       headersCacheIndexes = headersCacheIndexes + (h.height -> newHeadersIdsAtHeaderHeight)
-      lastAppliedHeadersCache = lastAppliedHeadersCache + (ByteArrayWrapper(h.id) -> h)
+      headersCache = headersCache + (ByteArrayWrapper(h.id) -> h)
       // cleanup cache if necessary
       if (headersCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
         headersCacheIndexes.get(getBestHeaderHeight - TestNetConstants.MaxRollbackDepth).foreach { headersIds =>
           val wrappedIds = headersIds.map(ByteArrayWrapper.apply)
           logger.debug(s"Cleanup header cache from headers: ${headersIds.map(Algos.encode).mkString(",")}")
-          lastAppliedHeadersCache = lastAppliedHeadersCache.filterNot { case (id, _) => wrappedIds.contains(id) }
+          headersCache = headersCache.filterNot { case (id, _) => wrappedIds.contains(id) }
         }
         headersCacheIndexes = headersCacheIndexes - (getBestHeaderHeight - TestNetConstants.MaxRollbackDepth)
       }
-      logger.debug(s"headersCache size: ${lastAppliedHeadersCache.size}")
+      logger.debug(s"headersCache size: ${headersCache.size}")
       logger.debug(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
     }
 

@@ -10,7 +10,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, Modifie
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.hash.Digest32
 
-trait HistoryApi extends StrictLogging {
+trait HistoryApiInternal extends StrictLogging {
 
   val historyStorage: HistoryStorage
 
@@ -27,31 +27,32 @@ trait HistoryApi extends StrictLogging {
     .get(headerHeightKey(id))
     .map(Ints.fromByteArray)
 
-  def getHeaderById(id: ModifierId): Option[Header] = getModifierById[Header](id)
-  def getBlockByHeader(header: Header): Option[Block] = getModifierById[Payload](header.payloadId)
+  def getHeaderByIdInternal(id: ModifierId): Option[Header] = getModifierById[Header](id)
+  def getPayloadByIdInternal(pId: ModifierId): Option[Payload] = getModifierById[Payload](pId)
+  def getBlockByHeaderInternal(header: Header): Option[Block] = getModifierById[Payload](header.payloadId)
     .map(payload => Block(header, payload))
-  def getBlockByHeaderId(id: ModifierId): Option[Block] = getHeaderById(id)
+  def getBlockByHeaderIdInternal(id: ModifierId): Option[Block] = getHeaderByIdInternal(id)
     .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
 
   def getBestHeaderId: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
-  def getBestHeader: Option[Header] = getBestHeaderId.flatMap(getHeaderById)
+  def getBestHeader: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdInternal)
   def getBestHeaderHeight: Int = getBestHeaderId
     .flatMap(getHeightByHeaderId)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
   def getBestBlockId: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
-  def getBestBlock: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderId)
+  def getBestBlock: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdInternal)
   def getBestBlockHeight: Int = getBestBlockId
     .flatMap(getHeightByHeaderId)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(getHeaderById)
+  def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(getHeaderByIdInternal)
 
   def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
     headerId <- getBestHeaderIdAtHeight(probablyAt)
-    header <- getHeaderById(headerId) if isModifierDefined(header.payloadId)
+    header   <- getHeaderByIdInternal(headerId) if isModifierDefined(header.payloadId)
   } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
   def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
@@ -64,7 +65,7 @@ trait HistoryApi extends StrictLogging {
   def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeight(h.height).exists(_.sameElements(h.id))
   def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(getBestHeaderIdAtHeight).exists(_.sameElements(id))
 
-  def getBestHeadersChainScore: BigInt = getBestHeaderId.flatMap(scoreOf).get //todo unsafe ?.getOrElse(BigInt(0))?
+  def getBestHeadersChainScore: BigInt = getBestHeaderId.flatMap(scoreOf).getOrElse(BigInt(0)) //todo ?.getOrElse(BigInt(0))?
 
   def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
     .get(headerScoreKey(id))

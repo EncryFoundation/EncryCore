@@ -15,7 +15,7 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scala.util.Try
 import cats.syntax.either._
 
-trait BlockProcessor extends HistoryExtension with StrictLogging {
+trait BlockProcessor extends HistoryApiExternal with StrictLogging {
 
   import BlockProcessor._
 
@@ -34,9 +34,6 @@ trait BlockProcessor extends HistoryExtension with StrictLogging {
   protected[history] def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]]
 
   //contains last n proccesed blocks
-  var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
-
-  var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   /** Process full block when we have one.
     *
@@ -107,7 +104,7 @@ trait BlockProcessor extends HistoryExtension with StrictLogging {
     val isBetter: Option[Boolean] = for {
       bestFullBlockId <- getBestBlockId
       //todo possible combine with getHeader(id: ModifierId)
-      heightOfThisHeader <- lastAppliedHeadersCache.get(ByteArrayWrapper(id)).map(_.height).orElse(getHeightByHeaderId(id))
+      heightOfThisHeader <- headersCache.get(ByteArrayWrapper(id)).map(_.height).orElse(getHeightByHeaderId(id))
       prevBestScore <- scoreOf(bestFullBlockId)
       score <- scoreOf(id)
     } yield (getBestBlockHeight < heightOfThisHeader) || (getBestBlockHeight == heightOfThisHeader && score > prevBestScore)
