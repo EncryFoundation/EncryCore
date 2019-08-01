@@ -5,7 +5,7 @@ import encry.consensus.History._
 import encry.modifiers.history._
 import encry.settings.NodeSettings
 import encry.view.history.processors.ValidationError.FatalValidationError.UnknownModifierFatalError
-import encry.view.history.processors.{HistoryExternalApi, ValidationError}
+import encry.view.history.processors.ValidationError
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -54,17 +54,7 @@ trait EncryHistoryReader extends HistoryExternalApi
     loop(header.height, Seq(Seq(header)))
   }
 
-  def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] = {
-    val validationResult: Either[ValidationError, PersistentModifier] = modifier match {
-      case header: Header => validate(header)
-      case payload: Payload => validate(payload)
-      case mod => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
-    }
-    validationResult match {
-      case Left(value) => logger.info(s"Validation result failed: $value"); validationResult
-      case Right(m) => logger.info(s"Validation result successful for ${m.encodedId}"); validationResult
-    }
-  }
+
 
   override def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
     historyStorage.store.get(validityKey(modifierId)) match {

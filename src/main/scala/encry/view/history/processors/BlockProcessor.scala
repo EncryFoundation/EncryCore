@@ -12,8 +12,10 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
+
 import scala.util.Try
 import cats.syntax.either._
+import encry.view.history.HistoryExternalApi
 
 trait BlockProcessor extends HistoryExternalApi with StrictLogging {
 
@@ -149,10 +151,6 @@ trait BlockProcessor extends HistoryExternalApi with StrictLogging {
 
   private def storageVersion(newModRow: PersistentModifier): ModifierId = newModRow.id
 
-  protected def modifierValidation(mod: PersistentModifier,
-                                   headerOpt: Option[Header]): Either[ValidationError, PersistentModifier] = headerOpt
-    .map(header => PayloadValidator.validate(mod, header, blockDownloadProcessor.minimalBlockHeight))
-    .getOrElse(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history").asLeft[PersistentModifier])
 
   private def logStatus(toRemove: Seq[Block],
                         toApply: Seq[Block],
@@ -169,22 +167,7 @@ trait BlockProcessor extends HistoryExternalApi with StrictLogging {
       s"going to apply ${toApply.length}$toRemoveStr modifiers.$newStatusStr")
   }
 
-  /** Validator for `BlockPayload` and `AdProofs` */
-  object PayloadValidator {
 
-    def validate(m: PersistentModifier,
-                 header: Header,
-                 minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
-      _ <- Either.cond(!historyStorage.containsObject(m.id), (),
-        PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
-      _ <- Either.cond(header.isRelated(m), (),
-        PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
-      _ <- Either.cond(isSemanticallyValid(header.id) != ModifierSemanticValidity.Invalid, (),
-        PayloadFatalValidationError(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid"))
-      _ <- Either.cond(header.height >= minimalHeight, (),
-        PayloadNonFatalValidationError(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
-    } yield m
-  }
 
 }
 

@@ -1,30 +1,30 @@
-package encry.view.history.processors
+package encry.view.history
 
+import cats.syntax.either._
 import com.google.common.primitives.Ints
 import encry.EncryApp.forceStopApplication
-import encry.consensus.History.{Equal, Fork, HistoryComparisonResult, ModifierIds, Older, ProgressInfo, Unknown, Younger}
+import encry.consensus.History._
 import encry.consensus._
 import encry.modifiers.history._
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.NetworkTimeProvider
+import encry.view.history.processors.ValidationError.FatalValidationError._
+import encry.view.history.processors.ValidationError.HistoryExternalApiError
+import encry.view.history.processors.ValidationError.NonFatalValidationError._
+import encry.view.history.processors.{BlockDownloadProcessor, ValidationError}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import supertagged.@@
+
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
-import encry.view.history.processors.ValidationError.FatalValidationError._
-import encry.view.history.processors.ValidationError.NonFatalValidationError._
-import cats.syntax.either._
-import cats.syntax.option._
-import encry.view.history.processors.ValidationError.HistoryExternalApiError
-import org.encryfoundation.common.network.SyncInfo
-
 import scala.util.Try
 
 trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
@@ -390,49 +390,4 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
     logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
-
-  protected def validate(h: Header): Either[ValidationError, Header] =
-    if (h.isGenesis) HeaderValidator.validateGenesisBlockHeader(h)
-    else getHeaderById(h.parentId)
-      .map(p => HeaderValidator.validateHeader(h, p))
-      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
-
-
-  object HeaderValidator {
-
-    def validateGenesisBlockHeader(h: Header): Either[ValidationError, Header] = for {
-      _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
-        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
-      _ <- Either.cond(getBestHeaderId.isEmpty, (),
-        GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
-      _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
-        GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
-    } yield h
-
-    def validateHeader(h: Header, parent: Header): Either[ValidationError, Header] = for {
-      _ <- Either.cond(h.timestamp > parent.timestamp, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has timestamp ${h.timestamp} less than parent's ${parent.timestamp}"))
-      _ <- Either.cond(h.height == parent.height + 1, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height} not greater by 1 than parent's ${parent.height}"))
-      _ <- Either.cond(!historyStorage.containsObject(h.id), (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
-      _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
-        HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-      _ <- Either.cond(h.difficulty >= (requiredDifficultyAfter(parent) match {
-        case Right(value) => value
-        case Left(value) => logger.error(value.toString); BigInt(0)
-      }), (),
-        HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
-      _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
-      powSchemeValidationResult = powScheme.verify(h)
-      _ <- Either.cond(powSchemeValidationResult.isRight, (),
-        HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId} caused: $powSchemeValidationResult"))
-      _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
-        HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
-      _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
-        HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
-    } yield h
-  }
-
 }

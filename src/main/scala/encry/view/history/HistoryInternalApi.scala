@@ -1,4 +1,4 @@
-package encry.view.history.processors
+package encry.view.history
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
