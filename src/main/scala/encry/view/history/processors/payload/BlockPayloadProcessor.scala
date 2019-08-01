@@ -16,7 +16,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   override protected def process(payload: Payload): ProgressInfo[PersistentModifier] = getBlockByPayload(payload)
     .flatMap(block =>
-      if (block.header.height - bestBlockHeight >= 2 + settings.network.maxInvObjects) None
+      if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) None
       else Some(processBlock(block, payload))
     )
     .getOrElse(putToHistory(payload))

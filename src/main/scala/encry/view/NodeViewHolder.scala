@@ -47,7 +47,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-    ref ! HeightStatistics(nodeView.history.bestHeaderHeight, nodeView.history.bestBlockHeight)
+    ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
   })
 
   override def preStart(): Unit = logger.info(s"Node view holder started.")
@@ -250,10 +250,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
             logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-            if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
+            if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
               context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
             if (newHistory.isFullChainSynced) {
-              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
+              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
               ModifiersCache.setChainSynced()
               Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
             }
@@ -331,7 +331,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: EncryHistory): UtxoState =
-    (stateIn.version, history.bestBlockOpt, stateIn) match {
+    (stateIn.version, history.getBestBlock, stateIn) match {
       case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
@@ -351,7 +351,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>
-          history.getBlock(h) match {
+          history.getBlockByHeader(h) match {
             case Some(fb) => fb
             case None => throw new Exception(s"Failed to get full block for header $h")
           }

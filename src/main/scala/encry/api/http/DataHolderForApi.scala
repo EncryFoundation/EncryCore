@@ -42,7 +42,7 @@ class DataHolderForApi(settings: EncryAppSettings,
         state,
         transactionsOnMinerActor,
         minerStatus,
-        BlockAndHeaderInfo(reader.bestHeaderOpt, reader.bestBlockOpt),
+        BlockAndHeaderInfo(reader.getBestHeader, reader.getBestBlock),
         allPeers))
 
     case ChangedState(reader: UtxoStateReader)  =>

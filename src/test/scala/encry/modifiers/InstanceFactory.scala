@@ -149,14 +149,14 @@ trait InstanceFactory extends Keys with EncryGenerator {
                         txsQty: Int = 100,
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
-      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
-    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+      prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
+    val requiredDifficulty: Difficulty = history.getBestHeader.map(parent => history.requiredDifficultyAfter(parent))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
-      height = history.bestHeaderHeight + 1,
+      height = history.getBestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff + additionalDifficulty),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )

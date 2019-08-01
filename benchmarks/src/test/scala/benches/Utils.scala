@@ -154,7 +154,7 @@ object Utils extends StrictLogging {
       .getOrElse(TestNetConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
-      height = history.bestHeaderHeight + 1,
+      height = history.getBestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
