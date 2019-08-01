@@ -15,7 +15,7 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scala.util.Try
 import cats.syntax.either._
 
-trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
+trait BlockProcessor extends HistoryExtension with StrictLogging {
 
   import BlockProcessor._
 

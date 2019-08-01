@@ -210,14 +210,16 @@ object EncryHistory extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
+    logger.info(s"Creating storage")
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
-
+    logger.info(s"Creating history")
     val history: EncryHistory = new EncryHistory with BlockPayloadProcessor {
-      override  val settings: EncryAppSettings = settingsEncry
-      override  val nodeSettings: NodeSettings = settings.node
-      override  val historyStorage: HistoryStorage = storage
-      override  val timeProvider: NetworkTimeProvider = ntp
+      override val settings: EncryAppSettings = settingsEncry
+      override val historyStorage: HistoryStorage = storage
+      override protected val nodeSettings: NodeSettings = settingsEncry.node
+      override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
     }
+    logger.info(s"History created")
     history
   }
 }

@@ -5,7 +5,7 @@ import encry.consensus.History._
 import encry.modifiers.history._
 import encry.settings.NodeSettings
 import encry.view.history.processors.ValidationError.FatalValidationError.UnknownModifierFatalError
-import encry.view.history.processors.{BlockHeaderProcessor, ValidationError}
+import encry.view.history.processors.{HistoryExtension, ValidationError}
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -19,7 +19,7 @@ import cats.syntax.either._
 import scala.annotation.tailrec
 import scala.util.Try
 
-trait EncryHistoryReader extends BlockHeaderProcessor
+trait EncryHistoryReader extends HistoryExtension
   with BlockPayloadProcessor
   with StrictLogging {
 

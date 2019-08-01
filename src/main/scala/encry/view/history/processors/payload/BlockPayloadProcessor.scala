@@ -10,7 +10,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 
 trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcessor {
 
-  protected val settings: EncryAppSettings
+   val settings: EncryAppSettings
 
    val historyStorage: HistoryStorage
 
