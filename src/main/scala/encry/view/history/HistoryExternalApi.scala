@@ -1,28 +1,19 @@
 package encry.view.history
 
 import cats.syntax.either._
-import com.google.common.primitives.Ints
-import encry.EncryApp.forceStopApplication
 import encry.consensus.History._
 import encry.consensus._
 import encry.modifiers.history._
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.NetworkTimeProvider
-import encry.view.history.processors.ValidationError.FatalValidationError._
 import encry.view.history.processors.ValidationError.HistoryExternalApiError
-import encry.view.history.processors.ValidationError.NonFatalValidationError._
 import encry.view.history.processors.{BlockDownloadProcessor, ValidationError}
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.encryfoundation.common.validation.ModifierSemanticValidity
-import supertagged.@@
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 import scala.util.Try
@@ -42,6 +33,8 @@ trait HistoryExternalApi extends HistoryInternalApi {
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
+
+  private var isHeadersChainSyncedVar: Boolean = false
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
@@ -84,11 +77,21 @@ trait HistoryExternalApi extends HistoryInternalApi {
       .orElse(getHeaderByIdInternal(id))
   )
 
+  //todo make this logic correct
+  def isBlockDefined(header: Header): Boolean =
+    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
+
+  //todo make this logic correct
+  def isHeaderDefined(id: ModifierId): Boolean =
+    headersCache.get(ByteArrayWrapper(id)).isDefined ||
+      blocksCache.get(ByteArrayWrapper(id)).isDefined ||
+      isModifierDefined(id)
+
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
-        case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isModifierDefined(h.payloadId) =>
+        case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) => //todo changed from isModDefined
           continuation(height + 1, acc :+ h.payloadId)
         case Some(_) =>
           continuation(height + 1, acc)
@@ -113,6 +116,7 @@ trait HistoryExternalApi extends HistoryInternalApi {
     }
   }
 
+  //todo change to Option(Tuple2(... -> ...))
   def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
   // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) Seq(Payload.modifierTypeId -> header.payloadId)
@@ -161,20 +165,7 @@ trait HistoryExternalApi extends HistoryInternalApi {
   }
 
 
-  val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
-
-  private var isHeadersChainSyncedVar: Boolean = false
-
-  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
-
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
-
-  private def isNewHeader(header: Header): Boolean =
-    timeProvider.estimatedTime - header.timestamp <
-      TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
-
-
-  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
 
   def addHeaderToCacheIfNecessary(h: Header): Unit =
@@ -233,11 +224,11 @@ trait HistoryExternalApi extends HistoryInternalApi {
     case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
 
     /* Other history is empty, or our history contains last id from other history */
-    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isModifierDefined) => Younger
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isHeaderDefined) => Younger
 
     case Some(_) =>
       //Our history contains some ids from other history
-      if (si.lastHeaderIds.exists(isModifierDefined)) Fork
+      if (si.lastHeaderIds.exists(isHeaderDefined)) Fork
       //Unknown comparison result
       else Unknown
 
@@ -312,9 +303,10 @@ trait HistoryExternalApi extends HistoryInternalApi {
     case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
-  def isBlockDefined(header: Header): Boolean =
-    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
-
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
     .flatMap(h => headerIdsAtHeight(h).headOption)
+
+  private def isNewHeader(header: Header): Boolean =
+    timeProvider.estimatedTime - header.timestamp <
+      TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
 }

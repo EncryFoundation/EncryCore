@@ -29,7 +29,7 @@ trait BlockProcessor extends HistoryExternalApi with StrictLogging {
 
   //def getBlockByHeader(h: Header): Option[Block]
 
-  protected def isBlockDefined(h: Header): Boolean
+  //protected def isBlockDefined(h: Header): Boolean
 
   protected def commonBlockThenSuffixes(header1: Header, header2: Header): (HeaderChain, HeaderChain)
 
