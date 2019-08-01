@@ -47,6 +47,16 @@ trait HistoryApiExternal extends HistoryApiInternal {
   def getBlockByHeaderId(id: ModifierId): Option[Block] = blocksCache
     .get(ByteArrayWrapper(id))
     .orElse(getHeaderById(id).flatMap(h => getPayloadByIdInternal(h.payloadId).map(p => Block(h, p))))
+  def getBestHeader: Option[Header] = getBestHeaderId
+    .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(getHeaderByIdInternal(id)))
+  def getBestHeaderHeight: Int = getBestHeaderId
+    .flatMap(id => headersCache.get(ByteArrayWrapper(id)).map(_.height).orElse(getHeightByHeaderId(id)))
+    .getOrElse(TestNetConstants.PreGenesisHeight)
+  def getBestBlock: Option[Block] = getBestBlockId
+    .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).orElse(getBlockByHeaderIdInternal(id)))
+  def getBestBlockHeight: Int = getBestBlockId
+    .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header.height).orElse(getHeightByHeaderId(id)))
+    .getOrElse(TestNetConstants.PreGenesisHeight)
 
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
@@ -61,19 +71,19 @@ trait HistoryApiExternal extends HistoryApiInternal {
       }
 
     (for {
-      bestBlockId             <- getBestBlockId
+      bestBlockId <- getBestBlockId
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-        case _ if !isHeadersChainSynced =>
-          Seq.empty
-        case Some(header) if isInBestChain(header) =>
-          continuation(header.height + 1, Seq.empty)
-        case Some(header) =>
-          lastBestBlockHeightRelevantToBestChain(header.height)
-            .map(height => continuation(height + 1, Seq.empty))
-            .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
-        case None =>
-          continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case _ if !isHeadersChainSynced =>
+        Seq.empty
+      case Some(header) if isInBestChain(header) =>
+        continuation(header.height + 1, Seq.empty)
+      case Some(header) =>
+        lastBestBlockHeightRelevantToBestChain(header.height)
+          .map(height => continuation(height + 1, Seq.empty))
+          .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
+      case None =>
+        continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 

@@ -35,14 +35,14 @@ trait HistoryApiInternal extends StrictLogging {
     .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
 
   def getBestHeaderId: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
-  def getBestHeader: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdInternal)
-  def getBestHeaderHeight: Int = getBestHeaderId
+  def getBestHeaderInternal: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdInternal)
+  def getBestHeaderHeightInternal: Int = getBestHeaderId
     .flatMap(getHeightByHeaderId)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
   def getBestBlockId: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
-  def getBestBlock: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdInternal)
-  def getBestBlockHeight: Int = getBestBlockId
+  def getBestBlockInternal: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdInternal)
+  def getBestBlockHeightInternal: Int = getBestBlockId
     .flatMap(getHeightByHeaderId)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
