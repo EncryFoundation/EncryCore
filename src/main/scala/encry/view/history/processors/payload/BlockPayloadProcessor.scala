@@ -12,7 +12,7 @@ trait BlockPayloadProcessor extends BaseBlockPayloadProcessor with BlockProcesso
 
   protected val settings: EncryAppSettings
 
-  protected val historyStorage: HistoryStorage
+   val historyStorage: HistoryStorage
 
   override protected def process(payload: Payload): ProgressInfo[PersistentModifier] = getBlockByPayload(payload)
     .flatMap(block =>

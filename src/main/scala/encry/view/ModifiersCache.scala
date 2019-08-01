@@ -84,7 +84,7 @@ object ModifiersCache extends StrictLogging {
     }
 
     def findApplicablePayloadAtHeight(height: Int): List[Key] = {
-      history.headerIdsAtHeight(height).flatMap(history.modifierById).collect {
+      history.headerIdsAtHeight(height).flatMap(history.getHeaderById).collect {
         case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           new mutable.WrappedArray.ofByte(header.payloadId)
       }
@@ -118,7 +118,7 @@ object ModifiersCache extends StrictLogging {
               if ((v.parentId sameElements history.bestHeaderIdOpt.getOrElse(Array.emptyByteArray)) ||
                 (history.bestHeaderHeight == TestNetConstants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
-                  ) || history.modifierById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
+                  ) || history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
@@ -134,7 +134,7 @@ object ModifiersCache extends StrictLogging {
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
     else history.headerIdsAtHeight(history.bestBlockHeight + 1).headOption match {
-      case Some(id) => history.modifierById(id) match {
+      case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ => exhaustiveSearch

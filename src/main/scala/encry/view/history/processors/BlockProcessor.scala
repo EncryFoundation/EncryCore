@@ -15,7 +15,7 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scala.util.Try
 import cats.syntax.either._
 
-trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
+trait BlockProcessor extends HistoryAPI with StrictLogging {
 
   import BlockProcessor._
 
@@ -25,7 +25,7 @@ trait BlockProcessor extends BlockHeaderProcessor with StrictLogging {
   //todo change description
   override def bestBlockIdOpt: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
 
-  protected def getBlock(h: Header): Option[Block]
+  def getBlock(h: Header): Option[Block]
 
   protected def isBlockDefined(h: Header): Boolean
 

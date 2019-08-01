@@ -415,10 +415,10 @@ object Utils extends StrictLogging {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
     new EncryHistory with BlockPayloadProcessor {
-      override protected val settings: EncryAppSettings = settingsEncry
-      override protected val nodeSettings: NodeSettings = settings.node
-      override protected val historyStorage: HistoryStorage = storage
-      override protected val timeProvider: NetworkTimeProvider = ntp
+      override  val settings: EncryAppSettings = settingsEncry
+      override  val nodeSettings: NodeSettings = settings.node
+      override  val historyStorage: HistoryStorage = storage
+      override  val timeProvider: NetworkTimeProvider = ntp
     }
   }
 

@@ -26,22 +26,113 @@ import encry.view.history.processors.ValidationError.FatalValidationError._
 import encry.view.history.processors.ValidationError.NonFatalValidationError._
 import cats.syntax.either._
 
-trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
+trait HistoryAPI extends StrictLogging { //scalastyle:ignore
+
+  val historyStorage: HistoryStorage
+
+  val BestHeaderKey: StorageKey =
+    StorageKey @@ Array.fill(TestNetConstants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
+  val BestBlockKey: StorageKey =
+    StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
+
+  private def getModifierById[T](id: ModifierId): Option[T] = historyStorage
+    .modifierById(id)
+    .collect { case m: T => m }
+
+  def getHeaderById(id: ModifierId): Option[Header] = getModifierById[Header](id)
+
+  def getPayloadById(id: ModifierId): Option[Payload] = getModifierById[Payload](id)
+
+  def getBlock(h: Header): Option[Block]
+
+  def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(getHeaderById)
+
+  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
+
+  def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
+    headerId <- bestHeaderIdAtHeight(probablyAt)
+    header <- getHeaderById(headerId) if isModifierDefined(header.payloadId)
+  } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
+
+
+  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
+
+  def bestHeaderIdOpt: Option[ModifierId] = historyStorage
+    .get(BestHeaderKey)
+    .map(ModifierId @@ _)
+
+  def bestBlockOpt: Option[Block]
+
+  def headerOfBestBlock: Option[Header]
+
+  def bestBlockIdOpt: Option[ModifierId]
+
+  def bestHeaderHeight: Int = bestHeaderIdOpt
+    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
+    .getOrElse(TestNetConstants.PreGenesisHeight)
+
+  def bestBlockHeight: Int = bestBlockIdOpt
+    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
+    .getOrElse(TestNetConstants.PreGenesisHeight)
+
+  def headerHeight(id: ModifierId): Option[Int] = historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray)
+
+  def bestBlockHeight(bestBlockId: ModifierId): Int = Ints.fromByteArray(headerHeightKey(bestBlockId))
+
+  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
+    .flatMap(h => bestHeaderIdAtHeight(h))
+    .exists(_.sameElements(id))
+
+  def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
+
+  private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
+
+  //todo remove .get
+  private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
+
+  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
+    .get(headerScoreKey(id))
+    .map(d => BigInt(d))
+
+  def heightOf(id: ModifierId): Option[Height] = historyStorage
+    .get(headerHeightKey(id))
+    .map(d => Height @@ Ints.fromByteArray(d))
+
+  /**
+    * @param height - block height
+    * @return ids of headers on chosen height.
+    *         Seq.empty we don't have any headers on this height
+    *         single id if no forks on this height
+    *         multiple ids if there are forks at chosen height.
+    *         First id is always from the best headers chain.
+    */
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
+    .store
+    .get(heightIdsKey(height))
+    .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
+    .getOrElse(Seq.empty[ModifierId])
+
+  def heightIdsKey(height: Int): StorageKey =
+    StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
+
+  def headerScoreKey(id: ModifierId): StorageKey =
+    StorageKey @@ Algos.hash("score".getBytes(Algos.charset) ++ id).untag(Digest32)
+
+  def headerHeightKey(id: ModifierId): StorageKey =
+    StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
+
+  def validityKey(id: Array[Byte]): StorageKey =
+    StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
+
 
   protected val settings: EncryAppSettings
   protected val timeProvider: NetworkTimeProvider
   private val difficultyController: PowLinearController.type = PowLinearController
   val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
-  protected val BestHeaderKey: StorageKey =
-    StorageKey @@ Array.fill(TestNetConstants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
-  protected val BestBlockKey: StorageKey = StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
-  protected val historyStorage: HistoryStorage
+
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
   private var isHeadersChainSyncedVar: Boolean = false
 
-  protected def getBlock(h: Header): Option[Block]
-
-  def getHeaderById(id: ModifierId): Option[Header]
 
   /**
     * headersCacheIndexes & headersCache contains headers from (currentBestHeaderHeight - maxRollBackDepth) to
@@ -58,9 +149,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     * Transactions for this Header may be missed, to get block from best full chain (in mode that support
     * it) call bestFullBlockOpt.
     */
-  def bestHeaderOpt: Option[Header] = bestHeaderIdOpt.flatMap(typedModifierById[Header])
 
-  def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
@@ -82,7 +171,7 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
 
     val bestBlockHeader: Option[Header] = for {
       bestBlockId <- bestBlockIdOpt
-      headerLinkedToBestBlock <- typedModifierById[Header](bestBlockId) //todo can be also found in cache
+      headerLinkedToBestBlock <- getHeaderById(bestBlockId) //todo can be also found in cache
     } yield headerLinkedToBestBlock
     bestBlockHeader match {
       case _ if !isHeadersChainSynced => Seq.empty
@@ -103,16 +192,11 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
   def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block] = {
     val bestBlockAtHeight: Option[Block] = for {
       headerId <- bestHeaderIdAtHeight(atHeight)
-      header <- typedModifierById[Header](headerId)
+      header <- getHeaderById(headerId)
       block <- getBlock(header)
     } yield block
     bestBlockAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
   }
-
-  def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
-    headerId <- bestHeaderIdAtHeight(probablyAt)
-    header <- typedModifierById[Header](headerId) if isModifierDefined(header.payloadId)
-  } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
 
   def modifiersToDownloadForNVH(howMany: Int): Seq[(ModifierTypeId, ModifierId)] = {
@@ -155,44 +239,9 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
     timeProvider.estimatedTime - header.timestamp <
       TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
 
-  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T]
-
-  def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
-
-  def bestHeaderIdOpt: Option[ModifierId] = historyStorage
-    .get(BestHeaderKey)
-    .map(ModifierId @@ _)
 
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
-  private def heightIdsKey(height: Int): StorageKey = StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
-
-  protected def headerScoreKey(id: ModifierId): StorageKey =
-    StorageKey @@ Algos.hash("score".getBytes(Algos.charset) ++ id).untag(Digest32)
-
-  protected def headerHeightKey(id: ModifierId): StorageKey =
-    StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
-
-  protected def validityKey(id: Array[Byte]): StorageKey =
-    StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
-
-  def bestBlockOpt: Option[Block]
-
-  def headerOfBestBlock: Option[Header]
-
-  def bestBlockIdOpt: Option[ModifierId]
-
-  def bestHeaderHeight: Int = bestHeaderIdOpt
-    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
-    .getOrElse(TestNetConstants.PreGenesisHeight)
-
-  def bestBlockHeight: Int = bestBlockIdOpt
-    .flatMap(id => historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray))
-    .getOrElse(TestNetConstants.PreGenesisHeight)
-
-  def headerHeight(id: ModifierId): Option[Int] = historyStorage.get(headerHeightKey(id)).map(Ints.fromByteArray)
-
-  def bestBlockHeight(bestBlockId: ModifierId): Int = Ints.fromByteArray(headerHeightKey(bestBlockId))
 
   protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
     case Some(dataToUpdate) =>
@@ -292,38 +341,6 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
       .map(p => HeaderValidator.validateHeader(h, p))
       .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
-  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
-    .flatMap(h => bestHeaderIdAtHeight(h))
-    .exists(_.sameElements(id))
-
-  def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeight(h.height).exists(_ sameElements h.id)
-
-  private def bestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
-
-  //todo remove .get
-  private def bestHeadersChainScore: BigInt = scoreOf(bestHeaderIdOpt.get).get
-
-  protected def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
-    .get(headerScoreKey(id))
-    .map(d => BigInt(d))
-
-  def heightOf(id: ModifierId): Option[Height] = historyStorage
-    .get(headerHeightKey(id))
-    .map(d => Height @@ Ints.fromByteArray(d))
-
-  /**
-    * @param height - block height
-    * @return ids of headers on chosen height.
-    *         Seq.empty we don't have any headers on this height
-    *         single id if no forks on this height
-    *         multiple ids if there are forks at chosen height.
-    *         First id is always from the best headers chain.
-    */
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
-    .store
-    .get(heightIdsKey(height))
-    .map(elem => elem.untag(VersionalLevelDbValue).grouped(32).map(ModifierId @@ _).toSeq)
-    .getOrElse(Seq.empty[ModifierId])
 
   /**
     * @param limit       - maximum length of resulting HeaderChain
@@ -409,4 +426,5 @@ trait BlockHeaderProcessor extends StrictLogging { //scalastyle:ignore
         HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp} is too far in future from now ${timeProvider.estimatedTime}"))
     } yield h
   }
+
 }

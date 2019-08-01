@@ -5,7 +5,7 @@ import encry.consensus.History._
 import encry.modifiers.history._
 import encry.settings.NodeSettings
 import encry.view.history.processors.ValidationError.FatalValidationError.UnknownModifierFatalError
-import encry.view.history.processors.{BlockHeaderProcessor, ValidationError}
+import encry.view.history.processors.{HistoryAPI, ValidationError}
 import encry.view.history.processors.payload.BlockPayloadProcessor
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -19,7 +19,7 @@ import cats.syntax.either._
 import scala.annotation.tailrec
 import scala.util.Try
 
-trait EncryHistoryReader extends BlockHeaderProcessor
+trait EncryHistoryReader extends HistoryAPI
   with BlockPayloadProcessor
   with StrictLogging {
 
@@ -37,12 +37,12 @@ trait EncryHistoryReader extends BlockHeaderProcessor
   def bestBlockOpt: Option[Block] = bestBlockIdOpt.flatMap(id => getBlock(id))
 
   def headerOfBestBlock: Option[Header] =
-    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header).orElse(typedModifierById[Header](id)))
+    bestBlockIdOpt.flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header).orElse(getHeaderById(id)))
 
-  def getHeaderById(id: ModifierId): Option[Header] = lastAppliedHeadersCache
-    .get(ByteArrayWrapper(id))
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-    .orElse(typedModifierById[Header](id))
+//  def getHeaderById(id: ModifierId): Option[Header] = lastAppliedHeadersCache
+//    .get(ByteArrayWrapper(id))
+//    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+//    .orElse(getModifierById[Header](id))
 
   def isBlockDefined(header: Header): Boolean =
     blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
@@ -144,22 +144,19 @@ trait EncryHistoryReader extends BlockHeaderProcessor
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
     .getOrElse(HeaderChain.empty)
 
-  def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
+//  def modifierById(id: ModifierId): Option[PersistentModifier] = historyStorage.modifierById(id)
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
-  def typedModifierById[T <: PersistentModifier](id: ModifierId): Option[T] = modifierById(id) match {
-    case Some(m: T@unchecked) if m.isInstanceOf[T] => Some(m)
-    case _ => None
-  }
+  //def getModifierById[T <: PersistentModifier](id: ModifierId): Option[T] =
 
   def getBlock(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
-    .orElse(typedModifierById[Payload](header.payloadId).map(payload => Block(header, payload)))
+    .orElse(getPayloadById(header.payloadId).map(payload => Block(header, payload)))
 
   def getBlock(id: ModifierId): Option[Block] = blocksCache
     .get(ByteArrayWrapper(id))
-    .orElse(typedModifierById[Header](id).flatMap(h => typedModifierById[Payload](h.payloadId).map(p => Block(h, p))))
+    .orElse(getHeaderById(id).flatMap(h => getPayloadById(h.payloadId).map(p => Block(h, p))))
 
   /**
     * Return headers, required to apply to reach header2 if you are at header1 position.
