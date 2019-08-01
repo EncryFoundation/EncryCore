@@ -73,7 +73,7 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
       a.foldLeft(modifiersCache, List.empty[PersistentModifier]) { case ((cache, modifiers), modsKey) =>
         cache.get(modsKey) match {
           case Some(value) => (cache - modsKey) -> (modifiers :+ value)
-          case None => cache -> modifiers
+          case None => (cache - modsKey) -> modifiers
         }
       }
     b._2 -> ModifiersCache(b._1, headersCache, settings)
@@ -81,13 +81,11 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
 
   def findCandidateKey(history: EncryHistory): List[Key] = {
 
-
     def isApplicable(modifierId: Key): Boolean = modifiersCache.get(modifierId).exists(mod => history.testApplicable(mod) match {
       case Left(_: FatalValidationError) => remove(modifierId); false
       case Right(_) => true
       case Left(_) => false
     })
-
 
     def exhaustiveSearch: List[Key] = modifiersCache
       .find { case (key, value) =>
@@ -133,7 +131,7 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
         (modifiers, ModifiersCache(modifiersCache, headersCache, settings))
     }
 
-    if (bestHeadersIds.nonEmpty) bestHeadersIds._1
+    if (bestHeadersIds._1.nonEmpty) bestHeadersIds._1
     else history
       .headerIdsAtHeight(history.bestBlockHeight + 1)
       .headOption match {
