@@ -8,8 +8,19 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 trait HistoryModifiersValidator extends HistoryExternalApi {
+
+  def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity =
+    historyStorage.store.get(validityKey(modifierId)) match {
+      case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case None if isModifierDefined(modifierId) => ModifierSemanticValidity.Unknown
+      case None => ModifierSemanticValidity.Absent
+      case mod => logger.error(s"Incorrect validity status: $mod")
+        ModifierSemanticValidity.Absent
+    }
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] = {
     val validationResult: Either[ValidationError, PersistentModifier] = modifier match {

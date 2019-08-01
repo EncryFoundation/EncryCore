@@ -35,7 +35,8 @@ import scala.util.Try
   * BlockPayloadProcessor: Processor of BlockPayload. BlockPayload may
   *   1. Be downloaded from other peers (verifyTransactions == true)
   *   2. Be ignored by history (verifyTransactions == false) */
-trait EncryHistory extends EncryHistoryReader  with HistoryModifiersValidator with AutoCloseable {
+trait EncryHistory extends EncryHistoryReader
+  with HistoryModifiersValidator  with HistoryModifiersProcessors with AutoCloseable {
 
   def isFullChainSynced: Boolean = getBestHeaderId
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))

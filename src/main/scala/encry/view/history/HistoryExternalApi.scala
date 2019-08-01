@@ -27,7 +27,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 import scala.util.Try
 
-trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
+trait HistoryExternalApi extends HistoryInternalApi {
 
   val settings: EncryAppSettings
 
@@ -177,21 +177,7 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
   def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity
 
 
-  protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
-    case Some(dataToUpdate) =>
-      historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
-      getBestHeaderId match {
-        case Some(bestHeaderId) =>
-          val toProcess: Seq[Header] = if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
-          ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
-        case None =>
-          logger.error("Should always have best header after header application")
-          forceStopApplication()
-      }
-    case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
-  }
-
-  private def addHeaderToCacheIfNecessary(h: Header): Unit =
+  def addHeaderToCacheIfNecessary(h: Header): Unit =
     if (h.height >= getBestHeaderHeight - TestNetConstants.MaxRollbackDepth) {
       logger.debug(s"Should add ${Algos.encode(h.id)} to header cache")
       val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, Seq.empty[ModifierId]) :+ h.id
@@ -228,32 +214,6 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
       logger.debug(s"headersCache size: ${blocksCache.size}")
       logger.debug(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")
     }
-
-  def commonBlockThenSuffixes(header1: Header,
-                              header2: Header): (HeaderChain, HeaderChain) = {
-    val heightDelta: Int = Math.max(header1.height - header2.height, 0)
-
-    def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
-      val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
-      if (chains._1.head == chains._2.head) chains
-      else {
-        val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
-        if (!otherChain.head.isGenesis) loop(biggerOther.length, biggerOther)
-        else throw new Exception(s"Common point not found for headers $header1 and $header2")
-      }
-    }
-
-    def commonBlockThenSuffixes(otherChain: HeaderChain,
-                                startHeader: Header,
-                                limit: Int): (HeaderChain, HeaderChain) = {
-      def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
-
-      val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
-      (currentChain, otherChain.takeAfter(currentChain.head))
-    }
-
-    loop(2, HeaderChain(Seq(header2)))
-  }
 
 
   def syncInfo: SyncInfo =
@@ -318,6 +278,32 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
+  def commonBlockThenSuffixes(header1: Header,
+                              header2: Header): (HeaderChain, HeaderChain) = {
+    val heightDelta: Int = Math.max(header1.height - header2.height, 0)
+
+    def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
+      val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
+      if (chains._1.head == chains._2.head) chains
+      else {
+        val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
+        if (!otherChain.head.isGenesis) loop(biggerOther.length, biggerOther)
+        else throw new Exception(s"Common point not found for headers $header1 and $header2")
+      }
+    }
+
+    def commonBlockThenSuffixes(otherChain: HeaderChain,
+                                startHeader: Header,
+                                limit: Int): (HeaderChain, HeaderChain) = {
+      def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
+
+      val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
+      (currentChain, otherChain.takeAfter(currentChain.head))
+    }
+
+    loop(2, HeaderChain(Seq(header2)))
+  }
+
   def getChainToHeader(fromHeaderOpt: Option[Header],
                        toHeader: Header): (Option[ModifierId], HeaderChain) = fromHeaderOpt match {
     case Some(h1) =>
@@ -331,63 +317,4 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
 
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
     .flatMap(h => headerIdsAtHeight(h).headOption)
-
-  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], PersistentModifier)] = {
-    addHeaderToCacheIfNecessary(header)
-    if (header.isGenesis) {
-      logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
-      Option(Seq(
-        BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
-        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
-        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
-        headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray
-      ) -> header)
-    } else scoreOf(header.parentId).map { parentScore =>
-      val score: BigInt @@ Difficulty.Tag =
-        Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
-      val bestRow: Seq[(StorageKey, StorageValue)] =
-        if ((header.height > getBestHeaderHeight) ||
-          (header.height == getBestHeaderHeight && score > getBestHeadersChainScore)) {
-          Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
-        } else Seq.empty
-      val scoreRow: (StorageKey, StorageValue) =
-        headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
-      val heightRow: (StorageKey, StorageValue) =
-        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
-      val headerIdsRow: Seq[(StorageKey, StorageValue)] =
-        if ((header.height > getBestHeaderHeight) || (header.height == getBestHeaderHeight && score > getBestHeadersChainScore))
-          bestBlockHeaderIdsRow(header, score)
-        else orphanedBlockHeaderIdsRow(header, score)
-      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
-    }
-  }
-
-
-  /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
-    * header ids at this height */
-  private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    val prevHeight: Int = getBestHeaderHeight
-    logger.info(s"New best header ${h.encodedId} with score: $score." +
-      s" New height: ${h.height}, old height: $prevHeight")
-    val self: (StorageKey, StorageValue) =
-      heightIdsKey(h.height) ->
-        StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
-    val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
-    val forkHeaders: Seq[Header] = parentHeaderOpt
-      .toSeq
-      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
-      .filter(h => !isInBestChain(h))
-    val forkIds: Seq[(StorageKey, StorageValue)] = forkHeaders.map { header =>
-      val otherIds: Seq[ModifierId] = headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)
-      heightIdsKey(header.height) -> StorageValue @@ (Seq(header.id) ++ otherIds).flatten.toArray
-    }
-    forkIds :+ self
-  }
-
-  /** Row to storage, that put this orphaned block id to the end of header ids at this height */
-  //todo why return type is Seq instead tuple2?
-  private def orphanedBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    logger.info(s"New orphaned header ${h.encodedId} at height ${h.height} with score $score")
-    Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
-  }
 }
