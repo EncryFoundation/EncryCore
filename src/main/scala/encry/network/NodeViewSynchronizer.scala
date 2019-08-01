@@ -23,6 +23,7 @@ import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.NodeViewErrors.ModifierApplyError
+import encry.view.history.processors.ValidationError
 import encry.view.history.{EncryHistory, EncryHistoryReader}
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
@@ -32,6 +33,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -103,14 +105,18 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case DataFromPeer(message, remote) => message match {
       case SyncInfoNetworkMessage(syncInfo) => Option(history) match {
         case Some(historyReader) =>
-          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
-          val ext: ModifierIds = extensionOpt.getOrElse(Seq())
+          val ext: Seq[ModifierId] =
+            historyReader.continuationIds(syncInfo, settings.network.networkChunkSize) match {
+              case Left(value) => logger.error(value.toString); Seq.empty
+              case Right(value) => value
+            }
+
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
-          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
-          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
+          if (!(ext.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
+          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
+          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
         case _ =>
       }
       case RequestModifiersNetworkMessage(invData) =>
