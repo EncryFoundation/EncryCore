@@ -15,7 +15,7 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 import scala.util.Try
 import cats.syntax.either._
 
-trait BlockProcessor extends HistoryApiExternal with StrictLogging {
+trait BlockProcessor extends HistoryExternalApi with StrictLogging {
 
   import BlockProcessor._
 
@@ -111,24 +111,7 @@ trait BlockProcessor extends HistoryApiExternal with StrictLogging {
     isBetter getOrElse false
   }
 
-  private def addBlockToCacheIfNecessary(b: Block): Unit =
-    if (b.header.height >= getBestBlockHeight - TestNetConstants.MaxRollbackDepth) {
-      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
-      val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
-      blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
-      blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
-      // cleanup cache if necessary
-      if (blocksCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
-        blocksCacheIndexes.get(getBestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
-          val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
-          logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
-          blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
-        }
-        blocksCacheIndexes = blocksCacheIndexes - (getBestBlockHeight - TestNetConstants.MaxRollbackDepth)
-      }
-      logger.debug(s"headersCache size: ${blocksCache.size}")
-      logger.debug(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")
-    }
+
 
   private def nonBestBlock: BlockProcessing = {
     case params =>

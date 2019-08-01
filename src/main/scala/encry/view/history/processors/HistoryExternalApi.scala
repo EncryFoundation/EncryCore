@@ -2,7 +2,7 @@ package encry.view.history.processors
 
 import com.google.common.primitives.Ints
 import encry.EncryApp.forceStopApplication
-import encry.consensus.History.ProgressInfo
+import encry.consensus.History.{Equal, Fork, HistoryComparisonResult, ModifierIds, Older, ProgressInfo, Unknown, Younger}
 import encry.consensus._
 import encry.modifiers.history._
 import encry.settings.EncryAppSettings
@@ -21,8 +21,13 @@ import scala.collection.immutable.HashSet
 import encry.view.history.processors.ValidationError.FatalValidationError._
 import encry.view.history.processors.ValidationError.NonFatalValidationError._
 import cats.syntax.either._
+import cats.syntax.option._
+import encry.view.history.processors.ValidationError.HistoryExternalApiError
+import org.encryfoundation.common.network.SyncInfo
 
-trait HistoryApiExternal extends HistoryApiInternal {
+import scala.util.Try
+
+trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
 
   val settings: EncryAppSettings
 
@@ -40,23 +45,44 @@ trait HistoryApiExternal extends HistoryApiInternal {
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
+    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
     .orElse(getHeaderByIdInternal(id))
+
   def getBlockByHeader(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
     .orElse(getPayloadByIdInternal(header.payloadId).map(p => Block(header, p)))
+
   def getBlockByHeaderId(id: ModifierId): Option[Block] = blocksCache
     .get(ByteArrayWrapper(id))
     .orElse(getHeaderById(id).flatMap(h => getPayloadByIdInternal(h.payloadId).map(p => Block(h, p))))
-  def getBestHeader: Option[Header] = getBestHeaderId
-    .flatMap(id => headersCache.get(ByteArrayWrapper(id)).orElse(getHeaderByIdInternal(id)))
-  def getBestHeaderHeight: Int = getBestHeaderId
-    .flatMap(id => headersCache.get(ByteArrayWrapper(id)).map(_.height).orElse(getHeightByHeaderId(id)))
-    .getOrElse(TestNetConstants.PreGenesisHeight)
-  def getBestBlock: Option[Block] = getBestBlockId
-    .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).orElse(getBlockByHeaderIdInternal(id)))
+
+  def getBestHeader: Option[Header] = getBestHeaderId.flatMap(id =>
+    headersCache
+      .get(ByteArrayWrapper(id))
+      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+      .orElse(getHeaderByIdInternal(id))
+  )
+
+  def getBestHeaderHeight: Int = getBestHeaderId.flatMap(id =>
+    headersCache.get(ByteArrayWrapper(id)).map(_.height)
+      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
+      .orElse(getHeightByHeaderId(id))
+  ).getOrElse(TestNetConstants.PreGenesisHeight)
+
+  def getBestBlock: Option[Block] = getBestBlockId.flatMap(id =>
+    blocksCache.get(ByteArrayWrapper(id))
+      .orElse(getBlockByHeaderIdInternal(id))
+  )
+
   def getBestBlockHeight: Int = getBestBlockId
     .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header.height).orElse(getHeightByHeaderId(id)))
     .getOrElse(TestNetConstants.PreGenesisHeight)
+
+  def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(id =>
+    headersCache.get(ByteArrayWrapper(id))
+      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+      .orElse(getHeaderByIdInternal(id))
+  )
 
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
@@ -87,28 +113,18 @@ trait HistoryApiExternal extends HistoryApiInternal {
     }
   }
 
-  /** Checks, whether it's time to download full chain and return toDownload modifiers */
-  protected def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
-    if (header.height >= blockDownloadProcessor.minimalBlockHeight)
-      requiredModifiersForHeader(header) // Already synced and header is not too far back. Download required modifiers
+  def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
+  // Already synced and header is not too far back. Download required modifiers
+    if (header.height >= blockDownloadProcessor.minimalBlockHeight) Seq(Payload.modifierTypeId -> header.payloadId)
+    // Headers chain is synced after this header. Start downloading full blocks
     else if (!isHeadersChainSynced && isNewHeader(header)) {
-      // Headers chain is synced after this header. Start downloading full blocks
-      logger.info(s"Headers chain is synced after header ${header.encodedId} at height ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       Seq.empty
     } else Seq.empty
 
-  /**
-    * @param limit       - maximum length of resulting HeaderChain
-    * @param startHeader - header to start
-    * @param until       - stop condition
-    * @return at most limit header back in history starting from startHeader and when condition until is not satisfied
-    *         Note now it includes one header satisfying until condition!
-    */
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
-    @tailrec
-    def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
+    @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
       else getHeaderById(header.parentId) match {
         case Some(parent: Header) => loop(parent, acc :+ parent)
@@ -117,39 +133,31 @@ trait HistoryApiExternal extends HistoryApiInternal {
       }
     }
 
-    if (getBestHeaderId.isEmpty || (limit == 0)) HeaderChain(Seq())
+    if (getBestHeaderId.isEmpty || (limit == 0)) HeaderChain(Seq.empty)
     else HeaderChain(loop(startHeader, Seq(startHeader)).reverse)
   }
 
-
-  /**
-    * Find first header with the best height <= $height which id satisfies condition $p
-    *
-    * @param height - start height
-    * @param p      - condition to satisfy
-    * @return found header
-    */
-  @tailrec
-  protected final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
-    .find(id => p(id))
+  @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
+    .find(p)
     .flatMap(getHeaderById) match {
-    case Some(header) => Some(header)
+    case h@Some(_) => h
     case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
-    case None => None
+    case n@None => n
   }
 
-
-  //todo remove asset + ensuring
-  def requiredDifficultyAfter(parent: Header): Difficulty = {
+  def requiredDifficultyAfter(parent: Header): Either[ValidationError, Difficulty] = {
     val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
       .ensuring(_.last == parent.height, "Incorrect heights sequence!")
-    val chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
-    val requiredHeaders: IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
-      .zip(chain.headers)
-      .filter(p => requiredHeights.contains(p._1))
-    assert(requiredHeights.length == requiredHeaders.length,
-      s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}")
-    PowLinearController.getDifficulty(requiredHeaders)
+    for {
+      _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
+        HistoryExternalApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
+      chain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
+      requiredHeaders = (requiredHeights.min to requiredHeights.max)
+        .zip(chain.headers)
+        .filter(p => requiredHeights.contains(p._1))
+      _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
+        HistoryExternalApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
+    } yield PowLinearController.getDifficulty(requiredHeaders)
   }
 
 
@@ -160,20 +168,6 @@ trait HistoryApiExternal extends HistoryApiInternal {
   def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
-
-
-  def lastBestBlockRelevantToBestChain(atHeight: Int): Option[Block] = {
-    val bestBlockAtHeight: Option[Block] = for {
-      headerId <- getBestHeaderIdAtHeight(atHeight)
-      header <- getHeaderById(headerId)
-      block <- getBlockByHeader(header)
-    } yield block
-    bestBlockAtHeight.orElse(lastBestBlockRelevantToBestChain(atHeight - 1))
-  }
-
-
-  private def requiredModifiersForHeader(h: Header): Seq[(ModifierTypeId, ModifierId)] =
-    Seq((Payload.modifierTypeId, h.payloadId))
 
   private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
@@ -215,6 +209,128 @@ trait HistoryApiExternal extends HistoryApiInternal {
       logger.debug(s"headersCache size: ${headersCache.size}")
       logger.debug(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
     }
+
+  def addBlockToCacheIfNecessary(b: Block): Unit =
+    if (b.header.height >= getBestBlockHeight - TestNetConstants.MaxRollbackDepth) {
+      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
+      val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
+      blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
+      blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
+      // cleanup cache if necessary
+      if (blocksCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
+        blocksCacheIndexes.get(getBestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
+          val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
+          logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
+          blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
+        }
+        blocksCacheIndexes = blocksCacheIndexes - (getBestBlockHeight - TestNetConstants.MaxRollbackDepth)
+      }
+      logger.debug(s"headersCache size: ${blocksCache.size}")
+      logger.debug(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")
+    }
+
+  def commonBlockThenSuffixes(header1: Header,
+                              header2: Header): (HeaderChain, HeaderChain) = {
+    val heightDelta: Int = Math.max(header1.height - header2.height, 0)
+
+    def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
+      val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
+      if (chains._1.head == chains._2.head) chains
+      else {
+        val biggerOther: HeaderChain = headerChainBack(numberBack, otherChain.head, _ => false) ++ otherChain.tail
+        if (!otherChain.head.isGenesis) loop(biggerOther.length, biggerOther)
+        else throw new Exception(s"Common point not found for headers $header1 and $header2")
+      }
+    }
+
+    def commonBlockThenSuffixes(otherChain: HeaderChain,
+                                startHeader: Header,
+                                limit: Int): (HeaderChain, HeaderChain) = {
+      def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
+
+      val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
+      (currentChain, otherChain.takeAfter(currentChain.head))
+    }
+
+    loop(2, HeaderChain(Seq(header2)))
+  }
+
+
+  def syncInfo: SyncInfo =
+    if (getBestHeaderId.isEmpty) SyncInfo(Seq.empty)
+    else SyncInfo(getBestHeader.map(header =>
+      ((header.height - settings.network.maxInvObjects + 1) to header.height)
+        .flatMap(height => headerIdsAtHeight(height).headOption)
+    ).getOrElse(Seq.empty))
+
+
+  def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {
+
+    //Our best header is the same as other history best header
+    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
+
+    //Our best header is in other history best chain, but not at the last position
+    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
+
+    /* Other history is empty, or our history contains last id from other history */
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isModifierDefined) => Younger
+
+    case Some(_) =>
+      //Our history contains some ids from other history
+      if (si.lastHeaderIds.exists(isModifierDefined)) Fork
+      //Unknown comparison result
+      else Unknown
+
+    //Both nodes do not keep any blocks
+    case None if si.lastHeaderIds.isEmpty => Equal
+
+    //Our history is empty, other contain some headers
+    case None => Older
+  }
+
+  def continuationIds(info: SyncInfo, size: Int): Option[ModifierIds] = Try {
+    if (getBestHeaderId.isEmpty) info.startingPoints
+    else if (info.lastHeaderIds.isEmpty) {
+      val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      //todo remove .get
+      val startHeader: Header = getHeaderById(startId).get
+      val headers: HeaderChain = headerChainBack(size, startHeader, _ => false)
+        .ensuring(_.headers.exists(_.height == TestNetConstants.GenesisHeight),
+          "Should always contain genesis header.")
+      headers.headers.flatMap(h => Seq((Header.modifierTypeId, h.id)))
+    } else {
+      val ids: Seq[ModifierId] = info.lastHeaderIds
+      val lastHeaderInOurBestChain: ModifierId = ids.view.reverse.find(m => isInBestChain(m)).get
+      val theirHeight: Height = heightOf(lastHeaderInOurBestChain).get
+      val heightFrom: Int = Math.min(getBestHeaderHeight, theirHeight + size)
+      val startId: ModifierId = headerIdsAtHeight(heightFrom).head
+      //todo remove .get
+      val startHeader: Header = getHeaderById(startId).get
+      headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
+        .headers.map(h => Header.modifierTypeId -> h.id)
+    }
+  }.toOption
+
+  def lastHeaders(count: Int): HeaderChain = getBestHeader
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
+    .getOrElse(HeaderChain.empty)
+
+  def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
+
+  def getChainToHeader(fromHeaderOpt: Option[Header],
+                       toHeader: Header): (Option[ModifierId], HeaderChain) = fromHeaderOpt match {
+    case Some(h1) =>
+      val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
+      (prevChain.headOption.map(_.id), newChain.tail)
+    case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
+  }
+
+  def isBlockDefined(header: Header): Boolean =
+    blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
+
+  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
+    .flatMap(h => headerIdsAtHeight(h).headOption)
 
   private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], PersistentModifier)] = {
     addHeaderToCacheIfNecessary(header)
@@ -302,7 +418,10 @@ trait HistoryApiExternal extends HistoryApiInternal {
         HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
       _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
         HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-      _ <- Either.cond(h.difficulty >= requiredDifficultyAfter(parent), (),
+      _ <- Either.cond(h.difficulty >= (requiredDifficultyAfter(parent) match {
+        case Right(value) => value
+        case Left(value) => logger.error(value.toString); BigInt(0)
+      }), (),
         HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
       _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
         HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))

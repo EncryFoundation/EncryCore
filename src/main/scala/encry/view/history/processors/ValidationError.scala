@@ -16,4 +16,5 @@ object ValidationError {
     case class HeaderNonFatalValidationError(error: String)  extends NonFatalValidationError
     case class PayloadNonFatalValidationError(error: String) extends NonFatalValidationError
   }
+  case class HistoryExternalApiError(error: String) extends ValidationError
 }

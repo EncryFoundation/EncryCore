@@ -10,7 +10,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, Modifie
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.hash.Digest32
 
-trait HistoryApiInternal extends StrictLogging {
+trait HistoryInternalApi extends StrictLogging {
 
   val historyStorage: HistoryStorage
 
@@ -46,10 +46,9 @@ trait HistoryApiInternal extends StrictLogging {
     .flatMap(getHeightByHeaderId)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(getHeaderByIdInternal)
-
   def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
+  //todo probably rewrite with indexes collection
   def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
     headerId <- getBestHeaderIdAtHeight(probablyAt)
     header   <- getHeaderByIdInternal(headerId) if isModifierDefined(header.payloadId)

@@ -150,7 +150,8 @@ trait InstanceFactory extends Keys with EncryGenerator {
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
-    val requiredDifficulty: Difficulty = history.getBestHeader.map(parent => history.requiredDifficultyAfter(parent))
+    val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
+      history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)

@@ -172,7 +172,10 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
 
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
+      case Right(value) => value
+      case Left(value) => logger.error(value.toString); Difficulty @@ BigInt(0)
+    })
       .getOrElse(TestNetConstants.InitialDifficulty)
 
     val candidate: CandidateBlock =

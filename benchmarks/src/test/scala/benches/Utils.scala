@@ -150,7 +150,8 @@ object Utils extends StrictLogging {
                                        prevBlock: Option[Block],
                                        txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
-    val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
+    val requiredDifficulty: Difficulty = prevBlock.map(b =>
+      history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
