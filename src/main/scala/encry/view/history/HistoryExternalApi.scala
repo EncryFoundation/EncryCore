@@ -17,7 +17,7 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait HistoryExternalApi extends HistoryInternalApi {
+trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
 
   val settings: EncryAppSettings
 
@@ -43,10 +43,6 @@ trait HistoryExternalApi extends HistoryInternalApi {
   def getBlockByHeader(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
     .orElse(getPayloadByIdInternal(header.payloadId).map(p => Block(header, p)))
-
-  def getBlockByHeaderId(id: ModifierId): Option[Block] = blocksCache
-    .get(ByteArrayWrapper(id))
-    .orElse(getHeaderById(id).flatMap(h => getPayloadByIdInternal(h.payloadId).map(p => Block(h, p))))
 
   def getBestHeader: Option[Header] = getBestHeaderId.flatMap(id =>
     headersCache
@@ -90,15 +86,23 @@ trait HistoryExternalApi extends HistoryInternalApi {
     getBestBlockId.map(id => blocksCache.contains(ByteArrayWrapper(id))).isDefined ||
       getHeaderOfBestBlock.map(h => isModifierDefined(h.payloadId)).isDefined
 
-  //todo make this logic correct
   def isBlockDefined(header: Header): Boolean =
     blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
 
-  //todo make this logic correct
   def isHeaderDefined(id: ModifierId): Boolean =
     headersCache.get(ByteArrayWrapper(id)).isDefined ||
       blocksCache.get(ByteArrayWrapper(id)).isDefined ||
       isModifierDefined(id)
+
+  def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = headersCacheIndexes
+    .get(h)
+    .flatMap(_.headOption)
+    .orElse(getBestHeaderIdAtHeightInternal(h))
+
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = headersCacheIndexes
+    .get(height)
+    .orElse(headerIdsAtHeightInternal(height))
+    .getOrElse(Seq.empty[ModifierId])
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
     .get(ByteArrayWrapper(id)).map(h => HeaderProtoSerializer.toProto(h).toByteArray)

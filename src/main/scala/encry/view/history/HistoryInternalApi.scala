@@ -52,19 +52,22 @@ trait HistoryInternalApi extends StrictLogging {
 
   //todo probably rewrite with indexes collection
   def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
-    headerId <- getBestHeaderIdAtHeight(probablyAt)
+    headerId <- getBestHeaderIdAtHeightInternal(probablyAt)
     header   <- getHeaderByIdInternal(headerId) if isModifierDefined(header.payloadId)
   } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = historyStorage
+  def headerIdsAtHeightInternal(height: Int): Option[Seq[ModifierId]] = historyStorage
     .get(heightIdsKey(height))
     .map(_.grouped(32).map(ModifierId @@ _).toSeq)
-    .getOrElse(Seq.empty[ModifierId])
 
-  def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = headerIdsAtHeight(h).headOption
+  def getBestHeaderIdAtHeightInternal(h: Int): Option[ModifierId] = headerIdsAtHeightInternal(h).flatMap(_.headOption)
 
-  def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeight(h.height).exists(_.sameElements(h.id))
-  def isInBestChain(id: ModifierId): Boolean = heightOf(id).flatMap(getBestHeaderIdAtHeight).exists(_.sameElements(id))
+  def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeightInternal(h.height)
+    .exists(_.sameElements(h.id))
+
+  def isInBestChain(id: ModifierId): Boolean = heightOf(id)
+    .flatMap(getBestHeaderIdAtHeightInternal)
+    .exists(_.sameElements(id))
 
   def getBestHeadersChainScore: BigInt = getBestHeaderId.flatMap(scoreOf).getOrElse(BigInt(0)) //todo ?.getOrElse(BigInt(0))?
 
