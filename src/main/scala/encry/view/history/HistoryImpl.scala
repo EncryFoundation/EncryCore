@@ -21,7 +21,7 @@ import cats.syntax.either._
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
- **/
+  **/
 trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
   def isFullChainSynced: Boolean = getBestHeaderId
@@ -51,10 +51,10 @@ trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcess
 
   /** @return header, that corresponds to modifier */
   protected def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
-    case header: Header   => Some(header)
-    case block: Block     => Some(block.header)
+    case header: Header => Some(header)
+    case block: Block => Some(block.header)
     case payload: Payload => getHeaderById(payload.headerId)
-    case _                => None
+    case _ => None
   }
 
   /**
@@ -63,63 +63,62 @@ trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcess
     * @param modifier that is invalid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
-  private def markModifierInvalid(modifier: PersistentModifier): ProgressInfo =
-    correspondingHeader(modifier) match {
-      case Some(invalidatedHeader) =>
-        val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
-        val validityRow: List[(StorageKey, StorageValue)] = invalidatedHeaders
-          .flatMap(h => Seq(h.id, h.payloadId)
-            .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))).toList
-        logger.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
-        val bestHeaderIsInvalidated: Boolean = getBestHeaderId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
-        val bestFullIsInvalidated: Boolean = getBestBlockId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
-        (bestHeaderIsInvalidated, bestFullIsInvalidated) match {
-          case (false, false) =>
-            // Modifiers from best header and best full chain are not involved, no rollback and links change required.
-            historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), validityRow)
-            ProgressInfo(None, Seq.empty, Seq.empty, None)
-          case _ =>
-            // Modifiers from best header and best full chain are involved, links change required.
-            val newBestHeader: Header =
-              loopHeightDown(getBestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
+  private def markModifierInvalid(modifier: PersistentModifier): ProgressInfo = correspondingHeader(modifier) match {
+    case Some(invalidatedHeader) =>
+      val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
+      val validityRow: List[(StorageKey, StorageValue)] = invalidatedHeaders
+        .flatMap(h => Seq(h.id, h.payloadId)
+          .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))).toList
+      logger.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
+      val bestHeaderIsInvalidated: Boolean = getBestHeaderId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
+      val bestFullIsInvalidated: Boolean = getBestBlockId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
+      (bestHeaderIsInvalidated, bestFullIsInvalidated) match {
+        case (false, false) =>
+          // Modifiers from best header and best full chain are not involved, no rollback and links change required.
+          historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), validityRow)
+          ProgressInfo(None, Seq.empty, Seq.empty, None)
+        case _ =>
+          // Modifiers from best header and best full chain are involved, links change required.
+          val newBestHeader: Header =
+            loopHeightDown(getBestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
               .ensuring(_.isDefined, "Where unable to find new best header, can't invalidate genesis block")
               .get
 
-            if (!bestFullIsInvalidated) {
-              // Only headers chain involved.
-              historyStorage.insert(
-                StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
-                List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
-              )
-              ProgressInfo(None, Seq.empty, Seq.empty, None)
-            } else {
-              val invalidatedChain: Seq[Block] = getBestBlock.toSeq
-                .flatMap(f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
+          if (!bestFullIsInvalidated) {
+            // Only headers chain involved.
+            historyStorage.insert(
+              StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
+              List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
+            )
+            ProgressInfo(None, Seq.empty, Seq.empty, None)
+          } else {
+            val invalidatedChain: Seq[Block] = getBestBlock.toSeq
+              .flatMap(f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
+              .flatMap(h => getBlockByHeader(h))
+              .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
+            val branchPoint: Block = invalidatedChain.head
+            val validChain: Seq[Block] =
+              continuationHeaderChains(branchPoint.header, h => getBlockByHeader(h).isDefined && !invalidatedHeaders.contains(h))
+                .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
                 .flatMap(h => getBlockByHeader(h))
-                .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
-              val branchPoint: Block = invalidatedChain.head
-              val validChain: Seq[Block] =
-                continuationHeaderChains(branchPoint.header, h => getBlockByHeader(h).isDefined && !invalidatedHeaders.contains(h))
-                  .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
-                  .flatMap(h => getBlockByHeader(h))
-              val changedLinks: Seq[(StorageKey, StorageValue)] =
-                List(
-                  BestBlockKey -> StorageValue @@ validChain.last.id.untag(ModifierId),
-                  BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId)
-                )
-              val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
-              historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
-              ProgressInfo(Some(branchPoint.id), invalidatedChain.tail, validChain.tail, None)
-            }
-        }
-      case None =>
-        // No headers become invalid. Just mark this particular modifier as invalid.
-        historyStorage.insert(
-          StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
-          List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
-        )
-        ProgressInfo(None, Seq.empty, Seq.empty, None)
-    }
+            val changedLinks: Seq[(StorageKey, StorageValue)] =
+              List(
+                BestBlockKey -> StorageValue @@ validChain.last.id.untag(ModifierId),
+                BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId)
+              )
+            val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
+            historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
+            ProgressInfo(Some(branchPoint.id), invalidatedChain.tail, validChain.tail, None)
+          }
+      }
+    case None =>
+      // No headers become invalid. Just mark this particular modifier as invalid.
+      historyStorage.insert(
+        StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
+        List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
+      )
+      ProgressInfo(None, Seq.empty, Seq.empty, None)
+  }
 
   /**
     * Marks modifier as valid
@@ -134,10 +133,10 @@ trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcess
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
         if (nonMarkedIds.nonEmpty) {
           historyStorage.
-          insert(
-            StorageVersion @@ validityKey(nonMarkedIds.head).untag(StorageKey),
-            nonMarkedIds.map(id => validityKey(id) -> StorageValue @@ Array(1.toByte)).toList
-          )
+            insert(
+              StorageVersion @@ validityKey(nonMarkedIds.head).untag(StorageKey),
+              nonMarkedIds.map(id => validityKey(id) -> StorageValue @@ Array(1.toByte)).toList
+            )
         }
         if (getBestBlock.contains(block))
           ProgressInfo(None, Seq.empty, Seq.empty, None) // Applies best header to the history

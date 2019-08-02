@@ -62,7 +62,7 @@ trait HistoryModifiersValidator extends HistoryExternalApi {
     _ <- Either.cond(h.height == parent.height + 1, (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height}" +
         s" not greater by 1 than parent's ${parent.height}"))
-    _ <- Either.cond(!historyStorage.containsObject(h.id), (),
+    _ <- Either.cond(!historyStorage.containsMod(h.id), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
     _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
@@ -87,7 +87,7 @@ trait HistoryModifiersValidator extends HistoryExternalApi {
   private def payloadValidator(m: PersistentModifier,
                                header: Header,
                                minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
-    _ <- Either.cond(!historyStorage.containsObject(m.id), (),
+    _ <- Either.cond(!historyStorage.containsMod(m.id), (),
       PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
     _ <- Either.cond(header.isRelated(m), (),
       PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
