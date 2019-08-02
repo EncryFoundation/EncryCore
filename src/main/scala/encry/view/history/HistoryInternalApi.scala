@@ -46,6 +46,8 @@ trait HistoryInternalApi extends StrictLogging {
     .flatMap(getHeightByHeaderId)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
+  def modifierBytesByIdInternal(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
+
   def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   //todo probably rewrite with indexes collection

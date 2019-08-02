@@ -9,7 +9,7 @@ import encry.utils.NetworkTimeProvider
 import encry.view.history.processors.ValidationError.HistoryExternalApiError
 import encry.view.history.processors.{BlockDownloadProcessor, ValidationError}
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, BlockProtoSerializer, Header, HeaderProtoSerializer, Payload}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
@@ -85,6 +85,18 @@ trait HistoryExternalApi extends HistoryInternalApi {
     headersCache.get(ByteArrayWrapper(id)).isDefined ||
       blocksCache.get(ByteArrayWrapper(id)).isDefined ||
       isModifierDefined(id)
+
+  def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
+    .get(ByteArrayWrapper(id)).map(h => HeaderProtoSerializer.toProto(h).toByteArray)
+    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(b => BlockProtoSerializer.toProto(b).toByteArray))
+    .orElse(modifierBytesByIdInternal(id))
+
+  def lastHeaders(count: Int): HeaderChain = getBestHeader
+    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
+    .getOrElse(HeaderChain.empty)
+
+  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
+    .flatMap(getBestHeaderIdAtHeight)
 
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
@@ -224,12 +236,6 @@ trait HistoryExternalApi extends HistoryInternalApi {
       }
     }
 
-  def lastHeaders(count: Int): HeaderChain = getBestHeader
-    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
-    .getOrElse(HeaderChain.empty)
-
-  def modifierBytesById(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
-
   def commonBlockThenSuffixes(header1: Header,
                               header2: Header): (HeaderChain, HeaderChain) = {
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
@@ -263,9 +269,6 @@ trait HistoryExternalApi extends HistoryInternalApi {
       (prevChain.headOption.map(_.id), newChain.tail)
     case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
-
-  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
-    .flatMap(h => headerIdsAtHeight(h).headOption)
 
   private def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
