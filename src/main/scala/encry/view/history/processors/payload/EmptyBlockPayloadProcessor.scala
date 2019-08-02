@@ -12,6 +12,6 @@ trait EmptyBlockPayloadProcessor extends BaseBlockPayloadProcessor {
   override protected def validate(m: Payload): Either[ValidationError, PersistentModifier] =
     IncorrectProcessingRegime("Regime that do not process BlockTransactions").asLeft[PersistentModifier]
 
-  override protected def process(m: Payload): ProgressInfo[PersistentModifier] =
+  override protected def process(m: Payload): ProgressInfo =
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
 }

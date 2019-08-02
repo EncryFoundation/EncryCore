@@ -76,6 +76,11 @@ trait HistoryExternalApi extends HistoryInternalApi {
       .orElse(getHeaderByIdInternal(id))
   )
 
+  def getBlockByPayload(payload: Payload): Option[Block] = headersCache
+    .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
+    .orElse(blocksCache.get(ByteArrayWrapper(payload.headerId)))
+    .orElse(getHeaderById(payload.headerId).flatMap(h => Some(Block(h, payload))))
+
   //todo make this logic correct
   def isBlockDefined(header: Header): Boolean =
     blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)

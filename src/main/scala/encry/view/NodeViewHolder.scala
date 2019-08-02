@@ -147,7 +147,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     nodeView = newNodeView
   }
 
-  def requestDownloads(pi: ProgressInfo[PersistentModifier], previousModifier: Option[ModifierId] = None): Unit =
+  def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
@@ -162,7 +162,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   private def updateState(history: EncryHistory,
                           state: UtxoState,
-                          progressInfo: ProgressInfo[PersistentModifier],
+                          progressInfo: ProgressInfo,
                           suffixApplied: IndexedSeq[PersistentModifier]):
   (EncryHistory, UtxoState, Seq[PersistentModifier]) = {
     logger.debug(s"\nStarting updating state in updateState function!")
@@ -194,7 +194,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo[PersistentModifier]) =
+              val (newHis: EncryHistory, newProgressInfo: ProgressInfo) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
@@ -377,7 +377,7 @@ object NodeViewHolder {
   case class UpdateInformation(history: EncryHistory,
                                state: UtxoState,
                                failedMod: Option[PersistentModifier],
-                               alternativeProgressInfo: Option[ProgressInfo[PersistentModifier]],
+                               alternativeProgressInfo: Option[ProgressInfo],
                                suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {

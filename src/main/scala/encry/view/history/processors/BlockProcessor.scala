@@ -44,7 +44,7 @@ trait BlockProcessor extends HistoryExternalApi with StrictLogging {
 
 object BlockProcessor {
 
-  type BlockProcessing = PartialFunction[ToProcess, ProgressInfo[PersistentModifier]]
+  type BlockProcessing = PartialFunction[ToProcess, ProgressInfo]
 
   case class ToProcess(fullBlock: Block,
                        newModRow: PersistentModifier,

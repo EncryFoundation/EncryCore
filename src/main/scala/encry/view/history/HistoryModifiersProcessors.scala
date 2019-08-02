@@ -6,63 +6,150 @@ import encry.consensus.ConsensusSchemeReaders
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.history.processors.BlockProcessor.{BlockProcessing, ToProcess}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import supertagged.@@
-
+import cats.syntax.option._
 import scala.annotation.tailrec
 import scala.util.Try
 
 trait HistoryModifiersProcessors extends HistoryExternalApi {
 
-  protected def process(h: Header): ProgressInfo[PersistentModifier] = getHeaderInfoUpdate(h) match {
-    case Some(dataToUpdate) =>
-      historyStorage.bulkInsert(h.id, dataToUpdate._1, Seq(dataToUpdate._2))
+  def process(modifier: PersistentModifier): ProgressInfo = modifier match {
+    case header: Header => processHeader(header)
+    case payload: Payload => processPayload(payload)
+  }
+
+  private def processHeader(h: Header): ProgressInfo = getHeaderInfoUpdate(h) match {
+    case dataToUpdate: Seq[_] if dataToUpdate.nonEmpty =>
+      historyStorage.bulkInsert(h.id, dataToUpdate, Seq(h))
       getBestHeaderId match {
         case Some(bestHeaderId) =>
-          val toProcess: Seq[Header] = if (!(bestHeaderId sameElements h.id)) Seq.empty else Seq(h)
-          ProgressInfo(None, Seq.empty, toProcess, toDownload(h))
+          ProgressInfo(none, Seq.empty, if (!bestHeaderId.sameElements(h.id)) Seq.empty else Seq(h), toDownload(h))
         case None =>
           logger.error("Should always have best header after header application")
           forceStopApplication()
       }
-    case None => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+    case _ => ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
 
-  private def getHeaderInfoUpdate(header: Header): Option[(Seq[(StorageKey, StorageValue)], PersistentModifier)] = {
+  def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
+    .flatMap(block =>
+      if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) none
+      else processBlock(block).some
+    )
+    .getOrElse(putToHistory(payload))
+
+  def processBlock(blockToProcess: Block): ProgressInfo = {
+    val bestFullChain: Seq[Block] = calculateBestFullChain(blockToProcess)
+    addBlockToCacheIfNecessary(blockToProcess)
+    bestFullChain.lastOption.map(_.header) match {
+      case Some(header) if isValidFirstBlock(blockToProcess.header) =>
+        processValidFirstBlock(blockToProcess, header, bestFullChain, settings.node.blocksToKeep)
+      case Some(header) if getBestBlock.nonEmpty && isBetterChain(header.id) =>
+        processBetterChain(blockToProcess, header, Seq.empty, settings.node.blocksToKeep)
+      case Some(header) =>
+        nonBestBlock(blockToProcess, header, Seq.empty, settings.node.blocksToKeep)
+      case None =>
+        logger.debug(s"Best full chain is empty. Returning empty progress info")
+        ProgressInfo(none, Seq.empty, Seq.empty, Seq.empty) //todo new case
+    }
+  }
+
+  def processValidFirstBlock(fullBlock: Block,
+                             newBestHeader: Header,
+                             newBestChain: Seq[Block],
+                             blocksToKeep: Int): ProgressInfo = {
+    logger.info(s"Appending ${fullBlock.encodedId} as a valid first block with height ${fullBlock.header.height}")
+    //logStatus(Seq(), newBestChain, fullBlock, None)
+    updateStorage(fullBlock.payload, newBestHeader.id)
+    ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
+  }
+
+  def processBetterChain(fullBlock: Block,
+                         newBestHeader: Header,
+                         newBestChain: Seq[Block],
+                         blocksToKeep: Int): ProgressInfo = getHeaderOfBestBlock.map { header =>
+    val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(header, newBestHeader)
+    val toRemove: Seq[Block] = prevChain
+      .tail
+      .headers
+      .flatMap(getBlockByHeader)
+    val toApply: Seq[Block] = newChain
+      .tail
+      .headers
+      .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlockByHeader(h))
+    toApply.foreach(addBlockToCacheIfNecessary)
+    toApply.foreach(addBlockToCacheIfNecessary)
+    if (toApply.lengthCompare(newChain.length - 1) != 0)
+      nonBestBlock(fullBlock, header, Seq.empty, settings.node.blocksToKeep)
+    else {
+      //application of this block leads to full chain with higher score
+      logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
+      //logStatus(toRemove, toApply, fullBlock, Some(headerOfPrevBestBlock))
+      val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
+      val bestHeaderHeight: Int = getBestHeaderHeight
+      val updateBestHeader: Boolean =
+        (fullBlock.header.height > bestHeaderHeight) || (
+          (fullBlock.header.height == bestHeaderHeight) &&
+            scoreOf(fullBlock.id)
+              .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
+              .getOrElse(false)
+          )
+
+      updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader)
+      if (blocksToKeep >= 0) {
+        val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
+        val bestHeight: Int = toApply.last.header.height
+        val diff: Int = bestHeight - header.height
+        clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
+      }
+      ProgressInfo(branchPoint, toRemove, toApply, Seq.empty)
+    }
+  }.getOrElse(ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty))
+
+  def nonBestBlock(fullBlock: Block,
+                   newBestHeader: Header,
+                   newBestChain: Seq[Block],
+                   blocksToKeep: Int): ProgressInfo = {
+    //Orphaned block or full chain is not initialized yet
+    logStatus(Seq.empty, Seq.empty, fullBlock, None)
+    historyStorage.bulkInsert(storageVersion(fullBlock.payload), Seq.empty, Seq(fullBlock.payload))
+    ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+  }
+
+  private def getHeaderInfoUpdate(header: Header): Seq[(StorageKey, StorageValue)] = {
     addHeaderToCacheIfNecessary(header)
     if (header.isGenesis) {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
-      Option(Seq(
-        BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId),
-        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id.untag(ModifierId),
+      Seq(
+        BestHeaderKey -> StorageValue @@ header.id,
+        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id,
         headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
         headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray
-      ) -> header)
+      )
     } else scoreOf(header.parentId).map { parentScore =>
-      val score: BigInt @@ Difficulty.Tag =
+      val score: Difficulty =
         Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
+      val bestHeaderHeight: Int = getBestHeaderHeight
+      val bestHeadersChainScore: BigInt = getBestHeadersChainScore
       val bestRow: Seq[(StorageKey, StorageValue)] =
-        if ((header.height > getBestHeaderHeight) ||
-          (header.height == getBestHeaderHeight && score > getBestHeadersChainScore)) {
+        if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
           Seq(BestHeaderKey -> StorageValue @@ header.id.untag(ModifierId))
-        } else Seq.empty
+        else Seq.empty
       val scoreRow: (StorageKey, StorageValue) =
         headerScoreKey(header.id) -> StorageValue @@ score.toByteArray
       val heightRow: (StorageKey, StorageValue) =
         headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
       val headerIdsRow: Seq[(StorageKey, StorageValue)] =
-        if ((header.height > getBestHeaderHeight) || (header.height == getBestHeaderHeight && score > getBestHeadersChainScore))
+        if ((header.height > bestHeaderHeight) || (header.height == bestHeaderHeight && score > bestHeadersChainScore))
           bestBlockHeaderIdsRow(header, score)
         else orphanedBlockHeaderIdsRow(header, score)
-      (Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow, header)
-    }
+      Seq(scoreRow, heightRow) ++ bestRow ++ headerIdsRow
+    }.getOrElse(Seq.empty)
   }
-
 
   /** Update header ids to ensure, that this block id and ids of all parent blocks are in the first position of
     * header ids at this height */
@@ -92,80 +179,10 @@ trait HistoryModifiersProcessors extends HistoryExternalApi {
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  def process(payload: Payload): ProgressInfo[PersistentModifier] = getBlockByPayload(payload)
-    .flatMap(block =>
-      if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) None
-      else Some(processBlock(block, payload))
-    )
-    .getOrElse(putToHistory(payload))
-
-  def getBlockByPayload(payload: Payload): Option[Block] = getHeaderById(payload.headerId)
-    .flatMap(h => Some(Block(h, payload)))
-
-
-  def putToHistory(payload: Payload): ProgressInfo[PersistentModifier] = {
+  def putToHistory(payload: Payload): ProgressInfo = {
     historyStorage.insertObjects(Seq(payload))
     ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
   }
-
-  def processBlock(fullBlock: Block,
-                   modToApply: PersistentModifier): ProgressInfo[PersistentModifier] = {
-    val bestFullChain: Seq[Block] = calculateBestFullChain(fullBlock)
-    logger.debug(s"best full chain contains: ${bestFullChain.length}")
-    val newBestAfterThis: Header = bestFullChain.last.header
-    addBlockToCacheIfNecessary(fullBlock)
-    if (isValidFirstBlock(fullBlock.header))
-      processValidFirstBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, bestFullChain, settings.node.blocksToKeep))
-    else if (getBestBlock.nonEmpty && isBetterChain(newBestAfterThis.id))
-      processBetterChain(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
-    else nonBestBlock(ToProcess(fullBlock, modToApply, newBestAfterThis, Seq.empty, settings.node.blocksToKeep))
-  }
-
-  def processValidFirstBlock: BlockProcessing = {
-    case ToProcess(fullBlock, newModRow, newBestHeader, newBestChain, _) if isValidFirstBlock(fullBlock.header) =>
-      logger.info(s"Appending ${fullBlock.encodedId} as a valid first block")
-      logStatus(Seq(), newBestChain, fullBlock, None)
-      updateStorage(newModRow, newBestHeader.id)
-      ProgressInfo(None, Seq.empty, newBestChain, Seq.empty)
-  }
-
-  //todo toRemove will be fixed later
-  def processBetterChain: BlockProcessing = {
-    case toProcess@ToProcess(fullBlock, newModRow, newBestHeader, _, blocksToKeep)
-      if getBestBlock.nonEmpty && isBetterChain(newBestHeader.id) =>
-      //todo remove .get
-      val headerOfPrevBestBlock: Header = getHeaderOfBestBlock.get
-      val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(headerOfPrevBestBlock, newBestHeader)
-      val toRemove: Seq[Block] = prevChain.tail.headers.flatMap(getBlockByHeader)
-      val toApply: Seq[Block] = newChain.tail.headers
-        .flatMap(h => if (h == fullBlock.header) Some(fullBlock) else getBlockByHeader(h))
-      toApply.foreach(addBlockToCacheIfNecessary)
-      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(toProcess)
-      else {
-        //application of this block leads to full chain with higher score
-        logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
-        logStatus(toRemove, toApply, fullBlock, Some(headerOfPrevBestBlock))
-        val branchPoint: Option[ModifierId] = toRemove.headOption.map(_ => prevChain.head.id)
-        val updateBestHeader: Boolean =
-          (fullBlock.header.height > getBestHeaderHeight) || (
-            (fullBlock.header.height == getBestHeaderHeight) &&
-              scoreOf(fullBlock.id)
-                .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
-                .getOrElse(false))
-
-        updateStorage(newModRow, newBestHeader.id, updateBestHeader)
-        if (blocksToKeep >= 0) {
-          val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
-          val bestHeight: Int = toApply.last.header.height
-          val diff: Int = bestHeight - headerOfPrevBestBlock.height
-          clipBlockDataAt(((lastKept - diff) until lastKept).filter(_ >= 0))
-        }
-        ProgressInfo(branchPoint, toRemove, toApply, Seq.empty)
-      }
-  }
-
-  def isValidFirstBlock(header: Header): Boolean =
-    header.height == blockDownloadProcessor.minimalBlockHeight && getBestBlockId.isEmpty
 
   def isBetterChain(id: ModifierId): Boolean = {
     val isBetter: Option[Boolean] = for {
@@ -177,16 +194,6 @@ trait HistoryModifiersProcessors extends HistoryExternalApi {
     } yield (getBestBlockHeight < heightOfThisHeader) || (getBestBlockHeight == heightOfThisHeader && score > prevBestScore)
     isBetter getOrElse false
   }
-
-
-  def nonBestBlock: BlockProcessing = {
-    case params =>
-      //Orphaned block or full chain is not initialized yet
-      logStatus(Seq.empty, Seq.empty, params.fullBlock, None)
-      historyStorage.bulkInsert(storageVersion(params.newModRow), Seq.empty, Seq(params.newModRow))
-      ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
-  }
-
 
   def calculateBestFullChain(block: Block): Seq[Block] = {
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.tail)
@@ -252,4 +259,7 @@ trait HistoryModifiersProcessors extends HistoryExternalApi {
 
     loop(header.height, Seq(Seq(header)))
   }
+
+  def isValidFirstBlock(header: Header): Boolean =
+    header.height == blockDownloadProcessor.minimalBlockHeight && getBestBlockId.isEmpty
 }
