@@ -5,8 +5,7 @@ import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
-import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
+import encry.view.history.HistoryImpl
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -143,7 +142,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }
   }._1
 
-  def generateNextBlock(history: EncryHistory,
+  def generateNextBlock(history: HistoryImpl,
                         difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
                         txsQty: Int = 100,
@@ -170,7 +169,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
                 from: Int,
                 to: Int,
                 settings: EncryAppSettings): (List[Block], List[Block]) = {
-    val history: EncryHistory = generateDummyHistory(settings)
+    val history: HistoryImpl = generateDummyHistory(settings)
     val forkInterval = (from until to).toList
     (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
       case ((histories, blocks), blockHeight) =>
@@ -213,7 +212,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }._2
   }
 
-  def generateDummyHistory(settingsEncry: EncryAppSettings): EncryHistory = {
+  def generateDummyHistory(settingsEncry: EncryAppSettings): HistoryImpl = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -223,9 +222,8 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with BlockPayloadProcessor {
+    new HistoryImpl {
       override  val settings: EncryAppSettings = settingsEncry
-      override  val nodeSettings: NodeSettings = settings.node
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }

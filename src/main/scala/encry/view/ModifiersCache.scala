@@ -3,8 +3,8 @@ package encry.view
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import encry.view.history.EncryHistory
-import encry.view.history.processors.ValidationError.{FatalValidationError, NonFatalValidationError}
+import encry.view.history.HistoryImpl
+import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
@@ -31,7 +31,7 @@ object ModifiersCache extends StrictLogging {
 
   def contains(key: Key): Boolean = cache.contains(key)
 
-  def put(key: Key, value: PersistentModifier, history: EncryHistory): Unit = if (!contains(key)) {
+  def put(key: Key, value: PersistentModifier, history: HistoryImpl): Unit = if (!contains(key)) {
     logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
     cache.put(key, value)
     value match {
@@ -57,13 +57,13 @@ object ModifiersCache extends StrictLogging {
     cache.remove(key)
   }
 
-  def popCandidate(history: EncryHistory): List[PersistentModifier] = synchronized {
+  def popCandidate(history: HistoryImpl): List[PersistentModifier] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 
-  def findCandidateKey(history: EncryHistory): List[Key] = {
+  def findCandidateKey(history: HistoryImpl): List[Key] = {
 
     def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
       case Left(_: FatalValidationError) => remove(key); false

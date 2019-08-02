@@ -66,8 +66,7 @@ case class AccountManager(store: Store) extends StrictLogging {
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.map(_.password)
     .getOrElse(throw new RuntimeException("password not specified"))))
     .fold(e => {
-      logger.error(s"AccountManager: decryption failed cause ${e.getCause}")
-      EncryApp.forceStopApplication(500)
+      EncryApp.forceStopApplication(500, s"AccountManager: decryption failed cause ${e.getCause}")
     }, r => r)
 
   private def saveAccount(privateKey: PrivateKey, publicKey: PublicKey): Unit = {

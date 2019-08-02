@@ -1,7 +1,6 @@
 package encry.view.history
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History.ProgressInfo
 import encry.modifiers.history._
@@ -11,7 +10,6 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
-import encry.view.history.processors.payload.BlockPayloadProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -21,28 +19,16 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
 
-import scala.util.Try
-
-/** History implementation. It is processing persistent modifiers generated locally or received from the network.
-  * Depending on chosen node settings, it will process modifiers in a different way, different processors define how to
-  * process different types of modifiers.
-  *
-  * HeadersProcessor: processor of block headers. It's the same for all node settings
-  * ADProofsProcessor: processor of ADProofs. ADProofs may
-  *   1. Be downloaded from other nodes (ADState == true)
-  *   2. Be calculated by using local state (ADState == false)
-  *   3. Be ignored by history in light mode (verifyTransactions == false)
-  * BlockPayloadProcessor: Processor of BlockPayload. BlockPayload may
-  *   1. Be downloaded from other peers (verifyTransactions == true)
-  *   2. Be ignored by history (verifyTransactions == false) */
-trait EncryHistory extends EncryHistoryReader
-  with HistoryModifiersValidator  with HistoryModifiersProcessors with AutoCloseable {
+/**
+  * History implementation. It is processing persistent modifiers generated locally or received from the network.
+ **/
+trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
   def isFullChainSynced: Boolean = getBestHeaderId
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, (EncryHistory, ProgressInfo)] = {
+  def append(modifier: PersistentModifier): Either[Throwable, (HistoryImpl, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header => (this, process(header))
@@ -50,7 +36,7 @@ trait EncryHistory extends EncryHistoryReader
     })
   }
 
-  def reportModifierIsValid(modifier: PersistentModifier): EncryHistory = {
+  def reportModifierIsValid(modifier: PersistentModifier): HistoryImpl = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     markModifierValid(modifier)
     this
@@ -58,17 +44,17 @@ trait EncryHistory extends EncryHistoryReader
 
   /** Report some modifier as valid or invalid semantically */
   def reportModifierIsInvalid(modifier: PersistentModifier, progressInfo: ProgressInfo):
-  (EncryHistory, ProgressInfo) = {
+  (HistoryImpl, ProgressInfo) = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     this -> markModifierInvalid(modifier)
   }
 
   /** @return header, that corresponds to modifier */
   protected def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
-    case header: Header => Some(header)
-    case block: Block => Some(block.header)
+    case header: Header   => Some(header)
+    case block: Block     => Some(block.header)
     case payload: Payload => getHeaderById(payload.headerId)
-    case _ => None
+    case _                => None
   }
 
   /**
@@ -91,7 +77,7 @@ trait EncryHistory extends EncryHistoryReader
           case (false, false) =>
             // Modifiers from best header and best full chain are not involved, no rollback and links change required.
             historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), validityRow)
-            ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+            ProgressInfo(None, Seq.empty, Seq.empty, None)
           case _ =>
             // Modifiers from best header and best full chain are involved, links change required.
             val newBestHeader: Header =
@@ -105,7 +91,7 @@ trait EncryHistory extends EncryHistoryReader
                 StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
                 List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
               )
-              ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+              ProgressInfo(None, Seq.empty, Seq.empty, None)
             } else {
               val invalidatedChain: Seq[Block] = getBestBlock.toSeq
                 .flatMap(f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
@@ -123,7 +109,7 @@ trait EncryHistory extends EncryHistoryReader
                 )
               val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
               historyStorage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
-              ProgressInfo(Some(branchPoint.id), invalidatedChain.tail, validChain.tail, Seq.empty)
+              ProgressInfo(Some(branchPoint.id), invalidatedChain.tail, validChain.tail, None)
             }
         }
       case None =>
@@ -132,7 +118,7 @@ trait EncryHistory extends EncryHistoryReader
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
         )
-        ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+        ProgressInfo(None, Seq.empty, Seq.empty, None)
     }
 
   /**
@@ -154,7 +140,7 @@ trait EncryHistory extends EncryHistoryReader
           )
         }
         if (getBestBlock.contains(block))
-          ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty) // Applies best header to the history
+          ProgressInfo(None, Seq.empty, Seq.empty, None) // Applies best header to the history
         else {
           // Marks non-best full block as valid. Should have more blocks to apply to sync state and history.
           val bestFullHeader: Header = getBestBlock.get.header
@@ -166,14 +152,14 @@ trait EncryHistory extends EncryHistoryReader
             .ensuring(_.isDefined, s"Should be able to get full block for header ${chainBack.headOption}")
             .ensuring(_.get.header.parentId sameElements block.header.id,
               s"Block to apply should link to current block. Failed for ${chainBack.headOption} and ${block.header}")
-          ProgressInfo(None, Seq.empty, toApply.toSeq, Seq.empty)
+          ProgressInfo(None, Seq.empty, toApply.toSeq, None)
         }
       case mod =>
         historyStorage.insert(
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(1.toByte))
         )
-        ProgressInfo(None, Seq.empty, Seq.empty, Seq.empty)
+        ProgressInfo(None, Seq.empty, Seq.empty, None)
     }
 
   override def close(): Unit = historyStorage.close()
@@ -181,7 +167,7 @@ trait EncryHistory extends EncryHistoryReader
   def closeStorage(): Unit = historyStorage.close()
 }
 
-object EncryHistory extends StrictLogging {
+object HistoryImpl extends StrictLogging {
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {
     val dir: File = new File(s"${settings.directory}/history/index")
@@ -195,7 +181,7 @@ object EncryHistory extends StrictLogging {
     dir
   }
 
-  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): EncryHistory = {
+  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): HistoryImpl = {
 
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
     //Check what kind of storage in settings:
@@ -211,16 +197,10 @@ object EncryHistory extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
-    logger.info(s"Creating storage")
-    val storage: HistoryStorage = new HistoryStorage(vldbInit)
-    logger.info(s"Creating history")
-    val history: EncryHistory = new EncryHistory with BlockPayloadProcessor {
+    new HistoryImpl {
       override val settings: EncryAppSettings = settingsEncry
-      override val historyStorage: HistoryStorage = storage
-      override protected val nodeSettings: NodeSettings = settingsEncry.node
+      override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
       override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
     }
-    logger.info(s"History created")
-    history
   }
 }

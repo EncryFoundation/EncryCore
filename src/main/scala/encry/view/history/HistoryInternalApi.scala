@@ -23,7 +23,7 @@ trait HistoryInternalApi extends StrictLogging {
     .modifierById(id)
     .collect { case m: T => m }
 
-  def getHeightByHeaderId(id: ModifierId): Option[Int] = historyStorage
+  def getHeightByHeaderIdInternal(id: ModifierId): Option[Int] = historyStorage
     .get(headerHeightKey(id))
     .map(Ints.fromByteArray)
 
@@ -37,13 +37,13 @@ trait HistoryInternalApi extends StrictLogging {
   def getBestHeaderId: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
   def getBestHeaderInternal: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdInternal)
   def getBestHeaderHeightInternal: Int = getBestHeaderId
-    .flatMap(getHeightByHeaderId)
+    .flatMap(getHeightByHeaderIdInternal)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
   def getBestBlockId: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
   def getBestBlockInternal: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdInternal)
   def getBestBlockHeightInternal: Int = getBestBlockId
-    .flatMap(getHeightByHeaderId)
+    .flatMap(getHeightByHeaderIdInternal)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
   def modifierBytesByIdInternal(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)

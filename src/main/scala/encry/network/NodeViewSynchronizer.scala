@@ -23,8 +23,7 @@ import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
 import encry.view.NodeViewErrors.ModifierApplyError
-import encry.view.history.processors.ValidationError
-import encry.view.history.{EncryHistory, EncryHistoryReader}
+import encry.view.history.{HistoryImpl, ValidationError}
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
@@ -56,7 +55,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
-  var historyReaderOpt: Option[EncryHistory] = None
+  var historyReaderOpt: Option[HistoryImpl] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
 
@@ -79,7 +78,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   override def receive: Receive = awaitingHistoryCycle
 
   def awaitingHistoryCycle: Receive = {
-    case ChangedHistory(reader: EncryHistory) =>
+    case ChangedHistory(reader: HistoryImpl) =>
       logger.info(s"get history: $reader from $sender")
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
@@ -88,7 +87,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg => logger.info(s"Nvsh got strange message: $msg during history awaiting.")
   }
 
-  def workingCycle(history: EncryHistory): Receive = {
+  def workingCycle(history: HistoryImpl): Receive = {
     case msg@InvalidModifiers(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
@@ -186,7 +185,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
-    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+    case ChangedHistory(reader: HistoryImpl@unchecked) if reader.isInstanceOf[HistoryImpl] =>
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
@@ -254,9 +253,9 @@ object NodeViewSynchronizer {
 
     trait NodeViewChange extends NodeViewHolderEvent
 
-    case class ChangedHistory(reader: EncryHistoryReader) extends NodeViewChange
+    case class ChangedHistory(reader: HistoryImpl) extends NodeViewChange
 
-    case class UpdatedHistory(history: EncryHistory)
+    case class UpdatedHistory(history: HistoryImpl)
 
     case class ChangedState(reader: UtxoState) extends NodeViewChange
 

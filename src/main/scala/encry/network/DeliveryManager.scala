@@ -12,7 +12,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.history.EncryHistory
+import encry.view.history.HistoryImpl
 import encry.settings.EncryAppSettings
 
 import scala.concurrent.duration._
@@ -95,7 +95,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }
 
-  def basicMessageHandler(history: EncryHistory,
+  def basicMessageHandler(history: HistoryImpl,
                           isBlockChainSynced: Boolean,
                           isMining: Boolean,
                           checkModScheduler: Cancellable): Receive = {
@@ -258,7 +258,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param isMining           - current mining status
     */
 
-  def requestModifies(history: EncryHistory,
+  def requestModifies(history: HistoryImpl,
                       peer: ConnectedPeer,
                       mTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
@@ -401,7 +401,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   def requestDownload(modifierTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
-                      history: EncryHistory,
+                      history: HistoryImpl,
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {

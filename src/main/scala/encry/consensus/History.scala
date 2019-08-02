@@ -31,7 +31,7 @@ object History {
   case class ProgressInfo(branchPoint: Option[ModifierId],
                           toRemove: Seq[PersistentModifier],
                           toApply: Seq[PersistentModifier],
-                          toDownload: Seq[(ModifierTypeId, ModifierId)]) {
+                          toDownload: Option[(ModifierTypeId, ModifierId)]) {
 
     require(branchPoint.isDefined == toRemove.nonEmpty, s"Branch point should be defined for non-empty toRemove," +
       s" ${branchPoint.isDefined} == ${toRemove.nonEmpty} given")

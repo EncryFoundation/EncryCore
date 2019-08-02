@@ -15,7 +15,7 @@ import encry.network.PeersKeeper.UpdatedPeersCollection
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.settings.EncryAppSettings
-import encry.view.history.EncryHistory
+import encry.view.history.HistoryImpl
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage}
@@ -36,7 +36,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   override def afterAll(): Unit = system.terminate()
 
   def initialiseState(isChainSynced: Boolean = true, isMining: Boolean = true): (TestActorRef[DeliveryManager],
-    ConnectedPeer, ConnectedPeer, ConnectedPeer, List[Block], List[ModifierId], List[WrappedArray.ofByte], EncryHistory) = {
+    ConnectedPeer, ConnectedPeer, ConnectedPeer, List[Block], List[ModifierId], List[WrappedArray.ofByte], HistoryImpl) = {
     val (deliveryManager, history) =
       initialiseDeliveryManager(isBlockChainSynced = isChainSynced, isMining = isMining, settings)
     val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
@@ -133,7 +133,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
         Map(headerIds.head -> headerBytes)), cp1)
 
-      val uHistory: EncryHistory = history.append(blocks.head.header).right.get._1.reportModifierIsValid(blocks.head.header)
+      val uHistory: HistoryImpl = history.append(blocks.head.header).right.get._1.reportModifierIsValid(blocks.head.header)
 
       deliveryManager ! UpdatedHistory(uHistory)
 

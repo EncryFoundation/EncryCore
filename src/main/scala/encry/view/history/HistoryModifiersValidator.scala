@@ -1,8 +1,7 @@
 package encry.view.history
 
-import encry.view.history.processors.ValidationError
-import encry.view.history.processors.ValidationError.FatalValidationError._
-import encry.view.history.processors.ValidationError.NonFatalValidationError._
+import encry.view.history.ValidationError.FatalValidationError._
+import encry.view.history.ValidationError.NonFatalValidationError._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.constants.TestNetConstants
@@ -21,8 +20,8 @@ trait HistoryModifiersValidator extends HistoryExternalApi {
       case payload: Payload => validatePayload(payload)
       case mod              => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
     }) match {
-        case l@Left(value) => logger.info(s"Validation result for ${modifier.encodedId} failed cause $value"); l
-        case r@Right(m)    => logger.info(s"Validation result successful for ${m.encodedId}"); r
+      case l@Left(value) => logger.info(s"Validation result for ${modifier.encodedId} failed cause $value"); l
+      case r@Right(m)    => logger.info(s"Validation result successful for ${m.encodedId}"); r
     }
 
   private def validateHeader(h: Header): Either[ValidationError, Header] =

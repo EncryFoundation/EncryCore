@@ -1,7 +1,6 @@
-package encry.view.history.processors
+package encry.view.history
 
 sealed trait ValidationError
-
 object ValidationError {
   sealed trait FatalValidationError extends ValidationError
   object FatalValidationError {

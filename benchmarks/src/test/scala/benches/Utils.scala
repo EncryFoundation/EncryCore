@@ -12,11 +12,9 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
-import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
+import encry.view.history.HistoryImpl
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
-import encry.view.state.UtxoState.{initialStateBoxes, logger}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -145,7 +143,7 @@ object Utils extends StrictLogging {
     Block(header, Payload(header.id, transactions))
   }
 
-  def generateNextBlockValidForHistory(history: EncryHistory,
+  def generateNextBlockValidForHistory(history: HistoryImpl,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
                                        txs: Seq[Transaction]): Block = {
@@ -405,7 +403,7 @@ object Utils extends StrictLogging {
     uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
-  def generateHistory(settingsEncry: EncryAppSettings, file: File): EncryHistory = {
+  def generateHistory(settingsEncry: EncryAppSettings, file: File): HistoryImpl = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -415,9 +413,8 @@ object Utils extends StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with BlockPayloadProcessor {
+    new HistoryImpl {
       override  val settings: EncryAppSettings = settingsEncry
-      override  val nodeSettings: NodeSettings = settings.node
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }

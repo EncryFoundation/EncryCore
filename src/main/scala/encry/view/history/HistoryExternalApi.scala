@@ -1,13 +1,13 @@
 package encry.view.history
 
 import cats.syntax.either._
+import cats.syntax.option._
 import encry.consensus.History._
 import encry.consensus._
 import encry.modifiers.history._
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.history.processors.ValidationError.HistoryExternalApiError
-import encry.view.history.processors.{BlockDownloadProcessor, ValidationError}
+import encry.view.history.ValidationError.HistoryExternalApiError
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.{Block, BlockProtoSerializer, Header, HeaderProtoSerializer, Payload}
 import org.encryfoundation.common.network.SyncInfo
@@ -81,6 +81,15 @@ trait HistoryExternalApi extends HistoryInternalApi {
     .orElse(blocksCache.get(ByteArrayWrapper(payload.headerId)))
     .orElse(getHeaderById(payload.headerId).flatMap(h => Some(Block(h, payload))))
 
+  def getHeightByHeaderId(id: ModifierId): Option[Int] = headersCache
+    .get(ByteArrayWrapper(id)).map(_.height)
+    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
+    .orElse(getHeightByHeaderIdInternal(id))
+
+  def isBestBlockDefined: Boolean =
+    getBestBlockId.map(id => blocksCache.contains(ByteArrayWrapper(id))).isDefined ||
+      getHeaderOfBestBlock.map(h => isModifierDefined(h.payloadId)).isDefined
+
   //todo make this logic correct
   def isBlockDefined(header: Header): Boolean =
     blocksCache.get(ByteArrayWrapper(header.id)).isDefined || isModifierDefined(header.payloadId)
@@ -107,7 +116,7 @@ trait HistoryExternalApi extends HistoryInternalApi {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
-        case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) => //todo changed from isModDefined
+        case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
           continuation(height + 1, acc :+ h.payloadId)
         case Some(_) =>
           continuation(height + 1, acc)
@@ -116,40 +125,39 @@ trait HistoryExternalApi extends HistoryInternalApi {
       }
 
     (for {
-      bestBlockId <- getBestBlockId
+      bestBlockId             <- getBestBlockId
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-      case _ if !isHeadersChainSynced =>
-        Seq.empty
-      case Some(header) if isInBestChain(header) =>
-        continuation(header.height + 1, Seq.empty)
-      case Some(header) =>
-        lastBestBlockHeightRelevantToBestChain(header.height)
-          .map(height => continuation(height + 1, Seq.empty))
-          .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
-      case None =>
-        continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+        case _ if !isHeadersChainSynced =>
+          Seq.empty
+        case Some(header) if isInBestChain(header) =>
+          continuation(header.height + 1, Seq.empty)
+        case Some(header) =>
+          lastBestBlockHeightRelevantToBestChain(header.height)
+            .map(height => continuation(height + 1, Seq.empty))
+            .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
+        case None =>
+          continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
-  //todo change to Option(Tuple2(... -> ...))
-  def toDownload(header: Header): Seq[(ModifierTypeId, ModifierId)] =
-  // Already synced and header is not too far back. Download required modifiers
-    if (header.height >= blockDownloadProcessor.minimalBlockHeight) Seq(Payload.modifierTypeId -> header.payloadId)
+  def toDownload(header: Header): Option[(ModifierTypeId, ModifierId)] =
+    // Already synced and header is not too far back. Download required modifiers
+    if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
     else if (!isHeadersChainSynced && isNewHeader(header)) {
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
-      Seq.empty
-    } else Seq.empty
+      none
+    } else none
 
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
     @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
       if (acc.length == limit || until(header)) acc
       else getHeaderById(header.parentId) match {
-        case Some(parent: Header) => loop(parent, acc :+ parent)
+        case Some(parent: Header)         => loop(parent, acc :+ parent)
         case None if acc.contains(header) => acc
-        case _ => acc :+ header
+        case _                            => acc :+ header
       }
     }
 
@@ -160,14 +168,13 @@ trait HistoryExternalApi extends HistoryInternalApi {
   @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
     .find(p)
     .flatMap(getHeaderById) match {
-    case h@Some(_) => h
-    case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
-    case n@None => n
+      case h@Some(_)                                       => h
+      case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
+      case n@None                                          => n
   }
 
   def requiredDifficultyAfter(parent: Header): Either[ValidationError, Difficulty] = {
     val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
-      .ensuring(_.last == parent.height, "Incorrect heights sequence!")
     for {
       _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
         HistoryExternalApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
@@ -182,32 +189,27 @@ trait HistoryExternalApi extends HistoryInternalApi {
 
   def syncInfo: SyncInfo =
     if (getBestHeaderId.isEmpty) SyncInfo(Seq.empty)
-    else SyncInfo(getBestHeader.map(header =>
-      ((header.height - settings.network.maxInvObjects + 1) to header.height)
-        .flatMap(height => headerIdsAtHeight(height).headOption)
-    ).getOrElse(Seq.empty))
+    else SyncInfo(
+      getBestHeader.map(header =>
+        ((header.height - settings.network.maxInvObjects + 1) to header.height)
+          .flatMap(height => headerIdsAtHeight(height).headOption)
+      ).getOrElse(Seq.empty))
 
 
   def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {
-
     //Our best header is the same as other history best header
     case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
-
     //Our best header is in other history best chain, but not at the last position
     case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
-
     /* Other history is empty, or our history contains last id from other history */
     case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isHeaderDefined) => Younger
-
     case Some(_) =>
       //Our history contains some ids from other history
       if (si.lastHeaderIds.exists(isHeaderDefined)) Fork
       //Unknown comparison result
       else Unknown
-
     //Both nodes do not keep any blocks
     case None if si.lastHeaderIds.isEmpty => Equal
-
     //Our history is empty, other contain some headers
     case None => Older
   }
@@ -217,7 +219,7 @@ trait HistoryExternalApi extends HistoryInternalApi {
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
       val headersChain: Option[HeaderChain] = for {
-        startId <- headerIdsAtHeight(heightFrom).headOption
+        startId     <- headerIdsAtHeight(heightFrom).headOption
         startHeader <- getHeaderById(startId)
       } yield headerChainBack(size, startHeader, _ => false)
       Either.cond(
@@ -229,15 +231,15 @@ trait HistoryExternalApi extends HistoryInternalApi {
       val ids: Seq[ModifierId] = info.lastHeaderIds
       (for {
         lastHeaderInOurBestChain <- ids.view.reverse.find(m => isInBestChain(m))
-        theirHeight <- heightOf(lastHeaderInOurBestChain)
+        theirHeight              <- heightOf(lastHeaderInOurBestChain)
         heightFrom = Math.min(getBestHeaderHeight, theirHeight + size)
-        startId <- headerIdsAtHeight(heightFrom).headOption
-        startHeader <- getHeaderById(startId)
+        startId                  <- headerIdsAtHeight(heightFrom).headOption
+        startHeader              <- getHeaderById(startId)
       } yield headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
-        .headers
-        .map(_.id)) match {
-        case Some(value) => value.asRight[ValidationError]
-        case None => HistoryExternalApiError(s"continuationIds - else condition is empty").asLeft[Seq[ModifierId]]
+          .headers
+          .map(_.id)) match {
+            case Some(value) => value.asRight[ValidationError]
+            case None        => HistoryExternalApiError(s"continuationIds - else condition is empty").asLeft[Seq[ModifierId]]
       }
     }
 

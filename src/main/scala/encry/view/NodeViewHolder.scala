@@ -17,7 +17,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.history.EncryHistory
+import encry.view.history.HistoryImpl
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
 import encry.view.wallet.EncryWallet
@@ -38,7 +38,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
-  case class NodeView(history: EncryHistory, state: UtxoState, wallet: EncryWallet)
+  case class NodeView(history: HistoryImpl, state: UtxoState, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -133,7 +133,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
-  def updateNodeView(updatedHistory: Option[EncryHistory] = None,
+  def updateNodeView(updatedHistory: Option[HistoryImpl] = None,
                      updatedState: Option[UtxoState] = None,
                      updatedVault: Option[EncryWallet] = None): Unit = {
     val newNodeView: NodeView = NodeView(updatedHistory.getOrElse(nodeView.history),
@@ -160,11 +160,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
-  private def updateState(history: EncryHistory,
+  private def updateState(history: HistoryImpl,
                           state: UtxoState,
                           progressInfo: ProgressInfo,
                           suffixApplied: IndexedSeq[PersistentModifier]):
-  (EncryHistory, UtxoState, Seq[PersistentModifier]) = {
+  (HistoryImpl, UtxoState, Seq[PersistentModifier]) = {
     logger.debug(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
       case header: Header => requestDownloads(progressInfo, Some(header.id))
@@ -190,11 +190,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
                 case _ =>
               })
-              val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
+              val newHis: HistoryImpl = history.reportModifierIsValid(modToApply)
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
-              val (newHis: EncryHistory, newProgressInfo: ProgressInfo) =
+              val (newHis: HistoryImpl, newProgressInfo: ProgressInfo) =
                 history.reportModifierIsInvalid(modToApply, progressInfo)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
@@ -205,9 +205,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case None => (uf.history, uf.state, uf.suffix)
         }
       case Failure(e) =>
-        logger.error(s"Rollback failed: $e")
         context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
-        EncryApp.forceStopApplication(500)
+        EncryApp.forceStopApplication(500, s"Rollback failed: $e")
     }
   }
 
@@ -234,7 +233,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           if (progressInfo.toApply.nonEmpty) {
             logger.debug(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
             val startPoint: Long = System.currentTimeMillis()
-            val (newHistory: EncryHistory, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
+            val (newHistory: HistoryImpl, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
             if (settings.influxDB.isDefined)
               context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
@@ -297,16 +296,16 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: UtxoState = UtxoState.genesis(stateDir, Some(self), settings, influxRef)
-    val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+    val history: HistoryImpl = HistoryImpl.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] = if (EncryHistory.getHistoryIndexDir(settings).listFiles.nonEmpty)
+  def restoreState(): Option[NodeView] = if (HistoryImpl.getHistoryIndexDir(settings).listFiles.nonEmpty)
     try {
       val stateDir: File = UtxoState.getStateDir(settings)
       stateDir.mkdirs()
-      val history: EncryHistory = EncryHistory.readOrGenerate(settings, timeProvider)
+      val history: HistoryImpl = HistoryImpl.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val state: UtxoState = restoreConsistentState(
         UtxoState.create(stateDir, Some(self), settings, influxRef), history
@@ -330,7 +329,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     UtxoState.create(stateDir, Some(self), settings, influxRef)
   }
 
-  def restoreConsistentState(stateIn: UtxoState, history: EncryHistory): UtxoState =
+  def restoreConsistentState(stateIn: UtxoState, history: HistoryImpl): UtxoState =
     (stateIn.version, history.getBestBlock, stateIn) match {
       case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
@@ -374,7 +373,7 @@ object NodeViewHolder {
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
 
-  case class UpdateInformation(history: EncryHistory,
+  case class UpdateInformation(history: HistoryImpl,
                                state: UtxoState,
                                failedMod: Option[PersistentModifier],
                                alternativeProgressInfo: Option[ProgressInfo],
