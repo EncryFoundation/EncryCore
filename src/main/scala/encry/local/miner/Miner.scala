@@ -174,7 +174,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
       case Right(value) => value
-      case Left(value) => logger.error(value.toString); Difficulty @@ BigInt(0)
+      case Left(value) => logger.error(value.toString); TestNetConstants.InitialDifficulty
     })
       .getOrElse(TestNetConstants.InitialDifficulty)
 

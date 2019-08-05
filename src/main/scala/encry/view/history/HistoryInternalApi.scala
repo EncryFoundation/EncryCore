@@ -9,6 +9,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.hash.Digest32
+import scala.reflect.ClassTag
 
 trait HistoryInternalApi extends StrictLogging {
 
@@ -19,7 +20,7 @@ trait HistoryInternalApi extends StrictLogging {
   val BestBlockKey: StorageKey =
     StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
 
-  private def getModifierById[T](id: ModifierId): Option[T] = historyStorage
+  private def getModifierById[T: ClassTag](id: ModifierId): Option[T] = historyStorage
     .modifierById(id)
     .collect { case m: T => m }
 

@@ -16,12 +16,7 @@ import cats.syntax.either._
 
 trait HistoryModifiersProcessors extends HistoryExternalApi {
 
-  def process(modifier: PersistentModifier): ProgressInfo = modifier match {
-    case header: Header   => processHeader(header)
-    case payload: Payload => processPayload(payload)
-  }
-
-  private def processHeader(h: Header): ProgressInfo = getHeaderInfoUpdate(h) match {
+  def processHeader(h: Header): ProgressInfo = getHeaderInfoUpdate(h) match {
     case dataToUpdate: Seq[_] if dataToUpdate.nonEmpty =>
       historyStorage.bulkInsert(h.id, dataToUpdate, Seq(h))
       getBestHeaderId match {
@@ -33,7 +28,7 @@ trait HistoryModifiersProcessors extends HistoryExternalApi {
     case _ => ProgressInfo(none, Seq.empty, Seq.empty, none)
   }
 
-  private def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
+  def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
     .flatMap(block =>
       if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) none
       else processBlock(block).some

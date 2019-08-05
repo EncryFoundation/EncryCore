@@ -195,7 +195,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
               val (newHis: HistoryImpl, newProgressInfo: ProgressInfo) =
-                history.reportModifierIsInvalid(modToApply, progressInfo)
+                history.reportModifierIsInvalid(modToApply)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u

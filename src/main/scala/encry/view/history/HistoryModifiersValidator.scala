@@ -21,7 +21,7 @@ trait HistoryModifiersValidator extends HistoryExternalApi {
       case mod              => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
     }) match {
       case l@Left(value) => logger.info(s"Validation result for ${modifier.encodedId} failed cause $value"); l
-      case r@Right(m)    => logger.info(s"Validation result successful for ${m.encodedId}"); r
+      case r@Right(_)    => r
     }
 
   private def validateHeader(h: Header): Either[ValidationError, Header] =
