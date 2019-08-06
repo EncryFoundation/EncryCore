@@ -148,8 +148,8 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
       .headerIdsAtHeight(history.bestBlockHeight + 1)
       .headOption match {
       case Some(id) => history.modifierById(id) match {
-        case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
-          (List(new mutable.WrappedArray.ofByte(header.payloadId)), bestHeadersIds._2)
+        case Some(header: Header) if isApplicable(key(header.payloadId)) =>
+          (List(key(header.payloadId)), bestHeadersIds._2)
         case _ => (exhaustiveSearch, bestHeadersIds._2)
       }
       case None if isChainSynced =>

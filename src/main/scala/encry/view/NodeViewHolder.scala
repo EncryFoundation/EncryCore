@@ -258,7 +258,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
             if (newHistory.isFullChainSynced) {
               logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
-              ModifiersCache.setChainSynced()
+              modCache.setChainSynced()
               Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
