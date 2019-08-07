@@ -54,7 +54,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
-      influx.foreach(_ ! InfoAboutTxsFromMiner(transactionsPool.size))
+      influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
       dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
@@ -206,9 +206,6 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
             val envelope: CandidateEnvelope =
               CandidateEnvelope
                 .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") !
-                CandidateProducingTime(System.currentTimeMillis() - producingStartTime)
             envelope
           } else CandidateEnvelope.empty
         candidate
