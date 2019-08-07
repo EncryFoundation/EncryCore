@@ -32,7 +32,7 @@ case class InfoApiRoute(dataHolder: ActorRef,
   //todo: remove later
   private val getStateType: String = "UTXO"
 
-  private val storageInfo: String = if (appSettings.postgres.exists(_.enableSave)) "Postgres(write)" else ""
+  private val storageInfo: String = ""
 
   private val getAddress: Seq[InetSocketAddress] = appSettings.network.knownPeers
 
