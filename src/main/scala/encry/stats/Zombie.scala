@@ -11,7 +11,8 @@ class Zombie extends Actor with StrictLogging {
   }
 
   override def receive: Receive = {
-    case deadMessage: DeadLetter => logger.debug(s"Dead letter: ${deadMessage.toString}.")
+    case deadMessage: DeadLetter => logger.debug(s"Dead letter: ${deadMessage.toString}." +
+      s"From: ${deadMessage.sender}. To ${deadMessage.recipient}")
     case unhandled: UnhandledMessage => logger.debug(s"Unhandled letter: ${unhandled.toString}. " +
       s"From: ${unhandled.sender}. To ${unhandled.recipient}")
   }
