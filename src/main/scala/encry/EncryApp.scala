@@ -93,7 +93,6 @@ object EncryApp extends App with StrictLogging {
   }
 
   system.actorOf(Props[Zombie], "zombie")
-
   def forceStopApplication(code: Int = 0, errorMessage: String): Nothing = {
     logger.error(errorMessage)
     system.registerOnTermination {
