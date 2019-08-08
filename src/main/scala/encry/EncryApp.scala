@@ -43,8 +43,7 @@ object EncryApp extends App with StrictLogging {
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
 
   val influxRef: Option[ActorRef] =
-    if (settings.influxDB.isDefined) Some(system.actorOf(Props[StatsSender], "statsSender"))
-    else None
+    settings.influxDB.map(s => system.actorOf(StatsSender.props(s), "statsSender"))
 
   lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
 
