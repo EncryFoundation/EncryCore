@@ -217,7 +217,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val startAppHistory = System.currentTimeMillis()
       if (settings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
-        StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+        StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
           logger.debug(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
