@@ -36,13 +36,13 @@ final case class MemoryPoolStorage private(transactions: Map[String, Transaction
 
   def validateTransactions(txs: Seq[Transaction]): (MemoryPoolStorage, Seq[Transaction]) = {
     val validatedElems: Seq[Transaction] = txs.filter(isValid)
-    if (size + validatedElems.size <= settings.node.mempoolMaxCapacity)
+    if (size + validatedElems.size <= settings.mempool.maxCapacity)
       (putTransactions(validatedElems.map(tx => tx.encodedId -> tx)), validatedElems)
     else {
       val withoutExpiredPool: MemoryPoolStorage = filter(isExpired)
       val transactionsWhichCanBeAdded: Seq[Transaction] = validatedElems
         .sortBy(_.fee)
-        .take(settings.node.mempoolMaxCapacity - withoutExpiredPool.size)
+        .take(settings.mempool.maxCapacity - withoutExpiredPool.size)
       (putTransactions(transactionsWhichCanBeAdded.map(tx => tx.encodedId -> tx)), transactionsWhichCanBeAdded)
     }
   }
@@ -64,7 +64,7 @@ final case class MemoryPoolStorage private(transactions: Map[String, Transaction
   def isValid: Transaction => Boolean = tx => tx.semanticValidity.isSuccess && !contains(tx.encodedId)
 
   def isExpired: (String, Transaction) => Boolean =
-    (_, tx) => (networkTimeProvider.estimatedTime - tx.timestamp) < settings.node.utxMaxAge.toMillis
+    (_, tx) => (networkTimeProvider.estimatedTime - tx.timestamp) < settings.mempool.utxMaxAge.toMillis
 
 }
 
