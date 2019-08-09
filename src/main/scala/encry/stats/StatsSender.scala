@@ -113,35 +113,20 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 
     case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
-    case SerializedModifierFromNetwork(modifier) if nodeName.exists(_.isDigit) =>
+    case SerializedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-      modifier match {
-        case typeId if typeId == Header.modifierTypeId =>
-          influxDB.write(
-            influxDBSettings.udpPort,
-            s"""serializedHeaderFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
-          )
-        case typeId if typeId == Payload.modifierTypeId =>
-          influxDB.write(
-            influxDBSettings.udpPort,
-            s"""serializedPayloadFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
-          )
-      }
-
-    case ValidatedModifierFromNetwork(modifier) =>
+      val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
+      influxDB.write(
+        influxDBSettings.udpPort,
+        s"""serializedHModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
+      )
+    case ValidatedModifierFromNetwork(modifierTypeId) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-      modifier match {
-        case typeId if typeId == Header.modifierTypeId =>
-          influxDB.write(
-            influxDBSettings.udpPort,
-            s"""validatedHeaderFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
-          )
-        case typeId if typeId == Payload.modifierTypeId =>
-          influxDB.write(
-            influxDBSettings.udpPort,
-            s"""validatedPayloadFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
-          )
-      }
+      val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
+      influxDB.write(
+        influxDBSettings.udpPort,
+        s"""validatedModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
+      )
 
     case ModifierAppendedToHistory(_, _) =>
     case ModifierAppendedToState(_) =>
