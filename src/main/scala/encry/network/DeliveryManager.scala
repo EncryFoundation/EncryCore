@@ -10,7 +10,7 @@ import encry.network.DeliveryManager.{CheckModifiersToDownload, _}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
-import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
+import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest, SerializedModifierFromNetwork}
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.History
 import encry.settings.EncryAppSettings
@@ -34,6 +34,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -175,6 +176,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm
           .filterNot { case (modId, _) => history.isModifierDefined(modId) }
           .toSeq
+        influxRef.foreach(ref => (0 to filteredModifiers.size).foreach(
+          _ => if (typeId != Transaction.modifierTypeId) ref ! SerializedModifierFromNetwork(typeId)
+        ))
         //todo check this logic
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)

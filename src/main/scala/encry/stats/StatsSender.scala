@@ -10,7 +10,7 @@ import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.settings.InfluxDBSettings
 import encry.stats.StatsSender._
-import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -23,7 +23,7 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 
   val nodeName: String = settings.network.nodeName match {
     case Some(value) => value
-    case None        => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
+    case None => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
   }
   val influxDB: InfluxDB = InfluxDBFactory
     .connect(influxDBSettings.url, influxDBSettings.login, influxDBSettings.password)
@@ -113,26 +113,79 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 
     case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
+    case SerializedModifierFromNetwork(modifier) if nodeName.exists(_.isDigit) =>
+      val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+      modifier match {
+        case typeId if typeId == Header.modifierTypeId =>
+          influxDB.write(
+            influxDBSettings.udpPort,
+            s"""serializedHeaderFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
+          )
+        case typeId if typeId == Payload.modifierTypeId =>
+          influxDB.write(
+            influxDBSettings.udpPort,
+            s"""serializedPayloadFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
+          )
+      }
+
+    case ValidatedModifierFromNetwork(modifier) =>
+      val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+      modifier match {
+        case typeId if typeId == Header.modifierTypeId =>
+          influxDB.write(
+            influxDBSettings.udpPort,
+            s"""validatedHeaderFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
+          )
+        case typeId if typeId == Payload.modifierTypeId =>
+          influxDB.write(
+            influxDBSettings.udpPort,
+            s"""validatedPayloadFromNetwork,nodeName=$nodeNumber value=$nodeNumber"""
+          )
+      }
+
+    case ModifierAppendedToHistory(_, _) =>
+    case ModifierAppendedToState(_) =>
+    case SerializedModifierFromNetwork(_) =>
+    case ValidatedModifierFromNetwork(_) =>
+
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
   }
 }
 
 object StatsSender {
+
   final case class BestHeaderInChain(bestHeader: Header) extends AnyVal
+
   final case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
+
   final case class TransactionsInBlock(txsNum: Int) extends AnyVal
+
   final case class ModifierAppendedToHistory(isHeader: Boolean, success: Boolean)
+
   final case class ModifierAppendedToState(success: Boolean) extends AnyVal
+
   final case class InfoAboutTransactionsFromMiner(qty: Int) extends AnyVal
+
   final case class EndOfApplyingModifier(modifierId: ModifierId) extends AnyVal
+
   final case class StateUpdating(time: Long) extends AnyVal
+
   final case class SleepTime(time: Long) extends AnyVal
+
   final case class StartApplyingModifier(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long)
+
   final case class MiningEnd(blockHeader: Header, workerIdx: Int, workersQty: Int)
+
   final case class MiningTime(time: Long) extends AnyVal
+
   final case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
+
   final case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
+
+  final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends AnyVal
+
+  final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends AnyVal
 
   def props(settings: InfluxDBSettings): Props = Props(new StatsSender(settings))
 }
