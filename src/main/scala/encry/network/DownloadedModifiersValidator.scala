@@ -39,6 +39,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
         case ((modsColl, forRemove), (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
+            influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
             (modsColl :+ modifier, forRemove)
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
@@ -51,7 +52,6 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
         }
       }
       if (modifiers._1.nonEmpty) {
-        influxRef.foreach(ref => (0 to modifiers._1.size).foreach(_ => ref ! ValidatedModifierFromNetwork(typeId)))
         logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
           s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
         nodeViewHolder ! ModifiersFromRemote(modifiers._1)
