@@ -139,37 +139,21 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 }
 
 object StatsSender {
-
   final case class BestHeaderInChain(bestHeader: Header) extends AnyVal
-
   final case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
-
   final case class TransactionsInBlock(txsNum: Int) extends AnyVal
-
   final case class ModifierAppendedToHistory(isHeader: Boolean, success: Boolean)
-
   final case class ModifierAppendedToState(success: Boolean) extends AnyVal
-
   final case class InfoAboutTransactionsFromMiner(qty: Int) extends AnyVal
-
   final case class EndOfApplyingModifier(modifierId: ModifierId) extends AnyVal
-
   final case class StateUpdating(time: Long) extends AnyVal
-
   final case class SleepTime(time: Long) extends AnyVal
-
   final case class StartApplyingModifier(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long)
-
   final case class MiningEnd(blockHeader: Header, workerIdx: Int, workersQty: Int)
-
   final case class MiningTime(time: Long) extends AnyVal
-
   final case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
-
   final case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
-
   final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends AnyVal
-
   final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends AnyVal
 
   def props(settings: InfluxDBSettings): Props = Props(new StatsSender(settings))
