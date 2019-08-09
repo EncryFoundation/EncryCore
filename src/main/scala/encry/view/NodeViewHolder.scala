@@ -66,6 +66,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
+    case ModifierFromRemote(mod) =>
+      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
+      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+      if (isInHistory || isInCache)
+        logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+          s"can't be placed into cache cause of: inCache: ${!isInCache}.")
+      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      computeApplications()
+
     case ModifiersFromRemote(modifiers) => modifiers.foreach { mod =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -390,6 +399,7 @@ object NodeViewHolder {
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
     case class ModifiersFromRemote(serializedModifiers: Seq[PersistentModifier])
+    final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
 
     case class LocallyGeneratedModifier(pmod: PersistentModifier)
 

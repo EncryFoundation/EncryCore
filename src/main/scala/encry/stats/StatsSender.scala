@@ -120,7 +120,7 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
         influxDBSettings.udpPort,
         s"""serializedHModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
       )
-    case ValidatedModifierFromNetwork(modifierTypeId) =>
+    case ValidatedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
       influxDB.write(

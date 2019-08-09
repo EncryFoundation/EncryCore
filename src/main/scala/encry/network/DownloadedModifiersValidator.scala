@@ -12,12 +12,11 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.ValidatedModifierFromNetwork
-import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.History
+import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.mempool.MemoryPool.NewTransactions
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.utils.Algos
 import scala.util.{Failure, Success, Try}
 
@@ -35,30 +34,32 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
 
   def workingCycle(history: History): Receive = {
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
-      val modifiers = filteredModifiers.foldLeft(Seq.empty[PersistentModifier], Seq.empty[ModifierId]) {
-        case ((modsColl, forRemove), (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
+      val modifiers = filteredModifiers.foldLeft(Seq.empty[ModifierId]) {
+        case (forRemove, (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
-            logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct.")
+            logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
+              s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
-            (modsColl :+ modifier, forRemove)
+            nodeViewHolder ! ModifierFromRemote(modifier)
+            forRemove
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
-            (modsColl, forRemove :+ id)
+            forRemove :+ id
           case Failure(ex) =>
             peersKeeper ! BanPeer(remote, CorruptedSerializedBytes)
             logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-            (modsColl, forRemove :+ id)
+            forRemove :+ id
         }
       }
-      if (modifiers._1.nonEmpty) {
-        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
-          s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
-        nodeViewHolder ! ModifiersFromRemote(modifiers._1)
-      }
-      if (modifiers._2.nonEmpty) {
-        logger.debug(s"Sending to delivery manager invalid modifiers: ${modifiers._2.map(k => Algos.encode(k))}.")
-        nodeViewSync ! InvalidModifiers(modifiers._2)
+//      if (modifiers._1.nonEmpty) {
+//        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
+//          s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
+//        nodeViewHolder ! ModifiersFromRemote(modifiers._1)
+//      }
+      if (modifiers.nonEmpty) {
+        logger.debug(s"Sending to delivery manager invalid modifiers: ${modifiers.map(k => Algos.encode(k))}.")
+        nodeViewSync ! InvalidModifiers(modifiers)
       }
 
     case ModifiersForValidating(remote, typeId, filteredModifiers) => typeId match {
