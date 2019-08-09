@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.History._
@@ -14,7 +13,6 @@ import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest, SerializedMod
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.EncryHistory
 import encry.settings.EncryAppSettings
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
@@ -27,14 +25,12 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
-import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -177,11 +173,13 @@ class DeliveryManager(influxRef: Option[ActorRef],
           receivedSpamModifiers = Map.empty
         }
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm
-          .filterNot { case (modId, _) => history.isModifierDefined(modId) }
+          .filterNot { case (modId, _) =>
+            val condition: Boolean = history.isModifierDefined(modId)
+            if (!condition && typeId != Transaction.modifierTypeId)
+              influxRef.foreach(_ ! SerializedModifierFromNetwork(typeId))
+            condition
+          }
           .toSeq
-        influxRef.foreach(ref => (0 to filteredModifiers.size).foreach(
-          _ => if (typeId != Transaction.modifierTypeId) ref ! SerializedModifierFromNetwork(typeId)
-        ))
         //todo check this logic
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
