@@ -43,7 +43,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val mempool = TestProbe()
 
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
-        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref)
+        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
       val history: EncryHistory = generateDummyHistory(settingsWithAllPeers)
 
@@ -111,7 +111,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       )
 
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
-        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref)
+        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
       val history: EncryHistory = generateDummyHistory(settingsWithAllPeers)
 

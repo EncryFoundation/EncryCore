@@ -11,6 +11,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
+import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
 import encry.view.history.EncryHistory
 import encry.view.mempool.MemoryPool.NewTransactions
@@ -24,7 +25,8 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
                                    nodeViewHolder: ActorRef,
                                    peersKeeper: ActorRef,
                                    nodeViewSync: ActorRef,
-                                   memoryPoolRef: ActorRef) extends Actor with StrictLogging {
+                                   memoryPoolRef: ActorRef,
+                                   influxRef: Option[ActorRef]) extends Actor with StrictLogging {
 
   override def receive: Receive = {
     case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
@@ -48,8 +50,8 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             (modsColl, forRemove :+ id)
         }
       }
-
       if (modifiers._1.nonEmpty) {
+        influxRef.foreach(ref => (0 to modifiers._1.size).foreach(_ => ref ! ValidatedModifierFromNetwork(typeId)))
         logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
           s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
         nodeViewHolder ! ModifiersFromRemote(modifiers._1)
@@ -104,8 +106,9 @@ object DownloadedModifiersValidator {
             nodeViewHolder: ActorRef,
             peersKeeper: ActorRef,
             nodeViewSync: ActorRef,
-            memoryPoolRef: ActorRef): Props =
-    Props(new DownloadedModifiersValidator(settings, nodeViewHolder, peersKeeper, nodeViewSync, memoryPoolRef))
+            memoryPoolRef: ActorRef,
+            influxRef: Option[ActorRef]): Props =
+    Props(new DownloadedModifiersValidator(settings, nodeViewHolder, peersKeeper, nodeViewSync, memoryPoolRef, influxRef))
 
   class DownloadedModifiersValidatorPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
