@@ -18,6 +18,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
 
+
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
