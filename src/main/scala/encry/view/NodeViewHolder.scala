@@ -191,7 +191,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Right(stateAfterApply) =>
               influxRef.foreach(ref => modToApply match {
-                case b: Block if history.isFullChainSynced => ref ! TxsInBlock(b.payload.txs.size)
+                case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
                 case _ =>
               })
               val newHis: EncryHistory = history.reportModifierIsValid(modToApply)
@@ -221,13 +221,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val startAppHistory = System.currentTimeMillis()
       if (settings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
-        StartApplyingModif(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+        StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
           logger.debug(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
           logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
           influxRef.foreach { ref =>
-            ref ! EndOfApplyingModif(pmod.id)
+            ref ! EndOfApplyingModifier(pmod.id)
             val isHeader: Boolean = pmod match {
               case _: Header => true
               case _: Payload => false
@@ -255,7 +255,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
             logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
             if (settings.influxDB.isDefined) newHistory.bestHeaderOpt.foreach(header =>
-              context.actorSelection("/user/statsSender") ! BestHeaderInChain(header, System.currentTimeMillis()))
+              context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
             if (newHistory.isFullChainSynced) {
               logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.bestHeaderHeight}!")
               modCache.setChainSynced()

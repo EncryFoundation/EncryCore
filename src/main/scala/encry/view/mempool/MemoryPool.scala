@@ -34,14 +34,14 @@ class MemoryPool(settings: EncryAppSettings,
   override def preStart(): Unit = {
     logger.debug(s"Starting MemoryPool. Initializing all schedulers...")
     context.system.scheduler.schedule(
-      settings.node.bloomFilterCleanupInterval,
-      settings.node.bloomFilterCleanupInterval, self, CleanupBloomFilter)
+      settings.mempool.bloomFilterCleanupInterval,
+      settings.mempool.bloomFilterCleanupInterval, self, CleanupBloomFilter)
     context.system.scheduler.schedule(
-      settings.node.mempoolCleanupInterval,
-      settings.node.mempoolCleanupInterval, self, RemoveExpiredFromPool)
+      settings.mempool.cleanupInterval,
+      settings.mempool.cleanupInterval, self, RemoveExpiredFromPool)
     context.system.scheduler.schedule(
-      settings.node.mempoolTxSendingInterval,
-      settings.node.mempoolTxSendingInterval, self, SendTransactionsToMiner)
+      settings.mempool.txSendingInterval,
+      settings.mempool.txSendingInterval, self, SendTransactionsToMiner)
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
   }
 
@@ -61,7 +61,7 @@ class MemoryPool(settings: EncryAppSettings,
       validatedTransactions.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
       logger.debug(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}." +
         s"Number of transactions for broadcast is ${validatedTransactions.size}.")
-      if (currentNumberOfProcessedTransactions > settings.node.mempoolTransactionsLimit) {
+      if (currentNumberOfProcessedTransactions > settings.mempool.transactionsLimit) {
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
@@ -89,7 +89,7 @@ class MemoryPool(settings: EncryAppSettings,
       memoryPool = newMemoryPool
       logger.debug(s"MemoryPool got rolled back transactions. New pool size is ${memoryPool.size}." +
         s"Number of rolled back transactions is ${validatedTransactions.size}.")
-      if (currentNumberOfProcessedTransactions > settings.node.mempoolTransactionsLimit) {
+      if (currentNumberOfProcessedTransactions > settings.mempool.transactionsLimit) {
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
@@ -143,7 +143,9 @@ class MemoryPool(settings: EncryAppSettings,
   }
 
   def initBloomFilter: BloomFilter[String] = BloomFilter.create(
-    Funnels.stringFunnel(Charsets.UTF_8), settings.node.bloomFilterCapacity, settings.node.bloomFilterFailureProbability
+    Funnels.stringFunnel(Charsets.UTF_8),
+    settings.mempool.bloomFilterCapacity,
+    settings.mempool.bloomFilterFailureProbability
   )
 
   def notRequestedYet(ids: IndexedSeq[ModifierId]): IndexedSeq[ModifierId] = ids.collect {
