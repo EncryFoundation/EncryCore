@@ -133,6 +133,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem._2)).mkString(",")}")
       if (newIds.nonEmpty) newIds.groupBy(_._1).foreach {
         case (modId: ModifierTypeId, ids: Seq[(ModifierTypeId, ModifierId)]) =>
+          logger.info(s"modId: $modId, ids: ${ids.map(_._2)}")
           requestDownload(modId, ids.map(_._2), history, isBlockChainSynced, isMining)
       }
       val nextCheckModsSche =
@@ -165,7 +166,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
-        logger.debug(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
+        logger.info(s"Got msg from ${remote.socketAddress.getAddress}")
+        logger.info(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))
@@ -175,6 +177,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
+
         val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm
           .filterNot { case (modId, _) => history.isModifierDefined(modId) }
           .toSeq
@@ -289,6 +292,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       if (notYetRequested.nonEmpty) {
         if (mTypeId != Transaction.modifierTypeId)
           logger.info(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
+          logger.info(s"Send request to ${peer.socketAddress}, notYetRequested = ${notYetRequested.map(x => Algos.encode(x))}")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator = priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
         if (mTypeId != Transaction.modifierTypeId) {
@@ -424,8 +428,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val cP = shuffle.last._1
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         if (modifierTypeId != Transaction.modifierTypeId)
-          logger.debug(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
+          logger.info(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
+
       } else logger.debug(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
     else peersCollection.filter(p => p._2._2 != Younger) match {

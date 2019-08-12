@@ -157,8 +157,9 @@ class PeerConnectionHandler(connection: ActorRef,
         outMessagesCounter += 1
         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
-        logger.debug(s"Sent to $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
+        logger.info(s"Sent to $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
           s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")
+
         connection ! Write(bytes, Ack(outMessagesCounter))
       }
       settings.network.addedMaxDelay match {
@@ -243,13 +244,14 @@ class PeerConnectionHandler(connection: ActorRef,
 
   def workingCycleRemoteInterface: Receive = {
     case Received(data) =>
+
       val packet: (List[ByteString], ByteString) = getPacket(chunksBuffer ++ data)
       chunksBuffer = packet._2
       packet._1.find { packet =>
         GeneralizedNetworkMessage.fromProto(packet.toArray) match {
           case Success(message) =>
             context.parent ! MessageFromNetwork(message, selfPeer)
-            logger.debug("Received message " + message.messageName + " from " + remote)
+            logger.info("Received message " + message.messageName + " from " + remote)
             false
           case Failure(e) =>
             logger.debug(s"Corrupted data from: " + remote + s"$e")
