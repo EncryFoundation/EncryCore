@@ -19,7 +19,7 @@ import scala.collection.{IndexedSeq, mutable}
 import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
@@ -96,7 +96,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                           isBlockChainSynced: Boolean,
                           isMining: Boolean,
                           checkModScheduler: Cancellable): Receive = {
-    case InvalidModifiers(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
+    case InvalidModifier(id) => receivedModifiers -= toKey(id)
 
     case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       checkDelivery(peer, modifierTypeId, modifierId)
@@ -169,10 +169,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
-        val filteredModifiersMap: Map[ModifierId, Array[Byte]] = fm.filterKeys(history.isModifierDefined)
+        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot(i => history.isModifierDefined(i._1)).toSeq
         if (typeId != Transaction.modifierTypeId) influxRef
-          .foreach(ref => (0 to filteredModifiersMap.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
-        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = filteredModifiersMap.toSeq
+          .foreach(ref => (0 to filteredModifiers.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
         //todo check this logic
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
@@ -526,7 +525,7 @@ object DeliveryManager {
 
         case ConnectionStopped(_) => 1
 
-        case InvalidModifiers(_) => 2
+        case InvalidModifier(_) => 2
 
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {

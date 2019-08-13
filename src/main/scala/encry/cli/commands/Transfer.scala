@@ -47,7 +47,7 @@ object Transfer extends Command {
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>
-          memoryPool ! NewTransactions(Seq(tx))
+          memoryPool ! NewTransaction(tx)
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

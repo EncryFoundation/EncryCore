@@ -10,7 +10,7 @@ import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.HistoryConsensus._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.InvalidModifiers
+import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -86,7 +86,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   }
 
   def workingCycle(history: History): Receive = {
-    case msg@InvalidModifiers(_) => deliveryManager ! msg
+    case msg@InvalidModifier(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>

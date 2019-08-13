@@ -6,7 +6,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{InvalidModifier, InvalidModifiers, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -14,10 +14,9 @@ import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.history.History
 import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
-import encry.view.mempool.MemoryPool.NewTransactions
+import encry.view.mempool.MemoryPool.NewTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-import org.encryfoundation.common.utils.Algos
 import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(settings: EncryAppSettings,
@@ -34,8 +33,8 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
 
   def workingCycle(history: History): Receive = {
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
-      filteredModifiers.foreach {
-        case (id, bytes) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
+      filteredModifiers.foreach { case (id, bytes) =>
+        ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
@@ -43,42 +42,29 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             nodeViewHolder ! ModifierFromRemote(modifier)
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
-            logger.debug(s"Sending to delivery manager invalid modifier: ${Algos.encode(id)}.")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
             nodeViewSync ! InvalidModifier(id)
           case Failure(ex) =>
             peersKeeper ! BanPeer(remote, CorruptedSerializedBytes)
             logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-            logger.debug(s"Sending to delivery manager invalid modifier: ${Algos.encode(id)}.")
             nodeViewSync ! InvalidModifier(id)
         }
       }
 
     case ModifiersForValidating(remote, typeId, filteredModifiers) => typeId match {
-      case Transaction.modifierTypeId =>
-        val transactions: (Seq[Transaction], Seq[ModifierId]) = filteredModifiers
-          .foldLeft(Seq.empty[Transaction], Seq.empty[ModifierId]) {
-            case ((transactionsColl, forRemove), (id, bytes)) =>
-              Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
-                case Success(tx) if tx.semanticValidity.isSuccess => (transactionsColl :+ tx, forRemove)
-                case Success(tx) =>
-                  logger.info(s"Payload with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
-                  (transactionsColl, forRemove :+ id)
-                case Failure(ex) =>
-                  context.parent ! BanPeer(remote, CorruptedSerializedBytes)
-                  logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-                  (transactionsColl, forRemove :+ id)
-              }
+      case Transaction.modifierTypeId => filteredModifiers
+        .foreach { case (id, bytes) =>
+          Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
+            case Success(tx) if tx.semanticValidity.isSuccess => memoryPoolRef ! NewTransaction(tx)
+            case Success(tx) =>
+              logger.info(s"Payload with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
+              context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
+              nodeViewSync ! InvalidModifier(id)
+            case Failure(ex) =>
+              context.parent ! BanPeer(remote, CorruptedSerializedBytes)
+              nodeViewSync ! InvalidModifier(id)
+              logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
           }
-
-        if (transactions._1.nonEmpty) {
-          logger.debug(s"Sending to node mempool parsed transactions: ${transactions._1.map(_.encodedId)}.")
-          memoryPoolRef ! NewTransactions(transactions._1)
-        }
-        if (transactions._2.nonEmpty) {
-          logger.debug(s"Sending to delivery manager invalid modifiers: ${transactions._2.map(k => Algos.encode(k))}.")
-          nodeViewSync ! InvalidModifiers(transactions._2)
         }
     }
     case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
@@ -93,7 +79,6 @@ object DownloadedModifiersValidator {
                                           typeId: ModifierTypeId,
                                           modifiers: Seq[(ModifierId, Array[Byte])])
 
-  final case class InvalidModifiers(ids: Seq[ModifierId])
   final case class InvalidModifier(ids: ModifierId) extends AnyVal
 
   def props(settings: EncryAppSettings,
@@ -108,7 +93,8 @@ object DownloadedModifiersValidator {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case UpdatedHistory(_) => 0
-        case PoisonPill        => 2
-        case _                 => 1
+        case PoisonPill => 2
+        case _ => 1
       })
+
 }
