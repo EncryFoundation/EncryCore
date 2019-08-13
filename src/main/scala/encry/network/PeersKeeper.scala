@@ -8,7 +8,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{UpdatingPeersInfo}
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
-import encry.consensus.History.HistoryComparisonResult
+import encry.consensus.HistoryConsensus.HistoryComparisonResult
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection.{LastUptime, PeerInfo}

@@ -12,7 +12,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
-import encry.view.history.EncryHistory
+import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransactions
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
@@ -31,7 +31,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
     case msg => logger.info(s"Got $msg on DownloadedModifiersValidator")
   }
 
-  def workingCycle(history: EncryHistory): Receive = {
+  def workingCycle(history: History): Receive = {
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
       val modifiers = filteredModifiers.foldLeft(Seq.empty[PersistentModifier], Seq.empty[ModifierId]) {
         case ((modsColl, forRemove), (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {

@@ -91,10 +91,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     )
   }
 
-  private def failWithError(msg: String): Nothing = {
-    logger.error(s"Stop application due to malformed configuration file: $msg")
-    EncryApp.forceStopApplication()
-  }
+  private def failWithError(msg: String): Nothing =
+    EncryApp.forceStopApplication(errorMessage = s"Stop application due to malformed configuration file: $msg")
 }
 
 final case class StorageSettings(history: StorageType, state: StorageType)

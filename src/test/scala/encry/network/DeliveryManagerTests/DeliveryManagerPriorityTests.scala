@@ -4,8 +4,8 @@ import java.net.InetSocketAddress
 import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
-import encry.consensus.History
-import encry.consensus.History.{Equal, Older, Younger}
+import encry.consensus.HistoryConsensus
+import encry.consensus.HistoryConsensus.{Equal, Older, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
@@ -63,7 +63,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "mark peer as BadNode with BadPriority (1)" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, _, headersIds) = initialiseState
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
         Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -85,7 +85,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "mark peer as HighPriorityNode with HighPriority (4)" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, headersIds) = initialiseState
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
         Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -110,7 +110,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "mark peer as LowPriorityNode with LowPriority (3)" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, headersIds) = initialiseState
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
         Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
@@ -230,7 +230,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
       */
     "not increment modifiers which will be putted in spam collection" in {
       val (deliveryManager, cp1, _, _, _, _, _, _, _, _, blocks, _) = initialiseState
-      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, History.Older.type, PeersPriorityStatus)] =
+      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
         Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
       deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(

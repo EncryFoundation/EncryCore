@@ -1,4 +1,4 @@
-package encry.view.history.processors
+package encry.view.history
 
 import encry.settings.NodeSettings
 import org.encryfoundation.common.modifiers.history.Header

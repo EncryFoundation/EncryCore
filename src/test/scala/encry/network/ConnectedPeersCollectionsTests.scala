@@ -3,7 +3,7 @@ package encry.network
 import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
-import encry.consensus.History.{Fork, Older, Unknown, Younger}
+import encry.consensus.HistoryConsensus.{Fork, Older, Unknown, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}

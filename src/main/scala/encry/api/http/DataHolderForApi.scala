@@ -1,17 +1,18 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.history.EncryHistoryReader
 import encry.view.state.UtxoStateReader
 import encry.local.miner.Miner.MinerStatus
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 
 class DataHolderForApi(settings: EncryAppSettings,
@@ -25,7 +26,7 @@ class DataHolderForApi(settings: EncryAppSettings,
 
   def workingCycle(blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
-                   history: Option[EncryHistoryReader] = None,
+                   history: Option[History] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
@@ -34,7 +35,7 @@ class DataHolderForApi(settings: EncryAppSettings,
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
-    case ChangedHistory(reader: EncryHistoryReader) =>
+    case ChangedHistory(reader: History) =>
       context.become(workingCycle(
         blackList,
         connectedPeers,
@@ -42,7 +43,7 @@ class DataHolderForApi(settings: EncryAppSettings,
         state,
         transactionsOnMinerActor,
         minerStatus,
-        BlockAndHeaderInfo(reader.bestHeaderOpt, reader.bestBlockOpt),
+        BlockAndHeaderInfo(reader.getBestHeader, reader.getBestBlock),
         allPeers))
 
     case ChangedState(reader: UtxoStateReader)  =>
@@ -114,7 +115,7 @@ object DataHolderForApi {
 
   case object GetAllInfo
 
-  final case class Readers(h: Option[EncryHistoryReader], s: Option[UtxoStateReader])
+  final case class Readers(h: Option[History], s: Option[UtxoStateReader])
 
   def props(settings: EncryAppSettings,
             ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))

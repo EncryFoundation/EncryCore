@@ -5,8 +5,7 @@ import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
-import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
+import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -143,20 +142,21 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }
   }._1
 
-  def generateNextBlock(history: EncryHistory,
+  def generateNextBlock(history: History,
                         difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
                         txsQty: Int = 100,
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
-      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
-    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent => history.requiredDifficultyAfter(parent))
+      prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
+    val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
+      history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
     val header = genHeader.copy(
       parentId = previousHeaderId,
-      height = history.bestHeaderHeight + 1,
+      height = history.getBestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff + additionalDifficulty),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
@@ -169,7 +169,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
                 from: Int,
                 to: Int,
                 settings: EncryAppSettings): (List[Block], List[Block]) = {
-    val history: EncryHistory = generateDummyHistory(settings)
+    val history: History = generateDummyHistory(settings)
     val forkInterval = (from until to).toList
     (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
       case ((histories, blocks), blockHeight) =>
@@ -212,7 +212,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }._2
   }
 
-  def generateDummyHistory(settingsEncry: EncryAppSettings): EncryHistory = {
+  def generateDummyHistory(settingsEncry: EncryAppSettings): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -222,11 +222,10 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with BlockPayloadProcessor {
-      override protected val settings: EncryAppSettings = settingsEncry
-      override protected val nodeSettings: NodeSettings = settings.node
-      override protected val historyStorage: HistoryStorage = storage
-      override protected val timeProvider: NetworkTimeProvider = ntp
+    new History {
+      override  val settings: EncryAppSettings = settingsEncry
+      override  val historyStorage: HistoryStorage = storage
+      override  val timeProvider: NetworkTimeProvider = ntp
     }
   }
 }
