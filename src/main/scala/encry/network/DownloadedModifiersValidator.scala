@@ -33,7 +33,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
 
   def workingCycle(history: History): Receive = {
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
-      filteredModifiers.reverse.foreach { case (id, bytes) =>
+      filteredModifiers.foreach { case (id, bytes) =>
         ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
