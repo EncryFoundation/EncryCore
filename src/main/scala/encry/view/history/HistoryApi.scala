@@ -218,19 +218,17 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     case None => Older
   }
 
-  def continuationIds(info: SyncInfo, size: Int): Either[ValidationError, Seq[ModifierId]] =
-    if (getBestHeaderId.isEmpty) info.startingPoints.map(_._2).asRight[ValidationError]
+  def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] =
+    if (getBestHeaderId.isEmpty) info.startingPoints.map(_._2)
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
-      val headersChain: Option[HeaderChain] = for {
+      (for {
         startId     <- headerIdsAtHeight(heightFrom).headOption
         startHeader <- getHeaderById(startId)
-      } yield headerChainBack(size, startHeader, _ => false)
-      Either.cond(
-        headersChain.isDefined && headersChain.exists(_.headers.exists(_.height == TestNetConstants.GenesisHeight)),
-        headersChain.getOrElse(HeaderChain.empty).headers.map(_.id),
-        HistoryApiError("continuationIds - should always contain genesis header")
-      )
+      } yield headerChainBack(size, startHeader, _ => false)) match {
+        case Some(value) if value.headers.exists(_.height == TestNetConstants.GenesisHeight) => value.headers.map(_.id)
+        case _ => Seq.empty
+      }
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
       (for {
@@ -242,8 +240,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       } yield headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
           .headers
           .map(_.id)) match {
-            case Some(value) => value.asRight[ValidationError]
-            case None        => HistoryApiError(s"continuationIds - else condition is empty").asLeft[Seq[ModifierId]]
+            case Some(value) => value
+            case None        => Seq.empty
       }
     }
 
