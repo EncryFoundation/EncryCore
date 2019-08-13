@@ -8,7 +8,7 @@ import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.NewTransactions
+import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
