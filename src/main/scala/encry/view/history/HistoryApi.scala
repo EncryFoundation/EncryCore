@@ -1,6 +1,5 @@
 package encry.view.history
 
-import cats.syntax.either._
 import cats.syntax.option._
 import encry.consensus.HistoryConsensus._
 import encry.consensus._

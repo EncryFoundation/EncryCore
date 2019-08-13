@@ -162,7 +162,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
         StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
     val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
     val forkHeaders: Seq[(StorageKey, StorageValue)] = parentHeaderOpt
-      .toSeq
+      .toList
       .view
       .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
       .filterNot(isInBestChain)
@@ -171,6 +171,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
           StorageValue @@ (Seq(header.id) ++
             headerIdsAtHeight(header.height).filterNot(_ sameElements header.id)).flatten.toArray
       )
+      .toList
     forkHeaders :+ self
   }
 
@@ -203,10 +204,10 @@ trait HistoryModifiersProcessors extends HistoryApi {
 
   private def clipBlockDataAt(heights: Seq[Int]): Either[Throwable, Unit] = Either.catchNonFatal {
     val toRemove: Seq[ModifierId] = heights
-      .view
-      .flatMap(h => headerIdsAtHeight(h))
+      .flatMap(headerIdsAtHeight)
       .flatMap(getHeaderById)
       .map(_.payloadId)
+      .toList
     historyStorage.removeObjects(toRemove)
   }
 

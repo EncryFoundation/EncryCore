@@ -84,7 +84,7 @@ object ModifiersCache extends StrictLogging {
     }
 
     def findApplicablePayloadAtHeight(height: Int): List[Key] = {
-      history.headerIdsAtHeight(height).flatMap(history.getHeaderById).collect {
+      history.headerIdsAtHeight(height).view.flatMap(history.getHeaderById).collect {
         case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           new mutable.WrappedArray.ofByte(header.payloadId)
       }
