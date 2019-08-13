@@ -34,6 +34,15 @@ final case class MemoryPoolStorage private(transactions: Map[String, Transaction
               f: (String, Transaction) => (String, Transaction)): MemoryPoolStorage =
     MemoryPoolStorage(transactions.collect { case (a, b) if p(a, b) => f(a, b) }, settings, networkTimeProvider)
 
+  def validateTransaction(tx: Transaction): (MemoryPoolStorage, Option[Transaction]) =
+    if (isValid(tx) && size + 1 <= settings.mempool.maxCapacity)
+      (putTransaction(tx), Some(tx))
+    else {
+      val withoutExpiredPool: MemoryPoolStorage = filter(isExpired)
+      if (withoutExpiredPool.size + 1 <= settings.mempool.maxCapacity) (putTransaction(tx), Some(tx))
+      else (withoutExpiredPool, None)
+    }
+
   def validateTransactions(txs: Seq[Transaction]): (MemoryPoolStorage, Seq[Transaction]) = {
     val validatedElems: Seq[Transaction] = txs.filter(isValid)
     if (size + validatedElems.size <= settings.mempool.maxCapacity)

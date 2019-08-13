@@ -55,12 +55,11 @@ class MemoryPool(settings: EncryAppSettings,
 
   def transactionsProcessor(currentNumberOfProcessedTransactions: Int): Receive = {
     case NewTransaction(transaction) =>
-      val (newMemoryPool: MemoryPoolStorage, validatedTransactions: Seq[Transaction]) =
-        memoryPool.validateTransactions(Seq(transaction))
+      val (newMemoryPool: MemoryPoolStorage, validatedTransaction: Option[Transaction]) =
+        memoryPool.validateTransaction(transaction)
       memoryPool = newMemoryPool
-      validatedTransactions.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
-      logger.debug(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}." +
-        s"Number of transactions for broadcast is ${validatedTransactions.size}.")
+      validatedTransaction.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
+      logger.debug(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}.")
       if (currentNumberOfProcessedTransactions > settings.mempool.transactionsLimit) {
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
@@ -68,7 +67,7 @@ class MemoryPool(settings: EncryAppSettings,
         Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
-        val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
+        val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + 1
         logger.debug(s"Current number of processed transactions is OK. Continue to process them..." +
           s" Current number is $currentTransactionsNumber.")
         context.become(continueProcessing(currentTransactionsNumber))

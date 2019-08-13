@@ -113,25 +113,26 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 
     case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
-    case SerializedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
-      val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-      val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
-      influxDB.write(
-        influxDBSettings.udpPort,
-        s"""serializedHModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
-      )
-    case ValidatedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
-      val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-      val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
-      influxDB.write(
-        influxDBSettings.udpPort,
-        s"""validatedModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
-      )
-
+    case msg: ModifiersDownloadStatistic => msg match {
+      case SerializedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
+        val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+        val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
+        influxDB.write(
+          influxDBSettings.udpPort,
+          s"""serializedHModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
+        )
+      case ValidatedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
+        val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+        val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
+        influxDB.write(
+          influxDBSettings.udpPort,
+          s"""validatedModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
+        )
+      case ValidatedModifierFromNetwork(_) =>
+      case SerializedModifierFromNetwork(_) =>
+    }
     case ModifierAppendedToHistory(_, _) =>
     case ModifierAppendedToState(_) =>
-    case SerializedModifierFromNetwork(_) =>
-    case ValidatedModifierFromNetwork(_) =>
 
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
@@ -153,8 +154,9 @@ object StatsSender {
   final case class MiningTime(time: Long) extends AnyVal
   final case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
   final case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
-  final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends AnyVal
-  final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends AnyVal
+  sealed trait ModifiersDownloadStatistic
+  final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
+  final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
 
   def props(settings: InfluxDBSettings): Props = Props(new StatsSender(settings))
 }
