@@ -5,6 +5,7 @@ import java.util.Date
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
@@ -30,7 +31,6 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-
 import scala.collection._
 import scala.concurrent.duration._
 
@@ -174,7 +174,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
       case Right(value) => value
-      case Left(value) => logger.error(value.toString); TestNetConstants.InitialDifficulty
+      case Left(value)  => EncryApp.forceStopApplication(999, value.toString)
     })
       .getOrElse(TestNetConstants.InitialDifficulty)
 

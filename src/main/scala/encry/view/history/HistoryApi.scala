@@ -7,7 +7,7 @@ import encry.consensus._
 import encry.modifiers.history._
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.history.ValidationError.HistoryExternalApiError
+import encry.view.history.ValidationError.HistoryApiError
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.{Block, BlockProtoSerializer, Header, HeaderProtoSerializer, Payload}
 import org.encryfoundation.common.network.SyncInfo
@@ -177,17 +177,17 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       case n@None                                          => n
   }
 
-  def requiredDifficultyAfter(parent: Header): Either[ValidationError, Difficulty] = {
+  def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
     val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
     for {
       _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
-        HistoryExternalApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
+        HistoryApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
       chain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
       requiredHeaders = (requiredHeights.min to requiredHeights.max)
         .zip(chain.headers)
         .filter(p => requiredHeights.contains(p._1))
       _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
-        HistoryExternalApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
+        HistoryApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
     } yield PowLinearController.getDifficulty(requiredHeaders)
   }
 
@@ -229,7 +229,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       Either.cond(
         headersChain.isDefined && headersChain.exists(_.headers.exists(_.height == TestNetConstants.GenesisHeight)),
         headersChain.getOrElse(HeaderChain.empty).headers.map(_.id),
-        HistoryExternalApiError("continuationIds - should always contain genesis header")
+        HistoryApiError("continuationIds - should always contain genesis header")
       )
     } else {
       val ids: Seq[ModifierId] = info.lastHeaderIds
@@ -243,7 +243,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
           .headers
           .map(_.id)) match {
             case Some(value) => value.asRight[ValidationError]
-            case None        => HistoryExternalApiError(s"continuationIds - else condition is empty").asLeft[Seq[ModifierId]]
+            case None        => HistoryApiError(s"continuationIds - else condition is empty").asLeft[Seq[ModifierId]]
       }
     }
 

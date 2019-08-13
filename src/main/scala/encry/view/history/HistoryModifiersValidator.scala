@@ -66,10 +66,7 @@ trait HistoryModifiersValidator extends HistoryApi {
       HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
     _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-    _ <- Either.cond(h.difficulty >= (requiredDifficultyAfter(parent) match {
-      case Right(value) => value
-      case Left(value)  => logger.error(value.toString); BigInt(0)
-    }), (),
+    _ <- Either.cond(requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
       HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
     _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
