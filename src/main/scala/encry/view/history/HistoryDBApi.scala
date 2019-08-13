@@ -11,7 +11,7 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.hash.Digest32
 import scala.reflect.ClassTag
 
-trait HistoryInternalApi extends StrictLogging {
+trait HistoryDBApi extends StrictLogging {
 
   val historyStorage: HistoryStorage
 
@@ -24,50 +24,50 @@ trait HistoryInternalApi extends StrictLogging {
     .modifierById(id)
     .collect { case m: T => m }
 
-  def getHeightByHeaderIdInternal(id: ModifierId): Option[Int] = historyStorage
+  def getHeightByHeaderIdDB(id: ModifierId): Option[Int] = historyStorage
     .get(headerHeightKey(id))
     .map(Ints.fromByteArray)
 
-  def getHeaderByIdInternal(id: ModifierId): Option[Header] = getModifierById[Header](id)
-  def getPayloadByIdInternal(pId: ModifierId): Option[Payload] = getModifierById[Payload](pId)
-  def getBlockByHeaderInternal(header: Header): Option[Block] = getModifierById[Payload](header.payloadId)
+  def getHeaderByIdDB(id: ModifierId): Option[Header] = getModifierById[Header](id)
+  def getPayloadByIdDB(pId: ModifierId): Option[Payload] = getModifierById[Payload](pId)
+  def getBlockByHeaderDB(header: Header): Option[Block] = getModifierById[Payload](header.payloadId)
     .map(payload => Block(header, payload))
-  def getBlockByHeaderIdInternal(id: ModifierId): Option[Block] = getHeaderByIdInternal(id)
+  def getBlockByHeaderIdDB(id: ModifierId): Option[Block] = getHeaderByIdDB(id)
     .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
 
   def getBestHeaderId: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
-  def getBestHeaderInternal: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdInternal)
-  def getBestHeaderHeightInternal: Int = getBestHeaderId
-    .flatMap(getHeightByHeaderIdInternal)
+  def getBestHeaderDB: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdDB)
+  def getBestHeaderHeightDB: Int = getBestHeaderId
+    .flatMap(getHeightByHeaderIdDB)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
   def getBestBlockId: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
-  def getBestBlockInternal: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdInternal)
-  def getBestBlockHeightInternal: Int = getBestBlockId
-    .flatMap(getHeightByHeaderIdInternal)
+  def getBestBlockDB: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdDB)
+  def getBestBlockHeightDB: Int = getBestBlockId
+    .flatMap(getHeightByHeaderIdDB)
     .getOrElse(TestNetConstants.PreGenesisHeight)
 
-  def modifierBytesByIdInternal(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
+  def modifierBytesByIdDB(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
   def isModifierDefined(id: ModifierId): Boolean = historyStorage.containsMod(id)
 
   //todo probably rewrite with indexes collection
   def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] = (for {
-    headerId <- getBestHeaderIdAtHeightInternal(probablyAt)
-    header   <- getHeaderByIdInternal(headerId) if isModifierDefined(header.payloadId)
+    headerId <- getBestHeaderIdAtHeightDB(probablyAt)
+    header   <- getHeaderByIdDB(headerId) if isModifierDefined(header.payloadId)
   } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
 
-  def headerIdsAtHeightInternal(height: Int): Option[Seq[ModifierId]] = historyStorage
+  def headerIdsAtHeightDB(height: Int): Option[Seq[ModifierId]] = historyStorage
     .get(heightIdsKey(height))
     .map(_.grouped(32).map(ModifierId @@ _).toSeq)
 
-  def getBestHeaderIdAtHeightInternal(h: Int): Option[ModifierId] = headerIdsAtHeightInternal(h).flatMap(_.headOption)
+  def getBestHeaderIdAtHeightDB(h: Int): Option[ModifierId] = headerIdsAtHeightDB(h).flatMap(_.headOption)
 
-  def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeightInternal(h.height)
+  def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeightDB(h.height)
     .exists(_.sameElements(h.id))
 
   def isInBestChain(id: ModifierId): Boolean = heightOf(id)
-    .flatMap(getBestHeaderIdAtHeightInternal)
+    .flatMap(getBestHeaderIdAtHeightDB)
     .exists(_.sameElements(id))
 
   def getBestHeadersChainScore: BigInt = getBestHeaderId.flatMap(scoreOf).getOrElse(BigInt(0)) //todo ?.getOrElse(BigInt(0))?

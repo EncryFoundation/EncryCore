@@ -17,7 +17,7 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
+trait HistoryExternalApi extends HistoryDBApi { //scalastyle:ignore
 
   val settings: EncryAppSettings
 
@@ -38,17 +38,17 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
     .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-    .orElse(getHeaderByIdInternal(id))
+    .orElse(getHeaderByIdDB(id))
 
   def getBlockByHeader(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
-    .orElse(getPayloadByIdInternal(header.payloadId).map(p => Block(header, p)))
+    .orElse(getPayloadByIdDB(header.payloadId).map(p => Block(header, p)))
 
   def getBestHeader: Option[Header] = getBestHeaderId.flatMap(id =>
     headersCache
       .get(ByteArrayWrapper(id))
       .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-      .orElse(getHeaderByIdInternal(id))
+      .orElse(getHeaderByIdDB(id))
   )
 
   def getBestHeaderHeight: Int = getBestHeaderId.flatMap(id =>
@@ -59,7 +59,7 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
 
   def getBestBlock: Option[Block] = getBestBlockId.flatMap(id =>
     blocksCache.get(ByteArrayWrapper(id))
-      .orElse(getBlockByHeaderIdInternal(id))
+      .orElse(getBlockByHeaderIdDB(id))
   )
 
   def getBestBlockHeight: Int = getBestBlockId
@@ -69,7 +69,7 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
   def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(id =>
     headersCache.get(ByteArrayWrapper(id))
       .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-      .orElse(getHeaderByIdInternal(id))
+      .orElse(getHeaderByIdDB(id))
   )
 
   def getBlockByPayload(payload: Payload): Option[Block] = headersCache
@@ -80,7 +80,7 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
   def getHeightByHeaderId(id: ModifierId): Option[Int] = headersCache
     .get(ByteArrayWrapper(id)).map(_.height)
     .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
-    .orElse(getHeightByHeaderIdInternal(id))
+    .orElse(getHeightByHeaderIdDB(id))
 
   def isBestBlockDefined: Boolean =
     getBestBlockId.map(id => blocksCache.contains(ByteArrayWrapper(id))).isDefined ||
@@ -97,17 +97,17 @@ trait HistoryExternalApi extends HistoryInternalApi { //scalastyle:ignore
   def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = headersCacheIndexes
     .get(h)
     .flatMap(_.headOption)
-    .orElse(getBestHeaderIdAtHeightInternal(h))
+    .orElse(getBestHeaderIdAtHeightDB(h))
 
   def headerIdsAtHeight(height: Int): Seq[ModifierId] = headersCacheIndexes
     .get(height)
-    .orElse(headerIdsAtHeightInternal(height))
+    .orElse(headerIdsAtHeightDB(height))
     .getOrElse(Seq.empty[ModifierId])
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
     .get(ByteArrayWrapper(id)).map(h => HeaderProtoSerializer.toProto(h).toByteArray)
     .orElse(blocksCache.get(ByteArrayWrapper(id)).map(b => BlockProtoSerializer.toProto(b).toByteArray))
-    .orElse(modifierBytesByIdInternal(id))
+    .orElse(modifierBytesByIdDB(id))
 
   def lastHeaders(count: Int): HeaderChain = getBestHeader
     .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
