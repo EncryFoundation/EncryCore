@@ -4,9 +4,7 @@ import org.encryfoundation.common.modifiers.{PersistentModifier, PersistentNodeV
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
-object History {
-
-  type ModifierIds = Seq[(ModifierTypeId, ModifierId)]
+object HistoryConsensus {
 
   sealed trait HistoryComparisonResult
 

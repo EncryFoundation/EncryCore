@@ -6,7 +6,7 @@ import akka.pattern.ask
 import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetMinerStatus}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{EncryAppSettings, RESTApiSettings}
-import encry.view.history.HistoryImpl
+import encry.view.history.History
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
@@ -31,7 +31,7 @@ case class HistoryApiRoute(dataHolder: ActorRef,
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private def getHistory: Future[HistoryImpl] = (dataHolder ? GetDataFromHistory).mapTo[HistoryImpl]
+  private def getHistory: Future[History] = (dataHolder ? GetDataFromHistory).mapTo[History]
 
   private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map {
     _.headerIdsAtHeight(h).map(Algos.encode).asJson

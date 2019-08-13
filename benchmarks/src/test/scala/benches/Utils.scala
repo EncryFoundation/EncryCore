@@ -12,7 +12,7 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
-import encry.view.history.HistoryImpl
+import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
@@ -143,7 +143,7 @@ object Utils extends StrictLogging {
     Block(header, Payload(header.id, transactions))
   }
 
-  def generateNextBlockValidForHistory(history: HistoryImpl,
+  def generateNextBlockValidForHistory(history: History,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
                                        txs: Seq[Transaction]): Block = {
@@ -403,7 +403,7 @@ object Utils extends StrictLogging {
     uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
-  def generateHistory(settingsEncry: EncryAppSettings, file: File): HistoryImpl = {
+  def generateHistory(settingsEncry: EncryAppSettings, file: File): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -413,7 +413,7 @@ object Utils extends StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new HistoryImpl {
+    new History {
       override  val settings: EncryAppSettings = settingsEncry
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp

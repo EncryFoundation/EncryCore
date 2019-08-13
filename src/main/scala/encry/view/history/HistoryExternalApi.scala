@@ -2,7 +2,7 @@ package encry.view.history
 
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.consensus.History._
+import encry.consensus.HistoryConsensus._
 import encry.consensus._
 import encry.modifiers.history._
 import encry.settings.EncryAppSettings

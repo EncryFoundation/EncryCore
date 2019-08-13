@@ -12,7 +12,7 @@ import encry.view.state.UtxoStateReader
 import encry.local.miner.Miner.MinerStatus
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.view.history.HistoryImpl
+import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 
 class DataHolderForApi(settings: EncryAppSettings,
@@ -26,7 +26,7 @@ class DataHolderForApi(settings: EncryAppSettings,
 
   def workingCycle(blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
-                   history: Option[HistoryImpl] = None,
+                   history: Option[History] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
@@ -35,7 +35,7 @@ class DataHolderForApi(settings: EncryAppSettings,
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
-    case ChangedHistory(reader: HistoryImpl) =>
+    case ChangedHistory(reader: History) =>
       context.become(workingCycle(
         blackList,
         connectedPeers,
@@ -115,7 +115,7 @@ object DataHolderForApi {
 
   case object GetAllInfo
 
-  final case class Readers(h: Option[HistoryImpl], s: Option[UtxoStateReader])
+  final case class Readers(h: Option[History], s: Option[UtxoStateReader])
 
   def props(settings: EncryAppSettings,
             ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))

@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.{HistoryComparisonResult, Unknown}
+import encry.consensus.HistoryConsensus.{HistoryComparisonResult, Unknown}
 import encry.network.ConnectedPeersCollection.{LastUptime, PeerInfo}
 import encry.network.PeerConnectionHandler.{ConnectedPeer, ConnectionType, Outgoing}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority

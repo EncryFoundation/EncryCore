@@ -2,7 +2,7 @@ package encry.view.history
 
 import java.io.File
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History.ProgressInfo
+import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
@@ -22,13 +22,13 @@ import cats.syntax.either._
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
-trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
+trait History extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
   def isFullChainSynced: Boolean = getBestHeaderId
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, (HistoryImpl, ProgressInfo)] = {
+  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header   => (this, processHeader(header))
@@ -49,7 +49,7 @@ trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcess
     * @param modifier that is invalid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
-  def reportModifierIsInvalid(modifier: PersistentModifier): (HistoryImpl, ProgressInfo) = {
+  def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
@@ -115,7 +115,7 @@ trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcess
     * @param modifier that is valid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
-  def reportModifierIsValid(modifier: PersistentModifier): HistoryImpl = {
+  def reportModifierIsValid(modifier: PersistentModifier): History = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     modifier match {
       case block: Block =>
@@ -140,7 +140,7 @@ trait HistoryImpl extends HistoryModifiersValidator with HistoryModifiersProcess
   def closeStorage(): Unit = historyStorage.close()
 }
 
-object HistoryImpl extends StrictLogging {
+object History extends StrictLogging {
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {
     val dir: File = new File(s"${settings.directory}/history/index")
@@ -154,7 +154,7 @@ object HistoryImpl extends StrictLogging {
     dir
   }
 
-  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): HistoryImpl = {
+  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): History = {
 
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
     //Check what kind of storage in settings:
@@ -170,7 +170,7 @@ object HistoryImpl extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
-    new HistoryImpl {
+    new History {
       override val settings: EncryAppSettings = settingsEncry
       override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
       override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)

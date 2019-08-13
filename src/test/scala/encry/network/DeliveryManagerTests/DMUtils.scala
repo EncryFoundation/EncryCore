@@ -10,7 +10,7 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.view.history.HistoryImpl
+import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -22,8 +22,8 @@ object DMUtils extends InstanceFactory {
   def initialiseDeliveryManager(isBlockChainSynced: Boolean,
                                 isMining: Boolean,
                                 settings: EncryAppSettings)
-                               (implicit actorSystem: ActorSystem): (TestActorRef[DeliveryManager], HistoryImpl) = {
-    val history: HistoryImpl = generateDummyHistory(settings)
+                               (implicit actorSystem: ActorSystem): (TestActorRef[DeliveryManager], History) = {
+    val history: History = generateDummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
       TestActorRef[DeliveryManager](DeliveryManager
         .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref, TestProbe().ref, TestProbe().ref))
@@ -34,7 +34,7 @@ object DMUtils extends InstanceFactory {
     (deliveryManager, history)
   }
 
-  def generateBlocks(qty: Int, history: HistoryImpl): (HistoryImpl, List[Block]) =
+  def generateBlocks(qty: Int, history: History): (History, List[Block]) =
     (0 until qty).foldLeft(history, List.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)

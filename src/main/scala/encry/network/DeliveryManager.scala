@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.History._
+import encry.consensus.HistoryConsensus._
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.DeliveryManager.{CheckModifiersToDownload, _}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
@@ -12,7 +12,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.history.HistoryImpl
+import encry.view.history.History
 import encry.settings.EncryAppSettings
 
 import scala.concurrent.duration._
@@ -95,7 +95,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case message => logger.debug(s"Got new message $message while awaiting history.")
   }
 
-  def basicMessageHandler(history: HistoryImpl,
+  def basicMessageHandler(history: History,
                           isBlockChainSynced: Boolean,
                           isMining: Boolean,
                           checkModScheduler: Cancellable): Receive = {
@@ -258,7 +258,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     * @param isMining           - current mining status
     */
 
-  def requestModifies(history: HistoryImpl,
+  def requestModifies(history: History,
                       peer: ConnectedPeer,
                       mTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
@@ -401,7 +401,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   def requestDownload(modifierTypeId: ModifierTypeId,
                       modifierIds: Seq[ModifierId],
-                      history: HistoryImpl,
+                      history: History,
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {

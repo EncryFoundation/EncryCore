@@ -3,7 +3,7 @@ package encry.view.history
 import com.google.common.primitives.Ints
 import encry.EncryApp.forceStopApplication
 import encry.consensus.ConsensusSchemeReaders
-import encry.consensus.History.ProgressInfo
+import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import org.encryfoundation.common.modifiers.PersistentModifier

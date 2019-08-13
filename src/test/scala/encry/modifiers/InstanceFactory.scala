@@ -5,7 +5,7 @@ import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
-import encry.view.history.HistoryImpl
+import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -142,7 +142,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }
   }._1
 
-  def generateNextBlock(history: HistoryImpl,
+  def generateNextBlock(history: History,
                         difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
                         txsQty: Int = 100,
@@ -169,7 +169,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
                 from: Int,
                 to: Int,
                 settings: EncryAppSettings): (List[Block], List[Block]) = {
-    val history: HistoryImpl = generateDummyHistory(settings)
+    val history: History = generateDummyHistory(settings)
     val forkInterval = (from until to).toList
     (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
       case ((histories, blocks), blockHeight) =>
@@ -212,7 +212,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }._2
   }
 
-  def generateDummyHistory(settingsEncry: EncryAppSettings): HistoryImpl = {
+  def generateDummyHistory(settingsEncry: EncryAppSettings): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -222,7 +222,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new HistoryImpl {
+    new History {
       override  val settings: EncryAppSettings = settingsEncry
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
