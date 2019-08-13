@@ -114,23 +114,21 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
     case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
     case msg: ModifiersDownloadStatistic => msg match {
-      case SerializedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
+      case _ if nodeName.exists(_.isDigit) =>
         val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-        val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
+        val (isHeader: Boolean, tableName: String) = msg match {
+          case SerializedModifierFromNetwork(t) =>
+            (t == Header.modifierTypeId) -> "serializedModifierFromNetwork"
+          case ValidatedModifierFromNetwork(t) =>
+            (t == Header.modifierTypeId) -> "validatedModifierFromNetwork"
+        }
         influxDB.write(
           influxDBSettings.udpPort,
-          s"""serializedHModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
+          s"""$tableName,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
         )
-      case ValidatedModifierFromNetwork(modifierTypeId) if nodeName.exists(_.isDigit) =>
-        val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
-        val isHeader: Boolean = if (modifierTypeId == Header.modifierTypeId) true else false
-        influxDB.write(
-          influxDBSettings.udpPort,
-          s"""validatedModifierFromNetwork,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
-        )
-      case ValidatedModifierFromNetwork(_) =>
-      case SerializedModifierFromNetwork(_) =>
+      case _ => //do nothing
     }
+
     case ModifierAppendedToHistory(_, _) =>
     case ModifierAppendedToState(_) =>
 
