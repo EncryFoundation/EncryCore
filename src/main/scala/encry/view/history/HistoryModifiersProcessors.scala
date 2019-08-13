@@ -207,7 +207,6 @@ trait HistoryModifiersProcessors extends HistoryApi {
       .flatMap(headerIdsAtHeight)
       .flatMap(getHeaderById)
       .map(_.payloadId)
-      .toList
     historyStorage.removeObjects(toRemove)
   }
 
