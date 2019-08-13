@@ -6,7 +6,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, InvalidModifiers, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -34,32 +34,24 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
 
   def workingCycle(history: History): Receive = {
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
-      val modifiers = filteredModifiers.foldLeft(Seq.empty[ModifierId]) {
-        case (forRemove, (id, bytes)) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
+      filteredModifiers.foreach {
+        case (id, bytes) => ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
           case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
             nodeViewHolder ! ModifierFromRemote(modifier)
-            forRemove
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
+            logger.debug(s"Sending to delivery manager invalid modifier: ${Algos.encode(id)}.")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
-            forRemove :+ id
+            nodeViewSync ! InvalidModifier(id)
           case Failure(ex) =>
             peersKeeper ! BanPeer(remote, CorruptedSerializedBytes)
             logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-            forRemove :+ id
+            logger.debug(s"Sending to delivery manager invalid modifier: ${Algos.encode(id)}.")
+            nodeViewSync ! InvalidModifier(id)
         }
-      }
-//      if (modifiers._1.nonEmpty) {
-//        logger.debug(s"Sending to node view holder parsed modifiers: ${modifiers._1.size} with ids: " +
-//          s"${modifiers._1.map(mod => Algos.encode(mod.id)).mkString(",")}")
-//        nodeViewHolder ! ModifiersFromRemote(modifiers._1)
-//      }
-      if (modifiers.nonEmpty) {
-        logger.debug(s"Sending to delivery manager invalid modifiers: ${modifiers.map(k => Algos.encode(k))}.")
-        nodeViewSync ! InvalidModifiers(modifiers)
       }
 
     case ModifiersForValidating(remote, typeId, filteredModifiers) => typeId match {
@@ -102,6 +94,7 @@ object DownloadedModifiersValidator {
                                           modifiers: Seq[(ModifierId, Array[Byte])])
 
   final case class InvalidModifiers(ids: Seq[ModifierId])
+  final case class InvalidModifier(ids: ModifierId) extends AnyVal
 
   def props(settings: EncryAppSettings,
             nodeViewHolder: ActorRef,

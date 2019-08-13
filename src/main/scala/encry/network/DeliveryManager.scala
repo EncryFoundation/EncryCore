@@ -169,14 +169,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
-        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm
-          .filterNot { case (modId, _) =>
-            val condition: Boolean = history.isModifierDefined(modId)
-            if (!condition && typeId != Transaction.modifierTypeId)
-              influxRef.foreach(_ ! SerializedModifierFromNetwork(typeId))
-            condition
-          }
-          .toSeq
+        val filteredModifiersMap: Map[ModifierId, Array[Byte]] = fm.filterKeys(history.isModifierDefined)
+        if (typeId != Transaction.modifierTypeId) influxRef
+          .foreach(ref => (0 to filteredModifiersMap.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
+        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = filteredModifiersMap.toSeq
         //todo check this logic
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
