@@ -77,7 +77,7 @@ object DownloadedModifiersValidator {
 
   final case class ModifiersForValidating(remote: ConnectedPeer,
                                           typeId: ModifierTypeId,
-                                          modifiers: Seq[(ModifierId, Array[Byte])])
+                                          modifiers: Map[ModifierId, Array[Byte]])
 
   final case class InvalidModifier(ids: ModifierId) extends AnyVal
 

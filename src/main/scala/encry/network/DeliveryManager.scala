@@ -169,7 +169,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
-        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm.filterNot(i => history.isModifierDefined(i._1)).toSeq
+        val filteredModifiers: Map[ModifierId, Array[Byte]] = fm.filterKeys(k => !history.isModifierDefined(k))
         if (typeId != Transaction.modifierTypeId) influxRef
           .foreach(ref => (0 to filteredModifiers.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
         //todo check this logic
