@@ -10,7 +10,7 @@ import cats.syntax.either._
 import encry.consensus.EquihashPowScheme
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 
-trait HistoryModifiersValidator extends HistoryExternalApi {
+trait HistoryModifiersValidator extends HistoryApi {
 
   val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
 

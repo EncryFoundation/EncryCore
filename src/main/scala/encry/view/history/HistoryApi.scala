@@ -17,7 +17,7 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait HistoryExternalApi extends HistoryDBApi { //scalastyle:ignore
+trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   val settings: EncryAppSettings
 

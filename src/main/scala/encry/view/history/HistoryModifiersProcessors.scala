@@ -14,7 +14,7 @@ import cats.syntax.option._
 import scala.annotation.tailrec
 import cats.syntax.either._
 
-trait HistoryModifiersProcessors extends HistoryExternalApi {
+trait HistoryModifiersProcessors extends HistoryApi {
 
   def processHeader(h: Header): ProgressInfo = getHeaderInfoUpdate(h) match {
     case dataToUpdate: Seq[_] if dataToUpdate.nonEmpty =>
