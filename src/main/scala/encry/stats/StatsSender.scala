@@ -10,7 +10,7 @@ import encry.EncryApp.{settings, timeProvider}
 import encry.consensus.EncrySupplyController
 import encry.settings.InfluxDBSettings
 import encry.stats.StatsSender._
-import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
 import org.influxdb.{InfluxDB, InfluxDBFactory}
@@ -23,7 +23,7 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 
   val nodeName: String = settings.network.nodeName match {
     case Some(value) => value
-    case None        => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
+    case None => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
   }
   val influxDB: InfluxDB = InfluxDBFactory
     .connect(influxDBSettings.url, influxDBSettings.login, influxDBSettings.password)
@@ -113,6 +113,25 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
 
     case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
+    case msg: ModifiersDownloadStatistic => msg match {
+      case _ if nodeName.exists(_.isDigit) =>
+        val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
+        val (isHeader: Boolean, tableName: String) = msg match {
+          case SerializedModifierFromNetwork(t) =>
+            (t == Header.modifierTypeId) -> "serializedModifierFromNetwork"
+          case ValidatedModifierFromNetwork(t) =>
+            (t == Header.modifierTypeId) -> "validatedModifierFromNetwork"
+        }
+        influxDB.write(
+          influxDBSettings.udpPort,
+          s"""$tableName,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
+        )
+      case _ => //do nothing
+    }
+
+    case ModifierAppendedToHistory(_, _) =>
+    case ModifierAppendedToState(_) =>
+
     case SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId]) =>
       modifiersToDownload = modifiersToDownload ++ modifiers.map(mod => (Algos.encode(mod), (modifierTypeId, System.currentTimeMillis())))
   }
@@ -133,6 +152,9 @@ object StatsSender {
   final case class MiningTime(time: Long) extends AnyVal
   final case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
   final case class GetModifiers(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
+  sealed trait ModifiersDownloadStatistic
+  final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
+  final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
 
   def props(settings: InfluxDBSettings): Props = Props(new StatsSender(settings))
 }

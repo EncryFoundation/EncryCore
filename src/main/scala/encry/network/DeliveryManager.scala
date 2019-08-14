@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus._
@@ -10,25 +9,23 @@ import encry.network.DeliveryManager.{CheckModifiersToDownload, _}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
-import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest}
+import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest, SerializedModifierFromNetwork}
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.History
 import encry.settings.EncryAppSettings
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
 import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.DownloadedModifiersValidator.{InvalidModifiers, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
-import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
@@ -99,7 +96,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                           isBlockChainSynced: Boolean,
                           isMining: Boolean,
                           checkModScheduler: Cancellable): Receive = {
-    case InvalidModifiers(ids) => ids.foreach(id => receivedModifiers -= toKey(id))
+    case InvalidModifier(id) => receivedModifiers -= toKey(id)
 
     case CheckDelivery(peer: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierId: ModifierId) =>
       checkDelivery(peer, modifierTypeId, modifierId)
@@ -172,9 +169,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               s": ${spam.keys.map(Algos.encode)}.")
           receivedSpamModifiers = Map.empty
         }
-        val filteredModifiers: Seq[(ModifierId, Array[Byte])] = fm
-          .filterNot { case (modId, _) => history.isModifierDefined(modId) }
-          .toSeq
+        val filteredModifiers: Map[ModifierId, Array[Byte]] = fm.filterKeys(k => !history.isModifierDefined(k))
+        if (typeId != Transaction.modifierTypeId) influxRef
+          .foreach(ref => (0 to filteredModifiers.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
         //todo check this logic
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
@@ -528,7 +525,7 @@ object DeliveryManager {
 
         case ConnectionStopped(_) => 1
 
-        case InvalidModifiers(_) => 2
+        case InvalidModifier(_) => 2
 
         case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
           msg match {

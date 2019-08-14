@@ -8,7 +8,7 @@ import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.NewTransactions
+import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -47,7 +47,7 @@ object Transfer extends Command {
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>
-          memoryPool ! NewTransactions(Seq(tx))
+          memoryPool ! NewTransaction(tx)
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

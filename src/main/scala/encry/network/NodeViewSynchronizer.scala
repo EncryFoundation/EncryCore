@@ -9,9 +9,8 @@ import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.HistoryConsensus._
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.BlackList.BanReason.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.InvalidModifiers
+import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -21,7 +20,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.{History, ValidationError}
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
@@ -32,7 +31,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -62,7 +60,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var canProcessTransactions: Boolean = true
 
   val downloadedModifiersValidator: ActorRef = context.system
-    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef)
+    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef, influxRef)
       .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
@@ -88,7 +86,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   }
 
   def workingCycle(history: History): Receive = {
-    case msg@InvalidModifiers(_) => deliveryManager ! msg
+    case msg@InvalidModifier(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>
@@ -165,7 +163,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       logger.info(s"NodeViewSyncronizer got request from delivery manager to peers keeper for" +
         s" peers for first sync info message. Resending $msg to peers keeper.")
       peersKeeper ! msg
-    case msg@ModifiersFromRemote(_) => nodeViewHolderRef ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
     case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
