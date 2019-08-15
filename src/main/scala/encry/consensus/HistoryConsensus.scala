@@ -1,12 +1,10 @@
 package encry.consensus
 
-import org.encryfoundation.common.modifiers.PersistentNodeViewModifier
+import org.encryfoundation.common.modifiers.{PersistentModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
-object History {
-
-  type ModifierIds = Seq[(ModifierTypeId, ModifierId)]
+object HistoryConsensus {
 
   sealed trait HistoryComparisonResult
 
@@ -27,12 +25,11 @@ object History {
     * @param toRemove    - modifiers to remove from current node view
     * @param toApply     - modifiers to apply to current node view
     * @param toDownload  - modifiers to download from other nodes
-    * @tparam PM - type of used modifier
     */
-  case class ProgressInfo[PM <: PersistentNodeViewModifier](branchPoint: Option[ModifierId],
-                                                            toRemove: Seq[PM],
-                                                            toApply: Seq[PM],
-                                                            toDownload: Seq[(ModifierTypeId, ModifierId)]) {
+  case class ProgressInfo(branchPoint: Option[ModifierId],
+                          toRemove: Seq[PersistentModifier],
+                          toApply: Seq[PersistentModifier],
+                          toDownload: Option[(ModifierTypeId, ModifierId)]) {
 
     require(branchPoint.isDefined == toRemove.nonEmpty, s"Branch point should be defined for non-empty toRemove," +
       s" ${branchPoint.isDefined} == ${toRemove.nonEmpty} given")

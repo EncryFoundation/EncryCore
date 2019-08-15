@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
 import encry.settings.EncryAppSettings
-import encry.view.history.EncryHistory
+import encry.view.history.History
 import encryBenchmark.Settings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -20,7 +20,7 @@ class HistoryBenches {
   @Benchmark
   def appendBlocksToHistoryBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
-      val history: EncryHistory = generateHistory(benchStateHistory.settings, getRandomTempDir)
+      val history: History = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
         historyL.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
       }
@@ -31,7 +31,7 @@ class HistoryBenches {
   @Benchmark
   def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
-      val history: EncryHistory = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
+      val history: History = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
       history.closeStorage()
     }
   }
@@ -64,9 +64,9 @@ object HistoryBenches {
 
     val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
-    val initialHistory: EncryHistory = generateHistory(settings, tmpDir)
+    val initialHistory: History = generateHistory(settings, tmpDir)
 
-    val resultedHistory: (EncryHistory, Option[Block], Vector[Block]) =
+    val resultedHistory: (History, Option[Block], Vector[Block]) =
       (0 until benchSettings.historyBenchSettings.blocksNumber)
         .foldLeft(initialHistory, Option.empty[Block], Vector.empty[Block]) {
           case ((prevHistory, prevBlock, vector), _) =>

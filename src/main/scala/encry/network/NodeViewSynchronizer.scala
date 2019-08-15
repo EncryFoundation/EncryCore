@@ -7,11 +7,10 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
-import encry.consensus.History._
+import encry.consensus.HistoryConsensus._
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.BlackList.BanReason.SentInvForPayload
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.InvalidModifiers
+import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -21,9 +20,9 @@ import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges, ModifiersFromRemote}
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
-import encry.view.history.{EncryHistory, EncryHistoryReader}
+import encry.view.history.{History, ValidationError}
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
@@ -54,14 +53,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
-  var historyReaderOpt: Option[EncryHistory] = None
+  var historyReaderOpt: Option[History] = None
   var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
   var chainSynced: Boolean = false
 
   var canProcessTransactions: Boolean = true
 
   val downloadedModifiersValidator: ActorRef = context.system
-    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef)
+    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef, influxRef)
       .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
@@ -77,7 +76,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   override def receive: Receive = awaitingHistoryCycle
 
   def awaitingHistoryCycle: Receive = {
-    case ChangedHistory(reader: EncryHistory) =>
+    case ChangedHistory(reader: History) =>
       logger.info(s"get history: $reader from $sender")
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
@@ -86,8 +85,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg => logger.info(s"Nvsh got strange message: $msg during history awaiting.")
   }
 
-  def workingCycle(history: EncryHistory): Receive = {
-    case msg@InvalidModifiers(_) => deliveryManager ! msg
+  def workingCycle(history: History): Receive = {
+    case msg@InvalidModifier(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
       case block: Block =>
@@ -103,14 +102,13 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case DataFromPeer(message, remote) => message match {
       case SyncInfoNetworkMessage(syncInfo) => Option(history) match {
         case Some(historyReader) =>
-          val extensionOpt: Option[ModifierIds] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
-          val ext: ModifierIds = extensionOpt.getOrElse(Seq())
+          val ext: Seq[ModifierId] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
-          if (!(extensionOpt.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
-          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
-          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, extensionOpt)
+          if (!(ext.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
+          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
+          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
         case _ =>
       }
       case RequestModifiersNetworkMessage(invData) =>
@@ -165,7 +163,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       logger.info(s"NodeViewSyncronizer got request from delivery manager to peers keeper for" +
         s" peers for first sync info message. Resending $msg to peers keeper.")
       peersKeeper ! msg
-    case msg@ModifiersFromRemote(_) => nodeViewHolderRef ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
     case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
@@ -180,7 +177,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
-    case ChangedHistory(reader: EncryHistory@unchecked) if reader.isInstanceOf[EncryHistory] =>
+    case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
@@ -237,7 +234,7 @@ object NodeViewSynchronizer {
     case object SendLocalSyncInfo
 
     final case class OtherNodeSyncingStatus(remote: ConnectedPeer,
-                                            status: encry.consensus.History.HistoryComparisonResult,
+                                            status: encry.consensus.HistoryConsensus.HistoryComparisonResult,
                                             extension: Option[Seq[(ModifierTypeId, ModifierId)]])
 
     final case class RequestFromLocal(source: ConnectedPeer,
@@ -248,9 +245,9 @@ object NodeViewSynchronizer {
 
     trait NodeViewChange extends NodeViewHolderEvent
 
-    case class ChangedHistory(reader: EncryHistoryReader) extends NodeViewChange
+    case class ChangedHistory(reader: History) extends NodeViewChange
 
-    case class UpdatedHistory(history: EncryHistory)
+    case class UpdatedHistory(history: History)
 
     case class ChangedState(reader: UtxoState) extends NodeViewChange
 

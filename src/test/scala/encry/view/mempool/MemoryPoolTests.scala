@@ -7,7 +7,7 @@ import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DummyEncryAppSettingsReader
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.{NewTransactions, TransactionsForMiner}
+import encry.view.mempool.MemoryPool.{NewTransaction, TransactionsForMiner}
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 import scala.concurrent.duration._
@@ -64,7 +64,7 @@ class MemoryPoolTests extends WordSpecLike
       val mempool: TestActorRef[MemoryPool] = TestActorRef[MemoryPool](
         MemoryPool.props(settings, timeProvider, miner.ref, Some(TestProbe().ref)))
       val transactions = genValidPaymentTxs(4)
-      mempool ! NewTransactions(transactions.toIndexedSeq)
+      transactions.foreach(mempool ! NewTransaction(_))
       mempool.underlyingActor.memoryPool.size shouldBe 4
       logger.info(s"generated: ${transactions.map(_.encodedId)}")
       miner.expectMsg(20.seconds, TransactionsForMiner(transactions.toIndexedSeq))

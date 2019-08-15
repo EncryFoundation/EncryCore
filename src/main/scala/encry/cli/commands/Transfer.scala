@@ -7,8 +7,8 @@ import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.view.NodeViewHolder.ReceivableMessages._
-import encry.view.history.EncryHistory
-import encry.view.mempool.MemoryPool.NewTransactions
+import encry.view.history.History
+import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -27,7 +27,7 @@ object Transfer extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
-      GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, Option[Transaction]] { view =>
+      GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
         Try {
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
@@ -47,7 +47,7 @@ object Transfer extends Command {
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>
-          memoryPool ! NewTransactions(Seq(tx))
+          memoryPool ! NewTransaction(tx)
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

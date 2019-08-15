@@ -128,7 +128,6 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
                case _ => mCache -> keys
           }
     }
-
         val updatedCache: Map[Key, PersistentModifier] =
           resultedIds._1 -- elems.map(id => key(id)).filterNot(resultedIds._2.contains)
         (resultedIds._2, ModifiersCache(updatedCache, updatedHeadersCollection, settings))
@@ -151,6 +150,7 @@ final case class ModifiersCache(modifiersCache: Map[Key, PersistentModifier],
         case Some(header: Header) if isApplicable(key(header.payloadId)) =>
           (List(key(header.payloadId)), bestHeadersIds._2)
         case _ => (exhaustiveSearch, bestHeadersIds._2)
+
       }
       case None if isChainSynced =>
         logger.debug(s"No payloads for current history")

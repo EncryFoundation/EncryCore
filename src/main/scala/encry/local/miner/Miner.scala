@@ -5,6 +5,7 @@ import java.util.Date
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
 import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme}
@@ -17,7 +18,7 @@ import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
-import encry.view.history.EncryHistory
+import encry.view.history.History
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
@@ -30,7 +31,6 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-
 import scala.collection._
 import scala.concurrent.duration._
 
@@ -153,7 +153,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[EncryHistory, UtxoState, EncryWallet],
+  def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
@@ -172,7 +172,10 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
 
-    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent))
+    val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
+      case Right(value) => value
+      case Left(value)  => EncryApp.forceStopApplication(999, value.toString)
+    })
       .getOrElse(TestNetConstants.InitialDifficulty)
 
     val candidate: CandidateBlock =
@@ -186,11 +189,11 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[EncryHistory, UtxoState, EncryWallet, CandidateEnvelope] {
+    nodeViewHolder ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
-        val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
+        val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)
         bestHeaderOpt match {
           case Some(h) => logger.info(s"Best header at height ${h.height}")
           case None => logger.info(s"No best header opt")

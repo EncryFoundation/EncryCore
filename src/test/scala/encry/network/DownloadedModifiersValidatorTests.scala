@@ -1,22 +1,21 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{ModifiersForValidating, InvalidModifiers}
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
-import encry.view.NodeViewHolder.ReceivableMessages.ModifiersFromRemote
-import encry.view.history.EncryHistory
+import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.history.History
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.crypto.hash.Digest32
@@ -43,9 +42,9 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val mempool = TestProbe()
 
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
-        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref)
+        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
-      val history: EncryHistory = generateDummyHistory(settingsWithAllPeers)
+      val history: History = generateDummyHistory(settingsWithAllPeers)
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
@@ -81,18 +80,18 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         EquihashSolution(Seq(1, 3))
       )
 
-      val history1: EncryHistory = history.append(header_first).right.get._1
+      val history1: History = history.append(header_first).right.get._1
 
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history1))
 
       /* Header */
-      val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray.reverse)
+      val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray.reverse).toMap
       val msg = ModifiersForValidating(connectedPeer, Header.modifierTypeId, mods)
 
       deliveryManager.send(downloadedModifiersValidator, msg)
       peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
       nodeViewHolder.expectNoMsg()
-      nodeViewSync.expectMsg(InvalidModifiers(Seq(header_second.id)))
+      nodeViewSync.expectMsg(InvalidModifier(header_second.id))
     }
     "find corrupted payload" in {
       val nodeViewHolder = TestProbe()
@@ -111,9 +110,9 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       )
 
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
-        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref)
+        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
-      val history: EncryHistory = generateDummyHistory(settingsWithAllPeers)
+      val history: History = generateDummyHistory(settingsWithAllPeers)
 
       val historyWith10Blocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>
@@ -126,15 +125,15 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
 
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(historyWith10Blocks._1))
 
-      val mods: Seq[(ModifierId, Array[Byte])] = historyWith10Blocks._2.map(b =>
+      val mods: Map[ModifierId, Array[Byte]] = (historyWith10Blocks._2.map(b =>
         b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray.reverse
-      ) :+ (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)
+      ) :+ (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)).toMap
 
-      deliveryManager.send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
+      deliveryManager
+        .send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
       peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
-      nodeViewHolder.expectMsg(ModifiersFromRemote(Seq(payload)))
-      nodeViewSync.expectMsg(InvalidModifiers(historyWith10Blocks._2.map(b => b.payload.id)))
+      nodeViewHolder.expectMsg(ModifierFromRemote(payload))
     }
   }
 }

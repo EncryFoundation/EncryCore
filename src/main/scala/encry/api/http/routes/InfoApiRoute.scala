@@ -9,7 +9,6 @@ import encry.local.miner.Miner.MinerStatus
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings._
 import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.history.EncryHistoryReader
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}

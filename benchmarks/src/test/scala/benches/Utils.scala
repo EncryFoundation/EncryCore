@@ -12,11 +12,9 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
-import encry.view.history.EncryHistory
-import encry.view.history.processors.payload.BlockPayloadProcessor
+import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
-import encry.view.state.UtxoState.{initialStateBoxes, logger}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -145,16 +143,17 @@ object Utils extends StrictLogging {
     Block(header, Payload(header.id, transactions))
   }
 
-  def generateNextBlockValidForHistory(history: EncryHistory,
+  def generateNextBlockValidForHistory(history: History,
                                        difficultyDiff: BigInt = 0,
                                        prevBlock: Option[Block],
                                        txs: Seq[Transaction]): Block = {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
-    val requiredDifficulty: Difficulty = prevBlock.map(b => history.requiredDifficultyAfter(b.header))
+    val requiredDifficulty: Difficulty = prevBlock.map(b =>
+      history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(TestNetConstants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
-      height = history.bestHeaderHeight + 1,
+      height = history.getBestHeaderHeight + 1,
       difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff),
       transactionsRoot = Payload.rootHash(txs.map(_.id))
     )
@@ -404,7 +403,7 @@ object Utils extends StrictLogging {
     uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
-  def generateHistory(settingsEncry: EncryAppSettings, file: File): EncryHistory = {
+  def generateHistory(settingsEncry: EncryAppSettings, file: File): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -414,11 +413,10 @@ object Utils extends StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new EncryHistory with BlockPayloadProcessor {
-      override protected val settings: EncryAppSettings = settingsEncry
-      override protected val nodeSettings: NodeSettings = settings.node
-      override protected val historyStorage: HistoryStorage = storage
-      override protected val timeProvider: NetworkTimeProvider = ntp
+    new History {
+      override  val settings: EncryAppSettings = settingsEncry
+      override  val historyStorage: HistoryStorage = storage
+      override  val timeProvider: NetworkTimeProvider = ntp
     }
   }
 
