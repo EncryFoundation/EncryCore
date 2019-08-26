@@ -103,7 +103,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case DataFromPeer(message, remote) => message match {
       case SyncInfoNetworkMessage(syncInfo) => Option(history) match {
         case Some(historyReader) =>
-          val ext: Seq[ModifierId] = historyReader.continuationIds(syncInfo, settings.network.networkChunkSize)
+          val ext: Seq[ModifierId] = historyReader.continuationIds(syncInfo, settings.network.syncPacketLength)
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
             s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
