@@ -196,13 +196,13 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     if (getBestHeaderId.isEmpty) SyncInfo(Seq.empty)
     else {
       val m: Option[Header] = getBestHeader
-      val s: Int = m.map(h => h.height).getOrElse(0)
+      val s: Option[Int] = m.map(h => h.height)
       logger.info(s"syncInfo -> getBestHeader -> ${m.map(_.height)}" +
         s"\n ${settings.network.maxInvObjects}" +
-        s"\n ${s - settings.network.maxInvObjects + 1} to $s" +
+        s"\n ${s.map(y => y - settings.network.maxInvObjects + 1)} to $s" +
         s"")
       val m1: Seq[ModifierId] = m.map(h =>
-        (s to h.height).flatMap(getBestHeaderIdAtHeight)
+        ((h.height - settings.network.maxInvObjects + 1) to h.height).flatMap(getBestHeaderIdAtHeight)
       ).getOrElse(Seq.empty)
       logger.info(s"syncInfo -> m1 -> ${m1.size}")
 //      val a = getBestHeader.map(header =>
