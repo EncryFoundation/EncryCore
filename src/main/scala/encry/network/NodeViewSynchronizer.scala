@@ -25,12 +25,14 @@ import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.{History, ValidationError}
 import encry.view.mempool.MemoryPool.{InvMessageWithTransactionsIds, RequestForTransactions, RequestModifiersForTransactions, RequestedModifiersForRemote, StartTransactionsValidation, StopTransactionsValidation}
 import encry.view.state.UtxoState
-import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
+import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
+import scala.annotation.switch
 import scala.concurrent.duration._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -54,7 +56,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   implicit val timeout: Timeout = Timeout(5.seconds)
 
   var historyReaderOpt: Option[History] = None
-  var modifiersRequestCache: Map[String, NodeViewModifier] = Map.empty
+  var modifiersRequestCache: Map[String, PersistentModifier] = Map.empty
   var chainSynced: Boolean = false
 
   var canProcessTransactions: Boolean = true
@@ -112,40 +114,39 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           peersKeeper ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
         case _ =>
       }
-      case RequestModifiersNetworkMessage(invData) =>
-        if (chainSynced || settings.node.offlineGeneration) {
-          val inRequestCache: Map[String, NodeViewModifier] =
-            invData._2.flatMap(id => modifiersRequestCache.get(Algos.encode(id)).map(mod => Algos.encode(mod.id) -> mod)).toMap
-          if (invData._1 != Transaction.modifierTypeId)
-            logger.info(s"inRequestCache(${inRequestCache.size}): ${inRequestCache.keys.mkString(",")}")
-          sendResponse(remote, invData._1, inRequestCache.values.collect {
-            case header: Header => header.id -> HeaderProtoSerializer.toProto(header).toByteArray
-            case payload: Payload => payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray
-          }.toSeq)
-          val nonInRequestCache: Seq[ModifierId] = invData._2.filterNot(id => inRequestCache.contains(Algos.encode(id)))
-          if (nonInRequestCache.nonEmpty) {
-            if (invData._1 == Transaction.modifierTypeId) memoryPoolRef ! RequestModifiersForTransactions(remote, nonInRequestCache)
-            else Option(history).foreach { reader =>
-              val mods = nonInRequestCache.map(id => (id, reader.modifierBytesById(id))).collect {
-                case (id, mod) if mod.isDefined => id -> mod.get
-              }
-              nonInRequestCache.foreach(id => if (reader.modifierBytesById(id).isEmpty) logger.info(s"Mod with id: ${Algos.encode(id)} is not defined"))
-              invData._1 match {
-                case Header.modifierTypeId =>
-                  logger.info(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
-                  sendResponse(remote, invData._1, mods)
-                case Payload.modifierTypeId => mods.foreach { case (id, modBytes) =>
-                  logger.info(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
-                    s"${Payload.modifierTypeId}.")
-                  sendResponse(remote, invData._1, Seq(id -> modBytes))
-                }
-                case _ => //nothing
-              }
-            }
-          }
+      case RequestModifiersNetworkMessage((typeId, requestedIds)) if chainSynced || settings.node.offlineGeneration =>
+        val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
+          .flatMap(id => modifiersRequestCache
+            .get(Algos.encode(id))
+            .map(mod => mod.id -> ModifiersToNetworkUtils.toProto(mod)))
+          .toMap
+        if (modifiersFromCache.nonEmpty) remote.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersFromCache)
+        val unrequestedModifiers: Seq[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains)
+
+        if (unrequestedModifiers.nonEmpty) (typeId: @switch) match {
+          case tId if tId == Transaction.modifierTypeId =>
+            memoryPoolRef ! RequestModifiersForTransactions(remote, unrequestedModifiers)
+          case tId if tId == Payload.modifierTypeId =>
+            getModsForRemote(unrequestedModifiers).foreach(_.foreach {
+              case (id, bytes) => remote.handlerRef ! ModifiersNetworkMessage(tId -> Map(id -> bytes))
+            })
+          case tId => getModsForRemote(unrequestedModifiers).foreach(modifiers =>
+            remote.handlerRef ! ModifiersNetworkMessage(tId -> modifiers)
+          )
         }
-        else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
-          s"node is not synced, so ignore msg")
+
+        def getModsForRemote(ids: Seq[ModifierId]): Option[Map[ModifierId, Array[Byte]]] = Option(history)
+          .map { historyStorage =>
+            val modifiers = unrequestedModifiers
+              .map(id => id -> historyStorage.modifierBytesById(id))
+              .collect { case (id, mod) if mod.isDefined => id -> mod.get }
+              .toMap
+            logger.info(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
+            logger.info(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
+            modifiers
+          }
+      case RequestModifiersNetworkMessage(requestedIds) =>
+        logger.info(s"Request from $remote for ${requestedIds._2.size} modifiers discarded cause to chain isn't synced")
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
           if (chainSynced && canProcessTransactions)
