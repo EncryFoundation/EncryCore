@@ -92,6 +92,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case block: Block =>
         broadcastModifierInv(block.header)
         broadcastModifierInv(block.payload)
+        //todo we can put serialized modifier to collection. Probably it'll be better
         modifiersRequestCache = Map(
           Algos.encode(block.id) -> block.header,
           Algos.encode(block.payload.id) -> block.payload
@@ -131,10 +132,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
               nonInRequestCache.foreach(id => if (reader.modifierBytesById(id).isEmpty) logger.info(s"Mod with id: ${Algos.encode(id)} is not defined"))
               invData._1 match {
                 case Header.modifierTypeId =>
-                  logger.debug(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
+                  logger.info(s"Trigger sendResponse to $remote for modifiers of type: ${Header.modifierTypeId}.")
                   sendResponse(remote, invData._1, mods)
                 case Payload.modifierTypeId => mods.foreach { case (id, modBytes) =>
-                  logger.debug(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
+                  logger.info(s"Trigger sendResponse to $remote for modifier ${Algos.encode(id)} of type: " +
                     s"${Payload.modifierTypeId}.")
                   sendResponse(remote, invData._1, Seq(id -> modBytes))
                 }
@@ -143,7 +144,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             }
           }
         }
-        else logger.debug(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
+        else logger.info(s"Peer $remote requested ${invData._2.length} modifiers ${idsToString(invData)}, but " +
           s"node is not synced, so ignore msg")
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
@@ -203,15 +204,15 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiersBytes: Seq[(ModifierId, Array[Byte])]): Unit =
     if (modifiersBytes.nonEmpty) {
-      if (typeId != Transaction.modifierTypeId)
-        logger.debug(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
+      if (typeId == Payload.modifierTypeId)
+        logger.info(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
       typeId match {
         case Header.modifierTypeId =>
           logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for HEADERS with ${modifiersBytes.size} headers." +
             s" \n Headers are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Payload.modifierTypeId =>
-          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
+          logger.info(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
             s" Mods length: ${modifiersBytes.map(_._2.length).mkString(",")}" +
             s" \n Payloads are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
