@@ -32,6 +32,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import scala.concurrent.duration._
+import encry.network.ModifiersToNetworkUtils._
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -54,7 +55,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   implicit val timeout: Timeout = Timeout(5.seconds)
 
   var historyReaderOpt: Option[History] = None
-  var modifiersRequestCache: Map[String, PersistentModifier] = Map.empty
+  var modifiersRequestCache: Map[String, Array[Byte]] = Map.empty
   var chainSynced: Boolean = false
 
   var canProcessTransactions: Boolean = true
@@ -92,10 +93,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case block: Block =>
         broadcastModifierInv(block.header)
         broadcastModifierInv(block.payload)
-        //todo we can put serialized modifier to collection. Probably it'll be better
-        modifiersRequestCache = Map(
-          Algos.encode(block.id) -> block.header,
-          Algos.encode(block.payload.id) -> block.payload
+        if (chainSynced) modifiersRequestCache = Map(
+          Algos.encode(block.id)         -> toProto(block.header),
+          Algos.encode(block.payload.id) -> toProto(block.payload)
         )
       case tx: Transaction => broadcastModifierInv(tx)
       case _ => //Do nothing
@@ -116,7 +116,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
           .flatMap(id => modifiersRequestCache
             .get(Algos.encode(id))
-            .map(mod => mod.id -> ModifiersToNetworkUtils.toProto(mod)))
+            .map(id -> _))
           .toMap
         if (modifiersFromCache.nonEmpty) remote.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersFromCache)
         val unrequestedModifiers: Seq[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains)
