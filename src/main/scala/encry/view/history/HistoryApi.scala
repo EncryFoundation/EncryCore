@@ -13,9 +13,7 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-
 import scala.annotation.tailrec
-import scala.collection.immutable
 import scala.collection.immutable.HashSet
 
 trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
@@ -194,23 +192,11 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   def syncInfo: SyncInfo =
     if (getBestHeaderId.isEmpty) SyncInfo(Seq.empty)
-    else {
-      val m: Option[Header] = getBestHeader
-      val s: Option[Int] = m.map(h => h.height)
-      logger.info(s"syncInfo -> getBestHeader -> ${m.map(_.height)}" +
-        s"\n ${settings.network.maxInvObjects}" +
-        s"\n ${s.map(y => y - settings.network.maxInvObjects + 1)} to $s" +
-        s"")
-      val m1: Seq[ModifierId] = m.map(h =>
-        ((h.height - settings.network.maxInvObjects + 1) to h.height).flatMap(getBestHeaderIdAtHeight)
-      ).getOrElse(Seq.empty)
-      logger.info(s"syncInfo -> m1 -> ${m1.size}")
-//      val a = getBestHeader.map(header =>
-//        ((header.height - settings.network.maxInvObjects + 1) to header.height)
-//          .flatMap(height => headerIdsAtHeight(height).headOption)
-//      )
-      SyncInfo(m1)
-    }
+    else SyncInfo(
+      getBestHeader.map(header =>
+        ((header.height - settings.network.maxInvObjects + 1) to header.height)
+          .flatMap(height => headerIdsAtHeight(height).headOption)
+      ).getOrElse(Seq.empty))
 
 
   def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {

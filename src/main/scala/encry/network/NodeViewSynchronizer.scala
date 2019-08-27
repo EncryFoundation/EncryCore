@@ -123,7 +123,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         if (modifiersFromCache.nonEmpty) remote.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersFromCache)
         val unrequestedModifiers: Seq[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains)
 
-        if (unrequestedModifiers.nonEmpty) (typeId: @switch) match {
+        if (unrequestedModifiers.nonEmpty) typeId match {
           case tId if tId == Transaction.modifierTypeId =>
             memoryPoolRef ! RequestModifiersForTransactions(remote, unrequestedModifiers)
           case tId if tId == Payload.modifierTypeId =>
@@ -145,8 +145,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             logger.info(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
             modifiers
           }
+
       case RequestModifiersNetworkMessage(requestedIds) =>
         logger.info(s"Request from $remote for ${requestedIds._2.size} modifiers discarded cause to chain isn't synced")
+
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
           if (chainSynced && canProcessTransactions)
@@ -206,14 +208,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiersBytes: Seq[(ModifierId, Array[Byte])]): Unit =
     if (modifiersBytes.nonEmpty) {
       if (typeId == Payload.modifierTypeId)
-        logger.info(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
+        logger.debug(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
       typeId match {
         case Header.modifierTypeId =>
           logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for HEADERS with ${modifiersBytes.size} headers." +
             s" \n Headers are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)
         case Payload.modifierTypeId =>
-          logger.info(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
+          logger.debug(s"Sent to peer handler for $peer ModfiersNetworkMessage for PAYLOADS with ${modifiersBytes.size} payloads." +
             s" Mods length: ${modifiersBytes.map(_._2.length).mkString(",")}" +
             s" \n Payloads are: ${modifiersBytes.map(x => Algos.encode(x._1)).mkString(",")}.")
           peer.handlerRef ! ModifiersNetworkMessage(typeId -> modifiersBytes.toMap)

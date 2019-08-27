@@ -118,17 +118,16 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
 
     case CheckPayloadsToDownload =>
-      logger.info(s"received CheckPayloadsToDownload on DeliveryManager actor")
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
-      logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
-      logger.info(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
+      logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
           currentQueue.map(elem => ModifierId @@ elem.toArray)
         ).filterNot(modId => currentQueue.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId)))
-      logger.info(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
+      logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
       if (newIds.nonEmpty) requestDownload(Payload.modifierTypeId, newIds, history, isBlockChainSynced, isMining)
       val nextCheckModsScheduler =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
@@ -142,7 +141,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       }
       if (!isBlockChainSynced && expectedModifiers.isEmpty && receivedModifiers.isEmpty) {
         checkModScheduler.cancel()
-        logger.info(s"SemanticallySuccessfulModifier case, if condition true. Resend CheckPayloadsToDownload to DM")
+        logger.debug(s"SemanticallySuccessfulModifier case, if condition true. Resend CheckPayloadsToDownload to DM")
         self ! CheckPayloadsToDownload
       }
     case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
@@ -161,8 +160,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case DataFromPeer(message, remote) => message match {
       case ModifiersNetworkMessage((typeId, modifiers)) =>
-        if (typeId == Payload.modifierTypeId)
-          logger.debug(s"Received payloads are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
+        logger.debug(s"Received modifiers are: ${modifiers.map(x => Algos.encode(x._1)).mkString(",")}")
         influxRef.foreach(_ ! GetModifiers(typeId, modifiers.keys.toSeq))
         for ((id, _) <- modifiers) receive(typeId, id, remote, isBlockChainSynced)
         val (spam: Map[ModifierId, Array[Byte]], fm: Map[ModifierId, Array[Byte]]) = modifiers.partition(p => isSpam(p._1))
@@ -269,8 +267,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
     val thirdCondition: Boolean =
       if (!isBlockChainSynced) peersCollection.get(peer.socketAddress).exists(p => p._2 != Younger)
       else peersCollection.contains(peer.socketAddress)
-    if (mTypeId == Payload.modifierTypeId)
-      logger.info(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
+    if (mTypeId != Transaction.modifierTypeId)
+      logger.debug(s"Got requestModifier for modifiers of type: $mTypeId to $peer with modifiers ${modifierIds.size}." +
         s" Try to check conditions: $firstCondition -> $secondCondition -> $thirdCondition.")
     if ((firstCondition || secondCondition) && thirdCondition) {
       val requestedModifiersFromPeer: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
@@ -284,8 +282,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
         )
 
       if (notYetRequested.nonEmpty) {
-        if (mTypeId == Payload.modifierTypeId)
-          logger.info(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
+        if (mTypeId != Transaction.modifierTypeId)
+          logger.debug(s"Send request to ${peer.socketAddress} for ${notYetRequested.size} modifiers of type $mTypeId ")
         peer.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> notYetRequested)
         priorityCalculator = priorityCalculator.incrementRequestForNModifiers(peer.socketAddress, notYetRequested.size)
         if (mTypeId != Transaction.modifierTypeId) {
@@ -320,7 +318,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       } match {
         case Some((_, (cP, _, _))) =>
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
-          logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
+          logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
           priorityCalculator = priorityCalculator.incrementRequest(peer.socketAddress)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress, peerRequests.updated(
@@ -344,11 +342,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
     */
   def isExpecting(mId: ModifierId, modifierTypeId: ModifierTypeId, peer: ConnectedPeer): Boolean = {
     if (modifierTypeId != Transaction.modifierTypeId) {
-      val a: Boolean = expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
-      logger.info(s"isExpecting -->> modId ${Algos.encode(mId)} --> $a")
-      a
-    }
-    else expectedTransactions.contains(toKey(mId))
+      val result: Boolean = expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
+      logger.info(s"isExpecting -->> modId ${Algos.encode(mId)} --> $result")
+      result
+    } else expectedTransactions.contains(toKey(mId))
   }
 
   /**
@@ -409,12 +406,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit =
     if (!isBlockChainSynced) {
-      logger.info(s"requestDownload -> !isBlockChainSynced = true")
+      logger.debug(s"requestDownload -> !isBlockChainSynced = true")
       val (withBadNodesMap, withoutBadNodesMap) = peersCollection.filter(p => p._2._2 != Younger).partition {
         case (_, (_, _, priority)) => priority == BadNode
       }
-      logger.info(s"withBadNodesMap -> ${withBadNodesMap.keys.mkString(",")}")
-      logger.info(s"withoutBadNodesMap -> ${withoutBadNodesMap.keys.mkString(",")}")
+      logger.debug(s"withBadNodesMap -> ${withBadNodesMap.keys.mkString(",")}")
+      logger.debug(s"withoutBadNodesMap -> ${withoutBadNodesMap.keys.mkString(",")}")
       val withBadNodes: IndexedSeq[(ConnectedPeer, HistoryComparisonResult)] =
         withBadNodesMap.map(x => x._2._1 -> x._2._2).toIndexedSeq
       val withoutBadNodes: IndexedSeq[(ConnectedPeer, HistoryComparisonResult)] =
@@ -422,14 +419,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val resultedPeerCollection =
         if (withBadNodes.nonEmpty) withoutBadNodes :+ Random.shuffle(withBadNodes).head
         else withoutBadNodes
-      logger.info(s"resultedPeerCollection -> $resultedPeerCollection")
+      logger.debug(s"resultedPeerCollection -> $resultedPeerCollection")
       logger.debug(s"Block chain is not synced. acceptedPeers: $resultedPeerCollection")
       if (resultedPeerCollection.nonEmpty) {
         val shuffle: IndexedSeq[(ConnectedPeer, HistoryComparisonResult)] = Random.shuffle(resultedPeerCollection)
         val cP = shuffle.last._1
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         if (modifierTypeId == Payload.modifierTypeId)
-          logger.info(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
+          logger.debug(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
@@ -437,8 +434,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case coll: Map[_, _] if coll.nonEmpty =>
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         coll.foreach { case (_, (cp, _, _)) =>
-          if (modifierTypeId == Payload.modifierTypeId)
-            logger.info(s"Sent download request to the ${cp.socketAddress} to modifiers of type: $modifierTypeId.")
+          if (modifierTypeId != Transaction.modifierTypeId)
+            logger.debug(s"Sent download request to the ${cp.socketAddress} to modifiers of type: $modifierTypeId.")
           requestModifies(history, cp, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")
@@ -458,7 +455,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
               isBlockChainSynced: Boolean): Unit =
     if (isExpecting(mId, mTid, peer)) {
       if (mTid != Transaction.modifierTypeId)
-        logger.info(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
+        logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
