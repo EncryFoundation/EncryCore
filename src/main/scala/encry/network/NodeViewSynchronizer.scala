@@ -205,7 +205,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   def sendResponse(peer: ConnectedPeer, typeId: ModifierTypeId, modifiersBytes: Seq[(ModifierId, Array[Byte])]): Unit =
     if (modifiersBytes.nonEmpty) {
-      if (typeId == Payload.modifierTypeId)
+      if (typeId != Transaction.modifierTypeId)
         logger.debug(s"Sent modifiers to $peer size is: ${modifiersBytes.length}")
       typeId match {
         case Header.modifierTypeId =>
