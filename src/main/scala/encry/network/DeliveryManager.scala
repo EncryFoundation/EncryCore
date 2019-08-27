@@ -343,7 +343,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
   def isExpecting(mId: ModifierId, modifierTypeId: ModifierTypeId, peer: ConnectedPeer): Boolean = {
     if (modifierTypeId != Transaction.modifierTypeId) {
       val result: Boolean = expectedModifiers.getOrElse(peer.socketAddress, Map.empty).contains(toKey(mId))
-      logger.info(s"isExpecting -->> modId ${Algos.encode(mId)} --> $result")
+      logger.debug(s"isExpecting -->> modId ${Algos.encode(mId)} --> $result")
       result
     } else expectedTransactions.contains(toKey(mId))
   }
