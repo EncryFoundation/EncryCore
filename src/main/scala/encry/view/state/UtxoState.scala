@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -24,6 +25,7 @@ import cats.syntax.traverse._
 import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.validated._
+import monix.eval.Callback
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -34,11 +36,12 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, E
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.encryfoundation.common.validation.ValidationResult.Invalid
+import org.encryfoundation.common.validation.ValidationResult.{Invalid, Valid}
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-import scala.concurrent.ExecutionContextExecutor
+
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
@@ -50,37 +53,39 @@ final case class UtxoState(storage: VersionalStorage,
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
-        logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
+        logger.info(s"Starting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
         UtxoState(
           storage,
           height,
           header.timestamp
         ).asRight[List[ModifierApplyError]]
       case block: Block =>
-        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
+        logger.info(s"Starting to applyModifier as a block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+
           if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
           else validate(tx)
+
         }).toList
           .traverse(Validated.fromEither)
           .toEither
-        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime)/1000L} s")
+        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
           txsToApply => {
             val combineTimeStart = System.currentTimeMillis()
             val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
-            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart)/1000L} s")
+            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart) / 1000L} s")
             val insertTimestart = System.currentTimeMillis()
             storage.insert(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
               combinedStateChange.inputsToDb.toList
             )
-            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
+            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
             UtxoState(
               storage,
               Height @@ block.header.height,
@@ -89,7 +94,7 @@ final case class UtxoState(storage: VersionalStorage,
           }
         )
     }
-    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime)/1000L} s)")
+    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime) / 1000L} s)")
     result
   }
 
@@ -109,9 +114,63 @@ final case class UtxoState(storage: VersionalStorage,
     }
   }
 
+  // In order to evaluate tasks, we'll need a Scheduler
+  import monix.execution.Scheduler.Implicits.global
+
+  // A Future type that is also Cancelable
+  import monix.execution.CancelableFuture
+
+  // Task is in monix.eval
+  import monix.eval.Task
+  import scala.util.{Success, Failure}
+  import scala.concurrent.ExecutionContext.Implicits.global
+  import scala.concurrent.duration._
+
+  def mmmm(): Future[Int] = {
+
+    val task: CancelableFuture[Int] = Task { 1 + 1 }.onErrorRestart(1).runAsync
+    task
+
+//    val cancelable = task.runAsync(
+//      new Callback[Throwable, Int] {
+//        def onSuccess(value: Int): Unit =
+//          println(value)
+//        def onError(ex: Throwable): Unit =
+//          System.err.println(s"ERROR: ${ex.getMessage}")
+//      })
+//    {
+//      case Right(value) =>
+//        println(value)
+//      case Left(ex) =>
+//        System.out.println(s"ERROR: ${ex}")
+//    }
+//
+//    Task {
+//      1 + 1
+//    }.runAsync { res =>
+//      res match {
+//        case Success(value) => println(value)
+//        case Failure(ex) => println(s"ERROR: ${ex.getMessage}")
+//      }
+//    }
+
+  }
+
+  def validateTransaction(transaction: Transaction, allowedOutputDelta: Amount = 0): Task[Unit] = Task {
+    transaction.semanticValidity match {
+      case Valid =>
+        val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
+
+      case Invalid(errors) =>
+    }
+  }
+
   def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
+
+      val t1 = Task(tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)))
+
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)
         .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input))
