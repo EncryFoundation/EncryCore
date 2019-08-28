@@ -90,10 +90,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@InvalidModifier(_) => deliveryManager ! msg
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
     case SemanticallySuccessfulModifier(mod) => mod match {
-      case block: Block =>
+      case block: Block if chainSynced =>
         broadcastModifierInv(block.header)
         broadcastModifierInv(block.payload)
-        if (chainSynced) modifiersRequestCache = Map(
+        modifiersRequestCache = Map(
           Algos.encode(block.id)         -> toProto(block.header),
           Algos.encode(block.payload.id) -> toProto(block.payload)
         )
@@ -122,11 +122,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         val unrequestedModifiers: Seq[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains)
 
         if (unrequestedModifiers.nonEmpty) typeId match {
-          case tId if tId == Transaction.modifierTypeId =>
+          case Transaction.modifierTypeId =>
             memoryPoolRef ! RequestModifiersForTransactions(remote, unrequestedModifiers)
-          case tId if tId == Payload.modifierTypeId =>
+          case Payload.modifierTypeId =>
             getModsForRemote(unrequestedModifiers).foreach(_.foreach {
-              case (id, bytes) => remote.handlerRef ! ModifiersNetworkMessage(tId -> Map(id -> bytes))
+              case (id, bytes) => remote.handlerRef ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
             })
           case tId => getModsForRemote(unrequestedModifiers).foreach(modifiers =>
             remote.handlerRef ! ModifiersNetworkMessage(tId -> modifiers)
@@ -135,7 +135,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
         def getModsForRemote(ids: Seq[ModifierId]): Option[Map[ModifierId, Array[Byte]]] = Option(history)
           .map { historyStorage =>
-            val modifiers = unrequestedModifiers
+            val modifiers: Map[ModifierId, Array[Byte]] = unrequestedModifiers
+              .view
               .map(id => id -> historyStorage.modifierBytesById(id))
               .collect { case (id, mod) if mod.isDefined => id -> mod.get }
               .toMap

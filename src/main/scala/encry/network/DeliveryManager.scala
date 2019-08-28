@@ -318,7 +318,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       } match {
         case Some((_, (cP, _, _))) =>
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
-          logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
+          logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
           priorityCalculator = priorityCalculator.incrementRequest(peer.socketAddress)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress, peerRequests.updated(
