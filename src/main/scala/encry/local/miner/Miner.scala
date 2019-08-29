@@ -126,14 +126,13 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
       logger.info(s"Txs = $transactionsPool")
-      logger.info(s"SSM height = ${mod.header.height} / Candidate height = ${candidateOpt.get.parentOpt.get.height + 1}")
-      logger.info(s"SSM size = ${mod.payload.txs.size} / Candidate size = ${candidateOpt.get.transactions.size}")
-      logger.info(s"First = ${mod.payload.txs.diff(candidateOpt.get.transactions)} / Second = ${candidateOpt.get.transactions.diff(mod.payload.txs)}")
-      if (mod.header.height == candidateOpt.get.parentOpt.get.height + 1
-        && mod.payload.txs.size != candidateOpt.get.transactions.size) {
+      logger.info(s"SSM height = ${mod.header.height} / Candidate height = ${candidateOpt.map(_.parentOpt.get.height + 1)}")
+      logger.info(s"SSM size = ${mod.payload.txs.size} / Candidate size = ${candidateOpt.map(_.transactions.size)}")
+      logger.info(s"First = ${mod.payload.txs.diff(candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty))} / Second = ${candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty).diff(mod.payload.txs)}")
+      if (candidateOpt.exists(_.parentOpt.exists(_.height == mod.header.height))
+        && (mod.payload.txs.dropRight(1).diff(candidateOpt.map(_.transactions.dropRight(1)).getOrElse(IndexedSeq.empty)) != Seq.empty)) {
         logger.info(s"if loop")
-        //if (mod.payload.txs.size != candidateOpt.get.transactions.size)
-          transactionsPool = transactionsPool ++ mod.payload.txs.diff(candidateOpt.get.transactions)
+          transactionsPool = transactionsPool ++ mod.payload.txs.diff(candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty))
         logger.info(s"IF txs = $transactionsPool")
       }
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
