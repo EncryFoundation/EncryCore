@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -24,6 +25,7 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
+import monix.eval.Task
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -31,7 +33,9 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
+
 import scala.collection._
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with StrictLogging {
@@ -61,7 +65,6 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
     }
   }
-
   override def postStop(): Unit = killAllWorkers()
 
   def killAllWorkers(): Unit = context.children.foreach(context.stop)
@@ -156,7 +159,11 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
 
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isRight).distinct
+//    val txsU: IndexedSeq[Transaction] = transactionsPool.filter { x =>
+//      val s = Await.result(view.state.validate(x), 60.seconds)
+//    }.distinct
+
+    val txsU: IndexedSeq[Transaction] = IndexedSeq.empty
 
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
@@ -176,7 +183,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
       case Right(value) => value
-      case Left(value)  => EncryApp.forceStopApplication(999, value.toString)
+      case Left(value) => EncryApp.forceStopApplication(999, value.toString)
     })
       .getOrElse(TestNetConstants.InitialDifficulty)
 
@@ -238,13 +245,13 @@ object Miner {
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(
-      "isMining"       -> isMining.asJson,
+      "isMining" -> isMining.asJson,
       "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 
   implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) => Map(
-    "isMining"       -> r.isMining.asJson,
+    "isMining" -> r.isMining.asJson,
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 

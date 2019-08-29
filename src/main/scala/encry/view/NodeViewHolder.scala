@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -27,9 +28,11 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
@@ -156,11 +159,60 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
+  import monix.execution.Scheduler.Implicits.global
+
+//  def updateState[F[_]](state: UtxoState,
+//                        progressInfo: ProgressInfo,
+//                        appliedModifiers: IndexedSeq[PersistentModifier]): Unit = {
+//    logger.info(s"Start update state with F[_].")
+//    progressInfo.toApply.foreach {
+//      case header: Header => requestDownloads(progressInfo, Some(header.id))
+//      case _ => requestDownloads(progressInfo, None)
+//    }
+//    val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
+//    val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]) =
+//      if (progressInfo.chainSwitchingNeeded) {
+//        branchingPointOpt.map { branchPoint =>
+//          if (!state.version.sameElements(branchPoint))
+//            state.rollbackTo(branchPoint) -> trimChainSuffix(appliedModifiers, ModifierId !@@ branchPoint)
+//          else Success(state) -> IndexedSeq()
+//        }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
+//      } else Success(state) -> appliedModifiers
+//    stateToApplyTry match {
+//      case Failure(exception) =>
+//      case Success(value) =>
+//        context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
+//        val u0: UpdateInformation = UpdateInformation(nodeView.history, value, None, None, suffixTrimmed)
+//        val uf = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
+//          if (u.failedMod.nonEmpty) u
+//          else {
+//            u.state.applyModifier(modToApply).onComplete {
+//              case Failure(exception) =>
+//              case Success(value) => value match {
+//                case Left(value) =>
+//                  val (newHis: History, newProgressInfo: ProgressInfo) =
+//                    nodeView.history.reportModifierIsInvalid(modToApply)
+//                  context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
+//                  UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+//                case Right(stateAfterApply) =>
+//                  influxRef.foreach(ref => modToApply match {
+//                    case b: Block if nodeView.history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
+//                    case _ =>
+//                  })
+//                  val newHis: History = nodeView.history.reportModifierIsValid(modToApply)
+//                  context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+//                  UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
+//              }
+//            }
+//          }
+//        }
+//    }
+//  }
+
   private def updateState(history: History,
                           state: UtxoState,
                           progressInfo: ProgressInfo,
-                          suffixApplied: IndexedSeq[PersistentModifier]):
-  (History, UtxoState, Seq[PersistentModifier]) = {
+                          suffixApplied: IndexedSeq[PersistentModifier]): (History, UtxoState, Seq[PersistentModifier]) = {
     logger.debug(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
       case header: Header => requestDownloads(progressInfo, Some(header.id))
@@ -175,12 +227,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
       } else Success(state) -> suffixApplied
+
     stateToApplyTry match {
       case Success(stateToApply) =>
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
+          if (u.failedMod.isEmpty) Await.result(u.state.applyModifier(modToApply), 5.minutes) match {
             case Right(stateAfterApply) =>
               influxRef.foreach(ref => modToApply match {
                 case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
@@ -339,7 +392,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         getRecreatedState()
       case (stateId, Some(historyBestBlock), state: UtxoState) =>
         val stateBestHeaderOpt = history.getHeaderById(ModifierId !@@ stateId) //todo naming
-        val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
+      val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
@@ -351,7 +404,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).right.get }
+        toApply.foldLeft(startState) { (s, m) => Await.result(s.applyModifier(m), 5.minutes).right.get }
     }
 
   override def close(): Unit = {
