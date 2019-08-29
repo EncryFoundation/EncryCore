@@ -53,37 +53,35 @@ final case class UtxoState(storage: VersionalStorage,
   extends StrictLogging with UtxoStateReader with AutoCloseable {
 
   def validateTransaction(transaction: Transaction,
-                          allowedOutputDelta: Amount = 0): Future[Either[ValidationResult, Transaction]] =
+                          allowedOutputDelta: Amount = 0): Task[Either[ValidationResult, Transaction]] =
     if (transaction.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp)
-      val getFromDBAndParse: Future[IndexedSeq[(EncryBaseBox, Input)]] = Future.sequence(
+      Task.sequence(
         transaction.inputs.map { input =>
           logger.info(s"Started future for box in transaction ${transaction.encodedId}, ${Algos.encode(input.boxId)}")
-          Future(storage
+          Task(storage
             .get(StorageKey !@@ input.boxId)
             .flatMap(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head).toOption)
             .map(_ -> input))
         })
         .map(_.flatten)
-
-      val validateContracts: Future[List[EncryBaseBox]] = getFromDBAndParse
-        .map(_.foldLeft(List.empty[EncryBaseBox]) { case (acc, (bxOpt, input)) =>
+        .map(l => l.foldLeft(Task.pure(List.empty[EncryBaseBox])) { case (acc, (bxOpt, input)) =>
           logger.info(s"Execute task 2 for input ${Algos.encode(input.boxId)}")
-          (bxOpt, transaction.defaultProofOpt) match {
+          Task((bxOpt, transaction.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (bx, defaultProofOpt) if input.proofs.nonEmpty =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(transaction, bx, stateView), input.contract,
-                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) bx :: acc else acc
+                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc.map(bx :: _) else acc
             case (bx, Some(defaultProof)) =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition,
-                Context(transaction, bx, stateView), input.contract, Seq(defaultProof))) bx :: acc else acc
+                Context(transaction, bx, stateView), input.contract, Seq(defaultProof))) acc.map(bx :: _) else acc
             case (bx, defaultProofOpt) =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(transaction, bx, stateView), input.contract,
-                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) bx :: acc else acc
+                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc.map(bx :: _) else acc
             case _ => acc
-          }
-        })
-      val validateDebitAndCredit: Future[Boolean] = validateContracts.map { boxes =>
+          }).flatten
+        }).flatten
+      .map { boxes =>
         val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(boxes).map {
           case (key, value) => Algos.encode(key) -> value
         }
@@ -99,16 +97,13 @@ final case class UtxoState(storage: VersionalStorage,
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
-
-      val result: Future[Either[ValidationResult, Transaction]] = validateDebitAndCredit.map { res =>
+        .map { res =>
         if (!res) {
           logger.info(s"Tx: ${Algos.encode(transaction.id)} invalid. Reason: Non-positive balance in $transaction")
           Invalid(Seq(MalformedModifierError(s"Non-positive balance in $transaction"))).asLeft[Transaction]
         } else transaction.asRight[ValidationResult]
       }
-
-      result
-    } else Future.successful(transaction.semanticValidity.errors.headOption
+    } else Task.pure(transaction.semanticValidity.errors.headOption
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(transaction.asRight[ValidationResult]))
 
@@ -223,12 +218,12 @@ final case class UtxoState(storage: VersionalStorage,
         .getOrElse(tx.asRight[ValidationResult]))
     }
 
-  def applyModifier(mod: PersistentModifier): Future[Either[List[ModifierApplyError], UtxoState]] = {
+  def applyModifier(mod: PersistentModifier): Task[Either[List[ModifierApplyError], UtxoState]] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
         logger.info(s"Starting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        Future.successful(UtxoState(
+        Task.pure(UtxoState(
           storage,
           height,
           header.timestamp
@@ -238,7 +233,7 @@ final case class UtxoState(storage: VersionalStorage,
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
-        val res: Future[Either[ValidationResult, List[Transaction]]] = Future.sequence(block.payload.txs.map(tx => {
+        val res: Task[Either[ValidationResult, List[Transaction]]] = Task.sequence(block.payload.txs.map(tx => {
 
           if (tx.id sameElements lastTxId) validateTransaction(tx, totalFees + EncrySupplyController.supplyAt(height))
           else validateTransaction(tx)
