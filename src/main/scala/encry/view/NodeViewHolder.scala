@@ -233,7 +233,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) Await.result(u.state.applyModifier(modToApply).runAsync, 5.minutes) match {
+          if (u.failedMod.isEmpty) Await.result(u.state.applyModifier(modToApply), 5.minutes) match {
             case Right(stateAfterApply) =>
               influxRef.foreach(ref => modToApply match {
                 case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
@@ -404,7 +404,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) => Await.result(s.applyModifier(m).runAsync, 5.minutes).right.get }
+        toApply.foldLeft(startState) { (s, m) => Await.result(s.applyModifier(m), 5.minutes).right.get }
     }
 
   override def close(): Unit = {
