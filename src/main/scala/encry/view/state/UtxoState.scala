@@ -56,48 +56,45 @@ final case class UtxoState(storage: VersionalStorage,
                           allowedOutputDelta: Amount = 0): Task[Either[ValidationResult, Transaction]] =
     if (transaction.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp)
-      Task.sequence(
+      Task(
         transaction.inputs.map { input =>
-          logger.info(s"Started future for box in transaction ${transaction.encodedId}, ${Algos.encode(input.boxId)}")
-          Task(storage
+          storage
             .get(StorageKey !@@ input.boxId)
             .flatMap(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head).toOption)
-            .map(_ -> input))
+            .map(_ -> input)
         })
         .map(_.flatten)
-        .map(l => l.foldLeft(Task.pure(List.empty[EncryBaseBox])) { case (acc, (bxOpt, input)) =>
-          logger.info(s"Execute task 2 for input ${Algos.encode(input.boxId)}")
-          Task((bxOpt, transaction.defaultProofOpt) match {
+        .map(l => l.foldLeft(List.empty[EncryBaseBox]) { case (acc, (bxOpt, input)) =>
+          (bxOpt, transaction.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (bx, defaultProofOpt) if input.proofs.nonEmpty =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(transaction, bx, stateView), input.contract,
-                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc.map(bx :: _) else acc
+                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) bx :: acc else acc
             case (bx, Some(defaultProof)) =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition,
-                Context(transaction, bx, stateView), input.contract, Seq(defaultProof))) acc.map(bx :: _) else acc
+                Context(transaction, bx, stateView), input.contract, Seq(defaultProof))) bx :: acc else acc
             case (bx, defaultProofOpt) =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(transaction, bx, stateView), input.contract,
-                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc.map(bx :: _) else acc
+                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) bx :: acc else acc
             case _ => acc
-          }).flatten
-        }).flatten
-      .map { boxes =>
-        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(boxes).map {
-          case (key, value) => Algos.encode(key) -> value
-        }
-        val creditB: Map[String, Amount] = {
-          val balanceSheet: Map[TokenId, Amount] =
-            BalanceCalculator.balanceSheet(transaction.newBoxes, excludeTokenIssuance = true)
-          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
-          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + transaction.fee)
-        }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
-        creditB.forall { case (tokenId, amount) =>
-          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
-            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
-          else debitB.getOrElse(tokenId, 0L) >= amount
-        }
-      }
-        .map { res =>
+          }
+        })
+        .map { boxes =>
+          val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(boxes).map {
+            case (key, value) => Algos.encode(key) -> value
+          }
+          val creditB: Map[String, Amount] = {
+            val balanceSheet: Map[TokenId, Amount] =
+              BalanceCalculator.balanceSheet(transaction.newBoxes, excludeTokenIssuance = true)
+            val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
+            balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + transaction.fee)
+          }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
+          creditB.forall { case (tokenId, amount) =>
+            if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
+              debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+            else debitB.getOrElse(tokenId, 0L) >= amount
+          }
+        }.map { res =>
         if (!res) {
           logger.info(s"Tx: ${Algos.encode(transaction.id)} invalid. Reason: Non-positive balance in $transaction")
           Invalid(Seq(MalformedModifierError(s"Non-positive balance in $transaction"))).asLeft[Transaction]
@@ -239,14 +236,14 @@ final case class UtxoState(storage: VersionalStorage,
           else validateTransaction(tx)
 
         })).map(_.toList.traverse(Validated.fromEither).toEither)
-//        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-//
-//          if (tx.id sameElements lastTxId) validateTransaction(tx, totalFees + EncrySupplyController.supplyAt(height))
-//          else validateTransaction(tx)
-//
-//        }).toList
-//          .traverse(Validated.fromEither)
-//          .toEither
+        //        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+        //
+        //          if (tx.id sameElements lastTxId) validateTransaction(tx, totalFees + EncrySupplyController.supplyAt(height))
+        //          else validateTransaction(tx)
+        //
+        //        }).toList
+        //          .traverse(Validated.fromEither)
+        //          .toEither
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.map(_.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
@@ -302,144 +299,142 @@ final case class UtxoState(storage: VersionalStorage,
   import scala.concurrent.duration._
 
 
-
-    //    val cancelable = task.runAsync(
-    //      new Callback[Throwable, Int] {
-    //        def onSuccess(value: Int): Unit =
-    //          println(value)
-    //        def onError(ex: Throwable): Unit =
-    //          System.err.println(s"ERROR: ${ex.getMessage}")
-    //      })
-    //    {
-    //      case Right(value) =>
-    //        println(value)
-    //      case Left(ex) =>
-    //        System.out.println(s"ERROR: ${ex}")
-    //    }
-    //
-    //    Task {
-    //      1 + 1
-    //    }.runAsync { res =>
-    //      res match {
-    //        case Success(value) => println(value)
-    //        case Failure(ex) => println(s"ERROR: ${ex.getMessage}")
-    //      }
-    //    }
-
+  //    val cancelable = task.runAsync(
+  //      new Callback[Throwable, Int] {
+  //        def onSuccess(value: Int): Unit =
+  //          println(value)
+  //        def onError(ex: Throwable): Unit =
+  //          System.err.println(s"ERROR: ${ex.getMessage}")
+  //      })
+  //    {
+  //      case Right(value) =>
+  //        println(value)
+  //      case Left(ex) =>
+  //        System.out.println(s"ERROR: ${ex}")
+  //    }
+  //
+  //    Task {
+  //      1 + 1
+  //    }.runAsync { res =>
+  //      res match {
+  //        case Success(value) => println(value)
+  //        case Failure(ex) => println(s"ERROR: ${ex.getMessage}")
+  //      }
+  //    }
 
 
-//  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Task[Either[ValidationResult, Transaction]] =
-//    if (tx.semanticValidity.isSuccess) {
-//      val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
-//
-//      //race many
-//
-//      val s1: Task[IndexedSeq[(EncryBaseBox, Input)]] = Task.sequence(tx.inputs.map {
-//        input =>
-//          val m: Task[Option[(EncryBaseBox, Input)]] = Task {
-//            logger.info(s"Execute task 1 for ${Algos.encode(input.boxId)}")
-//            storage.get(StorageKey !@@ input.boxId).flatMap {
-//              bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head).toOption
-//            }.map(_ -> input)
-//          }
-//          m
-//      }).map(_.flatten)
-//
-//      val s2: Task[IndexedSeq[EncryBaseBox]] =
-//        s1.map(_.foldLeft(IndexedSeq.empty[EncryBaseBox]) { case (acc, (bxOpt, input)) =>
-//          println(s"Execute task 2 for input ${Algos.encode(input.boxId)}")
-//          (bxOpt, tx.defaultProofOpt) match {
-//            // If no `proofs` provided, then `defaultProof` is used.
-//            case (bx, defaultProofOpt) if input.proofs.nonEmpty =>
-//              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-//                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
-//            case (bx, Some(defaultProof)) =>
-//              if (EncryPropositionFunctions.canUnlock(bx.proposition,
-//                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) acc :+ bx else acc
-//            case (bx, defaultProofOpt) =>
-//              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-//                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-//            case _ => acc
-//          }
-//        })
-//
-//      val s3: Task[Boolean] = s2.map { bxs =>
-//        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
-//          case (key, value) => Algos.encode(key) -> value
-//        }
-//        val creditB: Map[String, Amount] = {
-//          val balanceSheet: Map[TokenId, Amount] =
-//            BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
-//          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
-//          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
-//        }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
-//        creditB.forall { case (tokenId, amount) =>
-//          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
-//            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
-//          else debitB.getOrElse(tokenId, 0L) >= amount
-//        }
-//      }
-//
-//      val s4: Task[Either[ValidationResult, Transaction]] = s3.map { res =>
-//        if (!res) {
-//          logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
-//          Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
-//        } else tx.asRight[ValidationResult]
-//      }
-//
-//      //      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)
-//      //        .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
-//      //        .map(_.toOption -> input))
-//      //        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
-//      //          (bxOpt, tx.defaultProofOpt) match {
-//      //            // If no `proofs` provided, then `defaultProof` is used.
-//      //            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
-//      //              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-//      //                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
-//      //            case (Some(bx), Some(defaultProof)) =>
-//      //              if (EncryPropositionFunctions.canUnlock(bx.proposition,
-//      //                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) acc :+ bx else acc
-//      //            case (Some(bx), defaultProofOpt) =>
-//      //              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-//      //                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-//      //            case _ => acc
-//      //          }
-//      //        }
-//      //
-//      //      val validBalance: Boolean = {
-//      //        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
-//      //          case (key, value) => Algos.encode(key) -> value
-//      //        }
-//      //        val creditB: Map[String, Amount] = {
-//      //          val balanceSheet: Map[TokenId, Amount] =
-//      //            BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
-//      //          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
-//      //          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
-//      //        }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
-//      //        creditB.forall { case (tokenId, amount) =>
-//      //          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
-//      //            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
-//      //          else debitB.getOrElse(tokenId, 0L) >= amount
-//      //        }
-//      //      }
-//      //
-//      //      if (!validBalance) {
-//      //        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
-//      //        Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
-//      //      }
-//      //      else if (bxs.length != tx.inputs.length) {
-//      //        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Box not found")
-//      //        Invalid(Seq(MalformedModifierError(s"Box not found"))).asLeft[Transaction]
-//      //      }
-//      //      else tx.asRight[ValidationResult]
-//
-//      s4
-//
-//    } else {
-//      Task.pure(tx.semanticValidity.errors.headOption
-//        .map(err => Invalid(Seq(err)).asLeft[Transaction])
-//        .getOrElse(tx.asRight[ValidationResult]))
-//    }
+  //  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Task[Either[ValidationResult, Transaction]] =
+  //    if (tx.semanticValidity.isSuccess) {
+  //      val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
+  //
+  //      //race many
+  //
+  //      val s1: Task[IndexedSeq[(EncryBaseBox, Input)]] = Task.sequence(tx.inputs.map {
+  //        input =>
+  //          val m: Task[Option[(EncryBaseBox, Input)]] = Task {
+  //            logger.info(s"Execute task 1 for ${Algos.encode(input.boxId)}")
+  //            storage.get(StorageKey !@@ input.boxId).flatMap {
+  //              bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head).toOption
+  //            }.map(_ -> input)
+  //          }
+  //          m
+  //      }).map(_.flatten)
+  //
+  //      val s2: Task[IndexedSeq[EncryBaseBox]] =
+  //        s1.map(_.foldLeft(IndexedSeq.empty[EncryBaseBox]) { case (acc, (bxOpt, input)) =>
+  //          println(s"Execute task 2 for input ${Algos.encode(input.boxId)}")
+  //          (bxOpt, tx.defaultProofOpt) match {
+  //            // If no `proofs` provided, then `defaultProof` is used.
+  //            case (bx, defaultProofOpt) if input.proofs.nonEmpty =>
+  //              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
+  //                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
+  //            case (bx, Some(defaultProof)) =>
+  //              if (EncryPropositionFunctions.canUnlock(bx.proposition,
+  //                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) acc :+ bx else acc
+  //            case (bx, defaultProofOpt) =>
+  //              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
+  //                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
+  //            case _ => acc
+  //          }
+  //        })
+  //
+  //      val s3: Task[Boolean] = s2.map { bxs =>
+  //        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
+  //          case (key, value) => Algos.encode(key) -> value
+  //        }
+  //        val creditB: Map[String, Amount] = {
+  //          val balanceSheet: Map[TokenId, Amount] =
+  //            BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
+  //          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
+  //          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+  //        }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
+  //        creditB.forall { case (tokenId, amount) =>
+  //          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
+  //            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+  //          else debitB.getOrElse(tokenId, 0L) >= amount
+  //        }
+  //      }
+  //
+  //      val s4: Task[Either[ValidationResult, Transaction]] = s3.map { res =>
+  //        if (!res) {
+  //          logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
+  //          Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
+  //        } else tx.asRight[ValidationResult]
+  //      }
+  //
+  //      //      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)
+  //      //        .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
+  //      //        .map(_.toOption -> input))
+  //      //        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
+  //      //          (bxOpt, tx.defaultProofOpt) match {
+  //      //            // If no `proofs` provided, then `defaultProof` is used.
+  //      //            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+  //      //              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
+  //      //                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
+  //      //            case (Some(bx), Some(defaultProof)) =>
+  //      //              if (EncryPropositionFunctions.canUnlock(bx.proposition,
+  //      //                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) acc :+ bx else acc
+  //      //            case (Some(bx), defaultProofOpt) =>
+  //      //              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
+  //      //                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
+  //      //            case _ => acc
+  //      //          }
+  //      //        }
+  //      //
+  //      //      val validBalance: Boolean = {
+  //      //        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
+  //      //          case (key, value) => Algos.encode(key) -> value
+  //      //        }
+  //      //        val creditB: Map[String, Amount] = {
+  //      //          val balanceSheet: Map[TokenId, Amount] =
+  //      //            BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
+  //      //          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
+  //      //          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+  //      //        }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
+  //      //        creditB.forall { case (tokenId, amount) =>
+  //      //          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
+  //      //            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+  //      //          else debitB.getOrElse(tokenId, 0L) >= amount
+  //      //        }
+  //      //      }
+  //      //
+  //      //      if (!validBalance) {
+  //      //        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
+  //      //        Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
+  //      //      }
+  //      //      else if (bxs.length != tx.inputs.length) {
+  //      //        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Box not found")
+  //      //        Invalid(Seq(MalformedModifierError(s"Box not found"))).asLeft[Transaction]
+  //      //      }
+  //      //      else tx.asRight[ValidationResult]
+  //
+  //      s4
+  //
+  //    } else {
+  //      Task.pure(tx.semanticValidity.errors.headOption
+  //        .map(err => Invalid(Seq(err)).asLeft[Transaction])
+  //        .getOrElse(tx.asRight[ValidationResult]))
+  //    }
 
   def close(): Unit = storage.close()
 }
