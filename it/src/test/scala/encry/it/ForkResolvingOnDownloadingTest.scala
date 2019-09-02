@@ -1,19 +1,13 @@
 package encry.it
 
-import com.typesafe.config.Config
-import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
-import encry.it.docker.{DockerAfterAll, Node, NodesFromDocker}
-import monix.eval.Coeval
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.it.docker.{DockerAfterAll, Node}
 import org.scalatest.{AsyncFunSuite, Matchers}
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
-class ForkResolvingOnDownloading extends AsyncFunSuite with Matchers with DockerAfterAll {
+class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with DockerAfterAll {
 
   implicit class FutureBlockedRun[T](future: Future[T]) {
     def run(implicit duration: Duration): T = Await.result(future, duration)
@@ -73,6 +67,5 @@ class ForkResolvingOnDownloading extends AsyncFunSuite with Matchers with Docker
     s"nodeApiEndpoint: ${node.nodeApiEndpoint} " +
     s"nodeIp: ${node.nodeIp} " +
     s"nodePort: ${node.nodePort} "
-
 
 }
