@@ -10,13 +10,16 @@ import org.encryfoundation.prismlang.evaluator.Evaluator
 
 object EncryPropositionFunctions {
 
-  def canUnlock(proposition: EncryProposition, ctx: Context, contract: Either[CompiledContract, RegularContract], proofs: Seq[Proof]): Boolean =
+  def canUnlock(proposition: EncryProposition,
+                ctx: Context,
+                contract: Either[CompiledContract, RegularContract],
+                proofs: Seq[Proof]): Boolean =
     contract.fold (
       cc => if (sameHash(proposition.contractHash, cc.hash)) {
         val env: List[(Option[String], PValue)] =
           if (cc.args.isEmpty) List.empty
-          else List((None, ctx.transaction.asVal), (None, ctx.state.asVal), (None, ctx.box.asVal)) ++
-            proofs.map(proof => (proof.tagOpt, proof.value))
+          else List((None, ctx.transaction.asVal), (None, ctx.state.asVal), (None, ctx.box.asVal)) :::
+            proofs.map(proof => (proof.tagOpt, proof.value)).toList
         val args: List[(String, PValue)] = cc.args.map { case (name, tpe) =>
           env.find(_._1.contains(name))
             .orElse(env.find(e => e._2.tpe == tpe || tpe.isSubtypeOf(e._2.tpe)))

@@ -128,7 +128,7 @@ object Utils extends StrictLogging {
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
-    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    }._2.filter(tx => state.validateTransaction(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
     val header = Header(
       1.toByte,

@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -25,7 +26,7 @@ import cats.syntax.either._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.{StateModifierSerializer, box}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
@@ -36,6 +37,8 @@ import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
+
+import scala.annotation.switch
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
@@ -59,10 +62,11 @@ final case class UtxoState(storage: VersionalStorage,
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
-        val res: Future[Either[ValidationResult, List[Transaction]]] = Future.sequence(block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validateTransaction(tx, totalFees + EncrySupplyController.supplyAt(height))
-          else validateTransaction(tx)
-        })).map(_.toList.traverse(Validated.fromEither).toEither)
+        val res: Future[Either[ValidationResult, List[Transaction]]] = Future.sequence(block.payload.txs.map(tx =>
+          Future(
+            if (tx.id sameElements lastTxId) validateTransaction(tx, totalFees + EncrySupplyController.supplyAt(height))
+            else validateTransaction(tx)
+          ))).map(_.toList.traverse(Validated.fromEither).toEither)
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.map(_.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
@@ -90,41 +94,44 @@ final case class UtxoState(storage: VersionalStorage,
   }
 
   def validateTransaction(tx: Transaction,
-                          allowedOutputDelta: Amount = 0L): Future[Either[ValidationResult, Transaction]] = Future(
+                          allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp)
-      val bxs: List[EncryBaseBox] = tx.inputs
+      val boxes: List[EncryBaseBox] = tx.inputs
         .flatMap(input =>
           storage
             .get(StorageKey !@@ input.boxId)
             .map(StateModifierSerializer.parseBytes(_, input.boxId.head))
             .map(_.toOption -> input))
-        .foldLeft(List.empty[EncryBaseBox]) { case (acc, (bxOpt, input)) => (bxOpt, tx.defaultProofOpt) match {
-          // If no `proofs` provided, then `defaultProof` is used.
-          case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty => if (EncryPropositionFunctions.canUnlock(
-            bx.proposition,
-            Context(tx, bx, stateView),
-            input.contract,
-            defaultProofOpt.map(_ :: input.proofs).getOrElse(input.proofs)
-          )) bx :: acc else acc
-          case (Some(bx), Some(defaultProof)) => if (EncryPropositionFunctions.canUnlock(
-            bx.proposition,
-            Context(tx, bx, stateView),
-            input.contract,
-            Seq(defaultProof)
-          )) bx :: acc else acc
-          case (Some(bx), _) => if (EncryPropositionFunctions.canUnlock(
-            bx.proposition,
-            Context(tx, bx, stateView),
-            input.contract,
-            Seq.empty
-          )) bx :: acc else acc
-          case _ => acc
-        }
+        .foldLeft(List.empty[EncryBaseBox]) {
+          case (acc, (Some(box), input)) => tx.defaultProofOpt match {
+            case proofOpt if input.proofs.nonEmpty =>
+              if (EncryPropositionFunctions.canUnlock(
+                box.proposition,
+                Context(tx, box, stateView),
+                input.contract,
+                proofOpt.map(_ :: input.proofs).getOrElse(input.proofs)
+              )) box :: acc else acc
+            case Some(proof) =>
+              if (EncryPropositionFunctions.canUnlock(
+                box.proposition,
+                Context(tx, box, stateView),
+                input.contract,
+                Seq(proof)
+              )) box :: acc else acc
+            case _ =>
+              if (EncryPropositionFunctions.canUnlock(
+                box.proposition,
+                Context(tx, box, stateView),
+                input.contract,
+                Seq.empty
+              )) box :: acc else acc
+          }
+          case (acc, (_, _)) => acc
         }
 
-      val validBalance: Boolean = {
-        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
+      lazy val validBalance: Boolean = {
+        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(boxes).map {
           case (key, value) => Algos.encode(key) -> value
         }
         val creditB: Map[String, Amount] = {
@@ -140,18 +147,16 @@ final case class UtxoState(storage: VersionalStorage,
         }
       }
 
-      if (!validBalance) {
-        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
-        Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
-      }
-      else if (bxs.length != tx.inputs.length) {
+      if (boxes.lengthCompare(tx.inputs.length) != 0) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Box not found")
         Invalid(Seq(MalformedModifierError(s"Box not found"))).asLeft[Transaction]
-      }
-      else tx.asRight[ValidationResult]
+      } else if (!validBalance) {
+        logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
+        Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
+      } else tx.asRight[ValidationResult]
     } else tx.semanticValidity.errors.headOption
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
-      .getOrElse(tx.asRight[ValidationResult]))
+      .getOrElse(tx.asRight[ValidationResult])
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
     storage.versions.find(_ sameElements version) match {

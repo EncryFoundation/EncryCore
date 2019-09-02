@@ -19,6 +19,9 @@ import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
+
 class StateRollbackBench {
 
   @Benchmark
@@ -27,11 +30,11 @@ class StateRollbackBench {
       val innerState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
       val newState = stateBench.chain.foldLeft(innerState -> List.empty[VersionTag]) { case ((state, rootHashes), block) =>
-        val newState = state.applyModifier(block).right.get
+        val newState = Await.result(state.applyModifier(block), 100.seconds).right.get
         newState -> (rootHashes :+ newState.version)
       }
       val stateAfterRollback = newState._1.rollbackTo(newState._2.dropRight(1).last).get
-      val stateAfterForkBlockApplying = stateAfterRollback.applyModifier(stateBench.forkBlocks.last).right.get
+      val stateAfterForkBlockApplying = Await.result(stateAfterRollback.applyModifier(stateBench.forkBlocks.last), 100.seconds).right.get
       stateAfterForkBlockApplying.close()
     }
   }
@@ -72,7 +75,7 @@ object StateRollbackBench {
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
-    state = state.applyModifier(genesisBlock).right.get
+    state = Await.result(state.applyModifier(genesisBlock), 100.seconds).right.get
 
     val stateGenerationResults: (List[(Block, Block)], Block, UtxoState, IndexedSeq[AssetBox]) =
       (0 until benchSettings.stateBenchSettings.blocksNumber).foldLeft(List.empty[(Block, Block)], genesisBlock, state, initialBoxes) {
@@ -88,7 +91,7 @@ object StateRollbackBench {
             block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq,
             addDiff = Difficulty @@ BigInt(100)
           )
-          val stateN: UtxoState = stateL.applyModifier(nextBlockMainChain).right.get
+          val stateN: UtxoState = Await.result(stateL.applyModifier(nextBlockMainChain), 100.seconds).right.get
           (blocks :+ (nextBlockMainChain, nextBlockFork),
             nextBlockMainChain,
             stateN,

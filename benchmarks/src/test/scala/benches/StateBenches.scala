@@ -2,6 +2,7 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+import scala.concurrent.duration._
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
 import benches.Utils._
@@ -17,6 +18,8 @@ import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 
+import scala.concurrent.Await
+
 class StateBenches {
 
   @Benchmark
@@ -25,7 +28,7 @@ class StateBenches {
       val innerState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
       stateBench.chain.foldLeft(innerState) { case (state, block) =>
-        state.applyModifier(block).right.get
+        Await.result(state.applyModifier(block), 100.seconds).right.get
       }
       innerState.close()
     }
@@ -76,7 +79,7 @@ object StateBenches {
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
-    state = state.applyModifier(genesisBlock).right.get
+    state =  Await.result(state.applyModifier(genesisBlock), 100.seconds).right.get
 
     val stateGenerationResults: (Vector[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
       (0 until benchSettings.stateBenchSettings.blocksNumber).foldLeft(Vector[Block](), genesisBlock, state, initialBoxes) {
@@ -92,7 +95,7 @@ object StateBenches {
             benchSettings.stateBenchSettings.numberOfInputsInOneTransaction,
             benchSettings.stateBenchSettings.numberOfOutputsInOneTransaction
           )
-          val stateN: UtxoState = stateL.applyModifier(nextBlock).right.get
+          val stateN: UtxoState =  Await.result(stateL.applyModifier(nextBlock), 100.seconds).right.get
           (blocks :+ nextBlock,
             nextBlock,
             stateN,
