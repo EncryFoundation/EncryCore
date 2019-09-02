@@ -33,6 +33,8 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
 
 import scala.collection.immutable
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.{Random => R}
 
 object Utils extends StrictLogging {
@@ -128,7 +130,7 @@ object Utils extends StrictLogging {
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
-    }._2.filter(tx => state.validateTransaction(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    }._2.filter(tx => Await.result(state.validateTransaction(tx), 100.seconds).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
     val header = Header(
       1.toByte,
