@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -37,11 +36,9 @@ import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
-import scala.annotation.switch
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
+import scala.concurrent.ExecutionContext.Implicits.global
 
 final case class UtxoState(storage: VersionalStorage,
                            height: Height,
@@ -63,10 +60,9 @@ final case class UtxoState(storage: VersionalStorage,
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
         val res: Future[Either[ValidationResult, List[Transaction]]] = Future.sequence(block.payload.txs.map(tx =>
-          Future(
             if (tx.id sameElements lastTxId) validateTransaction(tx, totalFees + EncrySupplyController.supplyAt(height))
             else validateTransaction(tx)
-          ))).map(_.toList.traverse(Validated.fromEither).toEither)
+          )).map(_.toList.traverse(Validated.fromEither).toEither)
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.map(_.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
@@ -94,8 +90,8 @@ final case class UtxoState(storage: VersionalStorage,
   }
 
   def validateTransaction(tx: Transaction,
-                          allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
-    if (tx.semanticValidity.isSuccess) {
+                          allowedOutputDelta: Amount = 0L): Future[Either[ValidationResult, Transaction]] =
+    Future(if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp)
       val boxes: List[EncryBaseBox] = tx.inputs
         .flatMap(input =>
@@ -156,7 +152,7 @@ final case class UtxoState(storage: VersionalStorage,
       } else tx.asRight[ValidationResult]
     } else tx.semanticValidity.errors.headOption
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
-      .getOrElse(tx.asRight[ValidationResult])
+      .getOrElse(tx.asRight[ValidationResult]))
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
     storage.versions.find(_ sameElements version) match {
