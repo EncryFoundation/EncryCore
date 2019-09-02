@@ -22,6 +22,12 @@ object Configs {
     """.stripMargin
   )
 
+  def connectOnlyWithKnownPeers(connectOnlyWithKnownPeersEnable: Boolean): Config = ConfigFactory.parseString(
+    s"""
+       |encry.network.connectOnlyWithKnownPeers=$connectOnlyWithKnownPeersEnable
+    """.stripMargin
+  )
+
   def miningDelay(miningDelay: Int): Config = ConfigFactory.parseString(
     s"""
        |encry.node.miningDelay=${miningDelay}s
