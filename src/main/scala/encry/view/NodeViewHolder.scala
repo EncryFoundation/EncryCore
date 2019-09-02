@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -28,11 +27,9 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContextExecutor, Future}
-import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
@@ -158,56 +155,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
-
-  import monix.execution.Scheduler.Implicits.global
-
-//  def updateState[F[_]](state: UtxoState,
-//                        progressInfo: ProgressInfo,
-//                        appliedModifiers: IndexedSeq[PersistentModifier]): Unit = {
-//    logger.info(s"Start update state with F[_].")
-//    progressInfo.toApply.foreach {
-//      case header: Header => requestDownloads(progressInfo, Some(header.id))
-//      case _ => requestDownloads(progressInfo, None)
-//    }
-//    val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-//    val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]) =
-//      if (progressInfo.chainSwitchingNeeded) {
-//        branchingPointOpt.map { branchPoint =>
-//          if (!state.version.sameElements(branchPoint))
-//            state.rollbackTo(branchPoint) -> trimChainSuffix(appliedModifiers, ModifierId !@@ branchPoint)
-//          else Success(state) -> IndexedSeq()
-//        }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
-//      } else Success(state) -> appliedModifiers
-//    stateToApplyTry match {
-//      case Failure(exception) =>
-//      case Success(value) =>
-//        context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
-//        val u0: UpdateInformation = UpdateInformation(nodeView.history, value, None, None, suffixTrimmed)
-//        val uf = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-//          if (u.failedMod.nonEmpty) u
-//          else {
-//            u.state.applyModifier(modToApply).onComplete {
-//              case Failure(exception) =>
-//              case Success(value) => value match {
-//                case Left(value) =>
-//                  val (newHis: History, newProgressInfo: ProgressInfo) =
-//                    nodeView.history.reportModifierIsInvalid(modToApply)
-//                  context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
-//                  UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
-//                case Right(stateAfterApply) =>
-//                  influxRef.foreach(ref => modToApply match {
-//                    case b: Block if nodeView.history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
-//                    case _ =>
-//                  })
-//                  val newHis: History = nodeView.history.reportModifierIsValid(modToApply)
-//                  context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
-//                  UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
-//              }
-//            }
-//          }
-//        }
-//    }
-//  }
 
   private def updateState(history: History,
                           state: UtxoState,

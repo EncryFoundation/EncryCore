@@ -2,7 +2,6 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -25,7 +24,6 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import monix.eval.Task
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -33,10 +31,10 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-
 import scala.collection._
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.Try
 
 class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with StrictLogging {
 
@@ -159,11 +157,9 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
 
-//    val txsU: IndexedSeq[Transaction] = transactionsPool.filter { x =>
-//      val s = Await.result(view.state.validate(x), 60.seconds)
-//    }.distinct
-
-    val txsU: IndexedSeq[Transaction] = IndexedSeq.empty
+    val txsU: IndexedSeq[Transaction] = Try(transactionsPool.filter { x =>
+      Await.result(view.state.validateTransaction(x), 60.seconds).isRight
+    }.distinct).getOrElse(IndexedSeq.empty)
 
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
