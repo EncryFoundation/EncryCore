@@ -125,18 +125,9 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
-      logger.info(s"Txs = $transactionsPool")
-      val a = candidateOpt.map(_.parentOpt.get.height + 1)
-      logger.info(s"SSM height = ${mod.header.height} / Candidate height = ${candidateOpt.map(_.parentOpt.get.height + 1)}")
-      logger.info(s"SSM size = ${mod.payload.txs.size} / Candidate size = ${candidateOpt.map(_.transactions.size)}")
-      logger.info(s"All = ${mod.payload.txs.map(_.encodedId)} / ${candidateOpt.map(_.transactions.map(_.encodedId)).getOrElse(IndexedSeq.empty)} " +
-        s"First = ${mod.payload.txs.diff(candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty))} " +
-        s"/ Second = ${candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty).diff(mod.payload.txs)}")
-      if (candidateOpt.exists(_.parentOpt.exists(x => (x.height+1) == mod.header.height))
+      if (candidateOpt.exists(_.parentOpt.exists(x => (x.height + 1) == mod.header.height))
         && (mod.payload.txs.dropRight(1).diff(candidateOpt.map(_.transactions.dropRight(1)).getOrElse(IndexedSeq.empty)) != Seq.empty)) {
-        logger.info(s"if loop")
-          transactionsPool = transactionsPool ++ mod.payload.txs.diff(candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty))
-        logger.info(s"IF txs = $transactionsPool")
+        transactionsPool = transactionsPool ++ mod.payload.txs.diff(candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty))
       }
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
@@ -187,7 +178,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
       case Right(value) => value
-      case Left(value)  => EncryApp.forceStopApplication(999, value.toString)
+      case Left(value) => EncryApp.forceStopApplication(999, value.toString)
     })
       .getOrElse(TestNetConstants.InitialDifficulty)
 
@@ -249,13 +240,13 @@ object Miner {
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(
-      "isMining"       -> isMining.asJson,
+      "isMining" -> isMining.asJson,
       "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 
   implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) => Map(
-    "isMining"       -> r.isMining.asJson,
+    "isMining" -> r.isMining.asJson,
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 
