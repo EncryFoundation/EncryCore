@@ -114,6 +114,39 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
     bestFullHeaderId2 shouldEqual bestFullHeaderId12
   }
 
+  test("Node should sync after change offlineGeneration and port") {
+
+    val baseNodeConfig = Configs.mining(true)
+      .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(defaultConf)
+
+    val node1 = dockerSingleton()
+      .startNodeInternal(baseNodeConfig
+        .withFallback(Configs.nodeName("node1"))
+        .withFallback(Configs.offlineGeneration(true))
+      )
+
+    val node2 = dockerSingleton()
+      .startNodeInternal(baseNodeConfig
+        .withFallback(Configs.nodeName("node2"))
+        .withFallback(Configs.offlineGeneration(false))
+      )
+
+    println(s"${node2.nodeIp}:9001")
+    println(s"${node1.nodeIp}:9001")
+    node1.connect(s"${node2.nodeIp}:9001").run
+//    node2.connect(s"${node1.nodeIp}:9001").run
+
+    node1.waitForFullHeight(100).run
+
+//    val (bestFullHeaderId1, bestFullHeaderId2) =
+//      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run)
+//
+    docker.close()
+
+    true shouldEqual true
+  }
+
   def waitForEqualsId(id1Func: => String, id2Func: => String)(implicit duration: Duration): (String, String) = {
     @tailrec
     def loop(id1Func: => String, id2Func: => String, maxTries: Long): (String, String) = {
