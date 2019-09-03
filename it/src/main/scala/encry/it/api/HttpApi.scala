@@ -90,6 +90,15 @@ trait HttpApi { // scalastyle:ignore
     )
   }
 
+  def bestFullHeaderId: Future[String] = get("/info") flatMap { r =>
+    val response = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherHeight = response.hcursor.downField("bestFullHeaderId").as[Option[String]]
+    eitherHeight.fold[Future[String]](
+      e => Future.failed(new Exception(s"Error getting `bestFullHeaderId` from /info response: $e\n$response", e)),
+      maybeId => Future.successful(maybeId.getOrElse(""))
+    )
+  }
+
   def balances: Future[Map[String, Long]] = get("/wallet/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
     val eitherBalance = response.hcursor.downField("balances").as[Map[String, String]]
@@ -146,6 +155,10 @@ trait HttpApi { // scalastyle:ignore
 
   def waitForHeadersHeight(expectedHeight: Int, retryingInterval: FiniteDuration = 1.second): Future[Int] = {
     waitFor[Int](_.headersHeight, h => h >= expectedHeight, retryingInterval)
+  }
+
+  def waitForBestFullHeaderId(expectedId: String, retryingInterval: FiniteDuration = 1.minute): Future[String] = {
+    waitFor[String](_.bestFullHeaderId, id => id == expectedId, retryingInterval)
   }
 
   def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {

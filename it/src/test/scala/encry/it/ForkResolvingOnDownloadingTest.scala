@@ -1,9 +1,11 @@
 package encry.it
 
 import encry.it.configs.Configs
+import encry.it.docker.Docker.defaultConf
 import encry.it.docker.{DockerAfterAll, Node}
 import org.scalatest.{AsyncFunSuite, Matchers}
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
@@ -12,60 +14,114 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
   implicit class FutureBlockedRun[T](future: Future[T]) {
     def run(implicit duration: Duration): T = Await.result(future, duration)
   }
-  implicit val futureDuration = 10 minutes
 
-  test("Late node should sync with chain") {
+  implicit val futureDuration: FiniteDuration = 30 minutes
+  val heightSeparation = 10 //blocks
+  val maxTries: Int = 1800 //seconds
+
+  test("Late node should sync with one node") {
+
+    val miningNodeConfig = Configs.mining(true)
+      .withFallback(Configs.offlineGeneration(true))
+      .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(defaultConf)
 
     val node1 = dockerSingleton()
-      .startNodes(Seq(
-        Configs.nodeName("node1")
-          .withFallback(Configs.mining(true))
-          .withFallback(Configs.offlineGeneration(true))
-      ))
-      .head
+      .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node1")))
+
+    node1.waitForFullHeight(heightSeparation).run
 
     val node2 = dockerSingleton()
-      .startNodes(Seq(
+      .startNodeInternal(
         Configs.nodeName("node2")
-          .withFallback(Configs.mining(true))
-          .withFallback(Configs.offlineGeneration(true))
-      ))
-      .head
-
-    node1.waitForStartup.run
-    println(s"node1: ${extractNodeInfo(node1)}")
-
-    node2.waitForStartup.run
-    println(s"node2: ${extractNodeInfo(node2)}")
-
-    node1.waitForFullHeight(5).run
-
-    val node3 = dockerSingleton()
-      .startNodes(Seq(
-        Configs.nodeName("node3")
           .withFallback(Configs.mining(false))
-          .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001), (node2.nodeIp, 9001))))
-      ))
-      .head
+          .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001))))
+          .withFallback(defaultConf)
+      )
 
-    node3.waitForStartup.run
-    println(s"node3: ${extractNodeInfo(node3)}")
-
-    val hight1 = node1.headersHeight.run
-    println(s"headersHeight: $hight1")
-
-    node3.waitForFullHeight(hight1).run
+    val (bestFullHeaderId1, bestFullHeaderId2) =
+      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run, maxTries)
 
     docker.close()
 
-    node3.fullHeight.run shouldEqual hight1
+    bestFullHeaderId2 shouldEqual bestFullHeaderId1
   }
 
-  def extractNodeInfo(node: Node) = s"node: ${node.name}" +
-    s"address ${node.address} " +
-    s"networkAddress: ${node.networkAddress} " +
-    s"nodeApiEndpoint: ${node.nodeApiEndpoint} " +
-    s"nodeIp: ${node.nodeIp} " +
-    s"nodePort: ${node.nodePort} "
+  test("Late node should sync with the first of two nodes") {
 
+    val miningNodeConfig = Configs.mining(true)
+      .withFallback(Configs.offlineGeneration(true))
+      .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(defaultConf)
+
+    val node1 = dockerSingleton()
+      .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node1")))
+
+    val node2 = dockerSingleton()
+      .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node2")))
+
+    node1.waitForFullHeight(heightSeparation).run
+
+    val node3 = dockerSingleton()
+      .startNodeInternal(
+        Configs.nodeName("node3")
+          .withFallback(Configs.mining(false))
+          .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001), (node2.nodeIp, 9001))))
+          .withFallback(defaultConf)
+      )
+
+    val (bestFullHeaderId1, bestFullHeaderId3) =
+      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run, maxTries)
+
+    docker.close()
+
+    bestFullHeaderId3 shouldEqual bestFullHeaderId1
+  }
+
+  test("All nodes should go to first chain") {
+
+    val miningNodeConfig = Configs.mining(true)
+      .withFallback(Configs.offlineGeneration(true))
+      .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(defaultConf)
+
+    val node1 = dockerSingleton()
+      .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node1")))
+
+    node1.waitForFullHeight(heightSeparation).run
+
+    val node2 = dockerSingleton()
+      .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node2")))
+
+    node2.waitForFullHeight(heightSeparation).run
+
+    val node3 = dockerSingleton()
+      .startNodeInternal(
+        Configs.nodeName("node3")
+          .withFallback(Configs.mining(false))
+          .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001), (node2.nodeIp, 9001))))
+          .withFallback(defaultConf)
+      )
+
+    val (bestFullHeaderId13, bestFullHeaderId3) =
+      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run, maxTries)
+
+    val (bestFullHeaderId12, bestFullHeaderId2) =
+      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run, maxTries)
+
+    docker.close()
+
+    bestFullHeaderId3 shouldEqual bestFullHeaderId13
+    bestFullHeaderId2 shouldEqual bestFullHeaderId12
+  }
+
+  @tailrec
+  final def waitForEqualsId(id1Func: => String, id2Func: => String, maxTries: Int): (String, String) = {
+    val id1: String = id1Func
+    val id2: String = id2Func
+    if (id1 != id2 && maxTries > 0) {
+      Thread.sleep(1000)
+      waitForEqualsId(id1Func, id2Func, maxTries - 1)
+    } else (id1, id2)
+  }
 }
