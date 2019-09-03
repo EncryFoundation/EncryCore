@@ -17,7 +17,6 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
 
   implicit val futureDuration: FiniteDuration = 30 minutes
   val heightSeparation = 10 //blocks
-  val maxTries: Int = 1800 //seconds
 
   test("Late node should sync with one node") {
 
@@ -40,7 +39,7 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
       )
 
     val (bestFullHeaderId1, bestFullHeaderId2) =
-      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run, maxTries)
+      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run)
 
     docker.close()
 
@@ -71,7 +70,7 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
       )
 
     val (bestFullHeaderId1, bestFullHeaderId3) =
-      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run, maxTries)
+      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run)
 
     docker.close()
 
@@ -104,10 +103,10 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
       )
 
     val (bestFullHeaderId13, bestFullHeaderId3) =
-      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run, maxTries)
+      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run)
 
     val (bestFullHeaderId12, bestFullHeaderId2) =
-      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run, maxTries)
+      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run)
 
     docker.close()
 
@@ -115,13 +114,17 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
     bestFullHeaderId2 shouldEqual bestFullHeaderId12
   }
 
-  @tailrec
-  final def waitForEqualsId(id1Func: => String, id2Func: => String, maxTries: Int): (String, String) = {
-    val id1: String = id1Func
-    val id2: String = id2Func
-    if (id1 != id2 && maxTries > 0) {
-      Thread.sleep(1000)
-      waitForEqualsId(id1Func, id2Func, maxTries - 1)
-    } else (id1, id2)
+  def waitForEqualsId(id1Func: => String, id2Func: => String)(implicit duration: Duration): (String, String) = {
+    @tailrec
+    def loop(id1Func: => String, id2Func: => String, maxTries: Long): (String, String) = {
+      val id1: String = id1Func
+      val id2: String = id2Func
+      if (id1 != id2 && maxTries > 0) {
+        Thread.sleep(1000)
+        loop(id1Func, id2Func, maxTries - 1)
+      } else (id1, id2)
+    }
+
+    loop(id1Func, id2Func, duration.toSeconds)
   }
 }
