@@ -29,7 +29,7 @@ import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, blocking}
-import scala.util.Random
+import scala.util.{Random, Try}
 import scala.util.control.NonFatal
 
 case class Docker(suiteConfig: Config = empty,
@@ -233,8 +233,8 @@ case class Docker(suiteConfig: Config = empty,
       client.startContainer(containerId)
       val containerInfo = client.inspectContainer(containerId)
       val ports = containerInfo.networkSettings().ports()
-      val hostPort = extractHostPort(ports, 9001)
-      val hostRestApiPort = extractHostPort(ports, 9051) //get port from settings
+      val hostPort = extractHostPort(ports, extractNetworkPortFromConfig(nodeConfig).getOrElse(9001))
+      val hostRestApiPort = extractHostPort(ports,  extractApiPortFromConfig(nodeConfig).getOrElse(9051))
       val node = new Node(nodeConfig, hostRestApiPort, containerId, attachedNetwork.ipAddress(), hostPort, http)
       nodes.add(node)
       logger.debug(s"Started $containerId -> ${node.name}")
@@ -246,9 +246,19 @@ case class Docker(suiteConfig: Config = empty,
         throw e
     }
 
+  def stopNode(node: Node, secondsToWaitBeforeKilling: Int = 0) {
+    client.stopContainer(node.containerId, secondsToWaitBeforeKilling)
+    client.removeContainer(node.containerId, RemoveContainerParam.forceKill())
+  }
 
   def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
     portBindingMap.get(s"$containerPort/tcp").get(0).hostPort().toInt
+
+  def extractNetworkPortFromConfig(config: Config): Option[Int] =
+    Try(config.getString("encry.network.bindAddress").split(":")(1).toInt).toOption
+
+  def extractApiPortFromConfig(config: Config): Option[Int] =
+    Try(config.getString("encry.restApi.bindAddress").split(":")(1).toInt).toOption
 
   private def saveNodeLogs(): Unit = {
     val logDir = Paths.get(System.getProperty("user.dir"), "target", "logs")
