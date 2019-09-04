@@ -210,13 +210,13 @@ case class Docker(suiteConfig: Config = empty,
       .build()
   }
 
-  def startNodeInternal(nodeConfig: Config): Node =
+  def startNodeInternal(nodeConfig: Config, specialVolumeOpt: Option[(String, String)] = None): Node =
     try {
       val settings = EncryAppSettings.fromConfig(nodeConfig.withFallback(configTemplate))
       val nodeNumber = settings.network.nodeName.map(_.replace("node", "").toInt).getOrElse(0)
       val ip = ipForNode(nodeNumber)
 
-      val containerConfig = buildPeerContainerConfig(nodeConfig, EncryAppSettings.fromConfig(nodeConfig), ip)
+      val containerConfig = buildPeerContainerConfig(nodeConfig, EncryAppSettings.fromConfig(nodeConfig), ip, specialVolumeOpt)
 
       val containerId = {
         val containerName = networkName + "-" + settings.network.nodeName.getOrElse("NodeWithoutName") + "-" + uuidShort
