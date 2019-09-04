@@ -50,4 +50,16 @@ object Configs {
        |encry.wallet.seed="$key"
      """.stripMargin
   )
+
+  def networkAddress(address: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.network.bindAddress = "$address"
+     """.stripMargin
+  )
+
+  def apiAddress(address: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.restApi.bindAddress = "$address"
+     """.stripMargin
+  )
 }
