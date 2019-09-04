@@ -1,9 +1,13 @@
 package encry.it
 
+import java.nio.file.Paths
+
 import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
 import encry.it.docker.{DockerAfterAll, Node}
+import org.encryfoundation.common.utils.Algos
 import org.scalatest.{AsyncFunSuite, Matchers}
+import scorex.utils.Random
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
@@ -116,14 +120,12 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
 
   test("Nodes should sync after restart with new offlineGeneration and port") {
 
-    val baseNodeConfig = Configs.mining(true)
-      .withFallback(Configs.knownPeers(Seq()))
-      .withFallback(defaultConf)
-
     val node1 = dockerSingleton()
-      .startNodeInternal(baseNodeConfig
+      .startNodeInternal(Configs.mining(true)
         .withFallback(Configs.nodeName("node1"))
         .withFallback(Configs.offlineGeneration(true))
+        .withFallback(Configs.knownPeers(Seq()))
+        .withFallback(defaultConf)
       )
 
     val userDir = Paths.get(System.getProperty("user.dir"))
@@ -139,12 +141,43 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
       .startNodeInternal(Configs.mining(true)
         .withFallback(Configs.nodeName("node21"))
         .withFallback(Configs.offlineGeneration(false))
+        .withFallback(Configs.knownPeers(Seq()))
+        .withFallback(defaultConf),
+        Some(volumeName, containerMountPath)
       )
 
-    println(s"${node2.nodeIp}:9001")
-    println(s"${node1.nodeIp}:9001")
-    node1.connect(s"${node2.nodeIp}:9001").run
-//    node2.connect(s"${node1.nodeIp}:9001").run
+    node1.connect(s"${node21.nodeIp}:9001").run
+    node21.connect(s"${node1.nodeIp}:9001").run
+
+    node1.waitForFullHeight(5).run
+
+    println("node21 try stop")
+
+    node21.shutdown
+    Thread.sleep(5000)
+    docker.stopNode(node21, 5)
+    Thread.sleep(7000)
+
+    println("node21 stopped")
+
+    node1.waitForFullHeight(10).run
+
+    println("node2 start again")
+
+    val node22 = dockerSingleton()
+      .startNodeInternal(Configs.mining(true)
+        .withFallback(Configs.nodeName("node22"))
+        .withFallback(Configs.offlineGeneration(true))
+        .withFallback(Configs.knownPeers(Seq()))
+        .withFallback(Configs.networkAddress("0.0.0.0:9002"))
+        .withFallback(Configs.apiAddress("0.0.0.0:9052"))
+        .withFallback(defaultConf),
+        Some(volumeName, containerMountPath)
+      )
+
+    println("node22 started")
+
+    node1.waitForFullHeight(15).run
 
     println("connect again")
 
