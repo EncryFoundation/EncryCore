@@ -9,7 +9,8 @@ object SwaggerRoute extends SwaggerHttpService {
       classOf[InfoApiRoute],
       classOf[TransactionsApiRoute],
       classOf[WalletInfoApiRoute],
-      classOf[PeersApiRoute]
+      classOf[PeersApiRoute],
+      classOf[NodeApiRoute]
     )
 
   override def info: model.Info = Info(
