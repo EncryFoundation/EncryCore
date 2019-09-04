@@ -248,7 +248,6 @@ case class Docker(suiteConfig: Config = empty,
 
   def stopNode(node: Node, secondsToWaitBeforeKilling: Int = 0) {
     client.stopContainer(node.containerId, secondsToWaitBeforeKilling)
-    client.removeContainer(node.containerId, RemoveContainerParam.forceKill())
   }
 
   def extractHostPort(portBindingMap: JMap[String, JList[PortBinding]], containerPort: Int): Int =
