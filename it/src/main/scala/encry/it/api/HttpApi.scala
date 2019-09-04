@@ -167,6 +167,8 @@ trait HttpApi { // scalastyle:ignore
 
   def connect(addressAndPort: String): Future[Unit] = post("/peers/connect", addressAndPort).map(_ => ())
 
+  def shutdown: Future[Unit] = post("/node/shutdown", "").map(_ => ())
+
   def postJson[A: Encoder](path: String, body: A): Future[Response] =
     post(path, body.asJson.toString())
 
