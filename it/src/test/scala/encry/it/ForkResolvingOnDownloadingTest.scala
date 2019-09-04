@@ -114,7 +114,7 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
     bestFullHeaderId2 shouldEqual bestFullHeaderId12
   }
 
-  test("Node should sync after change offlineGeneration and port") {
+  test("Nodes should sync after restart with new offlineGeneration and port") {
 
     val baseNodeConfig = Configs.mining(true)
       .withFallback(Configs.knownPeers(Seq()))
@@ -126,9 +126,18 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
         .withFallback(Configs.offlineGeneration(true))
       )
 
-    val node2 = dockerSingleton()
-      .startNodeInternal(baseNodeConfig
-        .withFallback(Configs.nodeName("node2"))
+    val userDir = Paths.get(System.getProperty("user.dir"))
+    println(s"userDir: $userDir")
+
+    val volumeName = Algos.encode(Random.randomBytes(32))
+    println(s"volumeName: $volumeName")
+
+    val containerMountPath = userDir + "/encry/data"
+    println(s"containerMountPath: $containerMountPath")
+
+    val node21 = dockerSingleton()
+      .startNodeInternal(Configs.mining(true)
+        .withFallback(Configs.nodeName("node21"))
         .withFallback(Configs.offlineGeneration(false))
       )
 
@@ -137,14 +146,19 @@ class ForkResolvingOnDownloadingTest extends AsyncFunSuite with Matchers with Do
     node1.connect(s"${node2.nodeIp}:9001").run
 //    node2.connect(s"${node1.nodeIp}:9001").run
 
-    node1.waitForFullHeight(100).run
+    println("connect again")
 
-//    val (bestFullHeaderId1, bestFullHeaderId2) =
-//      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run)
-//
-    docker.close()
+    node1.connect(s"${node22.nodeIp}:9002").run
+    node22.connect(s"${node1.nodeIp}:9001").run
 
-    true shouldEqual true
+    node1.waitForFullHeight(20).run
+
+    println("try to sync")
+
+    val (bestFullHeaderId1, bestFullHeaderId2) =
+      waitForEqualsId(node1.bestFullHeaderId.run, node22.bestFullHeaderId.run)
+
+    bestFullHeaderId2 shouldEqual bestFullHeaderId1
   }
 
   def waitForEqualsId(id1Func: => String, id2Func: => String)(implicit duration: Duration): (String, String) = {
