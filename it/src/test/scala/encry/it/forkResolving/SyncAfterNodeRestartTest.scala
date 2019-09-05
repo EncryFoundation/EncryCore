@@ -16,7 +16,6 @@ import scala.concurrent.duration._
 class SyncAfterNodeRestartTest extends AsyncFunSuite with Matchers with DockerAfterAll {
 
   implicit val futureDuration: FiniteDuration = 30 minutes
-  val heightSeparation = 10 //blocks
 
   test("Nodes should sync after restart with new offlineGeneration and port") {
     val node1 = docker
@@ -28,13 +27,8 @@ class SyncAfterNodeRestartTest extends AsyncFunSuite with Matchers with DockerAf
       )
 
     val userDir = Paths.get(System.getProperty("user.dir"))
-    println(s"userDir: $userDir")
-
     val volumeName = Algos.encode(Random.randomBytes(32))
-    println(s"volumeName: $volumeName")
-
     val containerMountPath = userDir + "/encry/data"
-    println(s"containerMountPath: $containerMountPath")
 
     val node21 = docker
       .startNodeInternal(Configs.mining(true)
@@ -50,18 +44,12 @@ class SyncAfterNodeRestartTest extends AsyncFunSuite with Matchers with DockerAf
 
     node1.waitForFullHeight(5).run
 
-    println("node21 try stop")
-
     node21.shutdown
     Thread.sleep(5000)
     docker.stopNode(node21, 5)
     Thread.sleep(7000)
 
-    println("node21 stopped")
-
     node1.waitForFullHeight(10).run
-
-    println("node2 start again")
 
     val node22 = docker
       .startNodeInternal(Configs.mining(true)
@@ -74,18 +62,12 @@ class SyncAfterNodeRestartTest extends AsyncFunSuite with Matchers with DockerAf
         Some(volumeName, containerMountPath)
       )
 
-    println("node22 started")
-
     node1.waitForFullHeight(15).run
-
-    println("connect again")
 
     node1.connect(s"${node22.nodeIp}:9002").run
     node22.connect(s"${node1.nodeIp}:9001").run
 
     node1.waitForFullHeight(20).run
-
-    println("try to sync")
 
     val (bestFullHeaderId1, bestFullHeaderId2) =
       waitForEqualsId(node1.bestFullHeaderId.run, node22.bestFullHeaderId.run)
