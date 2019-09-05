@@ -1,17 +1,17 @@
 package encry.consensus.emission
 
 import encry.consensus.EncrySupplyController
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.utils.EncryGenerator
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
-
+import encry.settings.MainConstants.constants
 import scala.concurrent.duration._
 
-class EncrySupplyControllerTest extends PropSpec with Matchers {
+class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerator {
 
   val epochLen = 10
 
-  val blocksPerHour: Int =  ((60 * 60).seconds / TestNetConstants.DesiredBlockInterval).toInt
+  val blocksPerHour: Int =  ((60 * 60).seconds / constants.DesiredBlockInterval).toInt
 
   val blocksPerYear: Int = blocksPerHour * 24 * 365
 
@@ -27,7 +27,7 @@ class EncrySupplyControllerTest extends PropSpec with Matchers {
 
     val firstYearSupply = epochSupply.zipWithIndex.filter(i => i._2 <= blocksPerYear).map(_._1).sum
 
-    atEndEpochSupply < TestNetConstants.InitialEmissionAmount shouldBe true
+    atEndEpochSupply < constants.InitialEmissionAmount shouldBe true
   }
 
 }

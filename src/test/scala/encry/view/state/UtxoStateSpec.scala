@@ -12,10 +12,10 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
-
+import encry.settings.MainConstants.constants
 import scala.concurrent.ExecutionContextExecutor
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
@@ -38,7 +38,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 //    new UtxoState(
 //      persistentProver,
 //      EncryState.genesisStateVersion,
-//      TestNetConstants.GenesisHeight,
+//      constants.GenesisHeight,
 //      vldb,
 //      0L,
 //      None,
@@ -53,7 +53,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
                         settings: EncryAppSettings): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
-        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
@@ -66,7 +66,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     new UtxoState(
       storage,
-      TestNetConstants.PreGenesisHeight,
+      constants.PreGenesisHeight,
       0L,
     )
   }

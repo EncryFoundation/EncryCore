@@ -9,7 +9,7 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import cats.syntax.option._
 import scala.annotation.tailrec
 import cats.syntax.either._
@@ -131,8 +131,8 @@ trait HistoryModifiersProcessors extends HistoryApi {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
       Seq(
         BestHeaderKey                                -> StorageValue @@ header.id,
-        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id,
-        headerHeightKey(header.id)                   -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
+        heightIdsKey(constants.GenesisHeight) -> StorageValue @@ header.id,
+        headerHeightKey(header.id)                   -> StorageValue @@ Ints.toByteArray(constants.GenesisHeight),
         headerScoreKey(header.id)                    -> StorageValue @@ header.difficulty.toByteArray
       )
     } else scoreOf(header.parentId).map { parentScore =>

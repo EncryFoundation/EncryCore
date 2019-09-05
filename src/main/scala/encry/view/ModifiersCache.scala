@@ -2,7 +2,7 @@ package encry.view
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.settings
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import encry.view.history.History
 import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -116,7 +116,7 @@ object ModifiersCache extends StrictLogging {
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
-                (history.getBestHeaderHeight == TestNetConstants.PreGenesisHeight &&
+                (history.getBestHeaderHeight == constants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
                   ) || history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
@@ -126,8 +126,8 @@ object ModifiersCache extends StrictLogging {
           res
         case None =>
           logger.debug(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
-            s"Trying to find in range [${history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
-          (history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
+            s"Trying to find in range [${history.getBestHeaderHeight - constants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
+          (history.getBestHeaderHeight - constants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
           ).toList
       }

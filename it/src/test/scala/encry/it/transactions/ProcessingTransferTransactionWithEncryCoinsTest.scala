@@ -14,7 +14,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
@@ -65,7 +65,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     Await.result(dockerNodes().head.waitForHeadersHeight(secondHeightToWait), waitTime)
 
     val checkBalance: Boolean = Await.result(dockerNodes().head.balances, waitTime)
-      .find(_._1 == Algos.encode(TestNetConstants.IntrinsicTokenId))
+      .find(_._1 == Algos.encode(constants.IntrinsicTokenId))
       .map(_._2 == supplyAtHeight - amount)
       .get
 

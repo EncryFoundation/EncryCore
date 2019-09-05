@@ -3,7 +3,8 @@ package encry.utils
 import encry.modifiers.mempool.TransactionFactory
 import encry.modifiers.mempool.directive._
 import encry.modifiers.state.box._
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants
+import encry.settings.MainConstants.constants
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -18,7 +19,7 @@ import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-
+import encry.settings.MainConstants.constants
 import scala.util.{Random => ScRand}
 
 trait EncryGenerator {
@@ -140,7 +141,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      TestNetConstants.InitialDifficulty,
+      constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }
@@ -154,7 +155,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       height,
       random.nextLong(),
-      TestNetConstants.InitialDifficulty,
+      constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

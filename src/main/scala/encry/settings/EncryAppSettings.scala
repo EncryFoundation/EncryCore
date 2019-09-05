@@ -2,6 +2,7 @@ package encry.settings
 
 import java.io.File
 import java.net.InetSocketAddress
+
 import com.typesafe.scalalogging.StrictLogging
 import com.typesafe.config.{Config, ConfigFactory}
 import encry.EncryApp
@@ -9,6 +10,8 @@ import encry.storage.VersionalStorage.StorageType
 import encry.utils.NetworkTimeProviderSettings
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
+import org.encryfoundation.common.utils.constants.{Constants, TestNetConstants}
+
 import scala.concurrent.duration.FiniteDuration
 
 final case class EncryAppSettings(directory: String,
@@ -27,7 +30,6 @@ final case class EncryAppSettings(directory: String,
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
   val configPath: String = "encry"
-
   val read: EncryAppSettings = ConfigFactory.load("local.conf")
     .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)
 
@@ -93,6 +95,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 
   private def failWithError(msg: String): Nothing =
     EncryApp.forceStopApplication(errorMessage = s"Stop application due to malformed configuration file: $msg")
+
 }
 
 final case class StorageSettings(history: StorageType, state: StorageType)
@@ -139,4 +142,5 @@ final case class NodeSettings(blocksToKeep: Int,
                               numberOfMiningWorkers: Int,
                               miningDelay: FiniteDuration,
                               offlineGeneration: Boolean,
-                              useCli: Boolean)
+                              useCli: Boolean,
+                              constantsClass: Option[String])

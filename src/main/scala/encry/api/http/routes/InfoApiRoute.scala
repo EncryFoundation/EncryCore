@@ -13,7 +13,7 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import scala.concurrent.Future
 
 case class InfoApiRoute(dataHolder: ActorRef,
@@ -90,7 +90,7 @@ object InfoApiRoute {
       "bestFullHeaderId"          -> block.map(_.encodedId).getOrElse("").asJson,
       "previousFullHeaderId"      -> prevFullHeaderId.asJson,
       "difficulty"                -> block.map(_.header.difficulty.toString)
-        .getOrElse(TestNetConstants.InitialDifficulty.toString).asJson,
+        .getOrElse(constants.InitialDifficulty.toString).asJson,
       "unconfirmedCount"          -> mempoolSize.asJson,
       "stateType"                 -> stateType.asJson,
       "stateVersion"              -> stateVersion.asJson,

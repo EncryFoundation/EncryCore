@@ -11,9 +11,8 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, PropSpec}
+import encry.settings.MainConstants.constants
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging {
 
@@ -55,11 +54,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(firstBlock)
 
-    wallet.walletStorage.getTokenBalanceById(TestNetConstants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
+    wallet.walletStorage.getTokenBalanceById(constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance
 
     wallet.scanPersistent(secondBlock)
 
-    wallet.walletStorage.getTokenBalanceById(TestNetConstants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
+    wallet.walletStorage.getTokenBalanceById(constants.IntrinsicTokenId).getOrElse(0L) shouldEqual correctBalance - useBox.amount
 
     logger.info(s"tmp dir size: ${dir.length()}")
   }

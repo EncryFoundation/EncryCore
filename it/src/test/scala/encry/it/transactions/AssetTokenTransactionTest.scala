@@ -15,7 +15,7 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
@@ -135,7 +135,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
         }
 
         val ckeckEncryBalanceNew: Boolean = Await.result(dockerNodes().head.balances, waitTime)
-          .find(_._1 == Algos.encode(TestNetConstants.IntrinsicTokenId))
+          .find(_._1 == Algos.encode(constants.IntrinsicTokenId))
           .map(_._2 == supplyAtHeight - amount)
           .get
 

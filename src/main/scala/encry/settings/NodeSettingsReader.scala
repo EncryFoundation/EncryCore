@@ -15,5 +15,6 @@ trait NodeSettingsReader {
       cfg.as[FiniteDuration](s"$path.miningDelay"),
       cfg.as[Boolean](s"$path.offlineGeneration"),
       cfg.as[Boolean](s"$path.useCli"),
+      cfg.as[Option[String]](s"$path.constantsClass"),
     )
 }

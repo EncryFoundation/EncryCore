@@ -1,13 +1,13 @@
 package encry.consensus
 
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import supertagged.@@
 
 object PowLinearController {
 
-  private val chainParams = TestNetConstants
+  private val chainParams = constants
 
   val PrecisionConstant: Int = 1000000000
 

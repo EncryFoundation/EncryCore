@@ -6,10 +6,11 @@ import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
+import encry.settings.MainConstants.constants
 
 class BlockSerializerTest extends FunSuite with EncryGenerator {
 
@@ -22,7 +23,7 @@ class BlockSerializerTest extends FunSuite with EncryGenerator {
       99999L,
       199,
       999L,
-      TestNetConstants.InitialDifficulty,
+      constants.InitialDifficulty,
       EquihashSolution(Seq(1, 2, 3))
     )
 

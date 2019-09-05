@@ -1,6 +1,7 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
@@ -15,7 +16,7 @@ import encry.cli.ConsoleListener.StartListening
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network._
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, MainConstants}
 import encry.stats.{StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder
@@ -24,10 +25,12 @@ import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
+import org.encryfoundation.common.utils.constants.Constants
 
 object EncryApp extends App with StrictLogging {
 

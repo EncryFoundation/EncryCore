@@ -10,7 +10,8 @@ import encry.it.util.KeyHelper.createPrivKey
 import encry.settings.EncryAppSettings
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+
+import encry.settings.MainConstants.constants
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -47,6 +48,6 @@ object Node {
 
     def publicKeyStr: String = n.publicKey.toString
 
-    def blockDelay: FiniteDuration = TestNetConstants.DesiredBlockInterval
+    def blockDelay: FiniteDuration = constants.DesiredBlockInterval
   }
 }

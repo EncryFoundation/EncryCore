@@ -16,10 +16,11 @@ import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
+import encry.settings.MainConstants.constants
 
 class DownloadedModifiersValidatorTests extends WordSpecLike
   with Matchers
@@ -66,7 +67,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         timestamp2,
         2,
         scala.util.Random.nextLong(),
-        TestNetConstants.InitialDifficulty,
+        constants.InitialDifficulty,
         EquihashSolution(Seq(1, 3))
       )
       val header_second: Header = Header(
@@ -76,7 +77,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         timestamp1,
         1,
         scala.util.Random.nextLong(),
-        TestNetConstants.InitialDifficulty,
+        constants.InitialDifficulty,
         EquihashSolution(Seq(1, 3))
       )
 

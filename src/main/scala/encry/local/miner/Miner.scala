@@ -30,7 +30,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import scala.collection._
 import scala.concurrent.duration._
 
@@ -48,7 +48,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
   var candidateOpt: Option[CandidateBlock] = None
   var syncingDone: Boolean = settings.node.offlineGeneration
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
-  val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(constants.n, constants.k)
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
@@ -163,7 +163,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
         } else usedInputsIds -> acc
     }._2
     val timestamp: Time = timeProvider.estimatedTime
-    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1)
+    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(constants.PreGenesisHeight) + 1)
     val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
     val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height)
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
@@ -176,10 +176,10 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
       case Right(value) => value
       case Left(value)  => EncryApp.forceStopApplication(999, value.toString)
     })
-      .getOrElse(TestNetConstants.InitialDifficulty)
+      .getOrElse(constants.InitialDifficulty)
 
     val candidate: CandidateBlock =
-      CandidateBlock(bestHeaderOpt, TestNetConstants.Version, txs, timestamp, difficulty)
+      CandidateBlock(bestHeaderOpt, constants.Version, txs, timestamp, difficulty)
 
     logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height.")

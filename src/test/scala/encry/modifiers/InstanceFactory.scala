@@ -2,7 +2,7 @@ package encry.modifiers
 
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.settings.{EncryAppSettings, NodeSettings}
+import encry.settings.{EncryAppSettings, MainConstants, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History
@@ -14,13 +14,14 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryPropositio
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
+import encry.settings.MainConstants.constants
 
 import scala.util.{Random => Scarand}
 
@@ -51,7 +52,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
-      height = TestNetConstants.GenesisHeight,
+      height = constants.GenesisHeight,
       transactionsRoot = txsRoot
     )
     Block(header, Payload(header.id, Seq(coinbaseTransaction)))
@@ -151,7 +152,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
-      .getOrElse(TestNetConstants.InitialDifficulty)
+      .getOrElse(constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
     val header = genHeader.copy(

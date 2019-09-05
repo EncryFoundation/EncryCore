@@ -25,7 +25,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.MainConstants.constants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
@@ -66,13 +66,13 @@ object Utils extends StrictLogging {
     val txs = Seq(coinbaseTransaction(0))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
-      height = TestNetConstants.GenesisHeight
+      height = constants.GenesisHeight
     )
     Block(header, Payload(header.id, txs))
   }
 
   def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = constants.GenesisHeight)
     Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
@@ -150,7 +150,7 @@ object Utils extends StrictLogging {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b =>
       history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
-      .getOrElse(TestNetConstants.InitialDifficulty)
+      .getOrElse(constants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.getBestHeaderHeight + 1,
@@ -180,7 +180,7 @@ object Utils extends StrictLogging {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
@@ -194,7 +194,7 @@ object Utils extends StrictLogging {
 
     new UtxoState(
       storage,
-      TestNetConstants.PreGenesisHeight,
+      constants.PreGenesisHeight,
       0L,
     )
   }
@@ -214,7 +214,7 @@ object Utils extends StrictLogging {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      TestNetConstants.InitialDifficulty,
+      constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }
