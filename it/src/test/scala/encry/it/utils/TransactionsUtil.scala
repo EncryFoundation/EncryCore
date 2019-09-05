@@ -1,4 +1,4 @@
-package TransactionGenerator
+package encry.it.utils
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.typesafe.scalalogging.StrictLogging

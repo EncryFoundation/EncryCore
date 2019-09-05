@@ -1,11 +1,11 @@
 package encry.it.transactions
 
-import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
+import encry.it.utils.CreateTransaction
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
@@ -13,6 +13,7 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.utils.Random
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 

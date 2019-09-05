@@ -1,4 +1,4 @@
-package encry.it
+package encry.it.miner
 
 import com.typesafe.config.Config
 import encry.consensus.EncrySupplyController
