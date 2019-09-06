@@ -3,24 +3,17 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
-import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.{EncryGenerator, FileHelper, TestHelper}
+import encry.utils.EncryGenerator
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.modifiers.history.{Block, Payload}
-import encry.settings.EncryAppSettings.settings.constants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
-import encry.settings.EncryAppSettings.settings.constants
-import scala.concurrent.ExecutionContextExecutor
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
-
-  val settings: EncryAppSettings = EncryAppSettings.settings
 
 //  def utxoFromBoxHolder(bh: BoxHolder,
 //                        dir: File,
@@ -53,7 +46,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
                         settings: EncryAppSettings): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
-        IODBWrapper(new LSMStore(dir, keepVersions = constants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
@@ -66,7 +59,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
     new UtxoState(
       storage,
-      constants.PreGenesisHeight,
+      settings.constants.PreGenesisHeight,
       0L,
     )
   }

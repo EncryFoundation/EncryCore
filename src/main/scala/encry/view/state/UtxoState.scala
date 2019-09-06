@@ -1,11 +1,17 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
+import cats.data.Validated
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
+import encry.settings.EncryAppSettings.settings.constants
 import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
@@ -18,12 +24,6 @@ import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import io.iohk.iodb.LSMStore
-import cats.data.Validated
-import cats.Traverse
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.validated._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -33,12 +33,11 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
-import encry.settings.EncryAppSettings.settings.constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-import scala.concurrent.ExecutionContextExecutor
+
 import scala.util.Try
 
 final case class UtxoState(storage: VersionalStorage,
