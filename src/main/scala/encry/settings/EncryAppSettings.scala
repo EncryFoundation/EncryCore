@@ -10,7 +10,7 @@ import encry.storage.VersionalStorage.StorageType
 import encry.utils.NetworkTimeProviderSettings
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
-import org.encryfoundation.common.utils.constants.{Constants, TestNetConstants}
+import org.encryfoundation.common.utils.constants.Constants
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -31,8 +31,12 @@ final case class EncryAppSettings(directory: String,
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
   val configPath: String = "encry"
-  val read: EncryAppSettings = ConfigFactory.load("local.conf")
-    .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)
+  lazy val settings: EncryAppSettings =
+    if (EncryApp.cmdArgs.nonEmpty)
+      EncryAppSettings.read(EncryApp.cmdArgs.headOption)
+    else
+      ConfigFactory.load("local.conf")
+        .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
     val maybeConfigFile: Option[File] = for {
@@ -65,19 +69,19 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 
   def fromConfig(config: Config): EncryAppSettings = {
 
-    val directory          = config.as[String](s"$configPath.directory")
-    val nodeSettings       = config.as[NodeSettings](s"$configPath.node")
-    val mempool            = config.as[MemoryPoolSettings](s"$configPath.mempool")
-    val walletSettings     = config.as[Option[WalletSettings]](s"$configPath.wallet")
-    val networkSettings    = config.as[NetworkSettings](s"$configPath.network")
-    val restApiSettings    = config.as[RESTApiSettings](s"$configPath.restApi")
-    val storageSettings    = config.as[StorageSettings](s"$configPath.storage")
-    val ntpSettings        = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
-    val influxSettings     = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
-    val levelDb            = config.as[LevelDBSettings](s"$configPath.levelDB")
+    val directory = config.as[String](s"$configPath.directory")
+    val nodeSettings = config.as[NodeSettings](s"$configPath.node")
+    val mempool = config.as[MemoryPoolSettings](s"$configPath.mempool")
+    val walletSettings = config.as[Option[WalletSettings]](s"$configPath.wallet")
+    val networkSettings = config.as[NetworkSettings](s"$configPath.network")
+    val restApiSettings = config.as[RESTApiSettings](s"$configPath.restApi")
+    val storageSettings = config.as[StorageSettings](s"$configPath.storage")
+    val ntpSettings = config.as[NetworkTimeProviderSettings](s"$configPath.ntp")
+    val influxSettings = config.as[Option[InfluxDBSettings]](s"$configPath.influxDB")
+    val levelDb = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
-    val blackList          = config.as[BlackListSettings](s"$configPath.blackList")
-    val constants          = config.as[Constants](s"$configPath.constantsClass")
+    val blackList = config.as[BlackListSettings](s"$configPath.blackList")
+    val constants = config.as[Constants](s"$configPath.constantsClass")
 
     EncryAppSettings(
       directory,
@@ -102,15 +106,22 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 }
 
 final case class StorageSettings(history: StorageType, state: StorageType)
+
 final case class WalletSettings(password: String, seed: Option[String])
+
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
+
 final case class BlackListSettings(banTime: FiniteDuration, cleanupTime: FiniteDuration)
+
 final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32)
+
 final case class MonitoringSettings(kamonEnabled: Boolean)
+
 final case class RESTApiSettings(enabled: Option[Boolean],
                                  bindAddress: InetSocketAddress,
                                  corsAllowedOrigin: Option[String],
                                  timeout: FiniteDuration)
+
 final case class NetworkSettings(nodeName: Option[String],
                                  addedMaxDelay: Option[FiniteDuration],
                                  networkChunkSize: Int,
@@ -131,6 +142,7 @@ final case class NetworkSettings(nodeName: Option[String],
                                  syncTimeout: Option[FiniteDuration],
                                  syncPacketLength: Int,
                                  maxNumberOfReConnections: Int)
+
 final case class MemoryPoolSettings(utxMaxAge: FiniteDuration,
                                     cleanupInterval: FiniteDuration,
                                     maxCapacity: Int,
@@ -139,6 +151,7 @@ final case class MemoryPoolSettings(utxMaxAge: FiniteDuration,
                                     bloomFilterCleanupInterval: FiniteDuration,
                                     bloomFilterCapacity: Long,
                                     bloomFilterFailureProbability: Double)
+
 final case class NodeSettings(blocksToKeep: Int,
                               modifiersCacheSize: Int,
                               mining: Boolean,

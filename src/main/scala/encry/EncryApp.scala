@@ -8,6 +8,7 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream.ActorMaterializer
+import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.{ApiRoute, CompositeHttpService, DataHolderForApi}
 import encry.api.http.routes._
@@ -30,7 +31,7 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
-import org.encryfoundation.common.utils.constants.Constants
+import net.ceedubs.ficus.Ficus._
 
 object EncryApp extends App with StrictLogging {
 
@@ -38,7 +39,9 @@ object EncryApp extends App with StrictLogging {
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
+  val cmdArgs:Array[String] = args
+
+  lazy val settings: EncryAppSettings = EncryAppSettings.settings
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
