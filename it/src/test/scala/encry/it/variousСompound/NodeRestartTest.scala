@@ -1,4 +1,4 @@
-package encry.it.forkResolving
+package encry.it.variousСompound
 
 import java.nio.file.Paths
 
@@ -13,9 +13,9 @@ import scorex.utils.Random
 
 import scala.concurrent.duration._
 
-class SyncAfterNodeRestartTest extends AsyncFunSuite with Matchers with DockerAfterAll {
+class NodeRestartTest extends AsyncFunSuite with Matchers with DockerAfterAll {
 
-  implicit val futureDuration: FiniteDuration = 30 minutes
+  implicit val futureDuration: FiniteDuration = 10 minutes
 
   test("Nodes should sync after restart with new offlineGeneration and port") {
     val node1 = docker

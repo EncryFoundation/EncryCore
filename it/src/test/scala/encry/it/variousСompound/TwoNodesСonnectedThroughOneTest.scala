@@ -1,4 +1,4 @@
-package encry.it.forkResolving
+package encry.it.variousСompound
 
 import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
@@ -9,12 +9,12 @@ import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.duration._
 
-class SyncThreeNodesKnowAboutEachOtherTest extends FunSuite with Matchers with DockerAfterAll {
+class TwoNodesСonnectedThroughOneTest extends FunSuite with Matchers with DockerAfterAll {
 
-  implicit val futureDuration: FiniteDuration = 30 minutes
+  implicit val futureDuration: FiniteDuration = 10 minutes
   val heightSeparation = 10 //blocks
 
-  test("nodes know about each other should sync") {
+  test("nodes connected with first should sync") {
 
     val node1 = docker
       .startNodeInternal(Configs.nodeName("node1")
@@ -26,17 +26,15 @@ class SyncThreeNodesKnowAboutEachOtherTest extends FunSuite with Matchers with D
       )
 
     node1.waitForFullHeight(heightSeparation).run
-    println("try start node2")
+
     val node2 = docker
       .startNodeInternal(Configs.nodeName("node2")
         .withFallback(Configs.mining(true))
         .withFallback(Configs.offlineGeneration(false))
         .withFallback(Configs.networkAddress("0.0.0.0:9001"))
-        .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001))))
+        .withFallback(Configs.knownPeers(Seq()))
         .withFallback(defaultConf)
       )
-
-    node1.connect(s"${node2.nodeIp}:9001").run
 
     node1.waitForFullHeight(heightSeparation * 2).run
 

@@ -1,20 +1,24 @@
-package encry.it.forkResolving
+package encry.it.variousСompound
 
 import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
 import encry.it.docker.DockerAfterAll
 import encry.it.util.WaitUtils._
-import encry.it.utils.FutureBlockedRun._
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
-class SyncThreeNodesTest extends FunSuite with Matchers with DockerAfterAll {
+class TwoOfflinegenDelayTest extends FunSuite with Matchers with DockerAfterAll {
 
-  implicit val futureDuration: FiniteDuration = 30 minutes
-  val heightSeparation = 5 //blocks
+  implicit class FutureBlockedRun[T](future: Future[T]) {
+    def run(implicit duration: Duration): T = Await.result(future, duration)
+  }
 
-  test("Late node should sync with the first of two nodes") {
+  implicit val futureDuration: FiniteDuration = 20 minutes
+  val heightSeparation = 10 //blocks
+
+  test("Third node should sync with two offgen nodes started with delayed") {
 
     val miningNodeConfig = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
@@ -26,10 +30,12 @@ class SyncThreeNodesTest extends FunSuite with Matchers with DockerAfterAll {
     val node1 = docker
       .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node1")))
 
+    node1.waitForFullHeight(heightSeparation).run
+
     val node2 = docker
       .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node2")))
 
-    node1.waitForFullHeight(heightSeparation).run
+    node1.waitForFullHeight(heightSeparation * 2).run
 
     val node3 = docker
       .startNodeInternal(
@@ -40,9 +46,13 @@ class SyncThreeNodesTest extends FunSuite with Matchers with DockerAfterAll {
           .withFallback(defaultConf)
       )
 
-    val (bestFullHeaderId1, bestFullHeaderId3) =
+    val (bestFullHeaderId13, bestFullHeaderId3) =
       waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run)
 
-    bestFullHeaderId3 shouldEqual bestFullHeaderId1
+    val (bestFullHeaderId12, bestFullHeaderId2) =
+      waitForEqualsId(node1.bestFullHeaderId.run, node2.bestFullHeaderId.run)
+
+    bestFullHeaderId3 shouldEqual bestFullHeaderId13
+    bestFullHeaderId2 shouldEqual bestFullHeaderId12
   }
 }

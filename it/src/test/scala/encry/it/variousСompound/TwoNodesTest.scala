@@ -1,4 +1,4 @@
-package encry.it.forkResolving
+package encry.it.variousСompound
 
 import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
@@ -9,9 +9,9 @@ import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.duration._
 
-class SyncTwoNodesTest extends FunSuite with Matchers with DockerAfterAll {
+class TwoNodesTest extends FunSuite with Matchers with DockerAfterAll {
 
-  implicit val futureDuration: FiniteDuration = 30 minutes
+  implicit val futureDuration: FiniteDuration = 10 minutes
   val heightSeparation = 10 //blocks
 
   test("Late node should sync with one node") {
