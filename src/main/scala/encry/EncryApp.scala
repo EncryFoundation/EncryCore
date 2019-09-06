@@ -16,7 +16,7 @@ import encry.cli.ConsoleListener.StartListening
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network._
-import encry.settings.{EncryAppSettings, Constants}
+import encry.settings.EncryAppSettings
 import encry.stats.{StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder

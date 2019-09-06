@@ -2,7 +2,7 @@ package encry.modifiers
 
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.settings.{EncryAppSettings, Constants, NodeSettings}
+import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History

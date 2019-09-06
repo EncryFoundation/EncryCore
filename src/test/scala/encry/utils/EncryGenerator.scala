@@ -1,9 +1,6 @@
 package encry.utils
 
 import encry.modifiers.mempool.TransactionFactory
-import encry.modifiers.mempool.directive._
-import encry.modifiers.state.box._
-import encry.settings.Constants
 import encry.settings.EncryAppSettings.read.constants
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
@@ -14,12 +11,12 @@ import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Add
 import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box._
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-import encry.settings.EncryAppSettings.read.constants
+
 import scala.util.{Random => ScRand}
 
 trait EncryGenerator {

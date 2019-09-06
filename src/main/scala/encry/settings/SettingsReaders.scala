@@ -31,10 +31,8 @@ trait SettingsReaders {
         case _ => TestNetConstants
       }
     }
-    println(s"path: $path")
-    val keyPath = path//"encry.node.constantsClass"
     getConstants(
-      if (cfg.hasPath(keyPath)) cfg.getString(keyPath) else ""
+      if (cfg.hasPath(path)) cfg.getString(path) else ""
     )
   }
 
