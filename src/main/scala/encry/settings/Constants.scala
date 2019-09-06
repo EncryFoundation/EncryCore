@@ -7,9 +7,9 @@ object Constants {
 
   val keyPath = "encry.node.constantsClass"
   lazy val config: Config = ConfigFactory.load()
-  lazy val constants: Constants = getConstants(
-    if(config.hasPath(keyPath)) config.getString(keyPath) else ""
-  )
+//  lazy val constants: Constants = getConstants(
+//    if(config.hasPath(keyPath)) config.getString(keyPath) else ""
+//  )
 
   def getConstants(constantsClass: String): Constants = {
     constantsClass match {

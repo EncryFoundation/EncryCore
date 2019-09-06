@@ -25,7 +25,8 @@ final case class EncryAppSettings(directory: String,
                                   influxDB: Option[InfluxDBSettings],
                                   levelDB: LevelDBSettings,
                                   monitoringSettings: Option[MonitoringSettings],
-                                  blackList: BlackListSettings)
+                                  blackList: BlackListSettings,
+                                  constants: Constants)
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
@@ -76,6 +77,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val levelDb            = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
     val blackList          = config.as[BlackListSettings](s"$configPath.blackList")
+    val constants          = config.as[Constants](s"$configPath.constantsClass")
 
     EncryAppSettings(
       directory,
@@ -89,7 +91,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       influxSettings,
       levelDb,
       monitoringSettings,
-      blackList
+      blackList,
+      constants
     )
   }
 
@@ -142,5 +145,4 @@ final case class NodeSettings(blocksToKeep: Int,
                               numberOfMiningWorkers: Int,
                               miningDelay: FiniteDuration,
                               offlineGeneration: Boolean,
-                              useCli: Boolean,
-                              constantsClass: Option[String])
+                              useCli: Boolean)

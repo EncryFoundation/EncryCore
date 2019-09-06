@@ -4,10 +4,12 @@ import encry.consensus.EncrySupplyController
 import encry.utils.EncryGenerator
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
-import encry.settings.Constants.constants
+import encry.settings.EncryAppSettings.read.constants
+import encry.settings.ConstantsSettingsReader
+
 import scala.concurrent.duration._
 
-class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerator {
+class EncrySupplyControllerTest extends PropSpec with Matchers with ConstantsSettingsReader with EncryGenerator {
 
   val epochLen = 10
 

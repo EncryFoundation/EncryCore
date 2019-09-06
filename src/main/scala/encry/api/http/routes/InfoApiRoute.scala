@@ -13,7 +13,7 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
-import encry.settings.Constants.constants
+import encry.settings.EncryAppSettings.read.constants
 import scala.concurrent.Future
 
 case class InfoApiRoute(dataHolder: ActorRef,

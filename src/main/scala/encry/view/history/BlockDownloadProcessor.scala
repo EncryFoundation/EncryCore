@@ -2,7 +2,7 @@ package encry.view.history
 
 import encry.settings.NodeSettings
 import org.encryfoundation.common.modifiers.history.Header
-import encry.settings.Constants.constants
+import encry.settings.EncryAppSettings.read.constants
 
 /** Class that keeps and calculates minimal height for full blocks starting from which we need to download these full
   * blocks from the network and keep them in our history. */

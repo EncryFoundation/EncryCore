@@ -1,7 +1,7 @@
 package encry.modifiers.history
 
 import org.encryfoundation.common.modifiers.history.Payload
-import encry.settings.Constants.constants
+import encry.settings.EncryAppSettings.read.constants
 import org.encryfoundation.common.validation.{ModifierValidator, ValidationResult}
 
 object PayloadUtils {

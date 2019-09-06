@@ -1,6 +1,6 @@
 package encry.utils
 
-import encry.settings.Constants.constants
+import encry.settings.EncryAppSettings.read.constants
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
