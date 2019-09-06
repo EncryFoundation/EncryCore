@@ -31,8 +31,9 @@ final case class EncryAppSettings(directory: String,
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
   val configPath: String = "encry"
+
   lazy val settings: EncryAppSettings =
-    if (EncryApp.cmdArgs.nonEmpty)
+    if (Option(EncryApp.cmdArgs).nonEmpty && EncryApp.cmdArgs.headOption.nonEmpty)
       EncryAppSettings.read(EncryApp.cmdArgs.headOption)
     else
       ConfigFactory.load("local.conf")
