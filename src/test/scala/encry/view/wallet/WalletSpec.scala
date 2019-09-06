@@ -12,7 +12,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{Matchers, PropSpec}
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging {
 

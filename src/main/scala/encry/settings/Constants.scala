@@ -3,7 +3,7 @@ package encry.settings
 import com.typesafe.config.{Config, ConfigFactory}
 import org.encryfoundation.common.utils.constants.{Constants, TestNetConstants}
 
-object MainConstants {
+object Constants {
 
   val keyPath = "encry.node.constantsClass"
   lazy val config: Config = ConfigFactory.load()

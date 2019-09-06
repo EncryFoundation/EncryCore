@@ -7,7 +7,7 @@ import encry.it.docker.NodesFromDocker
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{AsyncFunSuite, Matchers}
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import scala.concurrent.Await
 import scala.concurrent.duration._
 

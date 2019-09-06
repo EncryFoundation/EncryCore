@@ -16,11 +16,11 @@ import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 
 class DownloadedModifiersValidatorTests extends WordSpecLike
   with Matchers

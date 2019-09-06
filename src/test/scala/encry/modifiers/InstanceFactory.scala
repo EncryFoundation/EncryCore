@@ -2,7 +2,7 @@ package encry.modifiers
 
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
-import encry.settings.{EncryAppSettings, MainConstants, NodeSettings}
+import encry.settings.{EncryAppSettings, Constants, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History
@@ -21,7 +21,7 @@ import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 
 import scala.util.{Random => Scarand}
 

@@ -3,8 +3,8 @@ package encry.utils
 import encry.modifiers.mempool.TransactionFactory
 import encry.modifiers.mempool.directive._
 import encry.modifiers.state.box._
-import encry.settings.MainConstants
-import encry.settings.MainConstants.constants
+import encry.settings.Constants
+import encry.settings.Constants.constants
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -19,7 +19,7 @@ import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import scala.util.{Random => ScRand}
 
 trait EncryGenerator {

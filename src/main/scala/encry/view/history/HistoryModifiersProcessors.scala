@@ -9,7 +9,7 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import cats.syntax.option._
 import scala.annotation.tailrec
 import cats.syntax.either._

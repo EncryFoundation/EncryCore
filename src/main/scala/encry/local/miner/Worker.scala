@@ -12,7 +12,7 @@ import encry.local.miner.Worker.{MineBlock, NextChallenge}
 import java.text.SimpleDateFormat
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 
 class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging {
 

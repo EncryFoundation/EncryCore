@@ -7,7 +7,7 @@ import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import scorex.crypto.hash.Digest32
 import scala.reflect.ClassTag
 

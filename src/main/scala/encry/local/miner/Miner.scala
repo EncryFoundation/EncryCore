@@ -30,7 +30,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import scala.collection._
 import scala.concurrent.duration._
 

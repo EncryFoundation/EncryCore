@@ -11,7 +11,7 @@ import encry.settings.EncryAppSettings
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 
 import scala.concurrent.duration.FiniteDuration
 

@@ -12,7 +12,7 @@ import org.encryfoundation.common.modifiers.history.{Block, BlockProtoSerializer
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 

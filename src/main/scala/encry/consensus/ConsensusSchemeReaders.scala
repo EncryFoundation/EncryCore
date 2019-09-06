@@ -1,6 +1,6 @@
 package encry.consensus
 
-import encry.settings.MainConstants.constants
+import encry.settings.Constants.constants
 
 object ConsensusSchemeReaders {
 
