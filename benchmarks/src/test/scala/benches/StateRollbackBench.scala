@@ -62,7 +62,7 @@ object StateRollbackBench {
   @State(Scope.Benchmark)
   class StateRollbackState {
 
-    val settings: EncryAppSettings = EncryAppSettings.read
+    val settings: EncryAppSettings = EncryAppSettings.settings
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>

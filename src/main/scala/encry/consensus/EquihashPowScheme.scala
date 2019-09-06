@@ -2,7 +2,7 @@ package encry.consensus
 
 import com.google.common.primitives.Chars
 import encry.crypto.equihash.{Equihash, EquihashValidationErrors}
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}

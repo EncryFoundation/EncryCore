@@ -1,7 +1,7 @@
 package encry.utils
 
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}

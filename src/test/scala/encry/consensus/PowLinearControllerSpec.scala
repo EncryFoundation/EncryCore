@@ -1,9 +1,9 @@
 package encry.consensus
 
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import scala.collection.immutable
 
 class PowLinearControllerSpec extends PropSpec with Matchers {

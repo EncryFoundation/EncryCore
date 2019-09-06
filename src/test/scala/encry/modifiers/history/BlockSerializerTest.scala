@@ -6,11 +6,11 @@ import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 
 class BlockSerializerTest extends FunSuite with EncryGenerator {
 

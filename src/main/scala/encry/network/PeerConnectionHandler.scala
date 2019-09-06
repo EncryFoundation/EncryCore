@@ -8,13 +8,13 @@ import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{settings, timeProvider}
+import encry.EncryApp.timeProvider
+import encry.settings.EncryAppSettings.settings
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 import org.encryfoundation.common.utils.Algos
-import cats.instances.long._
 
 import scala.annotation.tailrec
 import scala.collection.immutable.{HashMap, SortedMap}

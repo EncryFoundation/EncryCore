@@ -17,7 +17,7 @@ import scala.util.Try
 
 class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory {
 
-  val settings: EncryAppSettings = EncryAppSettings.read
+  val settings: EncryAppSettings = EncryAppSettings.settings
   val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
     case ((prevHistory, blocks), _) =>
       val block: Block = generateNextBlock(prevHistory)

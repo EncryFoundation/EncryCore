@@ -62,7 +62,7 @@ object HistoryBenches {
   @State(Scope.Benchmark)
   class HistoryBenchState {
 
-    val settings: EncryAppSettings = EncryAppSettings.read
+    val settings: EncryAppSettings = EncryAppSettings.settings
     val tmpDir: File = getRandomTempDir
     val initialHistory: History = generateHistory(settings, tmpDir)
 

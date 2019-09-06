@@ -12,15 +12,15 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 import scala.concurrent.ExecutionContextExecutor
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
-  val settings: EncryAppSettings = EncryAppSettings.read
+  val settings: EncryAppSettings = EncryAppSettings.settings
 
 //  def utxoFromBoxHolder(bh: BoxHolder,
 //                        dir: File,

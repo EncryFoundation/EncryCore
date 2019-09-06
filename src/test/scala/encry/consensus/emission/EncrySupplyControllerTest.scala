@@ -4,7 +4,7 @@ import encry.consensus.EncrySupplyController
 import encry.utils.EncryGenerator
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
-import encry.settings.EncryAppSettings.read.constants
+import encry.settings.EncryAppSettings.settings.constants
 
 import scala.concurrent.duration._
 

@@ -11,8 +11,6 @@ import encry.settings.EncryAppSettings
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 
-import encry.settings.EncryAppSettings.read.constants
-
 import scala.concurrent.duration.FiniteDuration
 
 case class Node(config: Config,
@@ -42,12 +40,12 @@ case class Node(config: Config,
 
 object Node {
 
-  implicit class NodeExt(val n: Node) extends AnyVal {
-    def name: String = n.settings.network.nodeName
-      .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)
+  implicit class NodeExt(val node: Node) extends AnyVal {
+    def name: String = node.settings.network.nodeName
+      .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + node.settings.network.bindAddress.getPort)
 
-    def publicKeyStr: String = n.publicKey.toString
+    def publicKeyStr: String = node.publicKey.toString
 
-    def blockDelay: FiniteDuration = settings.constants.DesiredBlockInterval
+    def blockDelay: FiniteDuration = node.settings.constants.DesiredBlockInterval
   }
 }
