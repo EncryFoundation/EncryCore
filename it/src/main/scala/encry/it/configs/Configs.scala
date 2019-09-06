@@ -62,4 +62,11 @@ object Configs {
        |encry.restApi.bindAddress = "$address"
      """.stripMargin
   )
+
+  def constantsClass(name: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.node.constantsClass="$name"
+    """.stripMargin
+  )
+
 }
