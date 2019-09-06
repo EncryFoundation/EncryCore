@@ -19,6 +19,7 @@ class SyncTwoNodesTest extends FunSuite with Matchers with DockerAfterAll {
     val miningNodeConfig = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
       .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(Configs.networkAddress("0.0.0.0:9001"))
       .withFallback(Docker.defaultConf)
 
     val node1 = docker

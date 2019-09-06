@@ -12,13 +12,15 @@ import scala.concurrent.duration._
 class SyncThreeNodesTest extends FunSuite with Matchers with DockerAfterAll {
 
   implicit val futureDuration: FiniteDuration = 30 minutes
-  val heightSeparation = 10 //blocks
+  val heightSeparation = 5 //blocks
 
   test("Late node should sync with the first of two nodes") {
 
     val miningNodeConfig = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
+      .withFallback(Configs.networkAddress("0.0.0.0:9001"))
       .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(Configs.constantsClass("SlowMiningConstants"))
       .withFallback(defaultConf)
 
     val node1 = docker
@@ -33,6 +35,7 @@ class SyncThreeNodesTest extends FunSuite with Matchers with DockerAfterAll {
       .startNodeInternal(
         Configs.nodeName("node3")
           .withFallback(Configs.mining(false))
+          .withFallback(Configs.networkAddress("0.0.0.0:9001"))
           .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001), (node2.nodeIp, 9001))))
           .withFallback(defaultConf)
       )

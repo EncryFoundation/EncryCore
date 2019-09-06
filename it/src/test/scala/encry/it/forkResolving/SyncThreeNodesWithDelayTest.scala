@@ -9,7 +9,7 @@ import org.scalatest.{FunSuite, Matchers}
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
-class TwoNodesSyncWithFirstTest extends FunSuite with Matchers with DockerAfterAll {
+class SyncThreeNodesWithDelayTest extends FunSuite with Matchers with DockerAfterAll {
 
   implicit class FutureBlockedRun[T](future: Future[T]) {
     def run(implicit duration: Duration): T = Await.result(future, duration)
@@ -22,7 +22,9 @@ class TwoNodesSyncWithFirstTest extends FunSuite with Matchers with DockerAfterA
 
     val miningNodeConfig = Configs.mining(true)
       .withFallback(Configs.offlineGeneration(true))
+      .withFallback(Configs.networkAddress("0.0.0.0:9001"))
       .withFallback(Configs.knownPeers(Seq()))
+      .withFallback(Configs.constantsClass("SlowMiningConstants"))
       .withFallback(defaultConf)
 
     val node1 = docker
@@ -39,6 +41,7 @@ class TwoNodesSyncWithFirstTest extends FunSuite with Matchers with DockerAfterA
       .startNodeInternal(
         Configs.nodeName("node3")
           .withFallback(Configs.mining(false))
+          .withFallback(Configs.networkAddress("0.0.0.0:9001"))
           .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001), (node2.nodeIp, 9001))))
           .withFallback(defaultConf)
       )
