@@ -125,8 +125,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
-      if (candidateOpt.exists(_.parentOpt.exists(x => (x.height + 1) == mod.header.height))
-        && (mod.payload.txs.dropRight(1).diff(candidateOpt.map(_.transactions.dropRight(1)).getOrElse(IndexedSeq.empty)) != Seq.empty)) {
+      if (mod.payload.txs.dropRight(1).diff(candidateOpt.map(_.transactions.dropRight(1)).getOrElse(IndexedSeq.empty)) != Seq.empty) {
         transactionsPool = transactionsPool ++ mod.payload.txs.diff(candidateOpt.map(_.transactions).getOrElse(IndexedSeq.empty))
       }
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
