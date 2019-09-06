@@ -13,12 +13,9 @@ object Constants {
 
   def getConstants(constantsClass: String): Constants = {
     constantsClass match {
-      case "TestConstants" =>
-        println("TestConstants")
-        TestConstants
-      case _ =>
-        println("TestNetConstants")
-        TestNetConstants
+      case "TestConstants" => TestConstants
+      case "SlowMiningConstants" => SlowMiningConstants
+      case _ => TestNetConstants
     }
   }
 
