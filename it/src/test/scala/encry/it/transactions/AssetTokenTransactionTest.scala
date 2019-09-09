@@ -131,7 +131,8 @@ class AssetTokenTransactionTest extends AsyncFunSuite
           .get
 
         val supplyAtHeight: Long = (0 to thirdHeightToWait).foldLeft(0: Long) {
-          case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+          case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, constants.InitialEmissionAmount,
+            constants.EmissionEpochLength, constants.EmissionDecay)
         }
 
         val ckeckEncryBalanceNew: Boolean = Await.result(dockerNodes().head.balances, waitTime)

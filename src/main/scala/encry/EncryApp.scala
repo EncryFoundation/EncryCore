@@ -8,7 +8,6 @@ import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream.ActorMaterializer
-import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.{ApiRoute, CompositeHttpService, DataHolderForApi}
 import encry.api.http.routes._
@@ -38,7 +37,7 @@ object EncryApp extends App with StrictLogging {
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(args)
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(if(Option(args).nonEmpty) Option(args).get.headOption else None)
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
@@ -50,7 +49,7 @@ object EncryApp extends App with StrictLogging {
 
   lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
 
-  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
+  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef, settings), "miner")
   lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner, influxRef)
     .withDispatcher("mempool-dispatcher"))
    val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
@@ -67,7 +66,7 @@ object EncryApp extends App with StrictLogging {
   }
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
-    system.actorOf(Props[ConsoleListener], "cliListener")
+    system.actorOf(ConsoleListener.props(settings), "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
 

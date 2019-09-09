@@ -13,7 +13,7 @@ import encry.view.state.{BoxHolder, UtxoState}
 import encryBenchmark.Settings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
-import org.encryfoundation.common.utils.TaggedTypes.Difficulty
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty}
 import org.openjdk.jmh.annotations.{Benchmark, Mode, Scope, State}
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
@@ -81,12 +81,13 @@ object StateRollbackBench {
           val nextBlockMainChain: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
             block,
             stateL,
-            block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq
-          )
+            block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq,
+            settings.constants.IntrinsicTokenId)
           val nextBlockFork: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
             block,
             stateL,
             block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq,
+            settings.constants.IntrinsicTokenId,
             addDiff = Difficulty @@ BigInt(100)
           )
           val stateN: UtxoState = stateL.applyModifier(nextBlockMainChain).right.get

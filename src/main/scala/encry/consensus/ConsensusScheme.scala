@@ -2,7 +2,8 @@ package encry.consensus
 
 import encry.crypto.equihash.EquihashValidationErrors
 import org.encryfoundation.common.modifiers.history.{Block, Header}
-import org.encryfoundation.common.utils.TaggedTypes.Difficulty
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
+
 import scala.math.BigInt
 
 trait ConsensusScheme {

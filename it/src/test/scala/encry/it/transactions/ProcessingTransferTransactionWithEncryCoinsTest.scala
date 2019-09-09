@@ -14,12 +14,11 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import encry.EncryApp.settings.constants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
-
+import encry.EncryApp.settings.constants
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
@@ -45,7 +44,8 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     val waitTime: FiniteDuration = 30.minutes
 
     val supplyAtHeight: Long = (0 to secondHeightToWait).foldLeft(0: Long) {
-      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, constants.InitialEmissionAmount,
+        constants.EmissionEpochLength, constants.EmissionDecay)
     }
 
     Await.result(dockerNodes().head.waitForHeadersHeight(firstHeightToWait), waitTime)

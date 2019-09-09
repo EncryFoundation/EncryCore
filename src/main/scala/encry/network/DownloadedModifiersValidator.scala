@@ -35,7 +35,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
       filteredModifiers.foreach { case (id, bytes) =>
         ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
-          case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
+          case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier, settings.constants.ModifierIdSize) =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))

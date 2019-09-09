@@ -1,16 +1,16 @@
 package encry.modifiers.history
 
 import org.encryfoundation.common.modifiers.history.Payload
-import encry.EncryApp.settings.constants
+
 import org.encryfoundation.common.validation.{ModifierValidator, ValidationResult}
 
 object PayloadUtils {
 
   //todo add payload size validation
-  def syntacticallyValidity(payload: Payload): ValidationResult = ModifierValidator.accumulateErrors
+  def syntacticallyValidity(payload: Payload, modifierIdSize: Int): ValidationResult = ModifierValidator.accumulateErrors
     .demand(payload.modifierTypeId == Payload.modifierTypeId,
       s"Modifier's type id should be ${Payload.modifierTypeId}")
-    .demand(payload.headerId.size == constants.ModifierIdSize,
-      s"Modifier's id should be ${constants.ModifierIdSize} bytes")
+    .demand(payload.headerId.size == modifierIdSize,
+      s"Modifier's id should be $modifierIdSize bytes")
     .result
 }

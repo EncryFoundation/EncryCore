@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings}
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -26,6 +26,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
 import encry.EncryApp.settings.constants
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
@@ -113,8 +114,10 @@ object Utils extends StrictLogging {
   def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
                                                             state: UtxoState,
                                                             box: Seq[AssetBox],
+                                                            intrinsicTokenId: ADKey,
                                                             splitCoef: Int = 2,
-                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)
+                                                            ): Block = {
 
     val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
       case ((boxes, transactionsL), _) =>
@@ -196,6 +199,7 @@ object Utils extends StrictLogging {
       storage,
       constants.PreGenesisHeight,
       0L,
+      settings.constants
     )
   }
 

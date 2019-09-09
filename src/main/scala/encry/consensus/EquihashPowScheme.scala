@@ -2,18 +2,19 @@ package encry.consensus
 
 import com.google.common.primitives.Chars
 import encry.crypto.equihash.{Equihash, EquihashValidationErrors}
-import encry.EncryApp.settings.constants
 import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import scorex.crypto.hash.Digest32
+
 import scala.math.BigInt
 import cats.syntax.either._
 import encry.crypto.equihash.EquihashValidationErrors._
 
-case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
+case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: Height, maxTarget: BigInt)
+  extends ConsensusScheme {
 
   private val seed: Array[Byte] =
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
@@ -21,10 +22,9 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
   override def verifyCandidate(candidateBlock: CandidateBlock,
                                startingNonce: Long): Either[EquihashValidationErrors, Block] = {
     val difficulty = candidateBlock.difficulty
-    val version: Byte = constants.Version
     val parentId: ModifierId = candidateBlock.parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val txsRoot: Digest32 = Payload.rootHash(candidateBlock.transactions.map(_.id))
-    val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(constants.PreGenesisHeight) + 1
+    val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(preGenesisHeight) + 1
     val bytesPerWord: Int = n / 8
     val wordsPerHash: Int = 512 / n
     val digest: Blake2bDigest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
@@ -61,7 +61,7 @@ case class EquihashPowScheme(n: Char, k: Char) extends ConsensusScheme {
     .validateSolution(n, k, seed, Equihash.nonceToLeBytes(header.nonce), header.equihashSolution.indexedSeq)
 
   override def realDifficulty(header: Header): Difficulty =
-    Difficulty @@ (constants.MaxTarget / BigInt(1, header.powHash))
+    Difficulty @@ (maxTarget / BigInt(1, header.powHash))
 
   override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"
 }

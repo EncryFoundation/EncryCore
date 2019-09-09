@@ -1,6 +1,5 @@
 package encry.utils
 
-import encry.EncryApp.settings.constants
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
@@ -8,10 +7,11 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, T
 object BalanceCalculator {
 
   def balanceSheet(bxs: Traversable[EncryBaseBox],
+                   defaultTokenId: TokenId,
                    excludeTokenIssuance: Boolean = false): Map[TokenId, Amount] =
     bxs.foldLeft(Map.empty[ByteStr, Amount]) {
       case (cache, bx: AssetBox) =>
-        val tokenId: ByteStr = ByteStr(bx.tokenIdOpt.getOrElse(constants.IntrinsicTokenId))
+        val tokenId: ByteStr = ByteStr(bx.tokenIdOpt.getOrElse(defaultTokenId))
         cache.get(tokenId).map { amount =>
           cache.updated(tokenId, amount + bx.amount)
         }.getOrElse(cache.updated(tokenId, bx.amount))

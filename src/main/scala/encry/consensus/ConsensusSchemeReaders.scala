@@ -1,8 +1,8 @@
 package encry.consensus
 
-import encry.EncryApp.settings.constants
+import encry.settings.ConstantsSettings
 
-object ConsensusSchemeReaders {
+object ConsensusSchemeReaders extends ConstantsSettings {
 
   val consensusScheme: ConsensusScheme = {
     val schemeName = constants.ConsensusScheme
@@ -17,13 +17,11 @@ sealed trait ConsensusSchemeReader[T <: ConsensusScheme] {
   def read: T
 }
 
-object EquihashPowSchemeReader extends ConsensusSchemeReader[EquihashPowScheme] {
+object EquihashPowSchemeReader extends ConsensusSchemeReader[EquihashPowScheme] with ConstantsSettings {
 
   val schemeName = "equihash"
 
   def read: EquihashPowScheme = {
-    val n = constants.n
-    val k = constants.k
-    EquihashPowScheme(n, k)
+    EquihashPowScheme(constants.n, constants.k, constants.Version, constants.PreGenesisHeight, constants.MaxTarget)
   }
 }

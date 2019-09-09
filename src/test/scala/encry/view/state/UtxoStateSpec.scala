@@ -61,6 +61,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       storage,
       settings.constants.PreGenesisHeight,
       0L,
+      settings.constants
     )
   }
 

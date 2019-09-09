@@ -18,7 +18,8 @@ class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerat
 
   property("testSupplyAt") {
 
-    val epochSupply = (0 until blocksPerYear * epochLen).map(h => EncrySupplyController.supplyAt(Height @@ h))
+    val epochSupply = (0 until blocksPerYear * epochLen).map(h => EncrySupplyController.supplyAt(Height @@ h,
+      constants.InitialEmissionAmount, constants.EmissionEpochLength, constants.EmissionDecay))
 
     val atEndEpochSupply = epochSupply.last
 

@@ -46,7 +46,9 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
           s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
             s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}", //++
           s"supply,nodeName=$nodeName,height=${fb.height} " +
-            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}" //++
+            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height],
+              settings.constants.InitialEmissionAmount, settings.constants.EmissionEpochLength,
+              settings.constants.EmissionDecay)}" //++
         ))
 
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>

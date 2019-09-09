@@ -29,7 +29,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
-  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
+  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
   private var isHeadersChainSyncedVar: Boolean = false
 
@@ -176,7 +176,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   }
 
   def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
-    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
+    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1),
+      settings.constants.EpochLength, settings.constants.RetargetingEpochsQty)
     for {
       _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
         HistoryApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
@@ -186,7 +187,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
         .filter(p => requiredHeights.contains(p._1))
       _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
         HistoryApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
-    } yield PowLinearController.getDifficulty(requiredHeaders)
+    } yield PowLinearController.getDifficulty(requiredHeaders, settings.constants.EpochLength,
+      settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
   }
 
   def syncInfo: SyncInfo =

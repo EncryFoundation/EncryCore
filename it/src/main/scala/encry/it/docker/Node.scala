@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings
 import encry.it.api.HttpApi
 import encry.it.util.KeyHelper.createPrivKey
 import encry.settings.EncryAppSettings
