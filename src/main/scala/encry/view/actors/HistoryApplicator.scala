@@ -22,6 +22,7 @@ import scala.collection.{IndexedSeq, immutable, mutable}
 class HistoryApplicator(history: History, setting: EncryAppSettings) extends Actor with StrictLogging {
 
   final case class QueueElement(modifier: PersistentModifier, progressInfo: ProgressInfo)
+
   var modifiersQueue: Queue[QueueElement] = Queue.empty[QueueElement]
   var currentQueueLength: Int = 0
 
@@ -29,7 +30,6 @@ class HistoryApplicator(history: History, setting: EncryAppSettings) extends Act
   var headersCache: HashMap[String, Header] = HashMap.empty[String, Header]
 
   var modifiersCache: HashMap[String, PersistentModifier] = HashMap.empty[String, PersistentModifier]
-
 
 
   override def receive: Receive = modifiersFromNetwork
@@ -55,7 +55,8 @@ class HistoryApplicator(history: History, setting: EncryAppSettings) extends Act
         val modifierForApplying: Option[PersistentModifier] = modifiersCache.find { case (_, v) => v match {
           case v@(_: Header) if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
           case v => history.testApplicable(v).isRight
-        }}.map(_._2)
+        }
+        }.map(_._2)
         //lotts side effects
         modifierForApplying.foreach { modL =>
           self ! ModifierForHistoryApplicator(modL)
@@ -96,9 +97,11 @@ class HistoryApplicator(history: History, setting: EncryAppSettings) extends Act
 object HistoryApplicator {
 
   final case class ModifierFromNetwork(mod: PersistentModifier) extends AnyVal
+
   final case class ModifierForHistoryApplicator(modifier: PersistentModifier) extends AnyVal
-  final case class ModifierForStateApplicator(progressInfo: ProgressInfo,
-                                              suffixApplied: Seq[PersistentModifier])
+
+  final case class StartModifiersApplicationOnStateApplicator(progressInfo: ProgressInfo,
+                                                              suffixApplied: Seq[PersistentModifier])
 
   def props(history: History, setting: EncryAppSettings): Props = Props(new HistoryApplicator(history, setting))
 }

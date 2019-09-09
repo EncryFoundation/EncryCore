@@ -1,26 +1,30 @@
 package encry.view.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Kill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.consensus.EncrySupplyController
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{RollbackFailed, RollbackSucceed, SemanticallyFailedModification, SemanticallySuccessfulModifier}
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.TransactionsInBlock
+import encry.storage.VersionalStorage.StorageVersion
 import encry.utils.CoreTaggedTypes
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.implicits.UTXO._
 import encry.view.NodeViewHolder.UpdateInformation
-import encry.view.actors.HistoryApplicator.ModifierForStateApplicator
-import encry.view.actors.StateApplicator.{IterateNextModifier, ModifierForStateAppliedSuccessfully, ModifierValidatedSuccessfully, StartTransactionsValidationForState}
+import encry.view.actors.HistoryApplicator.StartModifiersApplicationOnStateApplicator
+import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
 import encry.view.history.History
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.TaggedTypes
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
-import supertagged.@@
+import cats.syntax.option._
 
 import scala.collection.IndexedSeq
 import scala.collection.immutable.HashMap
@@ -31,28 +35,110 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
 
   var validatorsQueue: HashMap[String, ActorRef] = HashMap.empty[String, ActorRef]
 
-  var toApplyUi: (Seq[PersistentModifier], UpdateInformation) =
-    (Seq.empty, UpdateInformation(history, state, None, None, IndexedSeq.empty))
+  var validatedTxs: List[Transaction] = List.empty
+
+  var infoAboutCurrentFoldIteration: (Seq[PersistentModifier], UpdateInformation, Option[Block]) =
+    (Seq.empty, UpdateInformation(history, state, None, None, IndexedSeq.empty), None)
 
   //todo add supervisor strategy
 
-  override def receive: Receive = {
-    case ModifierForStateApplicator(progressInfo, suffixApplied) =>
-      //separate here for headers and blocks validation
+  def modifierApplication(toApply: List[PersistentModifier], updateInformation: UpdateInformation): Receive = {
+    case StartModifiersApplying if updateInformation.failedMod.isEmpty => toApply.headOption.foreach {
+      case header: Header =>
+        val newState: UtxoState = state.copy(height = Height @@ header.height, lastBlockTimestamp = header.timestamp)
+        val newHistory: History = history.reportModifierIsValid(header)
+        context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
+        val newToApply: List[PersistentModifier] = toApply.drop(1)
+        if (newToApply.nonEmpty) {
+          logger.info(s"Header ${header.encodedId} in receive modifierApplication applied successfully." +
+            s"Starting new modifier application.")
+          self ! StartModifiersApplying
+          context.become(modifierApplication(
+            newToApply,
+            UpdateInformation(newHistory, newState, none, none, updateInformation.suffix :+ header)
+          ))
+        } else {
+          logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
+          self ! ModifiersApplicationFinished
+          context.become(modifiersApplicationCompleted(
+            UpdateInformation(newHistory, newState, none, none, updateInformation.suffix :+ header)
+          ))
+        }
+      case block: Block =>
+        val lastTxId: ModifierId = block.payload.txs.last.id
+        val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
+        val height: Height = Height @@ block.header.height
+        block.payload.txs.foreach {
+          case tx if tx.id sameElements lastTxId =>
+            val txValidator: ActorRef = context.actorOf(
+              TransactionsValidator.props(state, 0L, tx, height),
+              s"validatorFor:${tx.encodedId}"
+            )
+            validatorsQueue = validatorsQueue.updated(tx.encodedId, txValidator)
+          case tx =>
+            val txValidator: ActorRef = context.actorOf(
+              TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(height), tx, height),
+              s"validatorFor:${tx.encodedId}"
+            )
+            validatorsQueue = validatorsQueue.updated(tx.encodedId, txValidator)
+        }
+        infoAboutCurrentFoldIteration = (
+          toApply,
+          updateInformation,
+          block.some
+        )
+        context.become(awaitingTransactionsValidation)
+    }
+    case StartModifiersApplying => //todo redundant iterations while updateInformation.failedMod.nonEmpty
+      self ! StartModifiersApplying
+      context.become(modifierApplication(toApply.drop(1), updateInformation))
+    case _ =>
+  }
 
-      //create N validators for each transaction in modifier
+  def modifiersApplicationCompleted(ui: UpdateInformation): Receive = {
+    case ModifiersApplicationFinished => ui.failedMod match {
+      case Some(_) =>
+        self ! StartModifiersApplicationOnStateApplicator(ui.alternativeProgressInfo.get, ui.suffix)
+        context.become(updateState)
+      case None =>
+        //todo send to history request for the next block
+    }
+  }
 
-      //await finishing all validators
+  def awaitingTransactionsValidation: Receive = {
+    case TransactionValidatedSuccessfully(tx) =>
+      validatorsQueue = validatorsQueue - tx.encodedId
+      validatedTxs = tx :: validatedTxs
+      if (validatorsQueue.isEmpty) {
+        val combinedStateChange = combineAll(validatedTxs.map(UtxoState.tx2StateChange))
+        infoAboutCurrentFoldIteration._3.foreach { block =>
+          state.storage.insert(
+            StorageVersion !@@ block.id,
+            combinedStateChange.outputsToDb.toList,
+            combinedStateChange.inputsToDb.toList
+          )
+          state = UtxoState(
+            state.storage,
+            Height @@ block.header.height,
+            block.header.timestamp
+          )
+          self ! StartApplyingModifiersForState(infoAboutCurrentFoldIteration._1, infoAboutCurrentFoldIteration._2)
+        }
+      }
+    case TransactionValidatedFailure(_, _) =>
+      context.children.foreach(_ ! Kill) //P_Pill
+  }
 
-      //sent request to HistoryApplicator for next modifier
-
+  def updateState: Receive = {
+    case StartModifiersApplicationOnStateApplicator(progressInfo, suffixApplied) =>
       val branchPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
       val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]) =
-        if (progressInfo.chainSwitchingNeeded) branchPointOpt.map(branchPoint =>
-          if (!state.version.sameElements(branchPoint))
-            state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied.toIndexedSeq, ModifierId !@@ branchPoint)
-          else Success(state) -> IndexedSeq.empty[PersistentModifier]
-        ).getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
+        if (progressInfo.chainSwitchingNeeded) branchPointOpt
+          .map(branchPoint =>
+            if (!state.version.sameElements(branchPoint))
+              state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied.toIndexedSeq, ModifierId !@@ branchPoint)
+            else Success(state) -> IndexedSeq.empty[PersistentModifier]
+          ).getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
         else Success(state) -> suffixApplied
       stateToApplyTry match {
         case Failure(exception) =>
@@ -60,112 +146,15 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
           EncryApp.forceStopApplication(500, s"Rollback failed: $exception")
         case Success(stateToApply) =>
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
-          val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
-          self ! StartTransactionsValidationForState(progressInfo.toApply, u0)
+          self ! StartModifiersApplying
+          context.become(modifierApplication(
+            progressInfo.toApply.toList,
+            UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
+          ))
       }
-
-    case StartTransactionsValidationForState(toApply, ui) if toApply.nonEmpty =>
-      if (ui.failedMod.isEmpty) toApply.headOption.foreach {
-        case block: Block =>
-          val lastTxId = block.payload.txs.last.id
-          val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-          block.payload.txs.foreach { tx =>
-            if (tx.id sameElements lastTxId) {
-              val txValidator: ActorRef = context.actorOf(
-                TransactionsValidator.props(state, 0L, tx, Height @@ block.header.height),
-                s"validatorFor:${tx.encodedId}"
-              )
-              validatorsQueue = validatorsQueue.updated(tx.encodedId, txValidator)
-            } else {
-              val txValidator: ActorRef = context.actorOf(
-                TransactionsValidator
-                  .props(state, totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height), tx, Height @@ block.header.height),
-                s"validatorFor:${tx.encodedId}"
-              )
-              validatorsQueue = validatorsQueue.updated(tx.encodedId, txValidator)
-            }
-          }
-          toApplyUi = (toApply, ui)
-        case _ => //todo add later
-      }
-
-    case TransactionValidatedSuccessfully(tx) =>
-      validatorsQueue = validatorsQueue - tx.encodedId
-      if (validatorsQueue.isEmpty) self ! IterateNextModifier
-
-    case IterateNextModifier =>
-
-    case TransactionValidatedFailure(tx, ex) =>
-
-    case ModifierValidatedSuccessfully =>
-    //historyRef ! RequestNextModifier
-
-    case ModifierForStateAppliedSuccessfully(ui, lastsToApply) if lastsToApply.nonEmpty =>
-      //check for empty
-      lastsToApply.headOption.foreach { mod =>
-        state.applyModifier(mod) match {
-          case Left(value) =>
-            val j = history.reportModifierIsInvalid(mod)
-            context.system.eventStream.publish(SemanticallyFailedModification(mod, value))
-            self ! ModifierForStateAppliedSuccessfully(
-              UpdateInformation(j._1, ui.state, Some(mod), Some(j._2), ui.suffix),
-              lastsToApply.drop(1)
-            )
-          case Right(value) =>
-            val newHistory = history.reportModifierIsValid(mod)
-            context.system.eventStream.publish(SemanticallySuccessfulModifier(mod))
-            self ! ModifierForStateAppliedSuccessfully(
-              UpdateInformation(newHistory, value, None, None, ui.suffix :+ mod),
-              lastsToApply.drop(1)
-            )
-        }
-      }
-    case ModifierForStateAppliedSuccessfully(ui, _) =>
-      ui.failedMod match {
-        case Some(_) => //self ! //message
-        case None => //history ! requestnextmod
-      }
-
-    case _ =>
   }
 
-  def applyToState(progressInfo: ProgressInfo,
-                   suffixApplied: Seq[PersistentModifier]): Unit = {
-    val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
-    val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
-      if (progressInfo.chainSwitchingNeeded) {
-        branchingPointOpt.map { branchPoint =>
-          if (!state.version.sameElements(branchPoint))
-            state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied.toIndexedSeq, ModifierId !@@ branchPoint)
-          else Success(state) -> IndexedSeq()
-        }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
-      } else Success(state) -> suffixApplied
-    stateToApplyTry match {
-      case Failure(exception) =>
-        context.system.eventStream.publish(RollbackFailed(branchingPointOpt))
-        EncryApp.forceStopApplication(500, s"Rollback failed: $exception")
-      case Success(value) =>
-        val u0: UpdateInformation = UpdateInformation(history, value, None, None, suffixTrimmed)
-        progressInfo.toApply.headOption.foreach { firstMod =>
-          value.applyModifier(firstMod) match {
-            case Left(v) =>
-              val j = history.reportModifierIsInvalid(firstMod)
-              context.system.eventStream.publish(SemanticallyFailedModification(firstMod, v))
-              self ! ModifierForStateAppliedSuccessfully(
-                UpdateInformation(j._1, u0.state, Some(firstMod), Some(j._2), u0.suffix),
-                progressInfo.toApply.drop(1)
-              )
-            case Right(state1) =>
-              val newHistory = history.reportModifierIsValid(firstMod)
-              context.system.eventStream.publish(SemanticallySuccessfulModifier(firstMod))
-              self ! ModifierForStateAppliedSuccessfully(
-                UpdateInformation(newHistory, state1, None, None, u0.suffix :+ firstMod),
-                progressInfo.toApply.drop(1)
-              )
-          }
-        }
-    }
-  }
+  override def receive: Receive = updateState
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
   IndexedSeq[PersistentModifier] = {
@@ -176,10 +165,14 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
 
 object StateApplicator {
 
-  case object IterateNextModifier
+  case object StartModifiersApplying
 
-  final case class StartTransactionsValidationForState(modifiersToApply: Seq[PersistentModifier],
-                                                       accumulatedUpdateInformation: UpdateInformation)
+  case object ModifiersApplicationFinished
+
+  case object ValidationFinished
+
+  final case class StartApplyingModifiersForState(modifiersToApply: Seq[PersistentModifier],
+                                                  accumulatedUpdateInformation: UpdateInformation)
 
 
   final case class ModifierForStateAppliedSuccessfully(accumulatedUpdateInformation: UpdateInformation,

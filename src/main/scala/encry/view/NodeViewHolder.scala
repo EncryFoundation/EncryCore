@@ -161,11 +161,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                           progressInfo: ProgressInfo,
                           suffixApplied: IndexedSeq[PersistentModifier]):
   (History, UtxoState, Seq[PersistentModifier]) = {
-    logger.debug(s"\nStarting updating state in updateState function!")
-    progressInfo.toApply.foreach {
-      case header: Header => requestDownloads(progressInfo, Some(header.id))
-      case _ => requestDownloads(progressInfo, None)
-    }
+//    logger.debug(s"\nStarting updating state in updateState function!")
+//    progressInfo.toApply.foreach {
+//      case header: Header => requestDownloads(progressInfo, Some(header.id))
+//      case _ => requestDownloads(progressInfo, None)
+//    }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
@@ -240,7 +240,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               }
               if (isBlock) ref ! ModifierAppendedToState(success = true)
             }
-            sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
+            sendUpdatedInfoTo MemoryPool(progressInfo.toRemove)
             if (progressInfo.chainSwitchingNeeded)
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
