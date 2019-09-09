@@ -125,9 +125,8 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
-      val txs: Seq[Transaction] = mod.payload.txs.dropRight(1)
+      transactionsPool = transactionsPool ++ mod.payload.txs.dropRight(1)
         .diff(candidateOpt.map(_.transactions.dropRight(1)).getOrElse(IndexedSeq.empty))
-      if (txs.nonEmpty) transactionsPool = transactionsPool ++ txs
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
@@ -239,13 +238,13 @@ object Miner {
 
   case class MinerStatus(isMining: Boolean, candidateBlock: Option[CandidateBlock]) {
     lazy val json: Json = Map(
-      "isMining" -> isMining.asJson,
+      "isMining"       -> isMining.asJson,
       "candidateBlock" -> candidateBlock.map(_.asJson).getOrElse("None".asJson)
     ).asJson
   }
 
   implicit val jsonEncoder: Encoder[MinerStatus] = (r: MinerStatus) => Map(
-    "isMining" -> r.isMining.asJson,
+    "isMining"       -> r.isMining.asJson,
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 
