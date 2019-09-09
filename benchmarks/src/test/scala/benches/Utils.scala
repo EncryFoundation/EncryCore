@@ -25,7 +25,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
-import encry.settings.EncryAppSettings.settings.constants
+import encry.EncryApp.settings.constants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}

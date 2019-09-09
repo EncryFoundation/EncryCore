@@ -1,6 +1,6 @@
 package encry.consensus
 
-import encry.settings.EncryAppSettings.settings.constants
+import encry.EncryApp.settings.constants
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import supertagged.@@

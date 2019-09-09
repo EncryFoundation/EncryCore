@@ -2,8 +2,10 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.view.history.History
 import encryBenchmark.Settings
@@ -62,7 +64,7 @@ object HistoryBenches {
   @State(Scope.Benchmark)
   class HistoryBenchState {
 
-    val settings: EncryAppSettings = EncryAppSettings.settings
+    val settings: EncryAppSettings = EncryApp.settings
     val tmpDir: File = getRandomTempDir
     val initialHistory: History = generateHistory(settings, tmpDir)
 

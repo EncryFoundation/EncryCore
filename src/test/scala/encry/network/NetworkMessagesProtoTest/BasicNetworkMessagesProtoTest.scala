@@ -4,6 +4,7 @@ import java.net.InetSocketAddress
 
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
+import encry.EncryApp
 import encry.modifiers.InstanceFactory
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -17,7 +18,7 @@ import scala.util.Try
 
 class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory {
 
-  val settings: EncryAppSettings = EncryAppSettings.settings
+  val settings: EncryAppSettings = EncryApp.settings
   val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
     case ((prevHistory, blocks), _) =>
       val block: Block = generateNextBlock(prevHistory)

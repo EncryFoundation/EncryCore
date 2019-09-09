@@ -31,7 +31,6 @@ import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
-import net.ceedubs.ficus.Ficus._
 
 object EncryApp extends App with StrictLogging {
 
@@ -39,9 +38,7 @@ object EncryApp extends App with StrictLogging {
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  val cmdArgs:Array[String] = args
-
-  private lazy val settings: EncryAppSettings = EncryAppSettings.settings
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(args)
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")

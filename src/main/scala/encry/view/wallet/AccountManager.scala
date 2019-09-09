@@ -16,7 +16,7 @@ case class AccountManager(store: Store) extends StrictLogging {
 
   import encry.storage.EncryStorage._
 
-  val settings: EncryAppSettings = EncryAppSettings.settings
+  val settings: EncryAppSettings = EncryApp.settings
 
   lazy val mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>

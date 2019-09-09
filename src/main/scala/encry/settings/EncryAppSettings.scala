@@ -32,9 +32,9 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 
   val configPath: String = "encry"
 
-  lazy val settings: EncryAppSettings =
-    if (Option(EncryApp.cmdArgs).nonEmpty && EncryApp.cmdArgs.headOption.nonEmpty)
-      EncryAppSettings.read(EncryApp.cmdArgs.headOption)
+  def read(args: Array[String]): EncryAppSettings =
+    if (Option(args).nonEmpty && args.headOption.nonEmpty)
+      fromConfig(readConfigFromPath(args.headOption))
     else
       ConfigFactory.load("local.conf")
         .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)
@@ -62,8 +62,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
           .resolve()
     }
   }
-
-  def read(userConfigPath: Option[String]): EncryAppSettings = fromConfig(readConfigFromPath(userConfigPath))
 
   val allConfig: Config = ConfigFactory.load("local.conf")
     .withFallback(ConfigFactory.load())

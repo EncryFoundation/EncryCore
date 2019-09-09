@@ -4,7 +4,7 @@ import encry.view.history.ValidationError.FatalValidationError._
 import encry.view.history.ValidationError.NonFatalValidationError._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import encry.settings.EncryAppSettings.settings.constants
+import encry.EncryApp.settings.constants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
 import encry.consensus.EquihashPowScheme

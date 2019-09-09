@@ -9,7 +9,7 @@ import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.timeProvider
-import encry.settings.EncryAppSettings.settings
+import encry.EncryApp.settings
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}

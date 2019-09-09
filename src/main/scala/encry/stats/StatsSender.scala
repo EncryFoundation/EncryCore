@@ -7,7 +7,7 @@ import java.text.SimpleDateFormat
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.timeProvider
-import encry.settings.EncryAppSettings.settings
+import encry.EncryApp.settings
 import encry.consensus.EncrySupplyController
 import encry.settings.InfluxDBSettings
 import encry.stats.StatsSender._

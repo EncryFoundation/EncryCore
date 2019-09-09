@@ -21,7 +21,7 @@ import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
-import encry.settings.EncryAppSettings.settings.constants
+import encry.EncryApp.settings.constants
 
 import scala.util.{Random => Scarand}
 

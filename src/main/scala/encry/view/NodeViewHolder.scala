@@ -8,7 +8,7 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.settings.EncryAppSettings.settings
+import encry.EncryApp.settings
 import encry.EncryApp.{miner, nodeViewSynchronizer, timeProvider}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced

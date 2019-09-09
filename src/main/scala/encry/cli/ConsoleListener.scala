@@ -1,7 +1,7 @@
 package encry.cli
 
 import akka.actor.Actor
-import encry.settings.EncryAppSettings.settings
+import encry.EncryApp.settings
 import encry.cli.commands._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}

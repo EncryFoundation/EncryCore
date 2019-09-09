@@ -2,9 +2,11 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
 import benches.Utils._
+import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.IODB
@@ -66,7 +68,7 @@ object StateBenches {
   @State(Scope.Benchmark)
   class StateBenchState {
 
-    val settings: EncryAppSettings = EncryAppSettings.settings
+    val settings: EncryAppSettings = EncryApp.settings
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>

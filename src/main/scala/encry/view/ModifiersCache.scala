@@ -1,7 +1,7 @@
 package encry.view
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.EncryAppSettings.settings
+import encry.EncryApp.settings
 import encry.view.history.History
 import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier

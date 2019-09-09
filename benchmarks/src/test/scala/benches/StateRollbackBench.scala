@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import benches.StateRollbackBench.StateRollbackState
 import benches.Utils._
+import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -62,7 +63,7 @@ object StateRollbackBench {
   @State(Scope.Benchmark)
   class StateRollbackState {
 
-    val settings: EncryAppSettings = EncryAppSettings.settings
+    val settings: EncryAppSettings = EncryApp.settings
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>

@@ -2,7 +2,7 @@ package encry.modifiers.history
 
 import encry.settings.TestConstants
 import org.encryfoundation.common.modifiers.history.Header
-import encry.settings.EncryAppSettings.settings.constants
+import encry.EncryApp.settings.constants
 import org.encryfoundation.common.validation.{ModifierValidator, ValidationResult}
 
 object HeaderUtils {
