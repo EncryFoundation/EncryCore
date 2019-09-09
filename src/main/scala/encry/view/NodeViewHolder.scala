@@ -214,7 +214,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         .actorSelection("user/statsSender") !
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
-        case Right((historyBeforeStUpdate, progressInfo)) =>
+        case Right(progressInfo) =>
           logger.debug(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
           logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
           influxRef.foreach { ref =>
