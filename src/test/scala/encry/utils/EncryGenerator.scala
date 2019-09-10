@@ -1,7 +1,7 @@
 package encry.utils
 
 import encry.modifiers.mempool.TransactionFactory
-import encry.EncryApp.settings.constants
+import encry.settings.ConstantsSettings
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -19,7 +19,7 @@ import scorex.utils.Random
 
 import scala.util.{Random => ScRand}
 
-trait EncryGenerator {
+trait EncryGenerator extends ConstantsSettings {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))

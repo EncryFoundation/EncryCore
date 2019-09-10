@@ -1,18 +1,17 @@
 package encry.modifiers.history
 
 import encry.modifiers.mempool.TransactionFactory
+import encry.settings.ConstantsSettings
 import encry.utils.{EncryGenerator, TestHelper}
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
-import encry.EncryApp.settings.constants
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
-import encry.EncryApp.settings.constants
 
-class BlockSerializerTest extends FunSuite with EncryGenerator {
+class BlockSerializerTest extends FunSuite with EncryGenerator with ConstantsSettings {
 
   test("testToBytes $ testFromBytes") {
 

@@ -1,12 +1,12 @@
 package encry.consensus
 
-import encry.EncryApp.settings.constants
+import encry.settings.ConstantsSettings
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
-import encry.EncryApp.settings.constants
+
 import scala.collection.immutable
 
-class PowLinearControllerSpec extends PropSpec with Matchers {
+class PowLinearControllerSpec extends PropSpec with Matchers with ConstantsSettings {
 
   property("getHeightsForRetargetingAt()") {
 

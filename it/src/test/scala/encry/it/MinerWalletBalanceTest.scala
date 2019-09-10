@@ -4,14 +4,15 @@ import com.typesafe.config.Config
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
+import encry.settings.ConstantsSettings
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{AsyncFunSuite, Matchers}
-import encry.EncryApp.settings.constants
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-class MinerWalletBalanceTest extends AsyncFunSuite with Matchers with NodesFromDocker {
+class MinerWalletBalanceTest extends AsyncFunSuite with Matchers with NodesFromDocker with ConstantsSettings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
     .withFallback(Configs.offlineGeneration(true))

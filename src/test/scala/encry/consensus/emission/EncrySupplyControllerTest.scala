@@ -1,14 +1,14 @@
 package encry.consensus.emission
 
 import encry.consensus.EncrySupplyController
+import encry.settings.ConstantsSettings
 import encry.utils.EncryGenerator
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{Matchers, PropSpec}
-import encry.EncryApp.settings.constants
 
 import scala.concurrent.duration._
 
-class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerator {
+class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerator with ConstantsSettings {
 
   val epochLen = 10
 

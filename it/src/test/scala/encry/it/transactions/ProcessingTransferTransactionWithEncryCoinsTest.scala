@@ -7,6 +7,7 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
+import encry.settings.ConstantsSettings
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
@@ -18,15 +19,16 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
 import scorex.utils.Random
-import encry.EncryApp.settings.constants
-import scala.concurrent.{Await, Future}
+
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 
 class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
   with Matchers
   with ScalaFutures
   with StrictLogging
-  with NodesFromDocker {
+  with NodesFromDocker
+  with ConstantsSettings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
     .withFallback(Configs.offlineGeneration(true))

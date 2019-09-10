@@ -7,7 +7,7 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
 import encry.consensus.EquihashPowScheme
-import encry.settings.{ConstantsSettings}
+import encry.settings.ConstantsSettings
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 
 trait HistoryModifiersValidator extends HistoryApi with ConstantsSettings {

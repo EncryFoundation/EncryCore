@@ -15,7 +15,7 @@ class ModifiersValidationTest extends WordSpecLike
   "Modifiers validator" should {
     "validate genesis block" in {
       val newHistory: History = generateDummyHistory(mainTestSettings)
-      val genesisBlock: Block = generateGenesisBlock
+      val genesisBlock: Block = generateGenesisBlock(mainTestSettings.constants.GenesisHeight)
       newHistory.testApplicable(genesisBlock.header).isRight shouldBe true
       val updatedHistory: History =
         newHistory.append(genesisBlock.header).right.get._1.reportModifierIsValid(genesisBlock.header)

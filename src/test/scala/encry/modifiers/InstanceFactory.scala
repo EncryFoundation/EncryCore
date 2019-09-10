@@ -21,7 +21,6 @@ import org.encryfoundation.prismlang.core.{Ast, Types}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
-import encry.EncryApp.settings.constants
 
 import scala.util.{Random => Scarand}
 
@@ -47,12 +46,12 @@ trait InstanceFactory extends Keys with EncryGenerator {
       publicKey.address.address, genHelper.Props.txAmount)
   }
 
-  def generateGenesisBlock: Block = {
+  def generateGenesisBlock(genesisHeight: Height): Block = {
     val txs: Seq[Transaction] = Seq(coinbaseTransaction)
     val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
-      height = constants.GenesisHeight,
+      height = genesisHeight,
       transactionsRoot = txsRoot
     )
     Block(header, Payload(header.id, Seq(coinbaseTransaction)))
@@ -124,11 +123,11 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
   lazy val UnsignedInput: Input = Input(ADKey @@ Random.randomBytes(), Left(Contract), List.empty)
 
-  def generateFakeChain(blocksQty: Int): Seq[Block] = {
+  def generateFakeChain(blocksQty: Int, genesisHeight: Height): Seq[Block] = {
     val srand = new Scarand()
     (0 until blocksQty).foldLeft(Seq.empty[Block], Seq.empty[AssetBox]) {
       case ((fakeBlockchain, utxo), blockHeight) =>
-        val block = if (fakeBlockchain.isEmpty) generateGenesisBlock else {
+        val block = if (fakeBlockchain.isEmpty) generateGenesisBlock(genesisHeight) else {
           val addr = randomAddress
           val txs =
             utxo.map(box => genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(box), addr)) ++
@@ -152,7 +151,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
-      .getOrElse(constants.InitialDifficulty)
+      .getOrElse(history.settings.constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseTransaction)
     val header = genHeader.copy(

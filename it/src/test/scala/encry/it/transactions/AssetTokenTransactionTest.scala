@@ -7,6 +7,7 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
+import encry.settings.ConstantsSettings
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
@@ -15,7 +16,6 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import encry.EncryApp.settings.constants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
@@ -28,7 +28,8 @@ class AssetTokenTransactionTest extends AsyncFunSuite
   with Matchers
   with ScalaFutures
   with StrictLogging
-  with NodesFromDocker {
+  with NodesFromDocker
+  with ConstantsSettings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
     .withFallback(Configs.offlineGeneration(true))
