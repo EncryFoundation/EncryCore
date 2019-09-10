@@ -3,7 +3,7 @@ package encry.view.wallet
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.modifiers.InstanceFactory
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.{EncryAppSettings, LevelDBSettings, Settings}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -12,9 +12,7 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{Matchers, PropSpec}
 
-class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging {
-
-  lazy val settings: EncryAppSettings = EncryApp.settings
+class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging with Settings {
 
   val dummyLevelDBSettings = LevelDBSettings(5)
 

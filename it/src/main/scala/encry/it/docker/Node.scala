@@ -6,7 +6,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.api.HttpApi
 import encry.it.util.KeyHelper.createPrivKey
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 
@@ -17,9 +17,8 @@ case class Node(config: Config,
                 containerId: String,
                 nodeIp: String,
                 nodePort: Int,
-                client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
+                client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi with Settings {
 
-  val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
   val privKey: PrivateKey25519 = createPrivKey(Some(settings.wallet.flatMap(_.seed).getOrElse("")))
   val publicKey: PublicKey25519 = privKey.publicImage
   val address: String = publicKey.address.address
