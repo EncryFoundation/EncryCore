@@ -7,13 +7,11 @@ import encry.consensus.EncrySupplyController
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.TransactionsInBlock
 import encry.storage.VersionalStorage.StorageVersion
-import encry.utils.CoreTaggedTypes
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
 import encry.view.NodeViewHolder.UpdateInformation
-import encry.view.actors.HistoryApplicator.StartModifiersApplicationOnStateApplicator
+import encry.view.actors.HistoryApplicator.{NewModifierNotification, StartModifiersApplicationOnStateApplicator}
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
 import encry.view.history.History
@@ -22,16 +20,17 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.TaggedTypes
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
-
+import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import scala.collection.IndexedSeq
 import scala.collection.immutable.HashMap
 import scala.util.{Failure, Success, Try}
 
-class StateApplicator(setting: EncryAppSettings, history: History) extends Actor with StrictLogging {
-  var state: UtxoState = UtxoState.create(UtxoState.getStateDir(setting), None, setting, None)
+class StateApplicator(setting: EncryAppSettings,
+                      history: History,
+                      historyApplicator: ActorRef,
+                      state: UtxoState) extends Actor with StrictLogging {
 
   var validatorsQueue: HashMap[String, ActorRef] = HashMap.empty[String, ActorRef]
 
@@ -39,6 +38,8 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
 
   var infoAboutCurrentFoldIteration: (Seq[PersistentModifier], UpdateInformation, Option[Block]) =
     (Seq.empty, UpdateInformation(history, state, None, None, IndexedSeq.empty), None)
+
+  var isInProgress: Boolean = false
 
   //todo add supervisor strategy
 
@@ -65,6 +66,7 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
           ))
         }
       case block: Block =>
+        logger.info(s"Start block ${block.encodedId} validation to the state")
         val lastTxId: ModifierId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val height: Height = Height @@ block.header.height
@@ -101,14 +103,17 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
         self ! StartModifiersApplicationOnStateApplicator(ui.alternativeProgressInfo.get, ui.suffix)
         context.become(updateState)
       case None =>
-        //todo send to history request for the next block
+        logger.info(s"Send request for the next modifier to the history applicator")
+        historyApplicator ! RequestNextModifier
+        isInProgress = false
+        context.become(updateState)
     }
   }
 
   def awaitingTransactionsValidation: Receive = {
     case TransactionValidatedSuccessfully(tx) =>
-      validatorsQueue = validatorsQueue - tx.encodedId
-      validatedTxs = tx :: validatedTxs
+      validatorsQueue = validatorsQueue - tx.encodedId //overhead
+      validatedTxs = tx :: validatedTxs //overhead
       if (validatorsQueue.isEmpty) {
         val combinedStateChange = combineAll(validatedTxs.map(UtxoState.tx2StateChange))
         infoAboutCurrentFoldIteration._3.foreach { block =>
@@ -117,20 +122,48 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
             combinedStateChange.outputsToDb.toList,
             combinedStateChange.inputsToDb.toList
           )
-          state = UtxoState(
-            state.storage,
-            Height @@ block.header.height,
-            block.header.timestamp
-          )
-          self ! StartApplyingModifiersForState(infoAboutCurrentFoldIteration._1, infoAboutCurrentFoldIteration._2)
+          if (infoAboutCurrentFoldIteration._1.isEmpty) {
+            logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
+            self ! ModifiersApplicationFinished
+            context.become(modifiersApplicationCompleted(
+              infoAboutCurrentFoldIteration._2.copy(state = UtxoState(
+                state.storage,
+                Height @@ block.header.height,
+                block.header.timestamp
+              ))
+            ))
+          } else {
+            self ! StartModifiersApplying
+            context.become(modifierApplication(infoAboutCurrentFoldIteration._1.toList, infoAboutCurrentFoldIteration._2))
+          }
         }
       }
     case TransactionValidatedFailure(_, _) =>
       context.children.foreach(_ ! Kill) //P_Pill
+      infoAboutCurrentFoldIteration._3.foreach { block =>
+        val (newHis: History, newProgressInfo: ProgressInfo) =
+          history.reportModifierIsInvalid(block)
+        context.system.eventStream.publish(SemanticallyFailedModification(block, List(StateModifierApplyError("1234"))))
+        self ! StartModifiersApplying
+        context.become(modifierApplication(
+          infoAboutCurrentFoldIteration._1.toList,
+          UpdateInformation(newHis, state, Some(block), Some(newProgressInfo), infoAboutCurrentFoldIteration._2.suffix)
+        ))
+      }
+
   }
 
   def updateState: Receive = {
+    case NewModifierNotification if !isInProgress =>
+      logger.info(s"StateApplicator got notification about new modifier. Send request for new one.")
+      sender() ! RequestNextModifier
+
+    case NewModifierNotification =>
+      logger.info(s"StateApplicator got notification about new modifier but inProgress is $isInProgress.")
+
     case StartModifiersApplicationOnStateApplicator(progressInfo, suffixApplied) =>
+      isInProgress = true
+      logger.info(s"Starting applying to the state.")
       val branchPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
       val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]) =
         if (progressInfo.chainSwitchingNeeded) branchPointOpt
@@ -145,6 +178,7 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
           context.system.eventStream.publish(RollbackFailed(branchPointOpt))
           EncryApp.forceStopApplication(500, s"Rollback failed: $exception")
         case Success(stateToApply) =>
+          logger.info(s"Successfully applied to the state. Starting modifiers applying.")
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
           self ! StartModifiersApplying
           context.become(modifierApplication(
@@ -165,6 +199,8 @@ class StateApplicator(setting: EncryAppSettings, history: History) extends Actor
 
 object StateApplicator {
 
+  case object NotificationAboutSuccessfullyAppliedModifier
+
   case object StartModifiersApplying
 
   case object ModifiersApplicationFinished
@@ -182,4 +218,6 @@ object StateApplicator {
 
   case object ModifierValidatedSuccessfully
 
+  def props(setting: EncryAppSettings, history: History, historyApplicator: ActorRef,state: UtxoState): Props =
+    Props(new StateApplicator(setting, history, historyApplicator, state))
 }

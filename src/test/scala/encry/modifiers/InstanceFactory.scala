@@ -164,53 +164,53 @@ trait InstanceFactory extends Keys with EncryGenerator {
     Block(header, Payload(header.id, txs))
   }
 
-  def genForkOn(qty: Int,
-                addDifficulty: BigInt = 0,
-                from: Int,
-                to: Int,
-                settings: EncryAppSettings): (List[Block], List[Block]) = {
-    val history: History = generateDummyHistory(settings)
-    val forkInterval = (from until to).toList
-    (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
-      case ((histories, blocks), blockHeight) =>
-        if (forkInterval.contains(blockHeight)) {
-          if (histories.length == 1) {
-            val secondHistory = generateDummyHistory(settings)
-            blocks._1.foldLeft(secondHistory) {
-              case (prevHistory, blockToApply) =>
-                prevHistory.append(blockToApply.header).right.get._1.append(blockToApply.payload).right.get._1.reportModifierIsValid(blockToApply)
-            }
-            val nextBlockInFirstChain = generateNextBlock(histories.head)
-            val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
-            (
-              List(
-                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
-                secondHistory.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
-              ),
-              (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
-            )
-          } else {
-            val nextBlockInFirstChain = generateNextBlock(histories.head)
-            val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
-            (
-              List(
-                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
-                histories.last.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
-              ),
-              (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
-            )
-          }
-        } else {
-          val block: Block = generateNextBlock(histories.head)
-          (
-            List(
-              histories.head.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
-            ),
-            (blocks._1 :+ block) -> blocks._2
-          )
-        }
-    }._2
-  }
+//  def genForkOn(qty: Int,
+//                addDifficulty: BigInt = 0,
+//                from: Int,
+//                to: Int,
+//                settings: EncryAppSettings): (List[Block], List[Block]) = {
+//    val history: History = generateDummyHistory(settings)
+//    val forkInterval = (from until to).toList
+//    (0 until qty).foldLeft((List(history), List.empty[Block] -> List.empty[Block])) {
+//      case ((histories, blocks), blockHeight) =>
+//        if (forkInterval.contains(blockHeight)) {
+//          if (histories.length == 1) {
+//            val secondHistory = generateDummyHistory(settings)
+//            blocks._1.foldLeft(secondHistory) {
+//              case (prevHistory, blockToApply) =>
+//                prevHistory.append(blockToApply.header).right.get._1.append(blockToApply.payload).right.get._1.reportModifierIsValid(blockToApply)
+//            }
+//            val nextBlockInFirstChain = generateNextBlock(histories.head)
+//            val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
+//            (
+//              List(
+//                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
+//                secondHistory.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
+//              ),
+//              (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
+//            )
+//          } else {
+//            val nextBlockInFirstChain = generateNextBlock(histories.head)
+//            val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
+//            (
+//              List(
+//                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
+//                histories.last.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
+//              ),
+//              (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
+//            )
+//          }
+//        } else {
+//          val block: Block = generateNextBlock(histories.head)
+//          (
+//            List(
+//              histories.head.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+//            ),
+//            (blocks._1 :+ block) -> blocks._2
+//          )
+//        }
+//    }._2
+//  }
 
   def generateDummyHistory(settingsEncry: EncryAppSettings): History = {
 

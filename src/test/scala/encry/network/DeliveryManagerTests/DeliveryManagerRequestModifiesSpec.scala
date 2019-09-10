@@ -40,7 +40,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
     val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
     val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", settings)
     val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", settings)
-    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(settings))._2
+    val blocks: List[Block] = List.empty//generateBlocks(10, generateDummyHistory(settings))._2
     val headersIds: List[ModifierId] = blocks.map(_.header.id)
     val headersAsKey = headersIds.map(toKey)
     (deliveryManager, cp1, cp2, cp3, blocks, headersIds, headersAsKey)
