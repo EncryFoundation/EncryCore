@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.settings.{EncryAppSettings, TestSettings}
+import encry.settings.{EncryAppSettings, MainTestSettings}
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.MemoryPool.{NewTransaction, TransactionsForMiner}
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
@@ -16,25 +16,25 @@ class MemoryPoolTests extends WordSpecLike
   with InstanceFactory
   with BeforeAndAfterAll
   with OneInstancePerTest
-  with TestSettings
+  with MainTestSettings
   with StrictLogging {
 
   implicit val system: ActorSystem = ActorSystem()
 
   override def afterAll(): Unit = system.terminate()
 
-  val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+  val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(mainTestSettings.ntp)
 
   "MemoryPool" should {
     "add new unique transactions" in {
-      val mempool = MemoryPoolStorage.empty(settings, timeProvider)
+      val mempool = MemoryPoolStorage.empty(mainTestSettings, timeProvider)
       val transactions = genValidPaymentTxs(10)
       val (newMempool, validTxs) = mempool.validateTransactions(transactions)
       newMempool.size shouldBe 10
       validTxs.map(_.encodedId).forall(transactions.map(_.encodedId).contains) shouldBe true
     }
     "reject not unique transactions" in {
-      val mempool = MemoryPoolStorage.empty(settings, timeProvider)
+      val mempool = MemoryPoolStorage.empty(mainTestSettings, timeProvider)
       val transactions = genValidPaymentTxs(10)
       val (newMempool, validTxs) = mempool.validateTransactions(transactions)
       val (newMempoolAgain, validTxsAgain) = newMempool.validateTransactions(validTxs)
@@ -42,14 +42,14 @@ class MemoryPoolTests extends WordSpecLike
       validTxsAgain.size shouldBe 0
     }
     "mempoolMaxCapacity works correct" in {
-      val mempool = MemoryPoolStorage.empty(settings, timeProvider)
+      val mempool = MemoryPoolStorage.empty(mainTestSettings, timeProvider)
       val transactions = genValidPaymentTxs(11)
       val (newMempool, validTxs) = mempool.validateTransactions(transactions)
       newMempool.size shouldBe 10
       validTxs.size shouldBe 10
     }
     "getTransactionsForMiner works fine" in {
-      val mempool = MemoryPoolStorage.empty(settings, timeProvider)
+      val mempool = MemoryPoolStorage.empty(mainTestSettings, timeProvider)
       val transactions = genValidPaymentTxs(10)
       val (newMempool, validTxs) = mempool.validateTransactions(transactions)
       val (uPool, txs) = newMempool.getTransactionsForMiner
@@ -62,7 +62,7 @@ class MemoryPoolTests extends WordSpecLike
     "send transactions to miner" in {
       val miner = TestProbe()
       val mempool: TestActorRef[MemoryPool] = TestActorRef[MemoryPool](
-        MemoryPool.props(settings, timeProvider, miner.ref, Some(TestProbe().ref)))
+        MemoryPool.props(mainTestSettings, timeProvider, miner.ref, Some(TestProbe().ref)))
       val transactions = genValidPaymentTxs(4)
       transactions.foreach(mempool ! NewTransaction(_))
       mempool.underlyingActor.memoryPool.size shouldBe 4

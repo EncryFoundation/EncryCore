@@ -13,9 +13,9 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.settings.{EncryAppSettings, Settings, TestSettings}
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
+import encry.settings.MainTestSettings
 import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -23,15 +23,15 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, Modifier
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
-import scala.concurrent.duration._
 import scala.collection.mutable.WrappedArray
+import scala.concurrent.duration._
 
 class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   with BeforeAndAfterAll
   with Matchers
   with InstanceFactory
   with OneInstancePerTest
-  with TestSettings {
+  with MainTestSettings {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
 
@@ -40,11 +40,11 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   def initialiseState(isChainSynced: Boolean = true, isMining: Boolean = true): (TestActorRef[DeliveryManager],
     ConnectedPeer, ConnectedPeer, ConnectedPeer, List[Block], List[ModifierId], List[WrappedArray.ofByte], History) = {
     val (deliveryManager, history) =
-      initialiseDeliveryManager(isBlockChainSynced = isChainSynced, isMining = isMining, settings)
-    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
-    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", settings)
-    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", settings)
-    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(settings))._2
+      initialiseDeliveryManager(isBlockChainSynced = isChainSynced, isMining = isMining, mainTestSettings)
+    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", mainTestSettings)
+    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", mainTestSettings)
+    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", mainTestSettings)
+    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(mainTestSettings))._2
     val headersIds: List[ModifierId] = blocks.map(_.header.id)
     val headersAsKey = headersIds.map(toKey)
     (deliveryManager, cp1, cp2, cp3, blocks, headersIds, headersAsKey, history)
@@ -58,7 +58,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(mainTestSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -70,7 +70,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(header))
       handler1.expectMsgAllOf(
-        settings.network.deliveryTimeout * (settings.network.maxDeliveryChecks + 2),
+        mainTestSettings.network.deliveryTimeout * (mainTestSettings.network.maxDeliveryChecks + 2),
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header))
@@ -87,7 +87,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(mainTestSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -101,7 +101,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       //await one re-ask
       handler1.expectMsgAllOf(
-        settings.network.deliveryTimeout * (settings.network.maxDeliveryChecks + 2),
+        mainTestSettings.network.deliveryTimeout * (mainTestSettings.network.maxDeliveryChecks + 2),
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header))
       )
@@ -118,7 +118,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(mainTestSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -152,7 +152,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
 
       deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, Seq(headerIds.head))
       //this thread sleep is using for expecting modifier removal
-      Thread.sleep((settings.network.maxDeliveryChecks * settings.network.deliveryTimeout._1) * 1000)
+      Thread.sleep((mainTestSettings.network.maxDeliveryChecks * mainTestSettings.network.deliveryTimeout._1) * 1000)
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress, Map.empty).isEmpty)
       assert(deliveryManager.underlyingActor.expectedModifiers
         .getOrElse(cp1.socketAddress, Map.empty) == Map.empty)
@@ -164,7 +164,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(mainTestSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
