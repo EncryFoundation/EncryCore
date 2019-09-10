@@ -1,6 +1,7 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import encry.consensus.HistoryConsensus
@@ -10,7 +11,7 @@ import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
@@ -22,15 +23,16 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.mutable.WrappedArray
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest {
+  with OneInstancePerTest
+  with Settings {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
-  val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 

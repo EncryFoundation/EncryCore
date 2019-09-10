@@ -7,9 +7,10 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
 import encry.consensus.EquihashPowScheme
+import encry.settings.Settings
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 
-trait HistoryModifiersValidator extends HistoryApi {
+trait HistoryModifiersValidator extends HistoryApi with Settings {
 
   val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k
     , settings.constants.Version, settings.constants.PreGenesisHeight, settings.constants.MaxTarget)

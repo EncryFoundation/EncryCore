@@ -3,8 +3,7 @@ package encry.view.history
 import encry.consensus.HistoryConsensus._
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils.generateBlocks
-import encry.network.DeliveryManagerTests.DummyEncryAppSettingsReader
-import encry.settings.EncryAppSettings
+import encry.settings.Settings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.SyncInfo
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
@@ -12,9 +11,8 @@ import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 class HistoryComparisionResultTest extends WordSpecLike
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest {
-
-  val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
+  with OneInstancePerTest
+  with Settings {
 
   "History Reader" should {
     "mark history as Equal where our best header is the same as other history best header" in {

@@ -1,6 +1,7 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
@@ -14,7 +15,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PeersKeeper.UpdatedPeersCollection
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -24,10 +25,10 @@ class DeliveryManagerPriorityTests extends WordSpecLike
   with BeforeAndAfterAll
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest {
+  with OneInstancePerTest
+  with Settings {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
-  val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
 
   override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 

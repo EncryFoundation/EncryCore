@@ -2,17 +2,15 @@ package encry.view.history
 
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils.generateBlocks
-import encry.network.DeliveryManagerTests.DummyEncryAppSettingsReader
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 
 class ModifiersValidationTest extends WordSpecLike
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest {
-
-  val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
+  with OneInstancePerTest
+  with Settings {
 
   "Modifiers validator" should {
     "validate genesis block" in {

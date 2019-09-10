@@ -16,7 +16,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, Modifie
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait HistoryApi extends  HistoryDBApi with Settings { //scalastyle:ignore
+trait HistoryApi extends HistoryDBApi with Settings { //scalastyle:ignore
 
   val timeProvider: NetworkTimeProvider
 
