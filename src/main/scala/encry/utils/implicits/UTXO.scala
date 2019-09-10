@@ -16,5 +16,4 @@ object UTXO {
     override def combine(x: StateChange, y: StateChange): StateChange =
       StateChange(x.inputsToDb ++ y.inputsToDb, x.outputsToDb ++ y.outputsToDb)
   }
-
 }
