@@ -46,7 +46,8 @@ class StateApplicator(setting: EncryAppSettings,
   def modifierApplication(toApply: List[PersistentModifier], updateInformation: UpdateInformation): Receive = {
     case StartModifiersApplying if updateInformation.failedMod.isEmpty => toApply.headOption.foreach {
       case header: Header =>
-        val newState: UtxoState = state.copy(height = Height @@ header.height, lastBlockTimestamp = header.timestamp)
+        state.lastBlockTimestamp = header.timestamp
+        //val newState: UtxoState = state.copy(height = Height @@ header.height, lastBlockTimestamp = )
         val newHistory: History = history.reportModifierIsValid(header)
         context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
         val newToApply: List[PersistentModifier] = toApply.drop(1)
@@ -56,17 +57,17 @@ class StateApplicator(setting: EncryAppSettings,
           self ! StartModifiersApplying
           context.become(modifierApplication(
             newToApply,
-            UpdateInformation(newHistory, newState, none, none, updateInformation.suffix :+ header)
+            UpdateInformation(newHistory, state, none, none, updateInformation.suffix :+ header)
           ))
         } else {
-          logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
+          logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted. headers height is ${header.height}")
           self ! ModifiersApplicationFinished
           context.become(modifiersApplicationCompleted(
-            UpdateInformation(newHistory, newState, none, none, updateInformation.suffix :+ header)
+            UpdateInformation(newHistory, state, none, none, updateInformation.suffix :+ header)
           ))
         }
       case block: Block =>
-        logger.info(s"Start block ${block.encodedId} validation to the state")
+        logger.debug(s"Start block ${block.encodedId} validation to the state")
         val lastTxId: ModifierId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val height: Height = Height @@ block.header.height
@@ -93,6 +94,7 @@ class StateApplicator(setting: EncryAppSettings,
     }
     case StartModifiersApplying => //todo redundant iterations while updateInformation.failedMod.nonEmpty
       self ! StartModifiersApplying
+      logger.info(s"StartModifiersApplying updateInformation.failedMod.nonEmpty")
       context.become(modifierApplication(toApply.drop(1), updateInformation))
     case _ =>
   }
@@ -103,8 +105,8 @@ class StateApplicator(setting: EncryAppSettings,
         self ! StartModifiersApplicationOnStateApplicator(ui.alternativeProgressInfo.get, ui.suffix)
         context.become(updateState)
       case None =>
-        logger.info(s"Send request for the next modifier to the history applicator")
-        historyApplicator ! RequestNextModifier
+        logger.debug(s"Send request for the next modifier to the history applicator")
+        historyApplicator ! NotificationAboutSuccessfullyAppliedModifier
         isInProgress = false
         context.become(updateState)
     }
@@ -123,13 +125,13 @@ class StateApplicator(setting: EncryAppSettings,
             combinedStateChange.inputsToDb.toList
           )
           if (infoAboutCurrentFoldIteration._1.isEmpty) {
-            logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
+            logger.debug(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
             self ! ModifiersApplicationFinished
+            state.height =  Height @@ block.header.height
+            state.lastBlockTimestamp = block.header.timestamp
             context.become(modifiersApplicationCompleted(
               infoAboutCurrentFoldIteration._2.copy(state = UtxoState(
-                state.storage,
-                Height @@ block.header.height,
-                block.header.timestamp
+                state.storage
               ))
             ))
           } else {
@@ -155,15 +157,15 @@ class StateApplicator(setting: EncryAppSettings,
 
   def updateState: Receive = {
     case NewModifierNotification if !isInProgress =>
-      logger.info(s"StateApplicator got notification about new modifier. Send request for new one.")
+      logger.debug(s"StateApplicator got notification about new modifier. Send request for new one.")
       sender() ! RequestNextModifier
 
     case NewModifierNotification =>
-      logger.info(s"StateApplicator got notification about new modifier but inProgress is $isInProgress.")
+      logger.debug(s"StateApplicator got notification about new modifier but inProgress is $isInProgress.")
 
     case StartModifiersApplicationOnStateApplicator(progressInfo, suffixApplied) =>
       isInProgress = true
-      logger.info(s"Starting applying to the state.")
+      logger.debug(s"Starting applying to the state.")
       val branchPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
       val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]) =
         if (progressInfo.chainSwitchingNeeded) branchPointOpt
@@ -178,7 +180,7 @@ class StateApplicator(setting: EncryAppSettings,
           context.system.eventStream.publish(RollbackFailed(branchPointOpt))
           EncryApp.forceStopApplication(500, s"Rollback failed: $exception")
         case Success(stateToApply) =>
-          logger.info(s"Successfully applied to the state. Starting modifiers applying.")
+          logger.debug(s"Successfully applied to the state. Starting modifiers applying.")
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
           self ! StartModifiersApplying
           context.become(modifierApplication(

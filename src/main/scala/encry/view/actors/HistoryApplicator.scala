@@ -22,11 +22,11 @@ import scala.collection.immutable.{HashMap, Queue}
 import scala.collection.mutable
 
 class HistoryApplicator(history: History,
-                        setting: EncryAppSettings,
-                        state: UtxoState) extends Actor with StrictLogging {
+                        state: UtxoState,
+                        setting: EncryAppSettings) extends Actor with StrictLogging {
 
-  val stateApplicator: ActorRef = context.system.actorOf(StateApplicator.props(setting, history, self, state)
-  .withDispatcher("state-applicator-dispatcher"))
+  val stateApplicator: ActorRef = context.system
+    .actorOf(StateApplicator.props(setting, history, self, state).withDispatcher("state-applicator-dispatcher"))
 
   var modifiersQueue: Queue[(PersistentModifier, ProgressInfo)] = Queue.empty[(PersistentModifier, ProgressInfo)]
   var modifiersCache: HashMap[String, PersistentModifier] = HashMap.empty[String, PersistentModifier]
@@ -37,8 +37,8 @@ class HistoryApplicator(history: History,
 
   def modifiersFromNetwork: Receive = {
     case ModifierFromNetwork(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
-      logger.info(s"Got new modifier ${mod.encodedId} of type ${mod.modifierTypeId} from network. Put it into modifiers cache.")
-      //modifiersCache = modifiersCache.updated(mod.encodedId, mod)
+      logger.debug(s"Got new modifier ${mod.encodedId} of type ${mod.modifierTypeId} from network." +
+        s" Put it into modifiers cache.")
       ModifiersCache.put(toKey(mod.id), mod, history)
       getModifierForApplying()
 
@@ -64,7 +64,6 @@ class HistoryApplicator(history: History,
 
     case RequestNextModifier =>
       logger.info(s"Got request for the new next modifier")
-      currentNumberOfAppliedModifiers -= 1
       val nextModifier: Option[((PersistentModifier, ProgressInfo), Queue[(PersistentModifier, ProgressInfo)])] =
         modifiersQueue.dequeueOption
       nextModifier.foreach { case ((mod, pi), newQueue) =>
@@ -80,17 +79,18 @@ class HistoryApplicator(history: History,
 
     case NotificationAboutSuccessfullyAppliedModifier =>
       logger.info(s"Get NotificationAboutSuccessfullyAppliedModifier. Trying to get new one.")
+      currentNumberOfAppliedModifiers -= 1
       getModifierForApplying()
   }
 
   def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
-    //logger.info(s"It's possible to append new modifier to history. Trying to get new one from th cache.")
+    //logger.info(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
     ModifiersCache.popCandidate(history).foreach { modifier =>
       logger.info(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
-        s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers.")
+        s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
+        s" Current mod cache size ${ModifiersCache.size}")
       self ! ModifierForHistoryApplicator(modifier)
       currentNumberOfAppliedModifiers += 1
-      modifiersCache = modifiersCache - modifier.encodedId
     }
   }
 
@@ -118,6 +118,6 @@ object HistoryApplicator {
   final case class StartModifiersApplicationOnStateApplicator(progressInfo: ProgressInfo,
                                                               suffixApplied: IndexedSeq[PersistentModifier])
 
-  def props(history: History, setting: EncryAppSettings,state: UtxoState): Props =
-    Props(new HistoryApplicator(history, setting, state))
+  def props(history: History, setting: EncryAppSettings, state: UtxoState): Props =
+    Props(new HistoryApplicator(history, state, setting))
 }
