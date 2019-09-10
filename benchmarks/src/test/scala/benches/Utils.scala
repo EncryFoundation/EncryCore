@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.EncryAppSettings
+import encry.settings.{ConstantsSettings, EncryAppSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -25,8 +25,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
-import encry.EncryApp.settings.constants
-import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
@@ -36,7 +34,7 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-object Utils extends StrictLogging {
+object Utils extends ConstantsSettings with StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
@@ -407,15 +405,15 @@ object Utils extends StrictLogging {
     uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
-  def generateHistory(settingsEncry: EncryAppSettings, file: File): History = {
+  def generateHistory(settings: EncryAppSettings, file: File): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB))
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
+    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
       override  val historyStorage: HistoryStorage = storage

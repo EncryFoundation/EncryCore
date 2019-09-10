@@ -8,7 +8,7 @@ import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRand
 import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.view.history.History
-import encryBenchmark.Settings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.openjdk.jmh.annotations._
@@ -39,9 +39,7 @@ class HistoryBenches {
   }
 }
 
-object HistoryBenches {
-
-  val benchSettings: Settings = Settings.read
+object HistoryBenches extends BenchSettings {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -62,9 +60,8 @@ object HistoryBenches {
   }
 
   @State(Scope.Benchmark)
-  class HistoryBenchState {
+  class HistoryBenchState extends encry.settings.Settings {
 
-    val settings: EncryAppSettings = EncryApp.settings
     val tmpDir: File = getRandomTempDir
     val initialHistory: History = generateHistory(settings, tmpDir)
 

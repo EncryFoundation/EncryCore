@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import benches.SerializedAssetTransactionBenchmark.SerializedAssetBenchState
 import benches.Utils._
-import encryBenchmark.Settings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionSerializer}
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.annotations._
@@ -24,9 +24,7 @@ class SerializedAssetTransactionBenchmark {
     bh.consume(stateBench.initialTransactions.map(tx => tx.bytes))
 }
 
-object SerializedAssetTransactionBenchmark {
-
-  val benchSettings: Settings = Settings.read
+object SerializedAssetTransactionBenchmark extends BenchSettings {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
