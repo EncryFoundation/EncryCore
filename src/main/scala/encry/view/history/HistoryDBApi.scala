@@ -2,7 +2,7 @@ package encry.view.history
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings.constants
+import encry.settings.ConstantsSettings
 import encry.storage.VersionalStorage.StorageKey
 import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -12,7 +12,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.reflect.ClassTag
 
-trait HistoryDBApi extends StrictLogging {
+trait HistoryDBApi extends ConstantsSettings with StrictLogging {
 
   val historyStorage: HistoryStorage
 

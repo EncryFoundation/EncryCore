@@ -8,12 +8,12 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp.settings
 import encry.EncryApp.{miner, nodeViewSynchronizer, timeProvider}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
@@ -37,7 +37,8 @@ import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
-                     dataHolder: ActorRef) extends Actor with StrictLogging with AutoCloseable {
+                     dataHolder: ActorRef,
+                     settings: EncryAppSettings) extends Actor with StrictLogging with AutoCloseable {
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
@@ -404,6 +405,6 @@ object NodeViewHolder {
         case otherwise => 1
       })
 
-  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef): Props =
-    Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder))
+  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef, settings: EncryAppSettings): Props =
+    Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder, settings))
 }

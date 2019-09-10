@@ -1,45 +1,47 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.PrioritiesCalculator.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
 import encry.network.PrioritiesCalculator.PeersPriorityStatus._
-import encry.settings.EncryAppSettings
+import encry.settings.NetworkSettings
+
 import scala.concurrent.duration._
 
-final case class PrioritiesCalculator(settings: EncryAppSettings,
+final case class PrioritiesCalculator(networkSettings: NetworkSettings,
                                       private val peersNetworkStatistic: Map[InetSocketAddress, (Requested, Received)])
   extends StrictLogging {
 
-  val updatingStatisticTime: FiniteDuration = (settings.network.deliveryTimeout._1 * settings.network.maxDeliveryChecks).seconds
+  val updatingStatisticTime: FiniteDuration = (networkSettings.deliveryTimeout._1 * networkSettings.maxDeliveryChecks).seconds
 
   def incrementRequest(peer: InetSocketAddress): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = requested.increment
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (newRequested, received)))
+    PrioritiesCalculator(networkSettings, peersNetworkStatistic.updated(peer, (newRequested, received)))
   }
 
   def incrementReceive(peer: InetSocketAddress): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newReceived: Received = received.increment
     logger.debug(s"Updating received parameter from $peer. Old is ($requested, $received). New one is: ($requested, $newReceived)")
-    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (requested, newReceived)))
+    PrioritiesCalculator(networkSettings, peersNetworkStatistic.updated(peer, (requested, newReceived)))
   }
 
   def decrementRequest(peer: InetSocketAddress): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = requested.decrement
     logger.debug(s"Decrement request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (newRequested, received)))
+    PrioritiesCalculator(networkSettings, peersNetworkStatistic.updated(peer, (newRequested, received)))
   }
 
   def incrementRequestForNModifiers(peer: InetSocketAddress, modifiersQty: Int): PrioritiesCalculator = {
     val (requested, received): (Requested, Received) = peersNetworkStatistic.getOrElse(peer, (Requested(), Received()))
     val newRequested: Requested = requested.incrementForN(modifiersQty)
     logger.debug(s"Updating request parameter from $peer. Old is ($requested, $received). New one is: ($newRequested, $received)")
-    PrioritiesCalculator(settings, peersNetworkStatistic.updated(peer, (newRequested, received)))
+    PrioritiesCalculator(networkSettings, peersNetworkStatistic.updated(peer, (newRequested, received)))
   }
 
   def accumulatePeersStatistic: (Map[InetSocketAddress, PeersPriorityStatus], PrioritiesCalculator) = {
@@ -50,7 +52,7 @@ final case class PrioritiesCalculator(settings: EncryAppSettings,
         peer -> priority
     }
     logger.info(s"Accumulated peers statistic. Current stats are: ${updatedStatistic.mkString(",")}")
-    (updatedStatistic, PrioritiesCalculator(settings))
+    (updatedStatistic, PrioritiesCalculator(networkSettings))
   }
 }
 
@@ -91,6 +93,6 @@ object PrioritiesCalculator {
       }
   }
 
-  def apply(settings: EncryAppSettings): PrioritiesCalculator =
-    PrioritiesCalculator(settings, Map.empty[InetSocketAddress, (Requested, Received)])
+  def apply(networkSettings: NetworkSettings): PrioritiesCalculator =
+    PrioritiesCalculator(networkSettings, Map.empty[InetSocketAddress, (Requested, Received)])
 }

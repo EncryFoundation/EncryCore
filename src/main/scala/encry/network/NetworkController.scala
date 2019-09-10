@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress, NetworkInterface, URI}
+
 import akka.actor._
 import akka.actor.SupervisorStrategy.Restart
 import akka.io.{IO, Tcp}
@@ -12,14 +13,15 @@ import encry.network.NetworkController.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeersKeeper._
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
+
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.{existentials, postfixOps}
 import scala.util.Try
 
-class NetworkController(settings: EncryAppSettings,
+class NetworkController(networkSettings: NetworkSettings,
                         peersKeeper: ActorRef,
                         nodeViewSync: ActorRef) extends Actor with StrictLogging {
 
@@ -29,17 +31,17 @@ class NetworkController(settings: EncryAppSettings,
   override def preStart(): Unit = logger.info(s"Network controller started")
 
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
-  val externalSocketAddress: Option[InetSocketAddress] = settings.network.declaredAddress
+  val externalSocketAddress: Option[InetSocketAddress] = networkSettings.declaredAddress
   logger.info(s"Declared address is: $externalSocketAddress.")
 
-  if (!settings.network.localOnly.getOrElse(false)) settings.network.declaredAddress.foreach(myAddress =>
+  if (!networkSettings.localOnly.getOrElse(false)) networkSettings.declaredAddress.foreach(myAddress =>
     Try(NetworkInterface.getNetworkInterfaces.asScala.exists(interface =>
       interface.getInterfaceAddresses.asScala.exists(interfaceAddress =>
         InetAddress.getAllByName(new URI("http://" + myAddress).getHost).contains(interfaceAddress.getAddress)
       ))).recover { case t: Throwable => logger.error(s"Declared address validation failed: $t") }
   )
 
-  IO(Tcp) ! Bind(self, settings.network.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
+  IO(Tcp) ! Bind(self, networkSettings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   override def supervisorStrategy: SupervisorStrategy = OneForOneStrategy(
     maxNrOfRetries = 5,
@@ -69,7 +71,7 @@ class NetworkController(settings: EncryAppSettings,
   }
 
   def businessLogic: Receive = {
-    case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.network.syncPacketLength) =>
+    case MessageFromNetwork(message, Some(remote)) if message.isValid(networkSettings.syncPacketLength) =>
       logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
@@ -84,7 +86,7 @@ class NetworkController(settings: EncryAppSettings,
         peer,
         None,
         KeepAlive(true) :: Nil,
-        Some(settings.network.connectionTimeout),
+        Some(networkSettings.connectionTimeout),
         pullMode = true
       )
 
@@ -95,7 +97,7 @@ class NetworkController(settings: EncryAppSettings,
     case ConnectionVerified(remote, remoteConnection, connectionType) =>
       logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
       val peerConnectionHandler: ActorRef = context.actorOf(
-        PeerConnectionHandler.props(remoteConnection, connectionType, externalSocketAddress, remote)
+        PeerConnectionHandler.props(remoteConnection, connectionType, externalSocketAddress, remote, networkSettings)
           .withDispatcher("network-dispatcher")
       )
       peerConnectionHandler ! StartInteraction
@@ -130,9 +132,8 @@ class NetworkController(settings: EncryAppSettings,
 
 object NetworkController {
 
-  def props(settings: EncryAppSettings,
-            peersKeeper: ActorRef,
-            nodeViewSync: ActorRef): Props = Props(new NetworkController(settings, peersKeeper, nodeViewSync))
+  def props(networkSettings: NetworkSettings, peersKeeper: ActorRef, nodeViewSync: ActorRef): Props =
+    Props(new NetworkController(networkSettings, peersKeeper, nodeViewSync))
 
   object ReceivableMessages {
 

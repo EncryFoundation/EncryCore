@@ -69,7 +69,7 @@ object EncryWallet extends StrictLogging {
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
     val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
-    val accountManager = AccountManager(accountManagerStore)
+    val accountManager = AccountManager(accountManagerStore, settings.wallet)
     //init keys
     accountManager.mandatoryAccount
     EncryWallet(walletStorage, accountManager, settings.constants.IntrinsicTokenId)
