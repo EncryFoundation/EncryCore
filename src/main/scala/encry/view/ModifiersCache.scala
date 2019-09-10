@@ -57,8 +57,12 @@ object ModifiersCache extends StrictLogging {
     cache.remove(key)
   }
 
-  def popCandidate(history: History): List[PersistentModifier] = synchronized {
-    findCandidateKey(history).flatMap(k => remove(k))
+  def popCandidate(history: History): Option[PersistentModifier] = synchronized {
+    val a = findCandidateKey(history).headOption
+     a match {
+      case Some(value) => remove(value)
+      case None => None
+    }
   }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
@@ -71,24 +75,17 @@ object ModifiersCache extends StrictLogging {
       case Left(_)                       => false
     })
 
-    def getHeadersKeysAtHeight(height: Int): List[Key] = {
+    def getHeadersKeysAtHeight(height: Int): Option[Key] = {
       headersCollection.get(height) match {
         case Some(headersIds) =>
-          headersIds.map(new mutable.WrappedArray.ofByte(_)).collect {
+          headersIds.map(new mutable.WrappedArray.ofByte(_)).collectFirst {
             case headerKey if isApplicable(headerKey) => headerKey
           }
         case None =>
           logger.debug(s"Can't find headers at height $height in cache")
-          List.empty[Key]
+          Option.empty[Key]
       }
     }
-
-    def findApplicablePayloadAtHeight(height: Int): List[Key] = {
-      history.headerIdsAtHeight(height).view.flatMap(history.getHeaderById).collect {
-        case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
-          new mutable.WrappedArray.ofByte(header.payloadId)
-      }
-    }.toList
 
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
       v match {
@@ -100,20 +97,14 @@ object ModifiersCache extends StrictLogging {
       }
     }).collect { case Some(v) => v._1 }
 
-    @tailrec
-    def applicableBestPayloadChain(atHeight: Int = history.getBestBlockHeight, prevKeys: List[Key] = List.empty[Key]): List[Key] = {
-      val payloads = findApplicablePayloadAtHeight(atHeight)
-      if (payloads.nonEmpty) applicableBestPayloadChain(atHeight + 1, prevKeys ++ payloads)
-      else prevKeys
-    }
 
-    val bestHeadersIds: List[Key] = {
+    val bestHeadersIds: Option[Key] = {
       headersCollection.get(history.getBestHeaderHeight + 1) match {
         case Some(value) =>
           headersCollection = headersCollection - (history.getBestHeaderHeight + 1)
           logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
           logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
-          val res = value.map(cache.get(_)).collect {
+          val res = value.map(cache.get(_)).collectFirst {
             case Some(v: Header)
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
                 (history.getBestHeaderHeight == TestNetConstants.PreGenesisHeight &&
@@ -129,10 +120,10 @@ object ModifiersCache extends StrictLogging {
             s"Trying to find in range [${history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
           (history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
-          ).toList
+          ).headOption
       }
     }
-    if (bestHeadersIds.nonEmpty) bestHeadersIds
+    if (bestHeadersIds.isDefined) bestHeadersIds
     else history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
       case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
