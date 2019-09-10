@@ -51,7 +51,7 @@ class StateApplicator(setting: EncryAppSettings,
         context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
         val newToApply: List[PersistentModifier] = toApply.drop(1)
         if (newToApply.nonEmpty) {
-          logger.info(s"Header ${header.encodedId} in receive modifierApplication applied successfully." +
+          logger.info(s"Header ${header.encodedId} with height ${header.height} in receive modifierApplication applied successfully." +
             s"Starting new modifier application.")
           self ! StartModifiersApplying
           context.become(modifierApplication(
