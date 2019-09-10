@@ -15,7 +15,7 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.PeersKeeper.UpdatedPeersCollection
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.Settings
 import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction

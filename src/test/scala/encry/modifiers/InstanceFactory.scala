@@ -213,18 +213,17 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }._2
   }
 
-  def generateDummyHistory(settingsEncry: EncryAppSettings): History = {
+  def generateDummyHistory(settings: EncryAppSettings): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB))
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
+    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override  val settings: EncryAppSettings = settingsEncry
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }

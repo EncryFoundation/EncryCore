@@ -418,7 +418,6 @@ object Utils extends StrictLogging {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
     new History {
-      override  val settings: EncryAppSettings = settingsEncry
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }

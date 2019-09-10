@@ -170,7 +170,6 @@ object History extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
     new History {
-      override val settings: EncryAppSettings = settingsEncry
       override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
       override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
     }
