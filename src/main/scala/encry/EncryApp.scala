@@ -37,7 +37,7 @@ object EncryApp extends App with StrictLogging {
   implicit val ec: ExecutionContextExecutor = system.dispatcher
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  lazy val settings: EncryAppSettings = EncryAppSettings.read(if(Option(args).nonEmpty) Option(args).get.headOption else None)
+  lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
