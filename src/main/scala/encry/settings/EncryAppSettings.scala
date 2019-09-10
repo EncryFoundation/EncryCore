@@ -36,8 +36,13 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     if (args.nonEmpty)
       fromConfig(readConfigFromPath(args))
     else
-      ConfigFactory.load("local.conf")
-        .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)
+      loadConfig("local.conf")
+
+  def loadConfig(configName: String): EncryAppSettings = {
+    ConfigFactory.load(configName)
+      .withFallback(ConfigFactory.load())
+      .as[EncryAppSettings](configPath)
+  }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
     val maybeConfigFile: Option[File] = for {

@@ -11,7 +11,7 @@ import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.{EncryAppSettings, TestSettings}
 import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
@@ -30,7 +30,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
   with Matchers
   with InstanceFactory
   with OneInstancePerTest
-  with Settings {
+  with TestSettings {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
 

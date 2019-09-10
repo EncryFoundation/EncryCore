@@ -2,7 +2,7 @@ package encry.view.history
 
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils.generateBlocks
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.{EncryAppSettings, TestSettings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 
@@ -10,7 +10,7 @@ class ModifiersValidationTest extends WordSpecLike
   with Matchers
   with InstanceFactory
   with OneInstancePerTest
-  with Settings {
+  with TestSettings {
 
   "Modifiers validator" should {
     "validate genesis block" in {

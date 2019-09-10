@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.{EncryAppSettings, TestSettings}
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.MemoryPool.{NewTransaction, TransactionsForMiner}
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
@@ -16,7 +16,7 @@ class MemoryPoolTests extends WordSpecLike
   with InstanceFactory
   with BeforeAndAfterAll
   with OneInstancePerTest
-  with Settings
+  with TestSettings
   with StrictLogging {
 
   implicit val system: ActorSystem = ActorSystem()

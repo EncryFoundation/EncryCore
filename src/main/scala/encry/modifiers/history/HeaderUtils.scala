@@ -1,10 +1,11 @@
 package encry.modifiers.history
 
-import encry.settings.TestConstants
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.validation.{ModifierValidator, ValidationResult}
 
 object HeaderUtils {
+
+  val TransactionsRootSize: Int = 32
 
   def syntacticallyValidity(header: Header, modifierIdSize: Int): ValidationResult = ModifierValidator.accumulateErrors
     .demand(header.modifierTypeId == Header.modifierTypeId,
@@ -13,7 +14,7 @@ object HeaderUtils {
       s"Modifier's id should be $modifierIdSize bytes")
     .demand(header.parentId.size == modifierIdSize,
       s"Parent's id should be $modifierIdSize bytes")
-    .demand(header.transactionsRoot.size == TestConstants.TransactionsRootSize,
-      s"TransactionsRoot's size should be ${TestConstants.TransactionsRootSize} bytes")
+    .demand(header.transactionsRoot.size == TransactionsRootSize,
+      s"TransactionsRoot's size should be $TransactionsRootSize bytes")
     .result
 }

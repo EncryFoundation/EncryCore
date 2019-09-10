@@ -15,7 +15,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PeersKeeper.UpdatedPeersCollection
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.{EncryAppSettings, TestSettings}
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -26,7 +26,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
   with Matchers
   with InstanceFactory
   with OneInstancePerTest
-  with Settings {
+  with TestSettings {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
 
