@@ -11,8 +11,10 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.util.{Failure, Random, Success}
 import cats.syntax.option._
+import org.encryfoundation.common.utils.Algos
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
@@ -62,6 +64,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
       )
     case _: VLDBWrapper =>
+      logger.info(s"for header ${Algos.encode(version)} inserting ${objectsToInsert.mkString(",")}")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>
