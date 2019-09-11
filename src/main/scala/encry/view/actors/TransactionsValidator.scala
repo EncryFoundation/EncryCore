@@ -15,7 +15,10 @@ class TransactionsValidator(state: UtxoState,
                             transaction: Transaction,
                             height: Height) extends Actor with StrictLogging {
 
-  override def preStart(): Unit = self ! StartValidation
+  override def preStart(): Unit = {
+    logger.info(s"Created TransactionsValidator for tx ${transaction.encodedId}")
+    self ! StartValidation
+  }
 
   override def receive: Receive = {
     case StartValidation =>

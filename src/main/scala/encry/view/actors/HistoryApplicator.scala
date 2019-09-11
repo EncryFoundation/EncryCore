@@ -96,16 +96,13 @@ class HistoryApplicator(history: History,
         logger.info(s"Found new valid for state modifier ${mod.encodedId}. Send it to the state applicator.")
         sender() ! StartModifiersApplicationOnStateApplicator(pi, IndexedSeq.empty[PersistentModifier])
         modifiersQueue = newQueue
-        logger.debug(s"\nStarting updating state in updateState function!")
-        pi.toApply.foreach {
-          case header: Header => requestDownloads(pi, Some(header.id))
-          case _ => requestDownloads(pi, None)
-        }
       }
 
     case NotificationAboutSuccessfullyAppliedModifier =>
-      logger.info(s"Get NotificationAboutSuccessfullyAppliedModifier. Trying to get new one.")
       currentNumberOfAppliedModifiers -= 1
+      logger.info(s"Get NotificationAboutSuccessfullyAppliedModifier. Trying to get new one." +
+        s"new currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
+        s" ModCahe size ${ModifiersCache.size}.")
       if (modifiersQueue.nonEmpty) {
         logger.info(s"modifiersQueue.nonEmpty in NotificationAboutSuccessfullyAppliedModifier. Sent NewModifierNotification")
         sender() ! NewModifierNotification
@@ -119,10 +116,10 @@ class HistoryApplicator(history: History,
   }
 
   def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
-    logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
+    logger.info(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
     val tmp: List[PersistentModifier] = ModifiersCache.popCandidate(history)
-    if (tmp.isEmpty) logger.debug(s"No applicable modifier to history from cache.")
-    if (tmp.size > 1) logger.debug(s"Size of getModifierForApplying tmp is ${tmp.size}")
+    if (tmp.isEmpty) logger.info(s"No applicable modifier to history from cache.")
+    if (tmp.size > 1) logger.info(s"Size of getModifierForApplying tmp is ${tmp.size}")
     logger.debug(s"${ModifiersCache.cache.map(l => l._2.encodedId).mkString(",")}")
     tmp.foreach { modifier =>
       logger.info(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +

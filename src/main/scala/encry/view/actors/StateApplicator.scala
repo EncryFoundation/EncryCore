@@ -10,7 +10,7 @@ import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.StorageVersion
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
-import encry.view.NodeViewHolder.UpdateInformation
+import encry.view.NodeViewHolder.{DownloadRequest, UpdateInformation}
 import encry.view.actors.HistoryApplicator.{NewModifierNotification, StartModifiersApplicationOnStateApplicator}
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
@@ -22,7 +22,10 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
+import encry.EncryApp.nodeViewSynchronizer
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import org.encryfoundation.common.utils.Algos
+
 import scala.collection.IndexedSeq
 import scala.collection.immutable.HashMap
 import scala.util.{Failure, Success, Try}
@@ -44,9 +47,6 @@ class StateApplicator(setting: EncryAppSettings,
 
   import context.dispatcher
 
-  context.system.scheduler.schedule(5.seconds, 1.seconds) {
-    logger.info(s"Im alive from state actor")
-  }
 
   override def postStop(): Unit = logger.info(s"State droped")
 
@@ -80,26 +80,26 @@ class StateApplicator(setting: EncryAppSettings,
             ))
           }
         case block: Block =>
-          logger.info(s"Start block ${block.encodedId} validation to the state")
+          logger.info(s"Start block ${block.encodedId} validation to the state with height ${block.header.height}")
           val lastTxId: ModifierId = block.payload.txs.last.id
           val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
           val height: Height = Height @@ block.header.height
           block.payload.txs.foreach {
             case tx if tx.id sameElements lastTxId =>
               val txValidator: ActorRef = context.actorOf(
-                TransactionsValidator.props(state, 0L, tx, height),
+                TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(height), tx, height),
                 s"validatorFor:${tx.encodedId}"
               )
               validatorsQueue = validatorsQueue.updated(tx.encodedId, txValidator)
             case tx =>
               val txValidator: ActorRef = context.actorOf(
-                TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(height), tx, height),
+                TransactionsValidator.props(state, 0L, tx, height),
                 s"validatorFor:${tx.encodedId}"
               )
               validatorsQueue = validatorsQueue.updated(tx.encodedId, txValidator)
           }
           infoAboutCurrentFoldIteration = (
-            toApply,
+            toApply.drop(1),
             updateInformation,
             block.some
           )
@@ -149,6 +149,7 @@ class StateApplicator(setting: EncryAppSettings,
             combinedStateChange.outputsToDb.toList,
             combinedStateChange.inputsToDb.toList
           )
+          validatedTxs = Nil
           if (infoAboutCurrentFoldIteration._1.isEmpty) {
             logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
             self ! ModifiersApplicationFinished
@@ -160,6 +161,7 @@ class StateApplicator(setting: EncryAppSettings,
               ))
             ))
           } else {
+            logger.info(s"awaitingTransactionsValidation finished but infoAboutCurrentFoldIteration._1 is not empty.")
             self ! StartModifiersApplying
             context.become(modifierApplication(infoAboutCurrentFoldIteration._1.toList, infoAboutCurrentFoldIteration._2))
           }
@@ -191,6 +193,10 @@ class StateApplicator(setting: EncryAppSettings,
 
     case StartModifiersApplicationOnStateApplicator(progressInfo, suffixApplied) =>
       logger.info(s"Starting applying to the state. got this message from $sender()")
+      progressInfo.toApply.foreach {
+        case header: Header => requestDownloads(progressInfo, Some(header.id))
+        case _ => requestDownloads(progressInfo, None)
+      }
       val branchPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
       val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]) =
         if (progressInfo.chainSwitchingNeeded) branchPointOpt
@@ -225,6 +231,13 @@ class StateApplicator(setting: EncryAppSettings,
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
+
+  def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
+    pi.toDownload.foreach { case (tid, id) =>
+      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+        s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
+      nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
+    }
 }
 
 object StateApplicator {
