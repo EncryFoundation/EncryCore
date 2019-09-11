@@ -55,7 +55,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   })
 
   val historyApplicator: ActorRef =
-    context.system.actorOf(HistoryApplicator.props(nodeView.history, settings, nodeView.state).withDispatcher("history-applicator-dispatcher"))
+    context.system.actorOf(HistoryApplicator.props(nodeView.history, settings, nodeView.state)
+      .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
 
   override def preStart(): Unit = logger.info(s"Node view holder started.")
 
