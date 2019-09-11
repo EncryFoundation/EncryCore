@@ -11,7 +11,7 @@ import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.actors.HistoryApplicator._
-import encry.view.actors.StateApplicator.{NotificationAboutSuccessfullyAppliedModifier, RequestNextModifier}
+import encry.view.actors.StateApplicator.{NeedToReportValid, NotificationAboutSuccessfullyAppliedModifier, RequestNextModifier}
 import encry.view.history.History
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -28,7 +28,7 @@ class HistoryApplicator(history: History,
                         state: UtxoState,
                         setting: EncryAppSettings) extends Actor with StrictLogging {
 
-  val stateApplicator: ActorRef = context
+  val stateApplicator: ActorRef = context.system
     .actorOf(StateApplicator.props(setting, history, self, state).withDispatcher("state-applicator-dispatcher"),
       "state")
 
@@ -58,6 +58,8 @@ class HistoryApplicator(history: History,
 
     case ModifierFromNetwork(mod) =>
       logger.info(s"Modifier ${mod.encodedId} contains in history or in modifiers cache. Reject it.")
+
+    case NeedToReportValid(h) => history.reportModifierIsValid(h)
   }
 
   def processingModifier: Receive = {
@@ -80,7 +82,7 @@ class HistoryApplicator(history: History,
         case Right(progressInfo) =>
           logger.info(s"Progress info is empty")
           requestDownloads(progressInfo, Some(mod.id))
-          history.reportModifierIsValid(mod)
+          //history.reportModifierIsValid(mod)
           context.system.eventStream.publish(SemanticallySuccessfulModifier(mod))
           getModifierForApplying()
           currentNumberOfAppliedModifiers -= 1
@@ -117,11 +119,11 @@ class HistoryApplicator(history: History,
   }
 
   def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
-    logger.info(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
+    logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
     val tmp: List[PersistentModifier] = ModifiersCache.popCandidate(history)
-    if (tmp.isEmpty) logger.info(s"No applicable modifier to history from cache.")
-    if (tmp.size > 1) logger.info(s"Size of getModifierForApplying tmp is ${tmp.size}")
-    logger.info(s"${ModifiersCache.cache.map(l => l._2.encodedId).mkString(",")}")
+    if (tmp.isEmpty) logger.debug(s"No applicable modifier to history from cache.")
+    if (tmp.size > 1) logger.debug(s"Size of getModifierForApplying tmp is ${tmp.size}")
+    logger.debug(s"${ModifiersCache.cache.map(l => l._2.encodedId).mkString(",")}")
     tmp.foreach { modifier =>
       logger.info(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
         s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +

@@ -78,7 +78,7 @@ object ModifiersCache extends StrictLogging {
             case headerKey if isApplicable(headerKey) => headerKey
           }
         case None =>
-          logger.info(s"Can't find headers at height $height in cache")
+          logger.debug(s"Can't find headers at height $height in cache")
           List.empty[Key]
       }
     }
@@ -111,22 +111,22 @@ object ModifiersCache extends StrictLogging {
       headersCollection.get(history.getBestHeaderHeight + 1) match {
         case Some(value) =>
           headersCollection = headersCollection - (history.getBestHeaderHeight + 1)
-          logger.info(s"HeadersCollection size is: ${headersCollection.size}")
-          logger.info(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
+          logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
+          logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
                 (history.getBestHeaderHeight == TestNetConstants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
                   ) || history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
-              logger.info(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
+              logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
           value.map(id => new mutable.WrappedArray.ofByte(id)).filterNot(res.contains).foreach(cache.remove)
           res
         case None =>
-          logger.info(s"${history.getBestHeader}")
-          logger.info(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
+          logger.debug(s"${history.getBestHeader}")
+          logger.debug(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
             s"Trying to find in range [${history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
           (history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
@@ -142,9 +142,9 @@ object ModifiersCache extends StrictLogging {
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>
-        logger.info(s"No payloads for current history")
+        logger.debug(s"No payloads for current history")
         exhaustiveSearch
-      case None => logger.info(s"No payloads for current history")
+      case None => logger.debug(s"No payloads for current history")
         List.empty[Key]
     }
   }

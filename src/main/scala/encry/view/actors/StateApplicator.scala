@@ -60,7 +60,8 @@ class StateApplicator(setting: EncryAppSettings,
         case header: Header =>
           state.lastBlockTimestamp = header.timestamp
           //val newState: UtxoState = state.copy(height = Height @@ header.height, lastBlockTimestamp = )
-          val newHistory: History = history.reportModifierIsValid(header)
+          historyApplicator ! NeedToReportValid(header)
+          //val newHistory: History = history.reportModifierIsValid(header)
           context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
           val newToApply: List[PersistentModifier] = toApply.drop(1)
           if (newToApply.nonEmpty) {
@@ -69,13 +70,13 @@ class StateApplicator(setting: EncryAppSettings,
             self ! StartModifiersApplying
             context.become(modifierApplication(
               newToApply,
-              UpdateInformation(newHistory, state, none, none, updateInformation.suffix :+ header)
+              UpdateInformation(history, state, none, none, updateInformation.suffix :+ header)
             ))
           } else {
             logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted. headers height is ${header.height}")
             self ! ModifiersApplicationFinished
             context.become(modifiersApplicationCompleted(
-              UpdateInformation(newHistory, state, none, none, updateInformation.suffix :+ header)
+              UpdateInformation(history, state, none, none, updateInformation.suffix :+ header)
             ))
           }
         case block: Block =>
@@ -227,6 +228,8 @@ class StateApplicator(setting: EncryAppSettings,
 }
 
 object StateApplicator {
+
+  final case class NeedToReportValid(h: Header) extends AnyVal
 
   case object NotificationAboutSuccessfullyAppliedModifier
 
