@@ -74,16 +74,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
-    case ModifierFromRemote(mod) =>
-      historyApplicator ! ModifierFromNetwork(mod)
-//      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-//      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
-//      if (isInHistory || isInCache)
-//        logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
-//          s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-//      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
-//      computeApplications()
-
+    case msg@ModifierFromRemote(_) => historyApplicator ! msg
     case lm: LocallyGeneratedModifier =>
       logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
       val startTime = System.currentTimeMillis()
@@ -108,18 +99,17 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
 
-    case msg@CompareViews(peer, modifierTypeId, modifierIds) =>
-      historyApplicator ! CompareViewsWithSender(peer, modifierTypeId, modifierIds, sender())
-//      val ids: Seq[ModifierId] = modifierTypeId match {
-//        case _ => modifierIds
-//          .filterNot(mid => nodeView.history.isModifierDefined(mid) || ModifiersCache.contains(key(mid)))
-//      }
-//      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
-//        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
-//        s" Sending RequestFromLocal with ids to $sender." +
-//        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-//      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
-//        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case CompareViews(peer, modifierTypeId, modifierIds) =>
+      val ids: Seq[ModifierId] = modifierTypeId match {
+        case _ => modifierIds
+          .filterNot(mid => nodeView.history.isModifierDefined(mid) || ModifiersCache.contains(key(mid)))
+      }
+      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
+        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
+        s" Sending RequestFromLocal with ids to $sender." +
+        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
+      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
+        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
@@ -350,11 +340,6 @@ object NodeViewHolder {
     case object GetWallet
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
-
-    case class CompareViewsWithSender(source: ConnectedPeer,
-                                      modifierTypeId: ModifierTypeId,
-                                      modifierIds: Seq[ModifierId],
-                                      sender: ActorRef)
 
     final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
 
