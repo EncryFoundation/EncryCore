@@ -3,8 +3,10 @@ package encry.view.actors
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{Actor, ActorRef, OneForOneStrategy, Props, Terminated}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.nodeViewSynchronizer
+import encry.EncryApp.{nodeViewSynchronizer, miner}
 import encry.consensus.HistoryConsensus.ProgressInfo
+import encry.local.miner.Miner
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
 import encry.view.ModifiersCache
@@ -24,8 +26,8 @@ import scala.concurrent.duration._
 import scala.collection.immutable.{HashMap, Queue}
 import scala.collection.mutable
 
-class HistoryApplicator(history: History,
-                        state: UtxoState,
+class HistoryApplicator(history: History, //try to use state monad hear
+                        state: UtxoState, //try to use state monad hear
                         setting: EncryAppSettings) extends Actor with StrictLogging {
 
   val stateApplicator: ActorRef = context.system
@@ -99,6 +101,11 @@ class HistoryApplicator(history: History,
       }
 
     case NotificationAboutSuccessfullyAppliedModifier =>
+      if (history.isFullChainSynced) {
+        logger.info(s"blockchain is synced on nvh on height ${history.getBestHeaderHeight}!")
+        ModifiersCache.setChainSynced()
+        Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
+      }
       currentNumberOfAppliedModifiers -= 1
       logger.info(s"Get NotificationAboutSuccessfullyAppliedModifier. Trying to get new one." +
         s"new currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
@@ -132,7 +139,7 @@ class HistoryApplicator(history: History,
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }

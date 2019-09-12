@@ -426,7 +426,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val cP = shuffle.last._1
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         if (modifierTypeId != Transaction.modifierTypeId)
-          logger.debug(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
+          logger.info(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
@@ -435,7 +435,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         coll.foreach { case (_, (cp, _, _)) =>
           if (modifierTypeId != Transaction.modifierTypeId)
-            logger.debug(s"Sent download request to the ${cp.socketAddress} to modifiers of type: $modifierTypeId.")
+            logger.info(s"Sent download request to the ${cp.socketAddress} to modifiers of type: $modifierTypeId.")
           requestModifies(history, cp, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")

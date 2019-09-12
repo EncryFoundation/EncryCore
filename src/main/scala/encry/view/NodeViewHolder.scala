@@ -145,8 +145,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet))
     if (updatedHistory.nonEmpty) {
-      nodeViewSynchronizer ! ChangedHistory(newNodeView.history)
-      context.system.eventStream.publish(ChangedHistory(newNodeView.history))
+
     }
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
     nodeView = newNodeView
@@ -217,45 +216,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
     if (!nodeView.history.isModifierDefined(pmod.id)) {
-      logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
-      val startAppHistory = System.currentTimeMillis()
-      if (settings.influxDB.isDefined) context.system
-        .actorSelection("user/statsSender") !
-        StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right(progressInfo) =>
-          logger.debug(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
-          logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
-          influxRef.foreach { ref =>
-            ref ! EndOfApplyingModifier(pmod.id)
-            val isHeader: Boolean = pmod match {
-              case _: Header => true
-              case _: Payload => false
-            }
-            ref ! ModifierAppendedToHistory(isHeader, success = true)
-          }
-          logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
 //          if (progressInfo.toApply.nonEmpty) {
-//            logger.debug(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
-//            val startPoint: Long = System.currentTimeMillis()
 //            val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
 //              updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-//            if (settings.influxDB.isDefined)
-//              context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
-//            influxRef.foreach { ref =>
-//              val isBlock: Boolean = pmod match {
-//                case _: Payload => true
-//                case _ => false
-//              }
-//              if (isBlock) ref ! ModifierAppendedToState(success = true)
-//            }
 //            sendUpdatedInfoTo MemoryPool(progressInfo.toRemove)
 //            if (progressInfo.chainSwitchingNeeded)
 //              nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
 //            blocksApplied.foreach(nodeView.wallet.scanPersistent)
-//            logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-//            if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
-//              context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
 //            if (newHistory.isFullChainSynced) {
 //              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
 //              ModifiersCache.setChainSynced()
@@ -265,23 +234,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 //          } else {
 //            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
 //            context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-//            logger.debug(s"\nProgress info is empty")
 //            updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
 //          }
         case Left(e) =>
-          influxRef.foreach { ref =>
-            val isHeader: Boolean = pmod match {
-              case _: Header => true
-              case _: Payload => false
-            }
-            ref ! ModifierAppendedToHistory(isHeader, success = false)
-          }
-          logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
-            s" to history caused $e")
           context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
       }
     }
-    else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
+    else ()
 
   def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
     val rolledBackTxs: IndexedSeq[Transaction] = toRemove

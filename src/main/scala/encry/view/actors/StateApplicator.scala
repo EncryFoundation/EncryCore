@@ -232,12 +232,14 @@ class StateApplicator(setting: EncryAppSettings,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
-  def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
+  def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit = {
+    if (pi.toDownload.isEmpty) logger.info(s"requestDownloads StateAplicaator to download is empty")
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
+  }
 }
 
 object StateApplicator {
