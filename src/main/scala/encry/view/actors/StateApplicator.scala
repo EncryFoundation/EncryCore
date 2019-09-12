@@ -45,9 +45,6 @@ class StateApplicator(setting: EncryAppSettings,
 
   var isInProgress: Boolean = false
 
-  import context.dispatcher
-
-
   override def postStop(): Unit = logger.info(s"State droped")
 
   //todo add supervisor strategy
@@ -148,6 +145,9 @@ class StateApplicator(setting: EncryAppSettings,
             StorageVersion !@@ block.id,
             combinedStateChange.outputsToDb.toList,
             combinedStateChange.inputsToDb.toList
+          )
+          infoAboutCurrentFoldIteration._3.foreach(b =>
+            context.system.eventStream.publish(SemanticallySuccessfulModifier(b))
           )
           validatedTxs = Nil
           if (infoAboutCurrentFoldIteration._1.isEmpty) {

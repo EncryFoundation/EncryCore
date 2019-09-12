@@ -3,28 +3,29 @@ package encry.view.actors
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{Actor, ActorRef, OneForOneStrategy, Props, Terminated}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{nodeViewSynchronizer, miner}
+import encry.EncryApp.{miner, nodeViewSynchronizer}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.local.miner.Miner
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallyFailedModification}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, SemanticallySuccessfulModifier, SyntacticallyFailedModification, UpdatedHistory}
 import encry.settings.EncryAppSettings
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, CompareViewsWithSender}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator.{NeedToReportValid, NotificationAboutSuccessfullyAppliedModifier, RequestNextModifier}
 import encry.view.history.History
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.concurrent.duration._
 import scala.collection.immutable.{HashMap, Queue}
-import scala.collection.mutable
+import scala.collection.{Seq, mutable}
 
 class HistoryApplicator(history: History, //try to use state monad hear
                         state: UtxoState, //try to use state monad hear
@@ -33,16 +34,6 @@ class HistoryApplicator(history: History, //try to use state monad hear
   val stateApplicator: ActorRef = context.system
     .actorOf(StateApplicator.props(setting, history, self, state).withDispatcher("state-applicator-dispatcher"),
       "state")
-
-  def commonSupervisorStrategy: OneForOneStrategy = OneForOneStrategy(
-    maxNrOfRetries = 5,
-    withinTimeRange = 60 seconds) {
-    case msg =>
-      logger.info(s"$msg from state actor")
-      Restart
-  }
-
-  context.watch(stateApplicator)
 
   var modifiersQueue: Queue[(PersistentModifier, ProgressInfo)] = Queue.empty[(PersistentModifier, ProgressInfo)]
   var modifiersCache: HashMap[String, PersistentModifier] = HashMap.empty[String, PersistentModifier]
@@ -62,6 +53,16 @@ class HistoryApplicator(history: History, //try to use state monad hear
       logger.info(s"Modifier ${mod.encodedId} contains in history or in modifiers cache. Reject it.")
 
     case NeedToReportValid(h) => history.reportModifierIsValid(h)
+
+    case CompareViewsWithSender(peer, modifierTypeId, modifierIds, senderRef) =>
+      val ids: Seq[ModifierId] = modifierTypeId match {
+        case _ => modifierIds
+          .filterNot(mid => history.isModifierDefined(mid) || ModifiersCache.contains(toKey(mid)))
+      }
+      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId))) {
+        senderRef ! RequestFromLocal(peer, modifierTypeId, ids)
+        logger.info(s"Trigger CompareViewsWithSender to $senderRef with ${ids.size}")
+      }
   }
 
   def processingModifier: Receive = {
@@ -101,6 +102,7 @@ class HistoryApplicator(history: History, //try to use state monad hear
       }
 
     case NotificationAboutSuccessfullyAppliedModifier =>
+      context.system.eventStream.publish(UpdatedHistory(history))
       if (history.isFullChainSynced) {
         logger.info(s"blockchain is synced on nvh on height ${history.getBestHeaderHeight}!")
         ModifiersCache.setChainSynced()
@@ -123,13 +125,13 @@ class HistoryApplicator(history: History, //try to use state monad hear
   }
 
   def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
-    logger.info(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
+    logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
     val tmp: List[PersistentModifier] = ModifiersCache.popCandidate(history)
-    if (tmp.isEmpty) logger.info(s"No applicable modifier to history from cache.")
-    if (tmp.size > 1) logger.info(s"Size of getModifierForApplying tmp is ${tmp.size}")
+    if (tmp.isEmpty) logger.debug(s"No applicable modifier to history from cache.")
+    if (tmp.size > 1) logger.debug(s"Size of getModifierForApplying tmp is ${tmp.size}")
     logger.debug(s"${ModifiersCache.cache.map(l => l._2.encodedId).mkString(",")}")
     tmp.foreach { modifier =>
-      logger.info(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
+      logger.debug(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
         s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
         s" Current mod cache size ${ModifiersCache.size}")
       self ! ModifierForHistoryApplicator(modifier)

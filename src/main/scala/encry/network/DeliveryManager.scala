@@ -73,6 +73,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
     networkControllerRef ! RegisterMessagesHandler(
       Seq(ModifiersNetworkMessage.NetworkMessageTypeID -> "ModifiersNetworkMessage"), self)
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
+    context.system.eventStream.subscribe(self, classOf[UpdatedHistory])
   }
 
   override def receive: Receive = {

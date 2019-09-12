@@ -108,21 +108,18 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
 
-    case CompareViews(peer, modifierTypeId, modifierIds) =>
-      logger.debug(s"Start processing CompareViews message on NVH.")
-      val startTime = System.currentTimeMillis()
-      val ids: Seq[ModifierId] = modifierTypeId match {
-        case _ => modifierIds
-          .filterNot(mid => nodeView.history.isModifierDefined(mid) || ModifiersCache.contains(key(mid)))
-      }
-      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
-        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
-        s" Sending RequestFromLocal with ids to $sender." +
-        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
-        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
-      logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
-
+    case msg@CompareViews(peer, modifierTypeId, modifierIds) =>
+      historyApplicator ! CompareViewsWithSender(peer, modifierTypeId, modifierIds, sender())
+//      val ids: Seq[ModifierId] = modifierTypeId match {
+//        case _ => modifierIds
+//          .filterNot(mid => nodeView.history.isModifierDefined(mid) || ModifiersCache.contains(key(mid)))
+//      }
+//      if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got compare view message on NVH from ${peer.socketAddress}." +
+//        s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
+//        s" Sending RequestFromLocal with ids to $sender." +
+//        s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
+//      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
+//        sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
@@ -353,6 +350,11 @@ object NodeViewHolder {
     case object GetWallet
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
+
+    case class CompareViewsWithSender(source: ConnectedPeer,
+                                      modifierTypeId: ModifierTypeId,
+                                      modifierIds: Seq[ModifierId],
+                                      sender: ActorRef)
 
     final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
 
