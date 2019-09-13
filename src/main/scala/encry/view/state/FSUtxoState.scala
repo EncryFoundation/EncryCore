@@ -79,11 +79,14 @@ final case class FSUtxoState(storage: VersionalStorage,
   override def validate(tx: Transaction, allowedOutputDelta: Amount): Either[ValidationResult, Transaction] =
     tx.asRight[ValidationResult]
 
-  def resolveState(history: History): UtxoState = UtxoState(
-    storage,
-    height,
-    lastBlockTimestamp
-  )
+  def resolveState(history: History): UtxoState = {
+    //storage.getAll(-1).flatMap{case (key, _) => history.historyStorage.get(key)}
+    UtxoState(
+      storage,
+      height,
+      lastBlockTimestamp
+    )
+  }
 }
 
 object FSUtxoState extends StrictLogging {

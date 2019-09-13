@@ -144,7 +144,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     }
   }
 
-  def toDownload(header: Header): Option[(ModifierTypeId, ModifierId)] =
+  def toDownload(header: Header): Option[(ModifierTypeId, ModifierId)] = {
+    logger.info(s"header height ${header.height} is newHeader: ${isNewHeader(header)}")
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
@@ -153,6 +154,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       blockDownloadProcessor.updateBestBlock(header)
       none
     } else none
+  }
 
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
     @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
