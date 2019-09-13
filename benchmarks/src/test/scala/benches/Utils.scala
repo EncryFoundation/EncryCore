@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{ConstantsSettings, EncryAppSettings}
+import encry.settings.{Settings, EncryAppSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -34,7 +34,7 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-object Utils extends ConstantsSettings with StrictLogging {
+object Utils extends Settings with StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
@@ -65,13 +65,13 @@ object Utils extends ConstantsSettings with StrictLogging {
     val txs = Seq(coinbaseTransaction(0))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
-      height = constants.GenesisHeight
+      height = settings.constants.GenesisHeight
     )
     Block(header, Payload(header.id, txs))
   }
 
   def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = constants.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = settings.constants.GenesisHeight)
     Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
@@ -112,7 +112,6 @@ object Utils extends ConstantsSettings with StrictLogging {
   def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
                                                             state: UtxoState,
                                                             box: Seq[AssetBox],
-                                                            intrinsicTokenId: ADKey,
                                                             splitCoef: Int = 2,
                                                             addDiff: Difficulty = Difficulty @@ BigInt(0)
                                                             ): Block = {
@@ -151,7 +150,7 @@ object Utils extends ConstantsSettings with StrictLogging {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b =>
       history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
-      .getOrElse(constants.InitialDifficulty)
+      .getOrElse(settings.constants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.getBestHeaderHeight + 1,
@@ -181,7 +180,7 @@ object Utils extends ConstantsSettings with StrictLogging {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(dir, keepVersions = constants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
@@ -195,7 +194,7 @@ object Utils extends ConstantsSettings with StrictLogging {
 
     new UtxoState(
       storage,
-      constants.PreGenesisHeight,
+      settings.constants.PreGenesisHeight,
       0L,
       settings.constants
     )
@@ -216,7 +215,7 @@ object Utils extends ConstantsSettings with StrictLogging {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      constants.InitialDifficulty,
+      settings.constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

@@ -7,7 +7,7 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
-import encry.settings.ConstantsSettings
+import encry.settings.Settings
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
@@ -28,7 +28,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
   with ScalaFutures
   with StrictLogging
   with NodesFromDocker
-  with ConstantsSettings {
+  with Settings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
     .withFallback(Configs.offlineGeneration(true))
@@ -46,8 +46,8 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     val waitTime: FiniteDuration = 30.minutes
 
     val supplyAtHeight: Long = (0 to secondHeightToWait).foldLeft(0: Long) {
-      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, constants.InitialEmissionAmount,
-        constants.EmissionEpochLength, constants.EmissionDecay)
+      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, settings.constants.InitialEmissionAmount,
+        settings.constants.EmissionEpochLength, settings.constants.EmissionDecay)
     }
 
     Await.result(dockerNodes().head.waitForHeadersHeight(firstHeightToWait), waitTime)
@@ -67,7 +67,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     Await.result(dockerNodes().head.waitForHeadersHeight(secondHeightToWait), waitTime)
 
     val checkBalance: Boolean = Await.result(dockerNodes().head.balances, waitTime)
-      .find(_._1 == Algos.encode(constants.IntrinsicTokenId))
+      .find(_._1 == Algos.encode(settings.constants.IntrinsicTokenId))
       .map(_._2 == supplyAtHeight - amount)
       .get
 

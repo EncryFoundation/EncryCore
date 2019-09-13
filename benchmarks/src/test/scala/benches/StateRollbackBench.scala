@@ -76,13 +76,11 @@ object StateRollbackBench extends BenchSettings {
           val nextBlockMainChain: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
             block,
             stateL,
-            block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq,
-            settings.constants.IntrinsicTokenId)
+            block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
           val nextBlockFork: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
             block,
             stateL,
             block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq,
-            settings.constants.IntrinsicTokenId,
             addDiff = Difficulty @@ BigInt(100)
           )
           val stateN: UtxoState = stateL.applyModifier(nextBlockMainChain).right.get

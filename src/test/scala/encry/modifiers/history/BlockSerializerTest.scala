@@ -1,7 +1,7 @@
 package encry.modifiers.history
 
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.ConstantsSettings
+import encry.settings.Settings
 import encry.utils.{EncryGenerator, TestHelper}
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history._
@@ -11,7 +11,7 @@ import org.scalatest.FunSuite
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
-class BlockSerializerTest extends FunSuite with EncryGenerator with ConstantsSettings {
+class BlockSerializerTest extends FunSuite with EncryGenerator with Settings {
 
   test("testToBytes $ testFromBytes") {
 
@@ -22,7 +22,7 @@ class BlockSerializerTest extends FunSuite with EncryGenerator with ConstantsSet
       99999L,
       199,
       999L,
-      constants.InitialDifficulty,
+      settings.constants.InitialDifficulty,
       EquihashSolution(Seq(1, 2, 3))
     )
 

@@ -23,7 +23,7 @@ trait SettingsReaders {
     new InetSocketAddress(split(0), split(1).toInt)
   }
 
-  implicit val constantsSettingsReader: ValueReader[Constants] = (cfg, path) => {
+  implicit val ConstantsSettingsReader: ValueReader[Constants] = (cfg, path) => {
     def getConstants(constantsClass: String): Constants = {
       constantsClass match {
         case "TestConstants" => TestConstants

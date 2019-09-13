@@ -49,7 +49,7 @@ case object TestConstants extends Constants {
 
   val NewHeaderTimeMultiplier: Int = 5
 
-  val RetargetingEpochsQty: Int = 2
+  val RetargetingEpochsQty: Int = 4
 
   val EpochLength: Int = 100
 

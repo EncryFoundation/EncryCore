@@ -2,7 +2,7 @@ package encry.view.history
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.ConstantsSettings
+import encry.settings.Settings
 import encry.storage.VersionalStorage.StorageKey
 import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -12,14 +12,14 @@ import scorex.crypto.hash.Digest32
 
 import scala.reflect.ClassTag
 
-trait HistoryDBApi extends ConstantsSettings with StrictLogging {
+trait HistoryDBApi extends Settings with StrictLogging {
 
   val historyStorage: HistoryStorage
 
   val BestHeaderKey: StorageKey =
-    StorageKey @@ Array.fill(constants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
+    StorageKey @@ Array.fill(settings.constants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
   val BestBlockKey: StorageKey =
-    StorageKey @@ Array.fill(constants.DigestLength)(-1: Byte)
+    StorageKey @@ Array.fill(settings.constants.DigestLength)(-1: Byte)
 
   private def getModifierById[T: ClassTag](id: ModifierId): Option[T] = historyStorage
     .modifierById(id)
@@ -40,13 +40,13 @@ trait HistoryDBApi extends ConstantsSettings with StrictLogging {
   def getBestHeaderDB: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdDB)
   def getBestHeaderHeightDB: Int = getBestHeaderId
     .flatMap(getHeightByHeaderIdDB)
-    .getOrElse(constants.PreGenesisHeight)
+    .getOrElse(settings.constants.PreGenesisHeight)
 
   def getBestBlockId: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
   def getBestBlockDB: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdDB)
   def getBestBlockHeightDB: Int = getBestBlockId
     .flatMap(getHeightByHeaderIdDB)
-    .getOrElse(constants.PreGenesisHeight)
+    .getOrElse(settings.constants.PreGenesisHeight)
 
   def modifierBytesByIdDB(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
