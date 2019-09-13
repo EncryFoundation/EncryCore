@@ -12,12 +12,12 @@ import java.util
 
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
-  var versionsList: List[LevelDBVersion] = versionsListInDB()
+  var versionsList: Array[LevelDBVersion] = versionsListInDB()
 
-  def versionsListInDB(readOptions: ReadOptions = new ReadOptions()): List[LevelDBVersion] = {
+  def versionsListInDB(readOptions: ReadOptions = new ReadOptions()): Array[LevelDBVersion] = {
     if (db.get(VERSIONS_LIST, readOptions) != null)
       splitValue2elems(settings.versionKeySize, db.get(VERSIONS_LIST, readOptions)).map(elem => LevelDBVersion @@ elem)
-    else List.empty
+    else Array.empty
   }
 
   def currentVersion: LevelDBVersion = LevelDBVersion @@ db.get(CURRENT_VERSION_KEY)
@@ -72,7 +72,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       //Set current version to newElem.version
       batch.put(CURRENT_VERSION_KEY, newElem.version)
       //Insert new version to versions list
-      batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList.flatten)
+      batch.put(VERSIONS_LIST, ArrayUtils.addAll(newElem.version, versionsList.flatten))
       //Ids of all elements, added by newElem
       versionsList = newElem.version +: versionsList
       batch.put(versionKey(newElem.version), newElem.elemsToInsert.flatMap(_._1).toArray)
@@ -133,7 +133,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     *
     * @return
     */
-  private def rollbackResolver(versionsToResolve: List[LevelDBVersion]): Unit = {
+  private def rollbackResolver(versionsToResolve: Array[LevelDBVersion]): Unit = {
     if (versionsToResolve.nonEmpty) {
       val versionToResolve = versionsToResolve.head
       val readOptions = new ReadOptions()
@@ -275,12 +275,12 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     }
   }
 
-  def inaccessibleKeys(readOptions: ReadOptions = new ReadOptions()): List[VersionalLevelDbKey] = {
+  def inaccessibleKeys(readOptions: ReadOptions = new ReadOptions()): Array[VersionalLevelDbKey] = {
     val currentVersions = versionsList
     currentVersions.flatMap(version => getInaccessiableKeysInVersion(version, readOptions))
   }
 
-  def getInaccessiableKeysInVersion(version: LevelDBVersion, readOptions: ReadOptions): List[VersionalLevelDbKey] = {
+  def getInaccessiableKeysInVersion(version: LevelDBVersion, readOptions: ReadOptions): Array[VersionalLevelDbKey] = {
     splitValue2elems(
       //size of elem key from settings
       32,
@@ -446,7 +446,7 @@ object VersionalLevelDBCompanion {
   def userKey(key: VersionalLevelDbKey): VersionalLevelDbKey =
     VersionalLevelDbKey @@ (USER_KEY_PREFIX +: key)
 
-  def splitValue2elems(elemSize: Int, value: Array[Byte] = Array.emptyByteArray): List[Array[Byte]] = {
+  def splitValue2elems(elemSize: Int, value: Array[Byte] = Array.emptyByteArray): Array[Array[Byte]] = {
     val resultArray = new Array[Array[Byte]](value.length / elemSize)
     (0 until (value.length / elemSize)).foreach {
       i =>
@@ -454,6 +454,6 @@ object VersionalLevelDBCompanion {
         System.arraycopy(value, i * elemSize, bufferArray, 0, elemSize)
         resultArray(i) = bufferArray
     }
-    resultArray.toList
+    resultArray
   }
 }

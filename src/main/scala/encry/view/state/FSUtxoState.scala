@@ -16,6 +16,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height, ModifierId}
 import org.encryfoundation.common.validation.ValidationResult
 import cats.syntax.either._
+import cats.instances.list._
 import com.google.common.primitives.Ints
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
@@ -29,12 +30,16 @@ import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
+import encry.EncryApp._
+import scala.collection.immutable.HashSet
 import scala.util.Try
 
 final case class FSUtxoState(storage: VersionalStorage,
                              height: Height,
                              lastBlockTimestamp: Long) extends State with StrictLogging {
+
+  var stateBatchToAdd: HashSet[StorageKey] = HashSet.empty
+  var stateBatchToDelete: HashSet[StorageKey] = HashSet.empty
 
   override def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], FSUtxoState] = {
     mod match {
@@ -47,11 +52,19 @@ final case class FSUtxoState(storage: VersionalStorage,
         ).asRight[List[ModifierApplyError]]
       case block: Block =>
         val combinedStateChange = combineAll(block.payload.txs.map(FSUtxoState.tx2StateChange).toList)
-        storage.insert(
-          StorageVersion !@@ block.id,
-          combinedStateChange.outputsToDb.toList,
-          combinedStateChange.inputsToDb.toList
-        )
+        stateBatchToAdd ++= combinedStateChange.outputsToDb.map(_._1).toSet
+        stateBatchToDelete ++= combinedStateChange.inputsToDb.toSet
+        if (height % settings.network.networkChunkSize == 0) {
+          val toAdd = stateBatchToAdd.diff(stateBatchToDelete).map(_ -> StorageValue @@ Array.emptyByteArray)
+          val toDelete = stateBatchToDelete.diff(stateBatchToAdd)
+          storage.insert(
+            StorageVersion !@@ block.id,
+            toAdd.toList,
+            toDelete.toList
+          )
+          stateBatchToAdd = HashSet.empty
+          stateBatchToDelete = HashSet.empty
+        }
         FSUtxoState(
           storage,
           Height @@ block.header.height,

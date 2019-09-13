@@ -9,20 +9,21 @@ import scorex.utils.{Random => ScorexRandom}
 import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Header, HistoryModifiersProtoSerializer}
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.util.{Failure, Random, Success}
 import cats.syntax.option._
-import org.encryfoundation.common.utils.{Algos, TaggedTypes}
-import org.encryfoundation.common.utils.constants.TestNetConstants
-import supertagged.@@
+import org.apache.commons.lang.ArrayUtils
+import org.encryfoundation.common.utils.Algos
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = (store match {
     case iodb: IODBHistoryWrapper => iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data)
-    case _: VLDBWrapper           => store.get(StorageKey @@ id.untag(ModifierId))
+    case _: VLDBWrapper           =>
+      //logger.info(s"Get from storage next bytes by id ${Algos.encode(id)}: ${Algos.encode(Algos.hash(res.get))}")
+        store.get(StorageKey @@ id.untag(ModifierId))
   })
     .flatMap(res => HistoryModifiersProtoSerializer.fromProto(res) match {
       case Success(b) => b.some
@@ -39,26 +40,26 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     case _: VLDBWrapper           => store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
   }
 
-  def insertObjects(objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+  def insertObjects(objectsToInsert: Seq[(PersistentModifier, Option[Array[Byte]])]): Unit = store match {
     case iodb: IODBHistoryWrapper =>
       iodb.objectStore.update(
         Random.nextLong(),
         Seq.empty,
-        objectsToInsert.map(obj => ByteArrayWrapper(obj.id) ->
-          ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj)))
+        objectsToInsert.map(obj => ByteArrayWrapper(obj._1.id) ->
+          ByteArrayWrapper(obj._2.getOrElse(HistoryModifiersProtoSerializer.toProto(obj._1))))
       )
     case _: VLDBWrapper =>
       insert(
-        StorageVersion @@ objectsToInsert.head.id.untag(ModifierId),
+        StorageVersion @@ objectsToInsert.head._1.id.untag(ModifierId),
         objectsToInsert.map(obj =>
-          StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
+          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2.getOrElse(HistoryModifiersProtoSerializer.toProto(obj._1))
         ).toList,
       )
   }
 
   def bulkInsert(version: Array[Byte],
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                 objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+                 objectsToInsert: Seq[(PersistentModifier, Option[Array[Byte]])]): Unit = store match {
     case _: IODBHistoryWrapper =>
       insertObjects(objectsToInsert)
       insert(
@@ -66,13 +67,15 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
       )
     case _: VLDBWrapper =>
-      logger.info(s"for header ${Algos.encode(version)} inserting ${objectsToInsert.mkString(",")}")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>
           StorageKey @@ key -> StorageValue @@ value
         } ++ objectsToInsert.map(obj =>
-          StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
+          StorageKey @@ obj._1.id.untag(ModifierId) -> {
+            logger.info(s"obj._2 for mod ${Algos.encode(obj._1.id)} is ${obj._2}")
+            StorageValue @@ obj._2.map(bytes => obj._1.modifierTypeId +: bytes).getOrElse(HistoryModifiersProtoSerializer.toProto(obj._1))
+          }
         )).toList
       )
   }

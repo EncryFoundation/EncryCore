@@ -17,6 +17,7 @@ import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.mempool.MemoryPool.NewTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(settings: EncryAppSettings,
@@ -39,7 +40,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
-            nodeViewHolder ! ModifierFromRemote(modifier)
+            nodeViewHolder ! ModifierFromRemote(modifier, bytes)
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)

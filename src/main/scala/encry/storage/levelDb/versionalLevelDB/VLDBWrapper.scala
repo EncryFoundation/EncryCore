@@ -13,7 +13,7 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
     StorageVersion @@ vldb.currentVersion.untag(LevelDBVersion)
 
   override def versions: List[StorageVersion] =
-    vldb.versionsList.map(StorageVersion @@ _.untag(LevelDBVersion))
+    vldb.versionsList.map(StorageVersion @@ _.untag(LevelDBVersion)).toList
 
   override def contains(key: StorageKey): Boolean = vldb.contains(VersionalLevelDbKey @@ key.untag(StorageKey))
 
