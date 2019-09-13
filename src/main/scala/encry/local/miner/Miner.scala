@@ -121,6 +121,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef]) extends Actor with S
     case FullBlockChainIsSynced() =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
+    case TransactionsForMiner(_) =>
     case DisableMining | SemanticallySuccessfulModifier(_) =>
   }
 

@@ -22,6 +22,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
+import encry.stats.StatsSender.{ModifierAppendedToState, TransactionsInBlock}
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import org.encryfoundation.common.utils.Algos
@@ -33,7 +34,7 @@ class StateApplicator(setting: EncryAppSettings,
                       historyApplicator: ActorRef,
                       state: UtxoState,
                       walletApplicator: ActorRef,
-                      nodeViewHolder: ActorRef) extends Actor with StrictLogging {
+                      influxRef: Option[ActorRef]) extends Actor with StrictLogging {
 
   var transactionsValidatorsNumber: Int = 0
   var isInProgress: Boolean = false
@@ -130,6 +131,10 @@ class StateApplicator(setting: EncryAppSettings,
         )
         context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
         historyApplicator ! NeedToReportAsValid(block)
+        influxRef.foreach { ref =>
+          ref ! ModifierAppendedToState(success = true)
+          if (history.isFullChainSynced) ref ! TransactionsInBlock(block.payload.txs.size)
+        }
         if (toApply.isEmpty) {
           logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
           self ! ModifiersApplicationFinished
@@ -238,6 +243,6 @@ object StateApplicator {
             historyApplicator: ActorRef,
             state: UtxoState,
             walletApplicator: ActorRef,
-            nodeViewHolder: ActorRef): Props =
-    Props(new StateApplicator(setting, history, historyApplicator, state, walletApplicator, nodeViewHolder))
+            influxRef: Option[ActorRef]): Props =
+    Props(new StateApplicator(setting, history, historyApplicator, state, walletApplicator, influxRef))
 }

@@ -47,8 +47,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
   })
 
-  val historyApplicator: ActorRef =
-    context.system.actorOf(HistoryApplicator.props(nodeView.history, settings, nodeView.state, nodeView.wallet, self)
+  val historyApplicator: ActorRef = context.system.actorOf(
+    HistoryApplicator.props(nodeView.history, settings, nodeView.state, nodeView.wallet, self, influxRef)
       .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
 
   override def preStart(): Unit = logger.info(s"Node view holder started.")

@@ -6,6 +6,7 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
+import encry.stats.StatsSender.ModifierAppendedToHistory
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
@@ -18,6 +19,7 @@ import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -28,13 +30,14 @@ class HistoryApplicator(history: History,
                         state: UtxoState,
                         wallet: EncryWallet,
                         setting: EncryAppSettings,
-                        nodeViewHolder: ActorRef) extends Actor with StrictLogging {
+                        nodeViewHolder: ActorRef,
+                        influxRef: Option[ActorRef]) extends Actor with StrictLogging {
 
   val walletApplicator: ActorRef =
     context.system.actorOf(WalletApplicator.props(wallet, self), "walletApplicator")
 
   val stateApplicator: ActorRef = context.system.actorOf(
-    StateApplicator.props(setting, history, self, state, walletApplicator, nodeViewHolder)
+    StateApplicator.props(setting, history, self, state, walletApplicator, influxRef)
       .withDispatcher("state-applicator-dispatcher"), name = "stateApplicator"
   )
 
@@ -72,6 +75,12 @@ class HistoryApplicator(history: History,
           modifiersQueue = modifiersQueue.enqueue(modifier.encodedId -> progressInfo)
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
+          influxRef.foreach(ref =>
+            ref ! ModifierAppendedToHistory(modifier match {
+              case _: Header => true
+              case _: Payload => false
+            }, success = true)
+          )
           if (progressInfo.chainSwitchingNeeded)
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
           if(progressInfo.toRemove.nonEmpty)
@@ -162,6 +171,7 @@ object HistoryApplicator {
             setting: EncryAppSettings,
             state: UtxoState,
             wallet: EncryWallet,
-            nodeViewHolder: ActorRef): Props =
-    Props(new HistoryApplicator(history, state, wallet, setting, nodeViewHolder))
+            nodeViewHolder: ActorRef,
+            influxRef: Option[ActorRef]): Props =
+    Props(new HistoryApplicator(history, state, wallet, setting, nodeViewHolder, influxRef))
 }
