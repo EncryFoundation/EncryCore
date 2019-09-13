@@ -32,7 +32,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: PersistentModifier, history: History): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
     cache.put(key, value)
     value match {
       case header: Header =>

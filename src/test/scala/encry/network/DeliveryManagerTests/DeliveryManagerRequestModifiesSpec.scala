@@ -11,7 +11,7 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
-import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.actors.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.PeersKeeper.UpdatedPeersCollection
@@ -118,7 +118,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Header.modifierTypeId -> blocks.map(k => k.header.id -> Array.emptyByteArray).toMap), cp1)
       headersIds.foreach(id =>
         deliveryManager ! DownloadRequest(Payload.modifierTypeId, blocks.find(block =>
-          block.id.sameElements(id)).get.payload.id, Some(id)))
+          block.id.sameElements(id)).get.payload.id))
       assert(deliveryManager.underlyingActor.expectedModifiers.getOrElse(cp1.socketAddress, Map.empty)
         .size == blocks.size)
       deliveryManager.stop()
@@ -163,7 +163,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(header.id -> header.bytes)), cp2)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId, Map(header.id -> header.bytes)), cp3)
 
-      deliveryManager ! DownloadRequest(Payload.modifierTypeId, header.payloadId, Some(header.id))
+      deliveryManager ! DownloadRequest(Payload.modifierTypeId, header.payloadId)
 
       handler1.expectMsgAnyOf(
         RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header.id)),

@@ -2,7 +2,6 @@ package encry.view.actors
 
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.EncrySupplyController
 import encry.view.actors.TransactionsValidator.{StartValidation, TransactionValidatedFailure, TransactionValidatedSuccessfully}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -15,15 +14,13 @@ class TransactionsValidator(state: UtxoState,
                             transaction: Transaction,
                             height: Height) extends Actor with StrictLogging {
 
-  override def preStart(): Unit = {
-    self ! StartValidation
-  }
+  override def preStart(): Unit = self ! StartValidation
 
   override def receive: Receive = {
     case StartValidation =>
       state.validate(transaction, totalFees) match {
         case Left(value) => context.parent ! TransactionValidatedFailure(transaction, value)
-        case Right(value) => context.parent ! TransactionValidatedSuccessfully(value)
+        case Right(_)    => context.parent ! TransactionValidatedSuccessfully
       }
       context.stop(self)
   }
@@ -36,6 +33,6 @@ object TransactionsValidator {
             height: Height): Props = Props(new TransactionsValidator(state, totalFees, transaction, height))
 
   case object StartValidation
-  final case class TransactionValidatedSuccessfully(tx: Transaction) extends AnyVal
+  case object TransactionValidatedSuccessfully
   final case class TransactionValidatedFailure(tx: Transaction, exceptions: ValidationResult)
 }

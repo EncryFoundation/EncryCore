@@ -7,7 +7,7 @@ import encry.settings.EncryAppSettings
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import encry.EncryApp._
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.state.UtxoState
 import org.encryfoundation.common.utils.Algos
 import scala.concurrent.Future
