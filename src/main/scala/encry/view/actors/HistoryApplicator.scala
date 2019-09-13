@@ -1,6 +1,8 @@
 package encry.view.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
@@ -11,7 +13,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
+import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.WalletApplicator.WalletNeedRollbackTo
@@ -23,6 +25,7 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 
@@ -83,7 +86,7 @@ class HistoryApplicator(history: History,
           )
           if (progressInfo.chainSwitchingNeeded)
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
-          if(progressInfo.toRemove.nonEmpty)
+          if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
           stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying()
@@ -154,6 +157,7 @@ class HistoryApplicator(history: History,
   }
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
+
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
 }
@@ -166,6 +170,17 @@ object HistoryApplicator {
 
   final case class StartModifiersApplicationOnStateApplicator(progressInfo: ProgressInfo,
                                                               suffixApplied: IndexedSeq[PersistentModifier])
+
+  class HistoryApplicatorPriorityQueue(settings: ActorSystem.Settings, config: Config)
+    extends UnboundedStablePriorityMailbox(
+      PriorityGenerator {
+        case NeedToReportAsValid(_) | NeedToReportAsInValid(_) => 0
+        case ModifierToHistoryAppending(_, _) => 1
+        case NotificationAboutSuccessfullyAppliedModifier => 2
+        case RequestNextModifier => 3
+        case PoisonPill => 5
+        case otherwise => 4
+      })
 
   def props(history: History,
             setting: EncryAppSettings,

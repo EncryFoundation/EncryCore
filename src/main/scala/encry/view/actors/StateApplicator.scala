@@ -72,12 +72,14 @@ class StateApplicator(setting: EncryAppSettings,
           val height: Height = Height @@ block.header.height
           block.payload.txs.foreach {
             case tx if tx.id sameElements lastTxId => context.actorOf(
-              TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(height), tx, height),
+              TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(height), tx, height)
+              .withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"
             )
               transactionsValidatorsNumber += 1
             case tx => context.actorOf(
-              TransactionsValidator.props(state, 0L, tx, height), s"validatorFor:${tx.encodedId}"
+              TransactionsValidator.props(state, 0L, tx, height).withDispatcher("transaction-validator-dispatcher"),
+              s"validatorFor:${tx.encodedId}"
             )
               transactionsValidatorsNumber += 1
           }
