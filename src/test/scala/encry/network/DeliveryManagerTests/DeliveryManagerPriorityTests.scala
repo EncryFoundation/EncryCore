@@ -15,7 +15,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PeersKeeper.UpdatedPeersCollection
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
-import encry.settings.{EncryAppSettings, TestNetSettings}
+import encry.settings.TestNetSettings
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -35,17 +35,17 @@ class DeliveryManagerPriorityTests extends WordSpecLike
   def initialiseState: (TestActorRef[DeliveryManager], ConnectedPeer, ConnectedPeer, ConnectedPeer,
     ConnectedPeer, ConnectedPeer, ConnectedPeer, ConnectedPeer, ConnectedPeer, ConnectedPeer,
     List[Block], List[ModifierId]) = {
-    val (deliveryManager, _) = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, settings)
-    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
-    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", settings)
-    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", settings)
-    val (_: InetSocketAddress, cp4: ConnectedPeer) = createPeer(9004, "172.16.13.13", settings)
-    val (_: InetSocketAddress, cp5: ConnectedPeer) = createPeer(9005, "172.16.13.14", settings)
-    val (_: InetSocketAddress, cp6: ConnectedPeer) = createPeer(9006, "172.16.13.15", settings)
-    val (_: InetSocketAddress, cp7: ConnectedPeer) = createPeer(9007, "172.16.13.16", settings)
-    val (_: InetSocketAddress, cp8: ConnectedPeer) = createPeer(9008, "172.16.13.17", settings)
-    val (_: InetSocketAddress, cp9: ConnectedPeer) = createPeer(9009, "172.16.13.18", settings)
-    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(settings))._2
+    val (deliveryManager, _) = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, testNetSettings)
+    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", testNetSettings)
+    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", testNetSettings)
+    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", testNetSettings)
+    val (_: InetSocketAddress, cp4: ConnectedPeer) = createPeer(9004, "172.16.13.13", testNetSettings)
+    val (_: InetSocketAddress, cp5: ConnectedPeer) = createPeer(9005, "172.16.13.14", testNetSettings)
+    val (_: InetSocketAddress, cp6: ConnectedPeer) = createPeer(9006, "172.16.13.15", testNetSettings)
+    val (_: InetSocketAddress, cp7: ConnectedPeer) = createPeer(9007, "172.16.13.16", testNetSettings)
+    val (_: InetSocketAddress, cp8: ConnectedPeer) = createPeer(9008, "172.16.13.17", testNetSettings)
+    val (_: InetSocketAddress, cp9: ConnectedPeer) = createPeer(9009, "172.16.13.18", testNetSettings)
+    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(testNetSettings))._2
     val headersIds: List[ModifierId] = blocks.map(_.header.id)
     (deliveryManager, cp1, cp2, cp3, cp4, cp5, cp6,cp7, cp8, cp9, blocks, headersIds)
   }
