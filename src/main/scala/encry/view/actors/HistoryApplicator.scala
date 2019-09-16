@@ -161,6 +161,8 @@ class HistoryApplicator(history: History,
 
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
+  def restoreHistory = if (History.getHistoryIndexDir(setting).listFiles.nonEmpty) ()
+
 }
 
 object HistoryApplicator {
