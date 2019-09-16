@@ -13,7 +13,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, LocallyGeneratedBlock, ModifierFromRemote}
+import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.WalletApplicator.WalletNeedRollbackTo
@@ -25,7 +25,6 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 

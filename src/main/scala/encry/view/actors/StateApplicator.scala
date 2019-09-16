@@ -10,7 +10,7 @@ import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.StorageVersion
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
-import encry.view.actors.NodeViewHolder.{DownloadRequest, UpdateInformation}
+import encry.view.actors.NodeViewHolder.DownloadRequest
 import encry.view.actors.HistoryApplicator.{NotificationAboutNewModifier, StartModifiersApplicationOnStateApplicator}
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
@@ -55,30 +55,31 @@ class StateApplicator(setting: EncryAppSettings,
             self ! StartModifiersApplying
             context.become(modifierApplication(
               newToApply,
-              UpdateInformation(history, state, none, none, updateInformation.suffix :+ header)
+              UpdateInformation(none, none, updateInformation.suffix :+ header)
             ))
           } else {
             logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted." +
               s"Headers height is ${header.height}")
             self ! ModifiersApplicationFinished
             context.become(modifiersApplicationCompleted(
-              UpdateInformation(history, state, none, none, updateInformation.suffix :+ header)
+              UpdateInformation(none, none, updateInformation.suffix :+ header)
             ))
           }
         case block: Block =>
           logger.info(s"Start block ${block.encodedId} validation to the state with height ${block.header.height}")
           val lastTxId: ModifierId = block.payload.txs.last.id
-          val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-          val height: Height = Height @@ block.header.height
+          val totalFees: Amount = block.payload.txs.dropRight(1).map(_.fee).sum
           block.payload.txs.foreach {
-            case tx if tx.id sameElements lastTxId => context.actorOf(
-              TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(height), tx, height)
-              .withDispatcher("transaction-validator-dispatcher"),
+            case tx if tx.id sameElements lastTxId =>
+              if(block.header.height > 5000) println(s"block: ${block.header.height} -> in state ${state.height}")
+              context.actorOf(
+              TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(state.height), tx, state.height)
+                .withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"
             )
               transactionsValidatorsNumber += 1
             case tx => context.actorOf(
-              TransactionsValidator.props(state, 0L, tx, height).withDispatcher("transaction-validator-dispatcher"),
+              TransactionsValidator.props(state, 0L, tx, state.height).withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"
             )
               transactionsValidatorsNumber += 1
@@ -95,7 +96,7 @@ class StateApplicator(setting: EncryAppSettings,
         logger.info(s"StartModifiersApplying w/0 if case to apply is empty")
         self ! ModifiersApplicationFinished
         context.become(modifiersApplicationCompleted(
-          UpdateInformation(history, state, none, none, updateInformation.suffix)
+          UpdateInformation(none, none, updateInformation.suffix)
         ))
       }
     case msg => logger.info(s"Got $msg in modifierApplication")
@@ -137,11 +138,11 @@ class StateApplicator(setting: EncryAppSettings,
           ref ! ModifierAppendedToState(success = true)
           if (history.isFullChainSynced) ref ! TransactionsInBlock(block.payload.txs.size)
         }
+        state.height = Height @@ block.header.height
+        state.lastBlockTimestamp = block.header.timestamp
         if (toApply.isEmpty) {
           logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
           self ! ModifiersApplicationFinished
-          state.height = Height @@ block.header.height
-          state.lastBlockTimestamp = block.header.timestamp
           context.become(modifiersApplicationCompleted(ui))
         } else {
           logger.info(s"awaitingTransactionsValidation finished but infoAboutCurrentFoldIteration._1 is not empty.")
@@ -166,7 +167,7 @@ class StateApplicator(setting: EncryAppSettings,
       context.become(
         modifierApplication(
           toApply.toList,
-          UpdateInformation(history, state, block.some, pi.some, ui.suffix)
+          UpdateInformation(block.some, pi.some, ui.suffix)
         )
       )
     case msg => logger.info(s"Got $msg in awaitingNewProgressInfo")
@@ -203,7 +204,7 @@ class StateApplicator(setting: EncryAppSettings,
           self ! StartModifiersApplying
           context.become(modifierApplication(
             progressInfo.toApply.toList,
-            UpdateInformation(history, stateToApply, none, none, suffixTrimmed)
+            UpdateInformation(none, none, suffixTrimmed)
           ))
       }
     case msg => logger.info(s"Got $msg in updateState")
@@ -239,6 +240,10 @@ object StateApplicator {
   case object ModifiersApplicationFinished
 
   case object RequestNextModifier
+
+  final case class UpdateInformation(failedMod: Option[PersistentModifier],
+                                     alternativeProgressInfo: Option[ProgressInfo],
+                                     suffix: IndexedSeq[PersistentModifier])
 
   def props(setting: EncryAppSettings,
             history: History,

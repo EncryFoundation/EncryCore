@@ -110,6 +110,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
         .view
         .flatMap(getHeaderById)
         .filter(filterCond)
+        .toList
       if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(h =>

@@ -101,7 +101,7 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
             }
         }
       case None =>
-        // No headers become invalid. Just mark this particular modifier as invalid.
+        logger.info(s"No headers become invalid. Just mark this particular modifier as invalid.")
         historyStorage.insert(
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))

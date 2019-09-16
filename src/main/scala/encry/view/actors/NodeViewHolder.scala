@@ -7,7 +7,6 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.{settings, timeProvider}
-import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.stats.StatsSender._
@@ -185,12 +184,6 @@ object NodeViewHolder {
                                    modifierId: ModifierId) extends NodeViewHolderEvent
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
-
-  case class UpdateInformation(history: History,
-                               state: UtxoState,
-                               failedMod: Option[PersistentModifier],
-                               alternativeProgressInfo: Option[ProgressInfo],
-                               suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {
 
