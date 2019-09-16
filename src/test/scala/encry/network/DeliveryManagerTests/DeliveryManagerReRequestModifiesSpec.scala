@@ -13,6 +13,7 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.network.PeersKeeper.UpdatedPeersCollection
+import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.settings.TestNetSettings
@@ -24,7 +25,6 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 import scala.collection.mutable.WrappedArray
-import scala.concurrent.duration._
 
 class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   with BeforeAndAfterAll

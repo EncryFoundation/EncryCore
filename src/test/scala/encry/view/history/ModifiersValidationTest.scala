@@ -14,16 +14,16 @@ class ModifiersValidationTest extends WordSpecLike
 
   "Modifiers validator" should {
     "validate genesis block" in {
-      val newHistory: History = generateDummyHistory(settings)
-      val genesisBlock: Block = generateGenesisBlock(settings.constants.GenesisHeight)
+      val newHistory: History = generateDummyHistory(testNetSettings)
+      val genesisBlock: Block = generateGenesisBlock(testNetSettings.constants.GenesisHeight)
       newHistory.testApplicable(genesisBlock.header).isRight shouldBe true
       val updatedHistory: History =
         newHistory.append(genesisBlock.header).right.get._1.reportModifierIsValid(genesisBlock.header)
       updatedHistory.testApplicable(genesisBlock.payload).isRight shouldBe true
     }
     "reject incorrect modifiers" in {
-      val blocks: List[Block] = generateBlocks(2, generateDummyHistory(settings))._2
-      val newHistory: History = generateDummyHistory(settings)
+      val blocks: List[Block] = generateBlocks(2, generateDummyHistory(testNetSettings))._2
+      val newHistory: History = generateDummyHistory(testNetSettings)
       blocks.take(1).foldLeft(newHistory) { case (history, block) =>
         history.testApplicable(block.header).isRight shouldBe true
         history.append(block.header).right.get._1.reportModifierIsValid(block.header)
