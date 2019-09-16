@@ -9,7 +9,7 @@ import encry.network.BlackList.BanReason._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeersKeeper.BanPeer
-import encry.settings.{EncryAppSettings, AdditionalTestSettings}
+import encry.settings.AdditionalTestSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
