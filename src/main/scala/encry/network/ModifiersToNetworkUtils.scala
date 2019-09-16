@@ -23,9 +23,9 @@ object ModifiersToNetworkUtils extends StrictLogging {
     case m                       => Failure(new RuntimeException(s"Try to deserialize unknown modifier: $m from proto."))
   }).flatten
 
-  def isSyntacticallyValid(modifier: PersistentModifier): Boolean = modifier match {
-    case h: Header  => HeaderUtils.syntacticallyValidity(h).isSuccess
-    case p: Payload => PayloadUtils.syntacticallyValidity(p).isSuccess
+  def isSyntacticallyValid(modifier: PersistentModifier, modifierIdSize: Int): Boolean = modifier  match {
+    case h: Header  => HeaderUtils.syntacticallyValidity(h, modifierIdSize).isSuccess
+    case p: Payload => PayloadUtils.syntacticallyValidity(p, modifierIdSize).isSuccess
     case _          => true
   }
 }

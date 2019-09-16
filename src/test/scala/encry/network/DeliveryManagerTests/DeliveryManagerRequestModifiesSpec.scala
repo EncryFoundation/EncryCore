@@ -1,6 +1,7 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import encry.consensus.HistoryConsensus
@@ -10,7 +11,7 @@ import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, TestNetSettings}
 import encry.view.NodeViewHolder.DownloadRequest
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import encry.network.DeliveryManagerTests.DMUtils._
@@ -22,25 +23,26 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.mutable.WrappedArray
 
 class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfterAll
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest {
+  with OneInstancePerTest
+  with TestNetSettings {
 
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
-  val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
 
   override def afterAll(): Unit = TestKit.shutdownActorSystem(system)
 
   def initialiseState(isChainSynced: Boolean = true, isMining: Boolean = true): (TestActorRef[DeliveryManager],
     ConnectedPeer, ConnectedPeer, ConnectedPeer, List[Block], List[ModifierId], List[WrappedArray.ofByte]) = {
-    val (deliveryManager, _) = initialiseDeliveryManager(isBlockChainSynced = isChainSynced, isMining = isMining, settings)
-    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", settings)
-    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", settings)
-    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", settings)
-    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(settings))._2
+    val (deliveryManager, _) = initialiseDeliveryManager(isBlockChainSynced = isChainSynced, isMining = isMining, testNetSettings)
+    val (_: InetSocketAddress, cp1: ConnectedPeer) = createPeer(9001, "172.16.13.10", testNetSettings)
+    val (_: InetSocketAddress, cp2: ConnectedPeer) = createPeer(9002, "172.16.13.11", testNetSettings)
+    val (_: InetSocketAddress, cp3: ConnectedPeer) = createPeer(9003, "172.16.13.12", testNetSettings)
+    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(testNetSettings))._2
     val headersIds: List[ModifierId] = blocks.map(_.header.id)
     val headersAsKey = headersIds.map(toKey)
     (deliveryManager, cp1, cp2, cp3, blocks, headersIds, headersAsKey)
@@ -129,19 +131,19 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val address2 = new InetSocketAddress("123.123.123.124", 9001)
       val handler2: TestProbe = TestProbe()
       val cp2: ConnectedPeer = ConnectedPeer(address2, handler2.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.124", Some(address2), System.currentTimeMillis()))
 
       val address3 = new InetSocketAddress("123.123.123.125", 9001)
       val handler3: TestProbe = TestProbe()
       val cp3: ConnectedPeer = ConnectedPeer(address3, handler3.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.125", Some(address3), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -181,13 +183,13 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val address2 = new InetSocketAddress("123.123.123.124", 9001)
       val handler2: TestProbe = TestProbe()
       val cp2: ConnectedPeer = ConnectedPeer(address2, handler2.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.124", Some(address2), System.currentTimeMillis()))
 
       val address3 = new InetSocketAddress("123.123.123.125", 9001)
       val handler3: TestProbe = TestProbe()
       val cp3: ConnectedPeer = ConnectedPeer(address3, handler3.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.125", Some(address3), System.currentTimeMillis()))
 
       val updatedPeersCollection =
@@ -214,13 +216,13 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val address2 = new InetSocketAddress("123.123.123.124", 9001)
       val handler2: TestProbe = TestProbe()
       val cp2: ConnectedPeer = ConnectedPeer(address2, handler2.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.124", Some(address2), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -244,7 +246,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -264,7 +266,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
@@ -283,7 +285,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       val address1 = new InetSocketAddress("123.123.123.123", 9001)
       val handler1: TestProbe = TestProbe()
       val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-        Handshake(protocolToBytes(settings.network.appVersion),
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
           "123.123.123.123", Some(address1), System.currentTimeMillis()))
 
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =

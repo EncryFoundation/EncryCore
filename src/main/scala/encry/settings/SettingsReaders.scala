@@ -2,11 +2,13 @@ package encry.settings
 
 import java.io.File
 import java.net.InetSocketAddress
+
 import com.typesafe.config.Config
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageType
 import encry.utils.ByteStr
 import net.ceedubs.ficus.readers.ValueReader
+import org.encryfoundation.common.utils.constants.{Constants, TestNetConstants}
 
 trait SettingsReaders {
   implicit val byteStrReader: ValueReader[ByteStr] = (cfg, path) => ByteStr.decodeBase58(cfg.getString(path)).get
@@ -20,4 +22,18 @@ trait SettingsReaders {
     val split = config.getString(path).split(":")
     new InetSocketAddress(split(0), split(1).toInt)
   }
+
+  implicit val ConstantsSettingsReader: ValueReader[Constants] = (cfg, path) => {
+    def getConstants(constantsClass: String): Constants = {
+      constantsClass match {
+        case "TestConstants" => TestConstants
+        case "SlowMiningConstants" => SlowMiningConstants
+        case _ => TestNetConstants
+      }
+    }
+    getConstants(
+      if (cfg.hasPath(path)) cfg.getString(path) else ""
+    )
+  }
+
 }

@@ -36,10 +36,10 @@ import scala.concurrent.ExecutionContextExecutor
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
                       networkControllerRef: ActorRef,
-                      settings: EncryAppSettings,
                       memoryPoolRef: ActorRef,
                       nodeViewSync: ActorRef,
-                      downloadedModifiersValidator: ActorRef) extends Actor with StrictLogging {
+                      downloadedModifiersValidator: ActorRef,
+                      settings: EncryAppSettings) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -65,7 +65,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
-  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings)
+  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings.network)
 
   var canProcessTransactions: Boolean = true
 
@@ -512,12 +512,12 @@ object DeliveryManager {
   def props(influxRef: Option[ActorRef],
             nodeViewHolderRef: ActorRef,
             networkControllerRef: ActorRef,
-            settings: EncryAppSettings,
             memoryPoolRef: ActorRef,
             nodeViewSync: ActorRef,
-            downloadedModifiersValidator: ActorRef): Props =
-    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings,
-      memoryPoolRef, nodeViewSync, downloadedModifiersValidator))
+            downloadedModifiersValidator: ActorRef,
+            settings: EncryAppSettings): Props =
+    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, memoryPoolRef, nodeViewSync,
+      downloadedModifiersValidator, settings))
 
   class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

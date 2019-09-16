@@ -2,14 +2,16 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
 import benches.Utils._
+import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.IODB
 import encry.view.state.{BoxHolder, UtxoState}
-import encryBenchmark.Settings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.infra.Blackhole
@@ -41,9 +43,7 @@ class StateBenches {
   }
 }
 
-object StateBenches {
-
-  val benchSettings: Settings = Settings.read
+object StateBenches extends BenchSettings {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -64,9 +64,8 @@ object StateBenches {
   }
 
   @State(Scope.Benchmark)
-  class StateBenchState {
+  class StateBenchState extends encry.settings.Settings {
 
-    val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>

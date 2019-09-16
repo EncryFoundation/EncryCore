@@ -4,10 +4,10 @@ package encry.view.nvh
 //  with BeforeAndAfterAll
 //  with Matchers
 //  with InstanceFactory
-//  with OneInstancePerTest {
+//  with OneInstancePerTest
+//  with TestSettings {
 //
 //  implicit val system: ActorSystem = ActorSystem("NodeViewHolderSpec")
-//  val settings: EncryAppSettings = DummyEncryAppSettingsReader.read
 //
 //  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 //

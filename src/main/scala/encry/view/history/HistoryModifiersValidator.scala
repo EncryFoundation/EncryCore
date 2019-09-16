@@ -4,15 +4,16 @@ import encry.view.history.ValidationError.FatalValidationError._
 import encry.view.history.ValidationError.NonFatalValidationError._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
 import encry.consensus.EquihashPowScheme
+import encry.settings.Settings
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 
-trait HistoryModifiersValidator extends HistoryApi {
+trait HistoryModifiersValidator extends HistoryApi with Settings {
 
-  val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k)
+  val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
+    settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
     (modifier match {
@@ -51,7 +52,7 @@ trait HistoryModifiersValidator extends HistoryApi {
       GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
     _ <- Either.cond(getBestHeaderId.isEmpty, (),
       GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
-    _ <- Either.cond(h.height == TestNetConstants.GenesisHeight, (),
+    _ <- Either.cond(h.height == settings.constants.GenesisHeight, (),
       GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
   } yield h
 
@@ -68,7 +69,7 @@ trait HistoryModifiersValidator extends HistoryApi {
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
     _ <- Either.cond(requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
       HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
-    _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < TestNetConstants.MaxRollbackDepth), (),
+    _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < settings.constants.MaxRollbackDepth), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
     powSchemeValidationResult = powScheme.verify(h)
     _ <- Either.cond(powSchemeValidationResult.isRight, (),
@@ -76,7 +77,7 @@ trait HistoryModifiersValidator extends HistoryApi {
         s" caused: $powSchemeValidationResult"))
     _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
       HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
-    _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= TestNetConstants.MaxTimeDrift, (),
+    _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= settings.constants.MaxTimeDrift, (),
       HeaderNonFatalValidationError(s"Header ${h.encodedId} with timestamp ${h.timestamp}" +
         s" is too far in future from now ${timeProvider.estimatedTime}"))
   } yield h

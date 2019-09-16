@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import encry.consensus.HistoryConsensus.{Fork, Older, Unknown, Younger}
@@ -8,18 +9,17 @@ import encry.modifiers.InstanceFactory
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
-import encry.settings.EncryAppSettings
+import encry.settings.TestNetSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 
 class ConnectedPeersCollectionsTests extends WordSpecLike
   with Matchers
   with InstanceFactory
-  with OneInstancePerTest {
+  with OneInstancePerTest
+  with TestNetSettings {
 
-  val settingsWithKnownPeers: EncryAppSettings = NetworkUtils.TestNetworkSettings.read("AdditionalTestSettings.conf")
   implicit val system: ActorSystem = ActorSystem()
-
 
   "ConnectedPeersCollection" should {
     "initialize new peer" in {
@@ -31,7 +31,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address,
         peerHandler.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
 
       val address1: InetSocketAddress = new InetSocketAddress("0.0.0.1", 9000)
@@ -40,7 +40,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address1,
         peerHandler1.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
       )
 
       val peersSeq = Seq(connectedPeer, connectedPeer1)
@@ -60,7 +60,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address,
         peerHandler.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
 
       val address1: InetSocketAddress = new InetSocketAddress("0.0.0.1", 9000)
@@ -69,7 +69,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address1,
         peerHandler1.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
       )
 
       val peersSeq = Seq(connectedPeer, connectedPeer1)
@@ -99,7 +99,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address,
         peerHandler.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
 
       val address1: InetSocketAddress = new InetSocketAddress("0.0.0.1", 9000)
@@ -108,7 +108,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address1,
         peerHandler1.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
       )
 
       val address3: InetSocketAddress = new InetSocketAddress("0.3.0.0", 9000)
@@ -117,7 +117,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address3,
         peerHandler3.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node3", Some(address3), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node3", Some(address3), System.currentTimeMillis())
       )
 
       val peersSeq = Seq(connectedPeer, connectedPeer1, connectedPeer3)
@@ -150,7 +150,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address,
         peerHandler.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
 
       val address1: InetSocketAddress = new InetSocketAddress("0.0.0.1", 9000)
@@ -159,7 +159,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address1,
         peerHandler1.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node 1", Some(address1), System.currentTimeMillis())
       )
 
       val address3: InetSocketAddress = new InetSocketAddress("0.3.0.0", 9000)
@@ -168,7 +168,7 @@ class ConnectedPeersCollectionsTests extends WordSpecLike
         address3,
         peerHandler3.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithKnownPeers.network.appVersion), "test node3", Some(address3), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node3", Some(address3), System.currentTimeMillis())
       )
 
       val peersSeq = Seq(connectedPeer, connectedPeer1, connectedPeer3)

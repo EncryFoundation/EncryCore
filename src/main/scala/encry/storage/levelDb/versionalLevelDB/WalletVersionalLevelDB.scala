@@ -40,11 +40,12 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 
   def rollback(modId: ModifierId): Unit = levelDb.rollbackTo(LevelDBVersion @@ modId.untag(ModifierId))
 
-  def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
+  def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox],
+                   intrinsicTokenId: ADKey): Unit = {
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
     val newBalances: Map[String, Amount] = {
-      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).map { case (key, value) => ByteStr(key) -> value * -1 }
-      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs).map { case (key, value) => ByteStr(key) -> value }
+      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs, intrinsicTokenId).map { case (key, value) => ByteStr(key) -> value * -1 }
+      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs, intrinsicTokenId).map { case (key, value) => ByteStr(key) -> value }
       val prevBalance = getBalances.map { case (id, value) => ByteStr(Algos.decode(id).get) -> value }
       (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case (tokenId, value) => tokenId.toString -> value }
     }
