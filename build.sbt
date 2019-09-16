@@ -110,6 +110,7 @@ val opts = Seq(
   "-XX:+IgnoreUnrecognizedVMOptions",
   "--add-modules=java.xml.bind",
   "-XX:+UseConcMarkSweepGC",
+  "-XX:+PrintCompilation",
   "-XX:+UseNUMA",
   "-XX:+AlwaysPreTouch",
   "-XX:+PerfDisableSharedMem",

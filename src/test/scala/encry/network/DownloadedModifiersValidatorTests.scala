@@ -134,7 +134,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         .send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
       peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
-      nodeViewHolder.expectMsg(ModifierFromRemote(payload, payload.bytes))
+      nodeViewHolder.expectMsg(ModifierFromRemote(payload))
     }
   }
 }

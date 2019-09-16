@@ -15,24 +15,26 @@ import encry.view.actors.HistoryApplicator.{NotificationAboutNewModifier, StartM
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
 import encry.view.history.History
-import encry.view.state.UtxoState
+import encry.view.state.{State, UtxoState}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
+import cats.instances.list._
 import encry.stats.StatsSender.{ModifierAppendedToState, TransactionsInBlock}
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import org.encryfoundation.common.utils.Algos
+
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
 class StateApplicator(setting: EncryAppSettings,
                       history: History,
                       historyApplicator: ActorRef,
-                      state: UtxoState,
+                      state: State,
                       walletApplicator: ActorRef,
                       influxRef: Option[ActorRef]) extends Actor with StrictLogging {
 
@@ -246,7 +248,7 @@ object StateApplicator {
   def props(setting: EncryAppSettings,
             history: History,
             historyApplicator: ActorRef,
-            state: UtxoState,
+            state: State,
             walletApplicator: ActorRef,
             influxRef: Option[ActorRef]): Props =
     Props(new StateApplicator(setting, history, historyApplicator, state, walletApplicator, influxRef))

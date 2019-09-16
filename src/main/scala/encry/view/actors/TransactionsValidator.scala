@@ -3,13 +3,13 @@ package encry.view.actors
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.view.actors.TransactionsValidator.{StartValidation, TransactionValidatedFailure, TransactionValidatedSuccessfully}
-import encry.view.state.UtxoState
+import encry.view.state.{State, UtxoState}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.encryfoundation.common.validation.ValidationResult
 
-class TransactionsValidator(state: UtxoState,
+class TransactionsValidator(state: State,
                             totalFees: Amount,
                             transaction: Transaction,
                             height: Height) extends Actor with StrictLogging {
@@ -27,7 +27,7 @@ class TransactionsValidator(state: UtxoState,
 }
 
 object TransactionsValidator {
-  def props(state: UtxoState,
+  def props(state: State,
             totalFees: Amount,
             transaction: Transaction,
             height: Height): Props = Props(new TransactionsValidator(state, totalFees, transaction, height))

@@ -34,9 +34,10 @@ import encry.EncryApp._
 import scala.collection.immutable.HashSet
 import scala.util.Try
 
-final case class FSUtxoState(storage: VersionalStorage,
-                             height: Height,
-                             lastBlockTimestamp: Long) extends State with StrictLogging {
+final case class FSUtxoState(storage: VersionalStorage) extends State with StrictLogging {
+
+  override var height: Height = TestNetConstants.PreGenesisHeight
+  override var lastBlockTimestamp: Long = 0L
 
   var stateBatchToAdd: HashSet[StorageKey] = HashSet.empty
   var stateBatchToDelete: HashSet[StorageKey] = HashSet.empty
@@ -46,9 +47,7 @@ final case class FSUtxoState(storage: VersionalStorage,
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
         FSUtxoState(
-          storage,
-          height,
-          header.timestamp
+          storage
         ).asRight[List[ModifierApplyError]]
       case block: Block =>
         val combinedStateChange = combineAll(block.payload.txs.map(FSUtxoState.tx2StateChange).toList)
@@ -66,9 +65,7 @@ final case class FSUtxoState(storage: VersionalStorage,
           stateBatchToDelete = HashSet.empty
         }
         FSUtxoState(
-          storage,
-          Height @@ block.header.height,
-          block.header.timestamp
+          storage
         ).asRight[List[ModifierApplyError]]
     }
   }
@@ -81,9 +78,7 @@ final case class FSUtxoState(storage: VersionalStorage,
         val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
           .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
         FSUtxoState(
-          storage,
-          Height @@ stateHeight,
-          lastBlockTimestamp
+          storage
         )
       case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
     }
@@ -95,9 +90,7 @@ final case class FSUtxoState(storage: VersionalStorage,
   def resolveState(history: History): UtxoState = {
     //storage.getAll(-1).flatMap{case (key, _) => history.historyStorage.get(key)}
     UtxoState(
-      storage,
-      height,
-      lastBlockTimestamp
+      storage
     )
   }
 }
@@ -130,9 +123,7 @@ object FSUtxoState extends StrictLogging {
     )
 
     new FSUtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
+      storage
     )
   }
 }

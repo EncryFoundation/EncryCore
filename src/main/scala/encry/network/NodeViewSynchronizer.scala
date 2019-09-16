@@ -24,7 +24,7 @@ import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, GetNod
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._
-import encry.view.state.UtxoState
+import encry.view.state.{State, UtxoState}
 import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
@@ -253,7 +253,7 @@ object NodeViewSynchronizer {
 
     case class UpdatedHistory(history: History)
 
-    case class ChangedState(reader: UtxoState) extends NodeViewChange
+    case class ChangedState(reader: State) extends NodeViewChange
 
     case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
 

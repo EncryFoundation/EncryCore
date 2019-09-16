@@ -16,9 +16,9 @@ trait UtxoStateReader {
 
   var height: Height
 
-  val lastBlockTimestamp: Long
+  var lastBlockTimestamp: Long
 
-  protected val storage: VersionalStorage
+  val storage: VersionalStorage
 
   def version: VersionTag = VersionTag !@@ storage.currentVersion
 

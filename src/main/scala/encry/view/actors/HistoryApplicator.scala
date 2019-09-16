@@ -18,18 +18,19 @@ import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.WalletApplicator.WalletNeedRollbackTo
 import encry.view.history.History
-import encry.view.state.UtxoState
+import encry.view.state.{State, UtxoState}
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 
 class HistoryApplicator(history: History,
-                        state: UtxoState,
+                        state: State,
                         wallet: EncryWallet,
                         setting: EncryAppSettings,
                         nodeViewHolder: ActorRef,
@@ -185,7 +186,7 @@ object HistoryApplicator {
 
   def props(history: History,
             setting: EncryAppSettings,
-            state: UtxoState,
+            state: State,
             wallet: EncryWallet,
             nodeViewHolder: ActorRef,
             influxRef: Option[ActorRef]): Props =

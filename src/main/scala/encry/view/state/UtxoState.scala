@@ -41,9 +41,9 @@ import scorex.crypto.hash.Digest32
 import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
-final case class UtxoState(storage: VersionalStorage) extends StrictLogging with UtxoStateReader with AutoCloseable {
+final case class UtxoState(storage: VersionalStorage) extends StrictLogging with State with AutoCloseable {
 
-  var height: Height = Height @@ TestNetConstants.PreGenesisHeight
+  var height: Height = TestNetConstants.PreGenesisHeight
   var lastBlockTimestamp: Long = 0L
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
@@ -151,7 +151,7 @@ final case class UtxoState(storage: VersionalStorage) extends StrictLogging with
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
 
-  def close(): Unit = storage.close()
+  override def close(): Unit = storage.close()
 }
 
 object UtxoState extends StrictLogging {
@@ -159,11 +159,11 @@ object UtxoState extends StrictLogging {
   final case class StateChange(inputsToDb: Vector[StorageKey],
                                outputsToDb: Vector[(StorageKey, StorageValue)])
 
-  private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
+  val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 
-  private val bestHeightKey: Digest32 = Algos.hash("state_height")
+  val bestHeightKey: Digest32 = Algos.hash("state_height")
 
-  private val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
+  val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
 
   def tx2StateChange(tx: Transaction): StateChange = StateChange(
     tx.inputs.map(input => StorageKey !@@ input.boxId).toVector,

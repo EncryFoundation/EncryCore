@@ -40,7 +40,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
-            nodeViewHolder ! ModifierFromRemote(modifier, bytes)
+            nodeViewHolder ! ModifierFromRemote(modifier)
           case Success(modifier) =>
             logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)

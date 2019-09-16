@@ -34,7 +34,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
-  case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
+  case class NodeView(history: History, state: State, wallet: EncryWallet)
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
@@ -106,7 +106,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     val stateDir: File = UtxoState.getStateDir(settings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: UtxoState = UtxoState.genesis(stateDir, Some(self), settings, influxRef)
+    val state: State = FSUtxoState.genesis(stateDir, Some(self), settings, influxRef)
     val history: History = History.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     NodeView(history, state, wallet)
