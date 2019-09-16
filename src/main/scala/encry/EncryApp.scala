@@ -18,7 +18,7 @@ import encry.network._
 import encry.settings.EncryAppSettings
 import encry.stats.{StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
-import encry.view.NodeViewHolder
+import encry.view.actors.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter

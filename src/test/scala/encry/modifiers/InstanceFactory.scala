@@ -178,36 +178,37 @@ trait InstanceFactory extends Keys with EncryGenerator {
             val secondHistory = generateDummyHistory(settings)
             blocks._1.foldLeft(secondHistory) {
               case (prevHistory, blockToApply) =>
-                prevHistory.append(blockToApply.header).right.get._1.append(blockToApply.payload).right.get._1.reportModifierIsValid(blockToApply)
+                prevHistory.append(blockToApply.header)
+                prevHistory.append(blockToApply.payload)
+                prevHistory.reportModifierIsValid(blockToApply)
+                prevHistory
             }
             val nextBlockInFirstChain = generateNextBlock(histories.head)
             val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
-            (
-              List(
-                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
-                secondHistory.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
-              ),
-              (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain)
-            )
+            histories.head.append(nextBlockInFirstChain.header)
+            histories.head.append(nextBlockInFirstChain.payload)
+            val a = histories.head.reportModifierIsValid(nextBlockInFirstChain)
+            secondHistory.append(nextBlockInSecondChain.header)
+            secondHistory.append(nextBlockInSecondChain.payload)
+            val b = secondHistory.reportModifierIsValid(nextBlockInSecondChain)
+            (List(a, b), (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain))
           } else {
             val nextBlockInFirstChain = generateNextBlock(histories.head)
             val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
-            (
-              List(
-                histories.head.append(nextBlockInFirstChain.header).right.get._1.append(nextBlockInFirstChain.payload).right.get._1.reportModifierIsValid(nextBlockInFirstChain),
-                histories.last.append(nextBlockInSecondChain.header).right.get._1.append(nextBlockInSecondChain.payload).right.get._1.reportModifierIsValid(nextBlockInSecondChain)
-              ),
-              (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain)
-            )
+            histories.head.append(nextBlockInFirstChain.header)
+            histories.head.append(nextBlockInFirstChain.payload)
+            val a = histories.head.reportModifierIsValid(nextBlockInFirstChain)
+            histories.last.append(nextBlockInSecondChain.header)
+            histories.last.append(nextBlockInSecondChain.payload)
+            val b = histories.last.reportModifierIsValid(nextBlockInSecondChain)
+            (List(a, b), (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain))
           }
         } else {
           val block: Block = generateNextBlock(histories.head)
-          (
-            List(
-              histories.head.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
-            ),
-            (blocks._1 :+ block) -> blocks._2
-          )
+          histories.head.append(block.header)
+          histories.head.append(block.payload)
+          val a = histories.head.reportModifierIsValid(block)
+          (List(a), (blocks._1 :+ block) -> blocks._2)
         }
     }._2
   }

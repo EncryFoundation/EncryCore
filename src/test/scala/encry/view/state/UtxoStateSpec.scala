@@ -65,9 +65,9 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
     )
 
     new UtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
+      storage
+//        Constants.PreGenesisHeight,
+//      0L,
     )
   }
 

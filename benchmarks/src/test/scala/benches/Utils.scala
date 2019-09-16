@@ -193,9 +193,9 @@ object Utils extends StrictLogging {
     )
 
     new UtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
+      storage
+//      TestNetConstants.PreGenesisHeight,
+//      0L,
     )
   }
 

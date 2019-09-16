@@ -156,5 +156,8 @@ object StatsSender {
   final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
   final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
 
+  final case class NewHeightByHistory(height: Int) extends AnyVal
+  final case class NewHeightByState(height: Int) extends AnyVal
+
   def props(settings: InfluxDBSettings): Props = Props(new StatsSender(settings))
 }

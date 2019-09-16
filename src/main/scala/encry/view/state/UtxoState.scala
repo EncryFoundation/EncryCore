@@ -41,21 +41,17 @@ import scorex.crypto.hash.Digest32
 import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
-final case class UtxoState(storage: VersionalStorage,
-                           height: Height,
-                           lastBlockTimestamp: Long)
-  extends StrictLogging with UtxoStateReader with AutoCloseable {
+final case class UtxoState(storage: VersionalStorage) extends StrictLogging with UtxoStateReader with AutoCloseable {
+
+  var height: Height = Height @@ TestNetConstants.PreGenesisHeight
+  var lastBlockTimestamp: Long = 0L
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(
-          storage,
-          height,
-          header.timestamp
-        ).asRight[List[ModifierApplyError]]
+        UtxoState(storage).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
@@ -81,11 +77,7 @@ final case class UtxoState(storage: VersionalStorage,
               combinedStateChange.inputsToDb.toList
             )
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
-            UtxoState(
-              storage,
-              Height @@ block.header.height,
-              block.header.timestamp
-            ).asRight[List[ModifierApplyError]]
+            UtxoState(storage).asRight[List[ModifierApplyError]]
           }
         )
     }
@@ -100,11 +92,9 @@ final case class UtxoState(storage: VersionalStorage,
         storage.rollbackTo(StorageVersion !@@ version)
         val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
           .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
-        UtxoState(
-          storage,
-          Height @@ stateHeight,
-          lastBlockTimestamp
-        )
+        val stateNew = UtxoState(storage)
+        stateNew.height = Height @@ stateHeight
+        stateNew
       case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
     }
   }
@@ -201,11 +191,10 @@ object UtxoState extends StrictLogging {
       .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)
     val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
-    new UtxoState(
-      versionalStorage,
-      Height @@ stateHeight,
-      lastBlockTimestamp,
-    )
+    val state = new UtxoState(versionalStorage)
+    state.height = Height @@ stateHeight
+    state.lastBlockTimestamp = lastBlockTimestamp
+    state
   }
 
   def genesis(stateDir: File,
@@ -227,11 +216,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-
-    new UtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
-    )
+    UtxoState(storage)
   }
 }

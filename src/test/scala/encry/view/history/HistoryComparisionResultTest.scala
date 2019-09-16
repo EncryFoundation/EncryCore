@@ -23,7 +23,9 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.map(_.header.id))
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        hst.append(block.header)
+        hst.append(block.payload)
+        hst.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -36,7 +38,9 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.map(_.header.id))
 
       val updatedHistory: History = blocks.take(50).foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        hst.append(block.header)
+        hst.append(block.payload)
+        hst.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -49,7 +53,9 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(Seq.empty)
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        hst.append(block.header)
+        hst.append(block.payload)
+        hst.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -63,7 +69,9 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.take(30).map(_.header.id))
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        hst.append(block.header)
+        hst.append(block.payload)
+        hst.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
@@ -80,7 +88,9 @@ class HistoryComparisionResultTest extends WordSpecLike
       )
 
       val updatedHistory: History = fork._1.take(30).foldLeft(history) { case (hst, block) =>
-        hst.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        hst.append(block.header)
+        hst.append(block.payload)
+        hst.reportModifierIsValid(block)
       }
 
       val comparisonResult = updatedHistory.compare(syncInfo)
