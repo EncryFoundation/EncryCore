@@ -34,12 +34,15 @@ object DMUtils extends InstanceFactory {
     (deliveryManager, history)
   }
 
-//  def generateBlocks(qty: Int, history: History): (History, List[Block]) =
-//    (0 until qty).foldLeft(history, List.empty[Block]) {
-//      case ((prevHistory, blocks), _) =>
-//        val block: Block = generateNextBlock(prevHistory)
-//        (prevHistory.append(block.header).right.get.append(block.payload).right.get._1.reportModifierIsValid(block), blocks :+ block)
-//    }
+  def generateBlocks(qty: Int, history: History): (History, List[Block]) =
+    (0 until qty).foldLeft(history, List.empty[Block]) {
+      case ((prevHistory, blocks), _) =>
+        val block: Block = generateNextBlock(prevHistory)
+        prevHistory.append(block.header)
+        prevHistory.append(block.payload)
+        val a = prevHistory.reportModifierIsValid(block)
+        (a, blocks :+ block)
+    }
 
   def toKey(id: ModifierId): WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 

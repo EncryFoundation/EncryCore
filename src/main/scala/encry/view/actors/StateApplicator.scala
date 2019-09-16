@@ -70,9 +70,7 @@ class StateApplicator(setting: EncryAppSettings,
           val lastTxId: ModifierId = block.payload.txs.last.id
           val totalFees: Amount = block.payload.txs.dropRight(1).map(_.fee).sum
           block.payload.txs.foreach {
-            case tx if tx.id sameElements lastTxId =>
-              if(block.header.height > 5000) println(s"block: ${block.header.height} -> in state ${state.height}")
-              context.actorOf(
+            case tx if tx.id sameElements lastTxId => context.actorOf(
               TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(state.height), tx, state.height)
                 .withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"

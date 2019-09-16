@@ -59,6 +59,7 @@ class HistoryApplicator(history: History,
       logger.info(s"History applicator got locally generated modifier ${block.encodedId}.")
       locallyGeneratedModifiers = locallyGeneratedModifiers.enqueue(block.header)
       locallyGeneratedModifiers = locallyGeneratedModifiers.enqueue(block.payload)
+      getModifierForApplying()
 
     case NeedToReportAsValid(modifier) =>
       logger.info(s"Modifier ${modifier.encodedId} should be marked as valid.")
@@ -123,6 +124,7 @@ class HistoryApplicator(history: History,
 
     case NeedToReportAsInValid(block) =>
       logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId}.")
+      currentNumberOfAppliedModifiers -= 1
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
 

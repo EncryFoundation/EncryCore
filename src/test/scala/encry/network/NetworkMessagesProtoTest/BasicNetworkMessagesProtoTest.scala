@@ -18,13 +18,13 @@ import scala.util.Try
 class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory {
 
   val settings: EncryAppSettings = EncryAppSettings.read
-  val testedBlocks: Vector[Block] = Vector.empty
-//    (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
-//    case ((prevHistory, blocks), _) =>
-//      val block: Block = generateNextBlock(prevHistory)
-//      (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
-//        blocks :+ block)
-//  }._2
+  val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
+    case ((prevHistory, blocks), _) =>
+      val block: Block = generateNextBlock(prevHistory)
+      prevHistory.append(block.header)
+      prevHistory.append(block.payload)
+      (prevHistory.reportModifierIsValid(block), blocks :+ block)
+  }._2
   val testedTransaction: Seq[Transaction] = genValidPaymentTxs(10)
 
   val firstAddress = new InetSocketAddress("172.16.11.10", 9000)
