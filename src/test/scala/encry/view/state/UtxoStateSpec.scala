@@ -3,15 +3,20 @@ package encry.view.state
 import java.io.File
 
 import akka.actor.ActorRef
+import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.EncryGenerator
+import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
+import org.encryfoundation.common.modifiers.history.{Block, Payload}
+import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
+
+import scala.concurrent.ExecutionContextExecutor
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
@@ -57,12 +62,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(
-      storage,
-      settings.constants.PreGenesisHeight,
-      0L,
-      settings.constants
-    )
+    new UtxoState(storage, settings.constants)
   }
 
 

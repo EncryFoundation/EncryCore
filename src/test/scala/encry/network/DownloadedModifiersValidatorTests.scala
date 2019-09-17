@@ -11,7 +11,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.TestNetSettings
-import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
@@ -79,9 +79,9 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         EquihashSolution(Seq(1, 3))
       )
 
-      val history1: History = history.append(header_first).right.get._1
+      history.append(header_first)
 
-      nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history1))
+      nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history))
 
       /* Header */
       val mods = Seq(header_second).map(x => x.id -> HeaderProtoSerializer.toProto(x).toByteArray.reverse).toMap
@@ -116,8 +116,9 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val historyWith10Blocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>
           val block: Block = generateNextBlock(prevHistory)
-          (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
-            blocks :+ block)
+          prevHistory.append(block.header)
+          prevHistory.append(block.payload)
+          (prevHistory.reportModifierIsValid(block), blocks :+ block)
       }
 
       val payload = Payload(ModifierId @@ scorex.utils.Random.randomBytes(), Seq(coinbaseTransaction))

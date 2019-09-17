@@ -2,9 +2,8 @@ package encry.stats
 
 import java.io.File
 import java.net.InetAddress
-import java.text.SimpleDateFormat
 import java.util
-
+import java.text.SimpleDateFormat
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.timeProvider
@@ -16,10 +15,9 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.Constants
 import org.influxdb.{InfluxDB, InfluxDBFactory}
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSettings, constants: Constants) extends Actor with StrictLogging {
+class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSettings, constants: Constants) extends Actor with StrictLogging {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map.empty
   var modifiersToApply: Map[String, (ModifierTypeId, Long)] = Map.empty
@@ -29,17 +27,17 @@ class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSett
     case None => InetAddress.getLocalHost.getHostAddress + ":" + networkSettings.bindAddress.getPort
   }
   val influxDB: InfluxDB = InfluxDBFactory
-    .connect(influxSettings.url, influxSettings.login, influxSettings.password)
+    .connect(influxDBSettings.url, influxDBSettings.login, influxDBSettings.password)
   influxDB.setRetentionPolicy("autogen")
 
-  override def preStart(): Unit = influxDB.write(influxSettings.udpPort, s"""nodesStartTime value="$nodeName"""")
+  override def preStart(): Unit = influxDB.write(influxDBSettings.udpPort, s"""nodesStartTime value="$nodeName"""")
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
     case BestHeaderInChain(fb) =>
       influxDB.write(
-        influxSettings.udpPort,
+        influxDBSettings.udpPort,
         util.Arrays.asList(
           s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}", //++
           s"""height,nodeName=$nodeName header="${fb.encodedId}",height=${fb.height}""", //++
@@ -55,35 +53,35 @@ class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSett
 
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
       influxDB.write(
-        influxSettings.udpPort,
+        influxDBSettings.udpPort,
         s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight"
       )
 
     case TransactionsInBlock(txsNum) =>
-      influxDB.write(influxSettings.udpPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
+      influxDB.write(influxDBSettings.udpPort, s"txsInEachBlock,nodeName=$nodeName value=$txsNum")
 
     case ModifierAppendedToHistory(isHeader, success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       influxDB.write(
-        influxSettings.udpPort,
+        influxDBSettings.udpPort,
         s"""modifierAppendedToHistory,success=$success,isHeader=$isHeader,nodeName=$nodeName value=$nodeNumber"""
       )
 
     case ModifierAppendedToState(success) if nodeName.exists(_.isDigit) =>
       val nodeNumber: Long = nodeName.filter(_.isDigit).toLong
       influxDB.write(
-        influxSettings.udpPort,
+        influxDBSettings.udpPort,
         s"""modifierAppendedToState,success=$success,nodeName=$nodeName value=$nodeNumber"""
       )
 
     case InfoAboutTransactionsFromMiner(qty) =>
-      influxDB.write(influxSettings.udpPort, s"infoAboutTxsFromMiner,nodeName=$nodeName value=$qty")
+      influxDB.write(influxDBSettings.udpPort, s"infoAboutTxsFromMiner,nodeName=$nodeName value=$qty")
 
     case GetModifiers(_, modifiers) => modifiers
       .foreach(downloadedModifierId =>
         modifiersToDownload.get(Algos.encode(downloadedModifierId)).foreach { dowloadInfo =>
           influxDB.write(
-            influxSettings.udpPort,
+            influxDBSettings.udpPort,
             s"modDownloadStat,nodeName=$nodeName,modId=${Algos.encode(downloadedModifierId)}," +
               s"modType=${dowloadInfo._1} value=${System.currentTimeMillis() - dowloadInfo._2}"
           )
@@ -94,7 +92,7 @@ class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSett
     case MiningEnd(blockHeader, workerIdx, workersQty) => timeProvider
       .time()
       .map(time => influxDB.write(
-        influxSettings.udpPort,
+        influxDBSettings.udpPort,
         util.Arrays.asList(
           s"miningEnd,nodeName=$nodeName,block=${Algos.encode(blockHeader.id)}," +
             s"height=${blockHeader.height},worker=$workerIdx value=${time - blockHeader.timestamp}",
@@ -104,7 +102,7 @@ class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSett
 
     case EndOfApplyingModifier(modifierId) =>
       modifiersToApply.get(Algos.encode(modifierId)).foreach { modInfo =>
-        influxDB.write(influxSettings.udpPort, s"modifApplying,nodeName=$nodeName," +
+        influxDB.write(influxDBSettings.udpPort, s"modifApplying,nodeName=$nodeName," +
           s"modType=${modInfo._1} value=${System.currentTimeMillis() - modInfo._2}")
         modifiersToApply -= Algos.encode(modifierId)
       }
@@ -112,11 +110,11 @@ class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSett
     case StartApplyingModifier(modifierId, modifierTypeId, startTime) =>
       modifiersToApply += Algos.encode(modifierId) -> (modifierTypeId, startTime)
 
-    case MiningTime(time) => influxDB.write(influxSettings.udpPort, s"miningTime,nodeName=$nodeName value=$time")
+    case MiningTime(time) => influxDB.write(influxDBSettings.udpPort, s"miningTime,nodeName=$nodeName value=$time")
 
-    case SleepTime(time) => influxDB.write(influxSettings.udpPort, s"sleepTime,nodeName=$nodeName value=$time")
+    case SleepTime(time) => influxDB.write(influxDBSettings.udpPort, s"sleepTime,nodeName=$nodeName value=$time")
 
-    case StateUpdating(time) => influxDB.write(influxSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
+    case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
     case msg: ModifiersDownloadStatistic => msg match {
       case _ if nodeName.exists(_.isDigit) =>
@@ -128,7 +126,7 @@ class StatsSender(influxSettings: InfluxDBSettings, networkSettings: NetworkSett
             (t == Header.modifierTypeId) -> "validatedModifierFromNetwork"
         }
         influxDB.write(
-          influxSettings.udpPort,
+          influxDBSettings.udpPort,
           s"""$tableName,nodeName=$nodeNumber,isHeader=$isHeader value=$nodeNumber"""
         )
       case _ => //do nothing
@@ -161,6 +159,9 @@ object StatsSender {
   final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
   final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
 
-  def props(influxSettings: InfluxDBSettings, networkSettings: NetworkSettings, constants: Constants): Props =
-    Props(new StatsSender(influxSettings, networkSettings, constants))
+  final case class NewHeightByHistory(height: Int) extends AnyVal
+  final case class NewHeightByState(height: Int) extends AnyVal
+
+  def props(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSettings, constants: Constants): Props =
+    Props(new StatsSender(influxDBSettings, networkSettings, constants))
 }

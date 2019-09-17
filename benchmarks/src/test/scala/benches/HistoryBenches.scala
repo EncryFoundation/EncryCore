@@ -24,7 +24,9 @@ class HistoryBenches {
     bh.consume {
       val history: History = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
-        historyL.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        historyL.append(block.header)
+        historyL.append(block.payload)
+        historyL.reportModifierIsValid(block)
       }
       history.closeStorage()
     }
@@ -73,8 +75,9 @@ object HistoryBenches extends BenchSettings {
               generateNextBlockValidForHistory(
                 prevHistory, 0, prevBlock,  Seq.empty[Transaction]
               )
-            (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
-              Some(block), vector :+ block)
+            prevHistory.append(block.header)
+            prevHistory.append(block.payload)
+            (prevHistory.reportModifierIsValid(block), Some(block), vector :+ block)
         }
     resultedHistory._1.closeStorage()
 

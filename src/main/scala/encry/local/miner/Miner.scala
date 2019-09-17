@@ -17,8 +17,8 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccess
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
-import encry.view.NodeViewHolder.CurrentView
-import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
+import encry.view.actors.NodeViewHolder.CurrentView
+import encry.view.actors.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedBlock}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
@@ -56,6 +56,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+    context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
       influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
     )
@@ -100,7 +101,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      nodeViewHolder ! LocallyGeneratedModifier(block)
+      nodeViewHolder ! LocallyGeneratedBlock(block)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
@@ -120,9 +121,10 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     case EnableMining =>
       context.become(miningEnabled)
       self ! StartMining
-    case FullBlockChainIsSynced =>
+    case FullBlockChainIsSynced() =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
+    case TransactionsForMiner(_) =>
     case DisableMining | SemanticallySuccessfulModifier(_) =>
   }
 
@@ -147,7 +149,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   }
 
   def chainEvents: Receive = {
-    case FullBlockChainIsSynced => syncingDone = true
+    case FullBlockChainIsSynced() => syncingDone = true
   }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {

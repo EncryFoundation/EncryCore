@@ -133,7 +133,8 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
         Map(headerIds.head -> headerBytes)), cp1)
 
-      val uHistory: History = history.append(blocks.head.header).right.get._1.reportModifierIsValid(blocks.head.header)
+      history.append(blocks.head.header)
+      val uHistory: History = history.reportModifierIsValid(blocks.head.header)
 
       deliveryManager ! UpdatedHistory(uHistory)
 

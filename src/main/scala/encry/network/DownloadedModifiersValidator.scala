@@ -13,7 +13,7 @@ import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.history.History
-import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.mempool.MemoryPool.NewTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}

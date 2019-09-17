@@ -1,12 +1,7 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
-import cats.data.Validated
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
@@ -23,6 +18,12 @@ import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import io.iohk.iodb.LSMStore
+import cats.data.Validated
+import cats.Traverse
+import cats.syntax.traverse._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.validated._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -38,26 +39,21 @@ import org.encryfoundation.common.validation.{MalformedModifierError, Validation
 import org.iq80.leveldb.Options
 import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
-
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
-final case class UtxoState(storage: VersionalStorage,
-                           height: Height,
-                           lastBlockTimestamp: Long,
-                           constants: Constants)
+final case class UtxoState(storage: VersionalStorage, constants: Constants)
   extends StrictLogging with UtxoStateReader with AutoCloseable {
+
+  var height: Height = Height @@ constants.PreGenesisHeight
+  var lastBlockTimestamp: Long = 0L
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(
-          storage,
-          height,
-          header.timestamp,
-          constants
-        ).asRight[List[ModifierApplyError]]
+        UtxoState(storage, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
@@ -86,8 +82,7 @@ final case class UtxoState(storage: VersionalStorage,
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
             UtxoState(
               storage,
-              Height @@ block.header.height,
-              block.header.timestamp, constants
+              constants
             ).asRight[List[ModifierApplyError]]
           }
         )
@@ -103,12 +98,9 @@ final case class UtxoState(storage: VersionalStorage,
         storage.rollbackTo(StorageVersion !@@ version)
         val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
           .map(d => Ints.fromByteArray(d)).getOrElse(constants.GenesisHeight)
-        UtxoState(
-          storage,
-          Height @@ stateHeight,
-          lastBlockTimestamp,
-          constants
-        )
+        val stateNew = UtxoState(storage, constants)
+        stateNew.height = Height @@ stateHeight
+        stateNew
       case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
     }
   }
@@ -205,12 +197,10 @@ object UtxoState extends StrictLogging {
       .map(d => Ints.fromByteArray(d)).getOrElse(settings.constants.PreGenesisHeight)
     val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
-    new UtxoState(
-      versionalStorage,
-      Height @@ stateHeight,
-      lastBlockTimestamp,
-      settings.constants
-    )
+    val state = new UtxoState(versionalStorage, settings.constants)
+    state.height = Height @@ stateHeight
+    state.lastBlockTimestamp = lastBlockTimestamp
+    state
   }
 
   def genesis(stateDir: File,
@@ -232,12 +222,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-
-    new UtxoState(
-      storage,
-      settings.constants.PreGenesisHeight,
-      0L,
-      settings.constants
-    )
+    UtxoState(storage, settings.constants)
   }
 }

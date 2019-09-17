@@ -113,8 +113,7 @@ object Utils extends Settings with StrictLogging {
                                                             state: UtxoState,
                                                             box: Seq[AssetBox],
                                                             splitCoef: Int = 2,
-                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)
-                                                            ): Block = {
+                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
 
     val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
       case ((boxes, transactionsL), _) =>
@@ -192,12 +191,7 @@ object Utils extends Settings with StrictLogging {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(
-      storage,
-      settings.constants.PreGenesisHeight,
-      0L,
-      settings.constants
-    )
+    new UtxoState(storage, settings.constants)
   }
 
   def getRandomTempDir: File = {

@@ -30,7 +30,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: PersistentModifier, history: History): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -123,6 +123,7 @@ object ModifiersCache extends StrictLogging {
           value.map(id => new mutable.WrappedArray.ofByte(id)).filterNot(res.contains).foreach(cache.remove)
           res
         case None =>
+          logger.debug(s"${history.getBestHeader}")
           logger.debug(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
             s"Trying to find in range [${history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
           (history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
