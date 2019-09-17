@@ -42,15 +42,15 @@ final case class FSUtxoState(storage: VersionalStorage) extends State with Stric
   var stateBatchToAdd: HashSet[StorageKey] = HashSet.empty
   var stateBatchToDelete: HashSet[StorageKey] = HashSet.empty
 
-  override def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], FSUtxoState] = {
+  override def applyModifier(mod: PersistentModifier): FSUtxoState = {
     mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
         FSUtxoState(
           storage
-        ).asRight[List[ModifierApplyError]]
+        )
       case block: Block =>
-        val combinedStateChange = combineAll(block.payload.txs.map(FSUtxoState.tx2StateChange).toList)
+        val combinedStateChange = combineAll(block.payload.txs.map(tx => FSUtxoState.tx2StateChange(tx, block)).toList)
         stateBatchToAdd ++= combinedStateChange.outputsToDb.map(_._1).toSet
         stateBatchToDelete ++= combinedStateChange.inputsToDb.toSet
         if (height % settings.network.networkChunkSize == 0) {
@@ -66,7 +66,7 @@ final case class FSUtxoState(storage: VersionalStorage) extends State with Stric
         }
         FSUtxoState(
           storage
-        ).asRight[List[ModifierApplyError]]
+        )
     }
   }
 
@@ -88,18 +88,25 @@ final case class FSUtxoState(storage: VersionalStorage) extends State with Stric
     tx.asRight[ValidationResult]
 
   def resolveState(history: History): UtxoState = {
-    //storage.getAll(-1).flatMap{case (key, _) => history.historyStorage.get(key)}
-    UtxoState(
-      storage
+    val boxes = storage.getAll(-1).flatMap {case (key, value) =>
+      val (blockId, txId) = value.splitAt(32)
+      val block = history.getBlockByHeaderIdDB(ModifierId @@ blockId).get
+      val tx = block.payload.txs.find(_.id sameElements txId).get
+      tx.newBoxes.find(_.id sameElements key).map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+    }
+    storage.insert(
+      history.historyStorage.store.currentVersion,
+      boxes.toList
     )
+    UtxoState(storage)
   }
 }
 
 object FSUtxoState extends StrictLogging {
 
-  def tx2StateChange(tx: Transaction): StateChange = StateChange(
+  def tx2StateChange(tx: Transaction, block: Block): StateChange = StateChange(
     tx.inputs.map(input => StorageKey !@@ input.boxId).toVector,
-    tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ Array.empty[Byte])).toVector
+    tx.newBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ (block.id ++ tx.id))).toVector
   )
 
   def genesis(stateDir: File,

@@ -80,7 +80,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
       newElem.elemsToInsert.foreach {
         case (elemKey, elemValue) =>
-
           /**
             * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
             * First check contain db this elem or not. if no: insert elem, and insert init access map

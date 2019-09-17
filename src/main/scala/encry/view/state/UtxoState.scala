@@ -46,46 +46,31 @@ final case class UtxoState(storage: VersionalStorage) extends StrictLogging with
   var height: Height = TestNetConstants.PreGenesisHeight
   var lastBlockTimestamp: Long = 0L
 
-  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
+  override def applyModifier(mod: PersistentModifier): UtxoState = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(storage).asRight[List[ModifierApplyError]]
+        UtxoState(storage)
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
-        val lastTxId = block.payload.txs.last.id
-        val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-        val validstartTime = System.currentTimeMillis()
-        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
-          else validate(tx)
-        }).toList
-          .traverse(Validated.fromEither)
-          .toEither
-        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime)/1000L} s")
-        res.fold(
-          err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
-          txsToApply => {
-            val combineTimeStart = System.currentTimeMillis()
-            val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
-            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart)/1000L} s")
-            val insertTimestart = System.currentTimeMillis()
-            storage.insert(
-              StorageVersion !@@ block.id,
-              combinedStateChange.outputsToDb.toList,
-              combinedStateChange.inputsToDb.toList
-            )
-            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
-            UtxoState(storage).asRight[List[ModifierApplyError]]
-          }
+        val combineTimeStart = System.currentTimeMillis()
+        val combinedStateChange = combineAll(block.payload.txs.toList.map(UtxoState.tx2StateChange))
+        logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart)/1000L} s")
+        val insertTimestart = System.currentTimeMillis()
+        storage.insert(
+          StorageVersion !@@ block.id,
+          combinedStateChange.outputsToDb.toList,
+          combinedStateChange.inputsToDb.toList
         )
+        logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
+        UtxoState(storage)
     }
     logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime)/1000L} s)")
     result
   }
 
-  def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
+  override def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
     storage.versions.find(_ sameElements version) match {
       case Some(_) =>
         logger.info(s"Rollback to version ${Algos.encode(version)}")
@@ -99,7 +84,7 @@ final case class UtxoState(storage: VersionalStorage) extends StrictLogging with
     }
   }
 
-  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
+  override def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)

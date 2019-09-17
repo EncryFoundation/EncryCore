@@ -77,14 +77,15 @@ class StateApplicator(setting: EncryAppSettings,
                 .withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"
             )
-              transactionsValidatorsNumber += 1
+              transactionsValidatorsNumber += 0
             case tx => context.actorOf(
               TransactionsValidator.props(state, 0L, tx, state.height).withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"
             )
-              transactionsValidatorsNumber += 1
+              transactionsValidatorsNumber += 0
           }
           context.become(awaitingTransactionsValidation(toApply.drop(1), updateInformation, block, block.payload.txs))
+          self ! TransactionValidatedSuccessfully
       }
     case StartModifiersApplying => //todo redundant iterations while updateInformation.failedMod.nonEmpty
       val newToApply: List[PersistentModifier] = toApply.drop(1)
@@ -124,14 +125,9 @@ class StateApplicator(setting: EncryAppSettings,
                                      block: Block,
                                      transactions: Seq[Transaction]): Receive = {
     case TransactionValidatedSuccessfully =>
-      transactionsValidatorsNumber -= 1
+      transactionsValidatorsNumber = 0
       if (transactionsValidatorsNumber == 0) {
-        val combinedStateChange = combineAll(transactions.toList.map(UtxoState.tx2StateChange))
-        state.storage.insert(
-          StorageVersion !@@ block.id,
-          combinedStateChange.outputsToDb.toList,
-          combinedStateChange.inputsToDb.toList
-        )
+        state.applyModifier(block)
         context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
         historyApplicator ! NeedToReportAsValid(block)
         influxRef.foreach { ref =>

@@ -52,7 +52,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
       insert(
         StorageVersion @@ objectsToInsert.head._1.id.untag(ModifierId),
         objectsToInsert.map(obj =>
-          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2.getOrElse(HistoryModifiersProtoSerializer.toProto(obj._1))
+          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2.map(bytes => obj._1.modifierTypeId +: bytes).getOrElse(HistoryModifiersProtoSerializer.toProto(obj._1))
         ).toList,
       )
   }

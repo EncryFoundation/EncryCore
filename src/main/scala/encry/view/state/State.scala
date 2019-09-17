@@ -11,7 +11,7 @@ import scala.util.Try
 
 trait State extends UtxoStateReader {
 
-  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], State]
+  def applyModifier(mod: PersistentModifier): State
 
   def rollbackTo(version: VersionTag): Try[State]
 

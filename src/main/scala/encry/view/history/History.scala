@@ -27,13 +27,13 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, ProgressInfo] = {
+  def append(modifier: PersistentModifier, bytes: Option[Array[Byte]] = None): Either[Throwable, ProgressInfo] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header   =>
         logger.info(s"Process header in history.append at height ${header.height}")
-        processHeader(header)
-      case payload: Payload => processPayload(payload)
+        processHeader(header, bytes)
+      case payload: Payload => processPayload(payload, bytes)
     })
   }
 

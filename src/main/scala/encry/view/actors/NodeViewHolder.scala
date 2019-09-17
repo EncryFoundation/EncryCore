@@ -63,7 +63,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
-    case msg@ModifierFromRemote(_) => historyApplicator ! msg
+    case msg@ModifierFromRemote(_, _) => historyApplicator ! msg
     case msg@LocallyGeneratedBlock(_) => historyApplicator ! msg
     case GetDataFromCurrentView(f) =>
       f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet)) match {
@@ -166,7 +166,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).right.get }
+        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m) }
     }
 
   override def close(): Unit = {
@@ -193,7 +193,7 @@ object NodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
+    final case class ModifierFromRemote(serializedModifiers: PersistentModifier, bytes: Array[Byte])
 
     final case class LocallyGeneratedBlock(block: Block) extends AnyVal
 

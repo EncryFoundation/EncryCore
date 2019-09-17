@@ -49,11 +49,11 @@ class HistoryApplicator(history: History,
   var locallyGeneratedModifiers: Queue[PersistentModifier] = Queue.empty[PersistentModifier]
 
   override def receive: Receive = {
-    case ModifierFromRemote(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
-      ModifiersCache.put(toKey(mod.id), mod, history)
+    case ModifierFromRemote(mod, bytes) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
+      ModifiersCache.put(toKey(mod.id), mod, bytes, history)
       getModifierForApplying()
 
-    case ModifierFromRemote(modifier) =>
+    case ModifierFromRemote(modifier, _) =>
       logger.info(s"Modifier ${modifier.encodedId} contains in history or in modifiers cache. Reject it.")
 
     case LocallyGeneratedBlock(block) =>
@@ -66,9 +66,9 @@ class HistoryApplicator(history: History,
       logger.info(s"Modifier ${modifier.encodedId} should be marked as valid.")
       history.reportModifierIsValid(modifier)
 
-    case ModifierToHistoryAppending(modifier, isLocallyGenerated) =>
+    case ModifierToHistoryAppending(modifier, isLocallyGenerated, bytes) =>
       logger.info(s"Starting to apply modifier ${modifier.encodedId} to history.")
-      history.append(modifier) match {
+      history.append(modifier, bytes) match {
         case Left(ex) =>
           currentNumberOfAppliedModifiers -= 1
           logger.info(s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.getMessage}." +
@@ -141,14 +141,14 @@ class HistoryApplicator(history: History,
         logger.debug(s"Found new local modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
           s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
           s" Current locally generated modifiers size ${locallyGeneratedModifiers.size}.")
-        self ! ModifierToHistoryAppending(modifier, isLocallyGenerated = true)
+        self ! ModifierToHistoryAppending(modifier, isLocallyGenerated = true, bytes = None)
     }
-    else ModifiersCache.popCandidate(history).foreach { modifier =>
+    else ModifiersCache.popCandidate(history).foreach { case (modifier, bytes) =>
       currentNumberOfAppliedModifiers += 1
       logger.debug(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
         s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
         s" Current mod cache size ${ModifiersCache.size}")
-      self ! ModifierToHistoryAppending(modifier)
+      self ! ModifierToHistoryAppending(modifier, bytes = Some(bytes))
     }
   }
 
@@ -168,7 +168,7 @@ object HistoryApplicator {
 
   case object NotificationAboutNewModifier
 
-  final case class ModifierToHistoryAppending(modifier: PersistentModifier, isLocallyGenerated: Boolean = false)
+  final case class ModifierToHistoryAppending(modifier: PersistentModifier, isLocallyGenerated: Boolean = false, bytes: Option[Array[Byte]])
 
   final case class StartModifiersApplicationOnStateApplicator(progressInfo: ProgressInfo,
                                                               suffixApplied: IndexedSeq[PersistentModifier])
@@ -177,7 +177,7 @@ object HistoryApplicator {
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
         case NeedToReportAsValid(_) | NeedToReportAsInValid(_) => 0
-        case ModifierToHistoryAppending(_, _) => 1
+        case ModifierToHistoryAppending(_, _, _) => 1
         case NotificationAboutSuccessfullyAppliedModifier => 2
         case RequestNextModifier => 3
         case PoisonPill => 5
