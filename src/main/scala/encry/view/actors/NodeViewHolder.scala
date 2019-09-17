@@ -112,7 +112,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] = if (History.getHistoryIndexDir(settings).listFiles.nonEmpty)
+  def restoreState(): Option[NodeView] = if (History.getHistoryIndexDir(settings).listFiles.nonEmpty) {
     try {
       val stateDir: File = UtxoState.getStateDir(settings)
       stateDir.mkdirs()
@@ -127,7 +127,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
         new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
         Some(genesisState)
-    } else {
+    }} else {
     None
   }
 

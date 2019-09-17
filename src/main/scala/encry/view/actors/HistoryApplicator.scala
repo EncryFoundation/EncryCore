@@ -164,6 +164,8 @@ class HistoryApplicator(state: UtxoState,
 
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
+  def awaitingСonsistentState
+
   def restoreHistory: History = History.readOrGenerate(settings, timeProvider)
 
 }
