@@ -10,6 +10,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySucces
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.ModifierAppendedToHistory
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
@@ -28,18 +29,20 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 
-class HistoryApplicator(history: History,
-                        state: UtxoState,
+class HistoryApplicator(state: UtxoState,
                         wallet: EncryWallet,
-                        setting: EncryAppSettings,
+                        settings: EncryAppSettings,
                         nodeViewHolder: ActorRef,
-                        influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+                        influxRef: Option[ActorRef],
+                        timeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
+
+  val history: History = restoreHistory
 
   val walletApplicator: ActorRef =
     context.system.actorOf(WalletApplicator.props(wallet, self), "walletApplicator")
 
   val stateApplicator: ActorRef = context.system.actorOf(
-    StateApplicator.props(setting, history, self, state, walletApplicator, influxRef)
+    StateApplicator.props(settings, history, self, state, walletApplicator, influxRef)
       .withDispatcher("state-applicator-dispatcher"), name = "stateApplicator"
   )
 
@@ -131,7 +134,7 @@ class HistoryApplicator(history: History,
     case nonsense => logger.info(s"History applicator actor got from $sender message $nonsense.")
   }
 
-  def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
+  def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < settings.levelDB.maxVersions) {
     logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
     if (locallyGeneratedModifiers.nonEmpty) locallyGeneratedModifiers.dequeueOption.foreach {
       case (modifier, newQueue) =>
@@ -161,7 +164,7 @@ class HistoryApplicator(history: History,
 
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
-  def restoreHistory = if (History.getHistoryIndexDir(setting).listFiles.nonEmpty) ()
+  def restoreHistory: History = History.readOrGenerate(settings, timeProvider)
 
 }
 
@@ -185,11 +188,11 @@ object HistoryApplicator {
         case otherwise => 4
       })
 
-  def props(history: History,
-            setting: EncryAppSettings,
+  def props(setting: EncryAppSettings,
             state: UtxoState,
             wallet: EncryWallet,
             nodeViewHolder: ActorRef,
-            influxRef: Option[ActorRef]): Props =
-    Props(new HistoryApplicator(history, state, wallet, setting, nodeViewHolder, influxRef))
+            influxRef: Option[ActorRef],
+            timeProvider: NetworkTimeProvider): Props =
+    Props(new HistoryApplicator(state, wallet, setting, nodeViewHolder, influxRef, timeProvider))
 }

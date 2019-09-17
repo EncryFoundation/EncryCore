@@ -175,9 +175,7 @@ object UtxoState extends StrictLogging {
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
   def create(stateDir: File,
-             nodeViewHolderRef: Option[ActorRef],
-             settings: EncryAppSettings,
-             statsSenderRef: Option[ActorRef]): UtxoState = {
+             settings: EncryAppSettings): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")

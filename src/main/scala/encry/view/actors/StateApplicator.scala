@@ -1,5 +1,7 @@
 package encry.view.actors
 
+import java.io.File
+
 import akka.actor.{Actor, ActorRef, Kill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
@@ -26,15 +28,21 @@ import encry.stats.StatsSender.{ModifierAppendedToState, TransactionsInBlock}
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import org.encryfoundation.common.utils.Algos
+import cats.syntax.option._
+import encry.modifiers.history.HeaderChain
+import org.apache.commons.io.FileUtils
+
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
-class StateApplicator(setting: EncryAppSettings,
-                      history: History,
+class StateApplicator(settings: EncryAppSettings,
+                      history: History, //only for restore state
                       historyApplicator: ActorRef,
-                      state: UtxoState,
+                      //state: UtxoState,
                       walletApplicator: ActorRef,
                       influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+
+  val state: UtxoState = restoreState
 
   var transactionsValidatorsNumber: Int = 0
   var isInProgress: Boolean = false
@@ -221,6 +229,59 @@ class StateApplicator(setting: EncryAppSettings,
       logger.debug(s"StateApplicator call requestDownloads for modifier ${Algos.encode(id)} of type $tid")
     context.system.eventStream.publish(DownloadRequest(tid, id))
   }
+
+  def restoreState: UtxoState =
+    try {
+      val stateDir: File = UtxoState.getStateDir(settings)
+      stateDir.mkdirs()
+      restoreConsistentState(UtxoState.create(stateDir, settings))
+    } catch {
+      case ex: Throwable =>
+        logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
+        new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
+        val stateDir: File = UtxoState.getStateDir(settings)
+        stateDir.mkdir()
+        assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
+        UtxoState.genesis(stateDir, Some(self), settings, influxRef)
+    }
+
+  def restoreConsistentState(stateIn: UtxoState): UtxoState =
+    (stateIn.version, history.getBestBlock, stateIn) match {
+      case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
+        logger.info(s"State and history are both empty on start.")
+        stateIn
+      case (stateId, Some(block), _) if stateId sameElements block.id =>
+        logger.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
+        stateIn
+      case (_, None, _) =>
+        logger.info(s"State and history are inconsistent. History is empty on start, rollback state to genesis.")
+        getRecreatedState
+      case (stateId, Some(historyBestBlock), state: UtxoState) =>
+        val (rollbackId: Option[ModifierId], newChain: HeaderChain) =
+          history.getChainToHeader(history.getHeaderById(ModifierId !@@ stateId), historyBestBlock.header)
+        logger.info(s"State and history are inconsistent." +
+          s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
+          s"apply ${newChain.length} modifiers")
+        val startState: UtxoState = rollbackId
+          .map(id => state.rollbackTo(VersionTag !@@ id).get)
+          .getOrElse(getRecreatedState)
+        val toApply: IndexedSeq[Block] = newChain.headers.map { h =>
+          history.getBlockByHeader(h) match {
+            case Some(fb) => fb
+            case None => throw new Exception(s"Failed to get full block for header $h")
+          }
+        }
+        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).right.get }
+    }
+
+  def getRecreatedState: UtxoState = {
+    val dir: File = UtxoState.getStateDir(settings)
+    dir.mkdirs()
+    dir.listFiles.foreach(_.delete())
+    val stateDir: File = UtxoState.getStateDir(settings)
+    stateDir.mkdirs()
+    UtxoState.create(stateDir, settings)
+  }
 }
 
 object StateApplicator {
@@ -249,5 +310,5 @@ object StateApplicator {
             state: UtxoState,
             walletApplicator: ActorRef,
             influxRef: Option[ActorRef]): Props =
-    Props(new StateApplicator(setting, history, historyApplicator, state, walletApplicator, influxRef))
+    Props(new StateApplicator(setting, history, historyApplicator, walletApplicator, influxRef))
 }
