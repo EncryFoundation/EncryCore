@@ -4,7 +4,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.HistoryBenches.HistoryBenchState
-import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import benches.Utils.{coinbaseTransaction, generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
 import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.view.history.History
@@ -73,7 +73,7 @@ object HistoryBenches extends BenchSettings {
           case ((prevHistory, prevBlock, vector), _) =>
             val block: Block =
               generateNextBlockValidForHistory(
-                prevHistory, 0, prevBlock,  Seq.empty[Transaction]
+                prevHistory, 0, prevBlock, Seq(coinbaseTransaction(0))
               )
             prevHistory.append(block.header)
             prevHistory.append(block.payload)
