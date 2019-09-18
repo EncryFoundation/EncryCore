@@ -15,7 +15,9 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.iq80.leveldb.{DB, Options}
 import scala.util.Try
 
-case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager, intrinsicTokenId: ADKey) extends StrictLogging with AutoCloseable {
+case class EncryWallet(walletStorage: WalletVersionalLevelDB,
+                       accountManager: AccountManager,
+                       intrinsicTokenId: ADKey) extends StrictLogging with AutoCloseable {
 
   val publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 
