@@ -27,7 +27,7 @@ class StateBenches {
       val innerState: UtxoState =
         utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
       stateBench.chain.foldLeft(innerState) { case (state, block) =>
-        state.applyModifier(block).right.get
+        state.applyModifierWhileStateInitializing(block).right.get
       }
       innerState.close()
     }
@@ -75,7 +75,7 @@ object StateBenches extends BenchSettings {
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
-    state = state.applyModifier(genesisBlock).right.get
+    state = state.applyModifierWhileStateInitializing(genesisBlock).right.get
 
     val stateGenerationResults: (Vector[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
       (0 until benchSettings.stateBenchSettings.blocksNumber).foldLeft(Vector[Block](), genesisBlock, state, initialBoxes) {
@@ -91,7 +91,7 @@ object StateBenches extends BenchSettings {
             benchSettings.stateBenchSettings.numberOfInputsInOneTransaction,
             benchSettings.stateBenchSettings.numberOfOutputsInOneTransaction
           )
-          val stateN: UtxoState = stateL.applyModifier(nextBlock).right.get
+          val stateN: UtxoState = stateL.applyModifierWhileStateInitializing(nextBlock).right.get
           (blocks :+ nextBlock,
             nextBlock,
             stateN,

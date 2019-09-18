@@ -1,15 +1,24 @@
 package encry.view.actors
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.view.actors.StateApplicator.NewWalletForWalletApplicator
 import encry.view.actors.WalletApplicator.{WalletNeedRollbackTo, WalletNeedScanPersistent}
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.PersistentModifier
 
-class WalletApplicator(wallet: EncryWallet, historyApplicator: ActorRef) extends Actor with StrictLogging {
+class WalletApplicator extends Actor with StrictLogging {
 
-  override def receive: Receive = {
+  override def receive: Receive = awaitingWallet
+
+  def awaitingWallet: Receive = {
+    case NewWalletForWalletApplicator(wallet) =>
+      logger.info("Wallet got wallet storage.")
+      context.become(mainBehaviour(wallet))
+  }
+
+  def mainBehaviour(wallet: EncryWallet): Receive = {
     case WalletNeedRollbackTo(version) =>
       logger.info(s"Wallet need to rollback.")
       wallet.rollback(version)
@@ -26,6 +35,5 @@ object WalletApplicator {
   final case class WalletNeedRollbackTo(version: VersionTag) extends AnyVal
   final case class WalletNeedScanPersistent(modifiers: Seq[PersistentModifier]) extends AnyVal
 
-  def props(wallet: EncryWallet, historyApplicator: ActorRef): Props =
-    Props(new WalletApplicator(wallet, historyApplicator))
+  def props: Props = Props(new WalletApplicator)
 }
