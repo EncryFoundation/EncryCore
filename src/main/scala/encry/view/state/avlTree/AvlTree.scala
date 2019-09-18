@@ -3,13 +3,15 @@ package encry.view.state.avlTree
 import cats.{Monoid, Order}
 import cats.syntax.order._
 
+import scala.annotation.tailrec
+
 final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
 
   def root: K = rootNode.key
 
   def insert(k: K, v: V): AvlTree[K, V] = {
     val newNode = insert(rootNode, k, v)
-    if (Math.abs(newNode.balance) == 2) AvlTree(leftRotation(newNode))
+    if (Math.abs(newNode.balance) == 2) AvlTree(rl2rotation(newNode))
     else AvlTree(newNode)
   }
 
@@ -48,7 +50,10 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
   private def rightRotation(node: Node[K, V]): Node[K, V] = node match {
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
-      val newRoot = internalNode.leftChild.get.asInstanceOf[InternalNode[K, V]]
+      val newRoot = internalNode.leftChild.get match {
+        case LeafNode(key, value) => InternalNode(key, value, 0, 0)
+        case internalNode: InternalNode[K, V] => internalNode
+      }
       val newLeftChildForPrevRoot = newRoot.rightChild
       val prevRoot = internalNode.copy(
         leftChild = newLeftChildForPrevRoot,
@@ -71,7 +76,10 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
   private def leftRotation(node: Node[K, V]): Node[K, V] = node match {
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
-      val newRoot = internalNode.rightChild.get.asInstanceOf[InternalNode[K, V]]
+      val newRoot = internalNode.rightChild.get match {
+        case LeafNode(key, value) => InternalNode(key, value, 0, 0)
+        case internalNode: InternalNode[K, V] => internalNode
+      }
       val newRightChildForPrevRoot = newRoot.leftChild
       val prevRoot = internalNode.copy(
         rightChild = newRightChildForPrevRoot,
@@ -90,6 +98,20 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
       )
   }
 
+  private def lr2rotation(node: Node[K, V]): Node[K, V] = node match {
+    case leafNode: LeafNode[K, V] => leafNode
+    case internalNode: InternalNode[K, V] =>
+      val rotatedRightChild = rightRotation(internalNode.rightChild.get)
+      leftRotation(internalNode.copy(rightChild = Some(rotatedRightChild)))
+  }
+
+  private def rl2rotation(node: Node[K, V]): Node[K, V] = node match {
+    case leafNode: LeafNode[K, V] => leafNode
+    case internalNode: InternalNode[K, V] =>
+      println(internalNode.leftChild.get)
+      val rotatedLeftChild = leftRotation(internalNode.leftChild.get)
+      rightRotation(internalNode.copy(leftChild = Some(rotatedLeftChild)))
+  }
   override def toString: String = rootNode.toString
 }
 
