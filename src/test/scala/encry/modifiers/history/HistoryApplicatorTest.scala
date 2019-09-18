@@ -30,8 +30,10 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
+import akka.testkit.{TestKit, TestActorRef}
 
 import scala.concurrent.duration._
+
 class HistoryApplicatorTest extends TestKit(ActorSystem())
   with WordSpecLike
   with ImplicitSender
@@ -44,9 +46,9 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     TestKit.shutdownActorSystem(system)
   }
 
-  implicit val timeout: FiniteDuration = 5 seconds
+  val timeout: FiniteDuration = 5 seconds
 
-  def utxoFromBoxHolder(bh: BoxHolder, dir: File, settings: EncryAppSettings): UtxoState = {
+  def utxoFromBoxHolder(boxHolder: BoxHolder, dir: File, settings: EncryAppSettings): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
@@ -56,34 +58,66 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     }
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
-      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
+      boxHolder.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
     new UtxoState(storage, settings.constants)
   }
 
-  "HistoryApplicator" should {
-    "add Modifier" in {
+  "HistoryApplicator add locall generated block" should {
+    "chain synced" in {
 
       val dir = FileHelper.getRandomTempDir
       val history: History = generateDummyHistory(settings)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
 
       val bxs = TestHelper.genAssetBoxes
-      val bh = BoxHolder(bxs)
-      val state = utxoFromBoxHolder(bh, FileHelper.getRandomTempDir, settings)
+      val boxHolder = BoxHolder(bxs)
+      val state = utxoFromBoxHolder(boxHolder, FileHelper.getRandomTempDir, settings)
 
       val nodeViewHolder = TestProbe()
       val influx = TestProbe()
 
-      //      val historyBlocks = (0 until 10).foldLeft(history) {
-      //        case (prevHistory, _) =>
-      //          val block: Block = generateNextBlock(prevHistory)
-      //          prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
-      //      }
+      val historyBlocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
+        case ((prevHistory, blocks), _) =>
+          val block: Block = generateNextBlock(prevHistory)
+          prevHistory.append(block.header)
+          prevHistory.append(block.payload)
+          (prevHistory.reportModifierIsValid(block), blocks :+ block)
+      }
+
+      val block: Block = generateNextBlock(history)
+
+      val historyApplicator: TestActorRef[HistoryApplicator] =
+        TestActorRef[HistoryApplicator](
+          HistoryApplicator.props(history, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
+        )
+
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+
+      historyApplicator ! LocallyGeneratedBlock(block)
+
+      expectMsg(timeout, FullBlockChainIsSynced())
+    }
+  }
+
+  "HistoryApplicator add locall generated block" should {
+    "check queues" in {
+
+      val dir = FileHelper.getRandomTempDir
+      val history: History = generateDummyHistory(settings)
+      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
+
+      val bxs = TestHelper.genAssetBoxes
+      val boxHolder = BoxHolder(bxs)
+      val state = utxoFromBoxHolder(boxHolder, FileHelper.getRandomTempDir, settings)
+
+      val nodeViewHolder = TestProbe()
+      val influx = TestProbe()
 
       val historyBlocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>
           val block: Block = generateNextBlock(prevHistory)
+          //prevHistory.append(block.header).get._1.append(block.payload).get._1.reportModifierIsValid(block)
           prevHistory.append(block.header)
           prevHistory.append(block.payload)
           (prevHistory.reportModifierIsValid(block), blocks :+ block)
@@ -94,42 +128,39 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
       val modifiers: Map[ModifierId, Array[Byte]] = historyBlocks._2.map { b =>
         b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray
-      }.toMap// + (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)
+      }.toMap // + (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)
 
-      val historyApplicator: ActorRef = system.actorOf(
-        Props(new HistoryApplicator(history, state, wallet, settings, nodeViewHolder.ref, Some(influx.ref)) {
-          override def receive: Receive = {
-            val r = super.receive
-            println(s"currentNumberOfAppliedModifiers: $currentNumberOfAppliedModifiers")
-            println(s"modifiersQueue: $modifiersQueue")
-            r
-          }})
-        //HistoryApplicator.props(history, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
-        //  .withDispatcher("history-applicator-dispatcher")
-        , "historyApplicator")
+      val historyApplicator: TestActorRef[HistoryApplicator] =
+        TestActorRef[HistoryApplicator](
+          HistoryApplicator.props(history, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
+        )
 
-//      import akka.actor.ActorDSL._
-//      val captureEventsActor = actor {
-//        new Act {
-//          become {
-//            case FullBlockChainIsSynced() => println(s"fullBlockChainIsSynced")
-//          }
-//        }
-//      }
+      //      val historyApplicator: ActorRef = system.actorOf(
+      //        Props(new HistoryApplicator(history, state, wallet, settings, nodeViewHolder.ref, Some(influx.ref)) {
+      //
+      //          override def getModifierForApplying(): Unit = {
+      //            println(s"-------------------")
+      //            println(s"locallyGeneratedModifiers: ${locallyGeneratedModifiers.size}")
+      //            //locallyGeneratedModifiers.size shouldBe 2
+      //            println(s"getModifierForApplying()")
+      //            super.getModifierForApplying()
+      //            println(s"currentNumberOfAppliedModifiers: $currentNumberOfAppliedModifiers")
+      //            //currentNumberOfAppliedModifiers shouldBe 1
+      //          }
+      //        })
+      //      )
 
-      val logProbe = TestProbe()
-      system.eventStream.subscribe(logProbe.ref, classOf[FullBlockChainIsSynced])
-
-      //      val probe = TestProbe()
-//      probe.watch(historyApplicator)
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       val modifier = ModifiersToNetworkUtils.fromProto(Payload.modifierTypeId, PayloadProtoSerializer.toProto(block.payload).toByteArray)
 
-//      historyApplicator ! ModifierFromRemote(modifier.get)
+      //historyApplicator ! ModifierFromRemote(modifier.get)
       historyApplicator ! LocallyGeneratedBlock(block)
 
-      //Thread.sleep(100000)
-      logProbe.expectMsg(FullBlockChainIsSynced())
+      expectMsgType[ModifierToHistoryAppending]
+
+      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
+      historyApplicator.underlyingActor.locallyGeneratedModifiers.size shouldBe 1
 
     }
   }
