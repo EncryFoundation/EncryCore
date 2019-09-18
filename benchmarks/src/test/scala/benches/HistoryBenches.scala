@@ -2,11 +2,13 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.view.history.History
-import encryBenchmark.Settings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.openjdk.jmh.annotations._
@@ -39,9 +41,7 @@ class HistoryBenches {
   }
 }
 
-object HistoryBenches {
-
-  val benchSettings: Settings = Settings.read
+object HistoryBenches extends BenchSettings {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -62,9 +62,8 @@ object HistoryBenches {
   }
 
   @State(Scope.Benchmark)
-  class HistoryBenchState {
+  class HistoryBenchState extends encry.settings.Settings {
 
-    val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
     val initialHistory: History = generateHistory(settings, tmpDir)
 

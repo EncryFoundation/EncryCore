@@ -1,6 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
@@ -9,14 +10,13 @@ import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersFor
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
-import encry.settings.EncryAppSettings
+import encry.settings.TestNetSettings
 import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
@@ -25,11 +25,10 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
   with Matchers
   with BeforeAndAfterAll
   with InstanceFactory
-  with OneInstancePerTest {
+  with OneInstancePerTest
+  with TestNetSettings {
 
   implicit val system: ActorSystem = ActorSystem()
-  val settingsWithKnownPeers: EncryAppSettings = NetworkUtils.TestNetworkSettings.read("AdditionalTestSettings.conf")
-  val settingsWithAllPeers: EncryAppSettings = NetworkUtils.TestNetworkSettings.read("MainTestSettings.conf")
 
   override def afterAll(): Unit = system.terminate()
 
@@ -42,9 +41,9 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val mempool = TestProbe()
 
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
-        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
+        testNetSettings.constants.ModifierIdSize, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
-      val history: History = generateDummyHistory(settingsWithAllPeers)
+      val history: History = generateDummyHistory(testNetSettings)
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
@@ -52,7 +51,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         address,
         peerHandler.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
 
       val timestamp1 = System.currentTimeMillis()
@@ -66,7 +65,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         timestamp2,
         2,
         scala.util.Random.nextLong(),
-        TestNetConstants.InitialDifficulty,
+        testNetSettings.constants.InitialDifficulty,
         EquihashSolution(Seq(1, 3))
       )
       val header_second: Header = Header(
@@ -76,7 +75,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         timestamp1,
         1,
         scala.util.Random.nextLong(),
-        TestNetConstants.InitialDifficulty,
+        testNetSettings.constants.InitialDifficulty,
         EquihashSolution(Seq(1, 3))
       )
 
@@ -106,13 +105,13 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         address,
         peerHandler.ref,
         Outgoing,
-        Handshake(protocolToBytes(settingsWithAllPeers.network.appVersion), "test node", Some(address), System.currentTimeMillis())
+        Handshake(protocolToBytes(testNetSettings.network.appVersion), "test node", Some(address), System.currentTimeMillis())
       )
 
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
-        settingsWithAllPeers, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
+        testNetSettings.constants.ModifierIdSize, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
-      val history: History = generateDummyHistory(settingsWithAllPeers)
+      val history: History = generateDummyHistory(testNetSettings)
 
       val historyWith10Blocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>

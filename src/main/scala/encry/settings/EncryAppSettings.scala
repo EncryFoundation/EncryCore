@@ -10,6 +10,7 @@ import encry.utils.NetworkTimeProviderSettings
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import scala.concurrent.duration.FiniteDuration
+import org.encryfoundation.common.utils.constants.Constants
 
 final case class EncryAppSettings(directory: String,
                                   node: NodeSettings,
@@ -22,14 +23,24 @@ final case class EncryAppSettings(directory: String,
                                   influxDB: Option[InfluxDBSettings],
                                   levelDB: LevelDBSettings,
                                   monitoringSettings: Option[MonitoringSettings],
-                                  blackList: BlackListSettings)
+                                  blackList: BlackListSettings,
+                                  constants: Constants)
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
   val configPath: String = "encry"
 
-  val read: EncryAppSettings = ConfigFactory.load("local.conf")
-    .withFallback(ConfigFactory.load()).as[EncryAppSettings](configPath)
+  def read(args: Option[String] = None): EncryAppSettings =
+    if (args.nonEmpty)
+      fromConfig(readConfigFromPath(args))
+    else
+      loadConfig("local.conf")
+
+  def loadConfig(configName: String): EncryAppSettings = {
+    ConfigFactory.load(configName)
+      .withFallback(ConfigFactory.load())
+      .as[EncryAppSettings](configPath)
+  }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
     val maybeConfigFile: Option[File] = for {
@@ -55,8 +66,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     }
   }
 
-  def read(userConfigPath: Option[String]): EncryAppSettings = fromConfig(readConfigFromPath(userConfigPath))
-
   val allConfig: Config = ConfigFactory.load("local.conf")
     .withFallback(ConfigFactory.load())
 
@@ -74,6 +83,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val levelDb            = config.as[LevelDBSettings](s"$configPath.levelDB")
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
     val blackList          = config.as[BlackListSettings](s"$configPath.blackList")
+    val constants          = config.as[Constants](s"$configPath.constantsClass")
 
     EncryAppSettings(
       directory,
@@ -87,7 +97,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       influxSettings,
       levelDb,
       monitoringSettings,
-      blackList
+      blackList,
+      constants
     )
   }
 

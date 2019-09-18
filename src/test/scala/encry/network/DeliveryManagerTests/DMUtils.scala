@@ -26,7 +26,7 @@ object DMUtils extends InstanceFactory {
     val history: History = generateDummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
       TestActorRef[DeliveryManager](DeliveryManager
-        .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref, TestProbe().ref, TestProbe().ref))
+        .props(None, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, settings))
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     else deliveryManager ! DisableMining

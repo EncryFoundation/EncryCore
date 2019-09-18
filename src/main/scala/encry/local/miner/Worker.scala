@@ -3,18 +3,16 @@ package encry.local.miner
 import java.util.Date
 
 import akka.actor.Actor
-import encry.EncryApp._
-
-import scala.concurrent.duration._
+import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.Miner.MinedBlock
 import encry.local.miner.Worker.{MineBlock, NextChallenge}
 import java.text.SimpleDateFormat
 
 import com.typesafe.scalalogging.StrictLogging
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.utils.TaggedTypes.Height
 
-class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging {
+class Worker(myIdx: Int, numberOfWorkers: Int, preGenesisHeight: Height) extends Actor with StrictLogging {
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
   var challengeStartTime: Date = new Date(System.currentTimeMillis())
@@ -43,7 +41,7 @@ class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging 
     case NextChallenge(candidate: CandidateBlock) =>
       challengeStartTime = new Date(System.currentTimeMillis())
       logger.info(s"Start next challenge on worker: $myIdx at height " +
-        s"${candidate.parentOpt.map(_.height + 1).getOrElse(TestNetConstants.PreGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
+        s"${candidate.parentOpt.map(_.height + 1).getOrElse(preGenesisHeight.toString)} at ${sdf.format(challengeStartTime)}")
       self ! MineBlock(candidate, Long.MaxValue / numberOfWorkers * myIdx)
   }
 

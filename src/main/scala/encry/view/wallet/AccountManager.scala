@@ -3,26 +3,25 @@ package encry.view.wallet
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.crypto.encryption.AES
-import encry.settings.EncryAppSettings
+import encry.settings.WalletSettings
 import encry.utils.Mnemonic
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
+
 import scala.util.Try
 
-case class AccountManager(store: Store) extends StrictLogging {
+case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) extends StrictLogging {
 
   import encry.storage.EncryStorage._
-
-  val settings: EncryAppSettings = EncryAppSettings.read
 
   lazy val mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
     }
-  } getOrElse createMandatory(settings.wallet.flatMap(_.seed))
+  } getOrElse createMandatory(walletSettings.flatMap(_.seed))
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.head == AccountManager.AccountPrefix)
@@ -63,7 +62,7 @@ case class AccountManager(store: Store) extends StrictLogging {
     acc
   }
 
-  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, settings.wallet.map(_.password)
+  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, walletSettings.map(_.password)
     .getOrElse(throw new RuntimeException("password not specified"))))
     .fold(e => {
       EncryApp.forceStopApplication(500, s"AccountManager: decryption failed cause ${e.getCause}")
@@ -75,7 +74,7 @@ case class AccountManager(store: Store) extends StrictLogging {
       Seq.empty,
 
       Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey),
-        ByteArrayWrapper(AES.encrypt(privateKey, settings.wallet.map(_.password)
+        ByteArrayWrapper(AES.encrypt(privateKey, walletSettings.map(_.password)
           .getOrElse(throw new RuntimeException("password not specified"))))))
 
     )

@@ -29,7 +29,7 @@ import org.encryfoundation.common.utils.Algos
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
-class StateApplicator(setting: EncryAppSettings,
+class StateApplicator(settings: EncryAppSettings,
                       history: History,
                       historyApplicator: ActorRef,
                       state: UtxoState,
@@ -71,7 +71,11 @@ class StateApplicator(setting: EncryAppSettings,
           val totalFees: Amount = block.payload.txs.dropRight(1).map(_.fee).sum
           block.payload.txs.foreach {
             case tx if tx.id sameElements lastTxId => context.actorOf(
-              TransactionsValidator.props(state, totalFees + EncrySupplyController.supplyAt(state.height), tx, state.height)
+              TransactionsValidator.props(
+                state,
+                totalFees + EncrySupplyController.supplyAt(state.height, settings.constants.InitialEmissionAmount,
+                  settings.constants.EmissionEpochLength, settings.constants.EmissionDecay),
+                tx, state.height)
                 .withDispatcher("transaction-validator-dispatcher"),
               s"validatorFor:${tx.encodedId}"
             )

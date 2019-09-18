@@ -42,15 +42,15 @@ object EncryApp extends App with StrictLogging {
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
 
-  val influxRef: Option[ActorRef] =
-    settings.influxDB.map(s => system.actorOf(StatsSender.props(s), "statsSender"))
+  val influxRef: Option[ActorRef] = settings.influxDB.map(influxSettings =>
+    system.actorOf(StatsSender.props(influxSettings, settings.network, settings.constants), "statsSender"))
 
   lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
 
-  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef), "miner")
+  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef, settings), "miner")
   lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner, influxRef)
     .withDispatcher("mempool-dispatcher"))
-   val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi)
+   val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi, settings)
      .withDispatcher("nvh-dispatcher"), "nodeViewHolder")
 
   val nodeViewSynchronizer: ActorRef = system.actorOf(NodeViewSynchronizer
@@ -64,7 +64,7 @@ object EncryApp extends App with StrictLogging {
   }
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
-    system.actorOf(Props[ConsoleListener], "cliListener")
+    system.actorOf(ConsoleListener.props(settings), "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
 

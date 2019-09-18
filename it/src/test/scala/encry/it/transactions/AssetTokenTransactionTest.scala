@@ -7,6 +7,7 @@ import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
+import encry.settings.Settings
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
@@ -15,7 +16,6 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
@@ -28,7 +28,8 @@ class AssetTokenTransactionTest extends AsyncFunSuite
   with Matchers
   with ScalaFutures
   with StrictLogging
-  with NodesFromDocker {
+  with NodesFromDocker
+  with Settings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
     .withFallback(Configs.offlineGeneration(true))
@@ -131,11 +132,12 @@ class AssetTokenTransactionTest extends AsyncFunSuite
           .get
 
         val supplyAtHeight: Long = (0 to thirdHeightToWait).foldLeft(0: Long) {
-          case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i)
+          case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, settings.constants.InitialEmissionAmount,
+            settings.constants.EmissionEpochLength, settings.constants.EmissionDecay)
         }
 
         val ckeckEncryBalanceNew: Boolean = Await.result(dockerNodes().head.balances, waitTime)
-          .find(_._1 == Algos.encode(TestNetConstants.IntrinsicTokenId))
+          .find(_._1 == Algos.encode(settings.constants.IntrinsicTokenId))
           .map(_._2 == supplyAtHeight - amount)
           .get
 

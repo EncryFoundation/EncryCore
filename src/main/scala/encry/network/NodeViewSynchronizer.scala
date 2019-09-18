@@ -44,7 +44,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
     .withDispatcher("peers-keeper-dispatcher"), "PeersKeeper")
 
-  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper, self)
+  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
 
   networkController ! RegisterMessagesHandler(Seq(
@@ -62,12 +62,13 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var canProcessTransactions: Boolean = true
 
   val downloadedModifiersValidator: ActorRef = context.system
-    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef, influxRef)
+    .actorOf(DownloadedModifiersValidator.props(settings.constants.ModifierIdSize, nodeViewHolderRef,
+      peersKeeper, self, memoryPoolRef, influxRef)
       .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings,
-      memoryPoolRef, self, downloadedModifiersValidator)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, memoryPoolRef, self,
+      downloadedModifiersValidator, settings)
       .withDispatcher("delivery-manager-dispatcher"), "DeliveryManager")
 
   override def preStart(): Unit = {

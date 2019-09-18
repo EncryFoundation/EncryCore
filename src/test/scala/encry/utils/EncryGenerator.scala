@@ -1,9 +1,7 @@
 package encry.utils
 
 import encry.modifiers.mempool.TransactionFactory
-import encry.modifiers.mempool.directive._
-import encry.modifiers.state.box._
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import encry.settings.Settings
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -13,7 +11,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Add
 import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box._
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
@@ -21,7 +19,7 @@ import scorex.utils.Random
 
 import scala.util.{Random => ScRand}
 
-trait EncryGenerator {
+trait EncryGenerator extends Settings {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
@@ -140,7 +138,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      TestNetConstants.InitialDifficulty,
+      settings.constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }
@@ -154,7 +152,7 @@ trait EncryGenerator {
       Math.abs(random.nextLong()),
       height,
       random.nextLong(),
-      TestNetConstants.InitialDifficulty,
+      settings.constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3))
     )
   }

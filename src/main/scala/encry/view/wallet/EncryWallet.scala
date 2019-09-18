@@ -11,11 +11,11 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.iq80.leveldb.{DB, Options}
 import scala.util.Try
 
-case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager) extends StrictLogging with AutoCloseable {
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager, intrinsicTokenId: ADKey) extends StrictLogging with AutoCloseable {
 
   val publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 
@@ -39,7 +39,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: Ac
               }
             (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
         }
-      walletStorage.updateWallet(modifier.id, newBxs, spentBxs)
+      walletStorage.updateWallet(modifier.id, newBxs, spentBxs, intrinsicTokenId)
 
     case _ => ()
   }
@@ -65,9 +65,9 @@ object EncryWallet extends StrictLogging {
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
     val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
-    val accountManager = AccountManager(accountManagerStore)
+    val accountManager = AccountManager(accountManagerStore, settings.wallet)
     //init keys
     accountManager.mandatoryAccount
-    EncryWallet(walletStorage, accountManager)
+    EncryWallet(walletStorage, accountManager, settings.constants.IntrinsicTokenId)
   }
 }

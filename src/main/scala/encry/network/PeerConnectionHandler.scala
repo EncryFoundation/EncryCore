@@ -2,19 +2,20 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 import java.nio.ByteOrder
+
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import akka.io.Tcp
 import akka.io.Tcp._
 import akka.util.{ByteString, CompactByteString}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{settings, timeProvider}
+import encry.EncryApp.timeProvider
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
+import encry.settings.NetworkSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 import org.encryfoundation.common.utils.Algos
-import cats.instances.long._
 
 import scala.annotation.tailrec
 import scala.collection.immutable.{HashMap, SortedMap}
@@ -25,7 +26,8 @@ import scala.util.{Failure, Random, Success}
 class PeerConnectionHandler(connection: ActorRef,
                             direction: ConnectionType,
                             ownSocketAddress: Option[InetSocketAddress],
-                            remote: InetSocketAddress) extends Actor with StrictLogging {
+                            remote: InetSocketAddress,
+                            networkSettings: NetworkSettings) extends Actor with StrictLogging {
 
   context watch connection
 
@@ -42,7 +44,7 @@ class PeerConnectionHandler(connection: ActorRef,
 
   override def preStart: Unit = {
     handshakeTimeoutCancellableOpt = Some(
-      context.system.scheduler.scheduleOnce(settings.network.handshakeTimeout)(self ! HandshakeTimeout)
+      context.system.scheduler.scheduleOnce(networkSettings.handshakeTimeout)(self ! HandshakeTimeout)
     )
     connection ! Register(self, keepOpenOnPeerClosed = false, useResumeWriting = true)
     connection ! ResumeReading
@@ -66,9 +68,9 @@ class PeerConnectionHandler(connection: ActorRef,
     case StartInteraction =>
       timeProvider.time().map { time =>
         val handshake: Handshake = Handshake(
-          protocolToBytes(settings.network.appVersion),
-          settings.network.nodeName
-            .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort),
+          protocolToBytes(networkSettings.appVersion),
+          networkSettings.nodeName
+            .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + networkSettings.bindAddress.getPort),
           ownSocketAddress,
           time
         )
@@ -161,7 +163,7 @@ class PeerConnectionHandler(connection: ActorRef,
           s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")
         connection ! Write(bytes, Ack(outMessagesCounter))
       }
-      settings.network.addedMaxDelay match {
+      networkSettings.addedMaxDelay match {
         case Some(delay) =>
           context.system.scheduler.scheduleOnce(Random.nextInt(delay.toMillis.toInt).millis)(sendMessage())
         case None => sendMessage()
@@ -338,6 +340,6 @@ object PeerConnectionHandler {
   final case class MessageFromNetwork(message: NetworkMessage, source: Option[ConnectedPeer])
 
   def props(connection: ActorRef, direction: ConnectionType,
-            ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress): Props =
-    Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote))
+            ownSocketAddress: Option[InetSocketAddress], remote: InetSocketAddress, networkSettings: NetworkSettings): Props =
+    Props(new PeerConnectionHandler(connection, direction, ownSocketAddress, remote, networkSettings))
 }

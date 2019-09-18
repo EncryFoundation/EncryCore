@@ -20,8 +20,6 @@ import scala.concurrent.ExecutionContextExecutor
 
 class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 
-  val settings: EncryAppSettings = EncryAppSettings.read
-
 //  def utxoFromBoxHolder(bh: BoxHolder,
 //                        dir: File,
 //                        nodeViewHolderRef: Option[ActorRef],
@@ -38,7 +36,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 //    new UtxoState(
 //      persistentProver,
 //      EncryState.genesisStateVersion,
-//      TestNetConstants.GenesisHeight,
+//      constants.GenesisHeight,
 //      vldb,
 //      0L,
 //      None,
@@ -53,7 +51,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
                         settings: EncryAppSettings): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
-        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
@@ -64,11 +62,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(
-      storage
-//        Constants.PreGenesisHeight,
-//      0L,
-    )
+    new UtxoState(storage, settings.constants)
   }
 
 
