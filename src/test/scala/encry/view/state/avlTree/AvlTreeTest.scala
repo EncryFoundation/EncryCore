@@ -13,9 +13,9 @@ class AvlTreeTest extends PropSpec with Matchers with EncryGenerator {
     val avl = AvlTree[Int, String]()
 
     val newAvl = avl
-      .insert(3, "test")
-      .insert(4, "test123")
-      .insert(5, "sss")
+      .insert(1, "test")
+      .insert(2, "test123")
+      .insert(3, "sss")
 
     println(newAvl)
   }

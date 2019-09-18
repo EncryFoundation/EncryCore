@@ -9,9 +9,8 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
 
   def insert(k: K, v: V): AvlTree[K, V] = {
     val newNode = insert(rootNode, k, v)
-//    if (newNode.balance == 2) AvlTree(leftRotation(newNode))
-//    else
-      AvlTree(newNode)
+    if (Math.abs(newNode.balance) == 2) AvlTree(leftRotation(newNode))
+    else AvlTree(newNode)
   }
 
   private def insert(node: Node[K, V], newKey: K, newValue: V): Node[K, V] = node match {
@@ -54,18 +53,18 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
       val prevRoot = internalNode.copy(
         leftChild = newLeftChildForPrevRoot,
         height = Math.max(
-          newLeftChildForPrevRoot.map(_.height).getOrElse(1),
-          internalNode.rightChild.map(_.height).getOrElse(1)
+          newLeftChildForPrevRoot.map(_.height).getOrElse(-1),
+          internalNode.rightChild.map(_.height).getOrElse(-1)
         ) + 1,
-        balance = newLeftChildForPrevRoot.map(_.balance).getOrElse(-1) - internalNode.rightChild.map(_.balance).getOrElse(-1)
+        balance = newLeftChildForPrevRoot.map(_.height).getOrElse(-1) - internalNode.rightChild.map(_.height).getOrElse(-1)
       )
       newRoot.copy(
         rightChild = Some(prevRoot),
         height = Math.max(
-          newRoot.leftChild.map(_.height).getOrElse(1),
+          newRoot.leftChild.map(_.height).getOrElse(-1),
           prevRoot.height
         ) + 1,
-        balance = newRoot.leftChild.map(_.balance).getOrElse(-1) - prevRoot.balance
+        balance = newRoot.leftChild.map(_.height).getOrElse(-1) - prevRoot.balance
       )
   }
 
@@ -77,17 +76,17 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
       val prevRoot = internalNode.copy(
         rightChild = newRightChildForPrevRoot,
         height = Math.max(
-          newRightChildForPrevRoot.map(_.height).getOrElse(1),
-          internalNode.leftChild.map(_.height).getOrElse(1)
+          newRightChildForPrevRoot.map(_.height).getOrElse(-1),
+          internalNode.leftChild.map(_.height).getOrElse(-1)
         ) + 1,
       )
       newRoot.copy(
         leftChild = Some(prevRoot),
         height = Math.max(
           prevRoot.height,
-          newRoot.rightChild.map(_.height).getOrElse(1)
+          newRoot.rightChild.map(_.height).getOrElse(-1)
         ) + 1,
-        balance = prevRoot.balance - newRoot.rightChild.map(_.balance).getOrElse(-1)
+        balance = prevRoot.height - newRoot.rightChild.map(_.height).getOrElse(-1)
       )
   }
 
