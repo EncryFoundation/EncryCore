@@ -157,10 +157,6 @@ class HistoryApplicator(history: History,
     context.system.eventStream.publish(DownloadRequest(tid, id))
   }
 
-  type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
-
-  def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
-
 }
 
 object HistoryApplicator {
@@ -182,6 +178,9 @@ object HistoryApplicator {
         case PoisonPill => 5
         case otherwise => 4
       })
+
+  type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
+  def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   def props(history: History,
             setting: EncryAppSettings,
