@@ -32,6 +32,7 @@ import org.iq80.leveldb.Options
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import akka.testkit.{TestActorRef, TestKit}
 import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.utils.Algos
 
 import scala.concurrent.duration._
 
@@ -47,7 +48,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     TestKit.shutdownActorSystem(system)
   }
 
-  val timeout: FiniteDuration = 5 seconds
+  val timeout: FiniteDuration = 10 seconds
 
   def utxoFromBoxHolder(boxHolder: BoxHolder, dir: File, settings: EncryAppSettings): UtxoState = {
     val storage = settings.storage.state match {
@@ -64,9 +65,11 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     new UtxoState(storage, settings.constants)
   }
 
-  def blockToModifier(block: Block): (PersistentModifier, PersistentModifier) = {
-    (ModifiersToNetworkUtils.fromProto(Header.modifierTypeId, HeaderProtoSerializer.toProto(block.header).toByteArray).get,
-      ModifiersToNetworkUtils.fromProto(Payload.modifierTypeId, PayloadProtoSerializer.toProto(block.payload).toByteArray).get)
+  def blockToModifiers(block: Block): Seq[PersistentModifier] = {
+    Seq(
+      ModifiersToNetworkUtils.fromProto(Header.modifierTypeId, HeaderProtoSerializer.toProto(block.header).toByteArray).get,
+      ModifiersToNetworkUtils.fromProto(Payload.modifierTypeId, PayloadProtoSerializer.toProto(block.payload).toByteArray).get
+    )
   }
 
 //  "HistoryApplicator add locall generated block" should {
@@ -109,46 +112,44 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
   "HistoryApplicator" should {
     "check queues" in {
 
-      val dir = FileHelper.getRandomTempDir
-      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
-
-      val bxs = TestHelper.genAssetBoxes
-      val boxHolder = BoxHolder(bxs)
-      val state = utxoFromBoxHolder(boxHolder, FileHelper.getRandomTempDir, settings)
-
       val nodeViewHolder = TestProbe()
       val influx = TestProbe()
 
+      val dir = FileHelper.getRandomTempDir
+      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
+      val bxs = TestHelper.genAssetBoxes
+      val boxHolder = BoxHolder(bxs)
+      val state = utxoFromBoxHolder(boxHolder, FileHelper.getRandomTempDir, settings)
       val initialHistory: History = generateDummyHistory(settings)
-
       val block1: Block = generateNextBlock(initialHistory)
-
-      val (headerMod1, payloadMod1) = blockToModifier(block1)
+      val modifiers = blockToModifiers(block1)
+      val modifierIds = modifiers.map(_.id)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
           HistoryApplicator.props(initialHistory, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
-      historyApplicator ! ModifierFromRemote(headerMod1)
+      modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      ModifiersCache.put(HistoryApplicator.toKey(headerMod1.id), headerMod1, initialHistory)
-      ModifiersCache.put(HistoryApplicator.toKey(payloadMod1.id), payloadMod1, initialHistory)
-
-      println(s"modifiersQueue.size: ${historyApplicator.underlyingActor.modifiersQueue.size}")
-      println(s"currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
-      historyApplicator.underlyingActor.modifiersQueue.size shouldBe 1
-      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 1
+      val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
+      val currentNumberOfAppliedModifiers = historyApplicator.underlyingActor.currentNumberOfAppliedModifiers
 
       historyApplicator ! StateApplicator.RequestNextModifier
 
-      println(s"modifiersQueue.size: ${historyApplicator.underlyingActor.modifiersQueue.size}")
-      println(s"currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
-      historyApplicator.underlyingActor.modifiersQueue.size shouldBe 0
-      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 1
+      val modifiersQueue1 = historyApplicator.underlyingActor.modifiersQueue
+      val currentNumberOfAppliedModifiers1 = historyApplicator.underlyingActor.currentNumberOfAppliedModifiers
+      val history = historyApplicator.underlyingActor.history
 
-//      expectMsgType[StartModifiersApplicationOnStateApplicator](timeout)
+      expectMsgType[StartModifiersApplicationOnStateApplicator](timeout)
 
+      modifiersQueue.size shouldBe 2
+      currentNumberOfAppliedModifiers shouldBe 2
+      modifiersQueue1.size shouldBe 0
+      currentNumberOfAppliedModifiers1 shouldBe 2
+
+      assert(modifierIds.forall(history.isModifierDefined))
+      assert(modifierIds.map(Algos.encode) == modifiersQueue.map(_._1))
     }
   }
 
