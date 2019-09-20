@@ -4,7 +4,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.StateRollbackBench.StateRollbackState
-import benches.Utils._
+import encry.utils.ChainUtils._
 import encry.storage.VersionalStorage
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.{BoxHolder, UtxoState}

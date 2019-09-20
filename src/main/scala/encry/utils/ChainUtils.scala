@@ -1,4 +1,4 @@
-package benches
+package encry.utils
 
 import java.io.File
 
@@ -11,7 +11,6 @@ import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, St
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
-import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
@@ -34,7 +33,7 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-object Utils extends Settings with StrictLogging {
+object ChainUtils extends Settings with StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
@@ -399,7 +398,6 @@ object Utils extends Settings with StrictLogging {
   }
 
   def generateHistory(settings: EncryAppSettings, file: File): History = {
-
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)

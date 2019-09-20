@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
-import benches.Utils._
+import encry.utils.ChainUtils._
 import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
