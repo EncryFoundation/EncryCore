@@ -19,5 +19,6 @@ object CleanHistory {
 
   final case class HistoryProcessingInfo(blockDownloadingProcessor: CleanBlockDownloadingProcessor,
                                          modifiersToDownload: Option[(ModifierTypeId, ModifierId)],
-                                         modifiersToApply: Option[PersistentModifier])
+                                         modifiersToApply: Option[PersistentModifier],
+                                         isHeaderChainSynced: Boolean)
 }

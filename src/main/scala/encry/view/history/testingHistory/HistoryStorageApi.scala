@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.settings.Settings
 import encry.storage.VersionalStorage.StorageKey
 import encry.view.history.storage.HistoryStorage
-import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import scorex.crypto.hash.Digest32
@@ -19,6 +19,9 @@ trait HistoryStorageApi extends Settings with StrictLogging {
   val BestHeaderKey: StorageKey =
     StorageKey @@ Array.fill(settings.constants.ModifierIdSize)(Header.modifierTypeId.untag(ModifierTypeId))
 
+  val BestBlockKey: StorageKey =
+    StorageKey @@ Array.fill(settings.constants.DigestLength)(-1: Byte)
+
   private def modifierById[T: ClassTag](id: ModifierId): Option[T] = storage
     .modifierById(id)
     .collect { case m: T => m }
@@ -28,11 +31,19 @@ trait HistoryStorageApi extends Settings with StrictLogging {
     .map(Ints.fromByteArray)
 
   def bestHeaderId: Option[ModifierId] = storage.get(BestHeaderKey).map(ModifierId @@ _)
+  def bestBlockId: Option[ModifierId] = storage.get(BestBlockKey).map(ModifierId @@ _)
+
+  def bestBlockHeightStorageApi: Int = bestBlockId
+    .flatMap(headerByIdStorageApi)
+    .map(_.height)
+    .getOrElse(settings.constants.GenesisHeight)
+
   def bestHeaderHeightStorageApi: Int = bestHeaderId
     .flatMap(heightByHeaderIdStorageApi)
     .getOrElse(settings.constants.PreGenesisHeight)
 
   def headerByIdStorageApi(id: ModifierId): Option[Header] = modifierById[Header](id)
+  def blockByPayloadStorageApi(payload: Payload): Option[Block] = headerByIdStorageApi(payload.headerId).map(Block(_, payload))
 
   def headerIdsAtHeightStorageApi(height: Int): List[ModifierId] = storage.get(heightIdsKey(height))
     .map(_.grouped(32).map(ModifierId @@ _).toList)

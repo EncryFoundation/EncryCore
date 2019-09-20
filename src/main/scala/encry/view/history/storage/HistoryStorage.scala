@@ -1,5 +1,6 @@
 package encry.view.history.storage
 
+import cats.Applicative
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
@@ -56,14 +57,14 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
       )
   }
 
-  def bulkInsert(version: Array[Byte],
-                 indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                 objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+  def bulkInsert[F[_]](version: Array[Byte],
+                       indexesToInsert: F[(Array[Byte], Array[Byte])],
+                       objectsToInsert: F[PersistentModifier])(implicit timohaPidor: Applicative[F]): Unit = store match {
     case _: IODBHistoryWrapper =>
       insertObjects(objectsToInsert)
       insert(
         StorageVersion @@ version,
-        indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
+        timohaPidor.map(indexesToInsert){case (key, value) => StorageKey @@ key -> StorageValue @@ value}
       )
     case _: VLDBWrapper =>
       logger.info(s"for header ${Algos.encode(version)} inserting ${objectsToInsert.mkString(",")}")

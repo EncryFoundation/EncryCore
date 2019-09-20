@@ -1,26 +1,14 @@
 package encry.view.history.testingHistory
 
+import encry.utils.NetworkTimeProvider
 import encry.view.history.History
 import org.encryfoundation.common.modifiers.PersistentModifier
 
-trait CleanHistoryApi {
+trait CleanHistoryApi extends HistoryStorageApi {
 
-  /**
-    * @param modifier
-    * @return
-    */
-  def append(modifier: PersistentModifier): Either[Throwable, History]
+  val blockDownloadingProcessor: CleanBlockDownloadingProcessor
 
-  /**
-    * @param modifier
-    * @return
-    */
-  def markModifierAsValid(modifier: PersistentModifier): Either[Throwable, History]
+  val isHeaderChainSynced: Boolean //todo upstream update
 
-  /**
-    * @param modifier
-    * @return
-    */
-  def markModifierAsInValid(modifier: PersistentModifier): Either[Throwable, History]
-
+  val timeProvider: NetworkTimeProvider
 }
