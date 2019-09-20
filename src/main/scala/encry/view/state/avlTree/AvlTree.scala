@@ -9,7 +9,7 @@ import encry.view.state.avlTree.utils.implicits.Hashable
 
 final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
 
-  implicit def nodeOrder(implicit ord: Order[K]) = new Order[Node[K, V]]{
+  implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]]{
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
   }
 
