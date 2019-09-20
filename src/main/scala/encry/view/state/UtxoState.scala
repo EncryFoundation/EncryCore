@@ -208,7 +208,12 @@ object UtxoState extends StrictLogging {
     val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
     logger.info(s"State created.")
-    UtxoState(versionalStorage, settings.constants, Height @@ stateHeight, lastBlockTimestamp)
+    UtxoState(
+      versionalStorage,
+      settings.constants,
+      Height @@ stateHeight,
+      lastBlockTimestamp
+    )
   }
 
   def genesis(stateDir: File, settings: EncryAppSettings): UtxoState = {
