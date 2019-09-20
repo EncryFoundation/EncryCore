@@ -16,8 +16,6 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     import encry.utils.implicits.UTXO._
 
-    println(randomAddress)
-
     val dir = FileHelper.getRandomTempDir
 
     val storage = {
@@ -27,16 +25,22 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     val avlStorage = AvlVersionalStorage[ADKey, Array[Byte]](storage)
 
-    val boxes = (0 to 100).map{i =>
+    val boxes = (0 to 1001).map{i =>
       val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
       genAssetBox(addr, i, nonce = i)
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+
+    //println(boxes.map(bx => Algos.encode(bx._1)).mkString("\n "))
+
+    val startTime = System.currentTimeMillis()
 
     val newAvl = avlStorage.insertWithTree(
       StorageVersion @@ Random.randomBytes(),
       boxes.toList,
       List.empty
     )
+
+    println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
 
     println(Algos.encode(newAvl.rootHash))
   }
