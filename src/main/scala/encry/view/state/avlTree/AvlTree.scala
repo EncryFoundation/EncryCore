@@ -42,19 +42,11 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
     case internalNode: InternalNode[K, V] =>
       if (internalNode.key > key) {
         val newLeftChild = internalNode.leftChild.flatMap(node => delete(node, key))
-        val newNode = internalNode.copy(
-          leftChild = newLeftChild,
-          balance = newLeftChild.map(_.height).getOrElse(-1) - internalNode.rightChild.map(_.height).getOrElse(-1),
-          height = Math.max(newLeftChild.map(_.height).getOrElse(-1), internalNode.rightChild.map(_.height).getOrElse(0)) + 1,
-        ).selfInspection
+        val newNode = internalNode.updateChilds(newLeftChild = newLeftChild).selfInspection
         Some(balance(newNode))
       } else if (internalNode.key < key){
         val newRightChild = internalNode.rightChild.flatMap(node => delete(node, key))
-        val newNode = internalNode.copy(
-          rightChild = newRightChild,
-          balance = internalNode.leftChild.map(_.height).getOrElse(-1) - newRightChild.map(_.height).getOrElse(-1),
-          height = Math.max(internalNode.leftChild.map(_.height).getOrElse(0), newRightChild.map(_.height).getOrElse(-1)) + 1,
-        ).selfInspection
+        val newNode = internalNode.updateChilds(newRightChild = newRightChild).selfInspection
         Some(balance(newNode))
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
@@ -62,22 +54,10 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
             val newLeftChild = internalNode.leftChild.flatMap(node => delete(node, newKey))
-            internalNode.copy(
-              key = newKey,
-              value = newValue,
-              leftChild = newLeftChild,
-              balance = newLeftChild.map(_.height).getOrElse(-1) - internalNode.rightChild.map(_.height).getOrElse(-1),
-              height = Math.max(newLeftChild.map(_.height).getOrElse(0), internalNode.rightChild.map(_.height).getOrElse(0)) + 1
-            )
+            internalNode.copy(key = newKey, value = newValue).updateChilds(newLeftChild = newLeftChild)
           case ((newKey, newValue), RIGHT) =>
             val newRightChild = internalNode.rightChild.flatMap(node => delete(node, newKey))
-            internalNode.copy(
-              key = newKey,
-              value = newValue,
-              rightChild = newRightChild,
-              balance = internalNode.leftChild.map(_.height).getOrElse(-1) - newRightChild.map(_.height).getOrElse(-1),
-              height = Math.max(internalNode.leftChild.map(_.height).getOrElse(0), newRightChild.map(_.height).getOrElse(-1)) + 1,
-            )
+            internalNode.copy(key = newKey, value = newValue).updateChilds(newRightChild = newRightChild)
           case ((_, _), EMPTY) => internalNode
         }
         Some(balance(newNode))
@@ -178,23 +158,9 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
         case internalNode: InternalNode[K, V] => internalNode
       }
       val newLeftChildForPrevRoot = newRoot.rightChild
-      val prevRoot = internalNode.copy(
-        leftChild = newLeftChildForPrevRoot.map(_.selfInspection),
-        height = Math.max(
-          newLeftChildForPrevRoot.map(_.height).getOrElse(-1),
-          internalNode.rightChild.map(_.height).getOrElse(-1)
-        ) + 1,
-        balance = newLeftChildForPrevRoot.map(_.height).getOrElse(-1) - internalNode.rightChild.map(_.height).getOrElse(-1)
-      )
+      val prevRoot = internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot.map(_.selfInspection))
       //println(s"prevroot: ${prevRoot}")
-      newRoot.copy(
-        rightChild = Some(prevRoot.selfInspection),
-        height = Math.max(
-          newRoot.leftChild.map(_.height).getOrElse(-1),
-          prevRoot.height
-        ) + 1,
-        balance = newRoot.leftChild.map(_.height).getOrElse(-1) - prevRoot.balance
-      )
+      newRoot.updateChilds(newRightChild = Some(prevRoot.selfInspection))
   }
 
   private def leftRotation(node: Node[K, V]): Node[K, V] = node match {
@@ -205,21 +171,8 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
         case internalNode: InternalNode[K, V] => internalNode
       }
       val newRightChildForPrevRoot = newRoot.leftChild
-      val prevRoot = internalNode.copy(
-        rightChild = newRightChildForPrevRoot.map(_.selfInspection),
-        height = Math.max(
-          newRightChildForPrevRoot.map(_.height).getOrElse(-1),
-          internalNode.leftChild.map(_.height).getOrElse(-1)
-        ) + 1,
-      ).selfInspection
-      newRoot.copy(
-        leftChild = Some(prevRoot),
-        height = Math.max(
-          prevRoot.height,
-          newRoot.rightChild.map(_.height).getOrElse(-1)
-        ) + 1,
-        balance = prevRoot.height - newRoot.rightChild.map(_.height).getOrElse(-1)
-      ).selfInspection
+      val prevRoot = internalNode.updateChilds(newRightChild = newRightChildForPrevRoot.map(_.selfInspection)).selfInspection
+      newRoot.updateChilds(newLeftChild = Some(prevRoot)).selfInspection
   }
 
   private def rlRotation(node: Node[K, V]): Node[K, V] = node match {

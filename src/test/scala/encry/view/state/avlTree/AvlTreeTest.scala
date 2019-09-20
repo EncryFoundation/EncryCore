@@ -26,17 +26,10 @@ class AvlTreeTest extends PropSpec with Matchers with EncryGenerator {
       .insert(1, "test")
       .insert(2, "test")
       .insert(3, "test")
-      .insert(8, "test")
 
     println(newAvl)
 
     println("=======")
-
-    println(newAvl)
-
-    val res = newAvl.delete(2)
-
-    println(res)
 
   }
 }
