@@ -3,6 +3,7 @@ package encry.view.state
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageKey
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.view.state.avlTree.AvlVersionalStorage
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
@@ -14,7 +15,7 @@ trait UtxoStateReader {
 
   val height: Height
 
-  protected val storage: VersionalStorage
+  protected val storage: AvlVersionalStorage[ADKey, Array[Byte]]
 
   def version: VersionTag = VersionTag !@@ storage.currentVersion
 

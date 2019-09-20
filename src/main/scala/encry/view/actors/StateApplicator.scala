@@ -36,17 +36,36 @@ class StateApplicator(settings: EncryAppSettings,
                       walletApplicator: ActorRef,
                       nodeViewHolder: ActorRef) extends Actor with StrictLogging {
 
-  //todo add supervisor strategy
+  //todo 1. add supervisor strategy
+
+  override def preStart(): Unit = {
+    context.system.eventStream.subscribe(self, classOf[InitialInfoForStateInitialization])
+    context.system.eventStream.subscribe(self, classOf[NotificationAboutNewModifier])
+  }
 
   override def receive: Receive = initializingState
 
+  def initializingState: Receive = {
+    case InitialInfoForStateInitialization(history, ntp) =>
+      val (state, historyUpdated, wallet) = initializeState(history, settings) match {
+        case Some((state, wallet)) => (state, history , wallet)
+        case None                  => initializeGenesisNodeState(ntp)
+      }
+      logger.info(s"State restored successfully. Now StateApplicator is working on full.")
+      sender() ! StateApplicatorStarted(historyUpdated, state, wallet)
+      walletApplicator ! NewWalletForWalletApplicator(wallet)
+      context.become(updateState(state, isInProgress = false))
+    case nonsense =>
+      logger.info(s"Actor had received message $nonsense during state initialized.")
+  }
+
   def updateState(state: UtxoState, isInProgress: Boolean): Receive = {
-    case NotificationAboutNewModifier if !isInProgress =>
+    case NotificationAboutNewModifier() if !isInProgress =>
       logger.info(s"StateApplicator got notification about new modifier and sent request for another one.")
       sender() ! RequestNextModifier
       context.become(updateState(state, isInProgress = true))
 
-    case NotificationAboutNewModifier =>
+    case NotificationAboutNewModifier() =>
       logger.info(s"StateApplicator got notification about new modifier but inProgress was $isInProgress.")
 
     case StartModifiersApplicationOnStateApplicator(progressInfo, suffixApplied) =>
@@ -162,25 +181,41 @@ class StateApplicator(settings: EncryAppSettings,
     case msg => logger.info(s"Got $msg in modifiersApplicationCompleted")
   }
 
+  def awaitingRollbackHistory(state: UtxoState): Receive = {
+    case _ =>
+  }
+
   def awaitingTransactionsValidation(toApply: Seq[PersistentModifier],
                                      ui: UpdateInformation,
                                      block: Block,
                                      currentState: UtxoState,
                                      numberOfTransactions: Int): Receive = {
     case TransactionValidatedSuccessfully =>
-
       if (numberOfTransactions - 1 == 0) {
+        val prevVersion: VersionTag = currentState.version
         val updatedState: UtxoState = currentState.applyValidModifier(block)
-        context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
-        historyApplicator ! NeedToReportAsValid(block)
-        if (toApply.isEmpty) {
-          logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
-          self ! ModifiersApplicationFinished
-          context.become(modifiersApplicationCompleted(ui, updatedState))
+        /* */
+        if (!(updatedState.storage.root sameElements block.header.stateRoot)) {
+          //rollback state
+          updatedState.rollbackTo(prevVersion) match {
+            case Failure(exception) => //stop app
+            case Success(rolledBackState) =>
+              historyApplicator ! RollbackHistoryToVersion(prevVersion, block)
+              context.become(awaitingRollbackHistory(rolledBackState))
+          }
         } else {
-          logger.info(s"awaitingTransactionsValidation finished but infoAboutCurrentFoldIteration._1 is not empty.")
-          self ! StartModifiersApplying
-          context.become(modifierApplication(toApply.toList, ui, updatedState))
+          //all is ok
+          context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
+          historyApplicator ! NeedToReportAsValid(block)
+          if (toApply.isEmpty) {
+            logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
+            self ! ModifiersApplicationFinished
+            context.become(modifiersApplicationCompleted(ui, updatedState))
+          } else {
+            logger.info(s"awaitingTransactionsValidation finished but infoAboutCurrentFoldIteration._1 is not empty.")
+            self ! StartModifiersApplying
+            context.become(modifierApplication(toApply.toList, ui, updatedState))
+          }
         }
       } else context.become(awaitingTransactionsValidation(toApply, ui, block, currentState, numberOfTransactions - 1))
 
@@ -208,22 +243,6 @@ class StateApplicator(settings: EncryAppSettings,
         )
       )
     case msg => logger.info(s"Got $msg in awaitingNewProgressInfo")
-  }
-
-  def initializingState: Receive = {
-    case InitialInfoForStateInitialization(history, ntp) =>
-      initializeState(history, settings) match {
-        case Some((state, wallet)) =>
-          logger.info(s"State restored successfully. Now StateApplicator is working on full.")
-          sender() ! StateRestoredSuccessfully(wallet, state)
-          walletApplicator ! NewWalletForWalletApplicator(wallet)
-          context.become(updateState(state, isInProgress = false))
-        case None =>
-          val (genesisState: UtxoState, genesisHistory: History, wallet: EncryWallet) = initializeGenesisNodeState(ntp)
-          sender() ! NewHistoryForHistoryApplicator(genesisHistory, wallet, genesisState)
-          walletApplicator ! NewWalletForWalletApplicator(wallet)
-          context.become(updateState(genesisState, isInProgress = false))
-      }
   }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier],
@@ -302,9 +321,13 @@ class StateApplicator(settings: EncryAppSettings,
 
 object StateApplicator {
 
+  final case class RollbackHistoryToVersion(version: VersionTag, failedBlock: Block)
+
+  final case class StateApplicatorStarted(history: History, state: UtxoState, wallet: EncryWallet)
+
   final case class StateRestoredSuccessfully(wallet: EncryWallet, state: UtxoState)
 
-  final case class NewHistoryForHistoryApplicator(history: History, wallet: EncryWallet, state: UtxoState)
+  final case class GenesisHistoryForHistoryApplicator(history: History, wallet: EncryWallet, state: UtxoState)
 
   final case class NewWalletForWalletApplicator(wallet: EncryWallet) extends AnyVal
 

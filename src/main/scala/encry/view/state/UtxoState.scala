@@ -24,6 +24,7 @@ import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.validated._
 import encry.view.state.UtxoState.StateChange
+import encry.view.state.avlTree.AvlVersionalStorage
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -32,7 +33,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, Height}
 import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
@@ -40,7 +41,7 @@ import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
-final case class UtxoState(storage: VersionalStorage,
+final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
                            constants: Constants,
                            height: Height,
                            lastBlockTimestamp: Long) extends StrictLogging with UtxoStateReader with AutoCloseable {
