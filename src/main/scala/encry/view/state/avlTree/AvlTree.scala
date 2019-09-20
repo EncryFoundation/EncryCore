@@ -50,7 +50,6 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
         Some(balance(newNode))
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
-        println(s"the closest value for: ${internalNode.key} is ${theClosestValue}")
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
             val newLeftChild = internalNode.leftChild.flatMap(node => delete(node, newKey))
@@ -68,14 +67,23 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
                                  (implicit m: Monoid[K], v: Monoid[V], h: Order[Node[K, V]]): ((K, V), Direction) = node match {
     case leafNode: LeafNode[K, V] => leafNode.key -> leafNode.value -> EMPTY
     case internalNode: InternalNode[K, V] =>
-      val onLeft = internalNode.leftChild.map(node => getRightPath(node).foldLeft[Node[K, V]](internalNode){
-        case (bestNode, nodeToCompr) => h.min(bestNode, nodeToCompr)
-      } -> LEFT)
-      onLeft.orElse(
-        internalNode.leftChild.map(node => getRightPath(node).foldLeft[Node[K, V]](internalNode){
-          case (bestNode, nodeToCompr) => h.max(bestNode, nodeToCompr)
-        } -> RIGHT)
-      ).map(node => node._1.key -> node._1.value -> node._2).get
+      val onLeft = internalNode.leftChild.flatMap{node =>
+        val rightPath = getRightPath(node)
+        rightPath.headOption.map(head =>
+          rightPath.foldLeft[Node[K, V]](head){
+            case (bestNode, nodeToCompr) => h.max(bestNode, nodeToCompr)
+          } -> LEFT
+        ) }
+      onLeft.orElse {
+        val onRight = internalNode.rightChild.flatMap{node =>
+          val leftPath = getLeftPath(node)
+            leftPath.headOption.map(head =>
+              leftPath.foldLeft[Node[K, V]](head) {
+                case (bestNode, nodeToCompr) => h.min(bestNode, nodeToCompr)
+              } -> RIGHT)
+        }
+        onRight
+      }.map(node => node._1.key -> node._1.value -> node._2).get
   }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
