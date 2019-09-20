@@ -29,8 +29,15 @@ case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: 
     val wordsPerHash: Int = 512 / n
     val digest: Blake2bDigest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
     val header: Header = Header(
-      version, parentId, txsRoot,
-      candidateBlock.timestamp, height, 0L, candidateBlock.difficulty, EquihashSolution.empty
+      version,
+      parentId,
+      txsRoot,
+      candidateBlock.timestamp,
+      height,
+      0L,
+      candidateBlock.difficulty,
+      EquihashSolution.empty,
+      Array.emptyByteArray
     )
     for {
       possibleHeader <- generateHeader(startingNonce, digest, header, difficulty)

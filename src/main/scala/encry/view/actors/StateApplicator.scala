@@ -197,12 +197,17 @@ class StateApplicator(settings: EncryAppSettings,
         /* */
         if (!(updatedState.storage.root sameElements block.header.stateRoot)) {
           //rollback state
-          updatedState.rollbackTo(prevVersion) match {
-            case Failure(exception) => //stop app
-            case Success(rolledBackState) =>
-              historyApplicator ! RollbackHistoryToVersion(prevVersion, block)
-              context.become(awaitingRollbackHistory(rolledBackState))
-          }
+          //updatedState.rollbackTo(prevVersion) match {
+          //  case Failure(exception) => //stop app
+          //  case Success(rolledBackState) =>
+          //    historyApplicator ! RollbackHistoryToVersion(prevVersion, block)
+          //    context.become(awaitingRollbackHistory(rolledBackState))
+          // }
+          historyApplicator ! NeedToReportAsInValid(block)
+          context.system.eventStream.publish(
+            SemanticallyFailedModification(block, List(StateModifierApplyError(s"Invalid modifier by state")))
+          )
+          context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState))
         } else {
           //all is ok
           context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
