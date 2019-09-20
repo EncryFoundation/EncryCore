@@ -1,7 +1,7 @@
 package encry.view.state.avlTree
 
-import encry.view.state.avlTree.AvlTree.InsertDirection
-import encry.view.state.avlTree.AvlTree.InsertDirections.EMPTY
+import encry.view.state.avlTree.AvlTree.Direction
+import encry.view.state.avlTree.AvlTree.Directions.EMPTY
 
 final case class LeafNode[K, V](key: K,
                                 value: V) extends Node[K, V] {
@@ -9,8 +9,6 @@ final case class LeafNode[K, V](key: K,
   override val balance: Int = 0
 
   override val height: Int = 0
-
-  override val insertDirection: InsertDirection = EMPTY
 
   override def selfInspection: Node[K, V] = this
 

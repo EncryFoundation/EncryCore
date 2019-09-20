@@ -195,7 +195,7 @@ class StateApplicator(settings: EncryAppSettings,
         val prevVersion: VersionTag = currentState.version
         val updatedState: UtxoState = currentState.applyValidModifier(block)
         /* */
-        if (!(updatedState.storage.root sameElements block.header.stateRoot)) {
+        if (!(updatedState.storage.rootHash sameElements block.header.stateRoot)) {
           //rollback state
           //updatedState.rollbackTo(prevVersion) match {
           //  case Failure(exception) => //stop app
