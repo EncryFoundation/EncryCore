@@ -1,11 +1,10 @@
 package encry.view.state.avlTree
 
 import cats.kernel.Monoid
-import encry.view.state.avlTree.AvlTree.InsertDirection
-import encry.view.state.avlTree.AvlTree.InsertDirections.EMPTY
+import encry.view.state.avlTree.AvlTree.Direction
+import encry.view.state.avlTree.AvlTree.Directions.EMPTY
 
 final case class EmptyNode[K, V] private (key: K, value: V, height: Int, balance: Int) extends Node[K, V] {
-  override val insertDirection: InsertDirection = EMPTY
 
   override def selfInspection: Node[K, V] = this
 }

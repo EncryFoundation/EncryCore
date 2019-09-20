@@ -2,8 +2,10 @@ package encry.view.state.avlTree
 
 import java.math.BigInteger
 
+import cats.Order
 import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
+import cats.instances.int._
 
 import scala.util.Random
 
@@ -16,20 +18,25 @@ class AvlTreeTest extends PropSpec with Matchers with EncryGenerator {
 
     val avl = AvlTree[Int, String]()
 
-    val startTime = System.currentTimeMillis()
+    val orderImpl = implicitly[Order[Int]]
 
-    val randomList = (0 until 10000).map(_ => Random.nextInt()).zipWithIndex
+    println(orderImpl.compare(1, 4))
 
-    val newAvl = randomList.foldLeft(AvlTree[Int, Int]()) {
-      case (avl, i) =>
-        val nanoTime = System.currentTimeMillis()
-        val res = avl.insert(i._1, i._1)
-        //println(s"Insert time${i._2}: ${(System.currentTimeMillis() - nanoTime)} ms")
-        res
-    }
+    val newAvl = avl
+      .insert(1, "test")
+      .insert(2, "test")
+      .insert(3, "test")
+      .insert(8, "test")
 
+    println(newAvl)
 
-    println(newAvl.get(1).isDefined)
+    println("=======")
+
+    println(newAvl)
+
+    val res = newAvl.delete(2)
+
+    println(res)
 
   }
 }

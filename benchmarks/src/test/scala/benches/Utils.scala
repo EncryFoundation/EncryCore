@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{Settings, EncryAppSettings}
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -14,8 +14,10 @@ import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
+import encry.view.state.avlTree.AvlVersionalStorage
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
+import encry.utils.implicits.UTXO._
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -104,7 +106,8 @@ object Utils extends Settings with StrictLogging {
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ BigInt(1),
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
     Block(header, Payload(header.id, transactions))
   }
@@ -137,7 +140,8 @@ object Utils extends Settings with StrictLogging {
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ (BigInt(1) + addDiff),
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
     Block(header, Payload(header.id, transactions))
   }
@@ -191,7 +195,7 @@ object Utils extends Settings with StrictLogging {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(storage, settings.constants)
+    new UtxoState(AvlVersionalStorage[ADKey, Array[Byte]](storage), settings.constants, height = Height @@ 0, lastBlockTimestamp = R.nextLong())
   }
 
   def getRandomTempDir: File = {
@@ -210,7 +214,8 @@ object Utils extends Settings with StrictLogging {
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
       settings.constants.InitialDifficulty,
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
   }
 

@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
@@ -18,13 +19,16 @@ import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import io.iohk.iodb.LSMStore
 import cats.data.Validated
-import cats.Traverse
+import cats.{Order, Traverse}
 import cats.syntax.traverse._
 import cats.instances.list._
+import cats.kernel.Monoid
 import cats.syntax.either._
 import cats.syntax.validated._
 import encry.view.state.UtxoState.StateChange
 import encry.view.state.avlTree.AvlVersionalStorage
+import encry.view.state.avlTree.utils.implicits.Hashable
+import org.bouncycastle.util.Arrays
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -39,6 +43,7 @@ import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
@@ -209,7 +214,7 @@ object UtxoState extends StrictLogging {
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
     logger.info(s"State created.")
     UtxoState(
-      versionalStorage,
+      AvlVersionalStorage[ADKey, Array[Byte]](versionalStorage),
       settings.constants,
       Height @@ stateHeight,
       lastBlockTimestamp
@@ -231,6 +236,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-    UtxoState(storage, settings.constants, settings.constants.PreGenesisHeight, 0L)
+    UtxoState(AvlVersionalStorage[ADKey, Array[Byte]](storage), settings.constants, settings.constants.PreGenesisHeight, 0L)
   }
 }
