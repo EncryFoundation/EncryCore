@@ -1,0 +1,53 @@
+package encry.view.history.testingHistory
+
+import com.google.common.primitives.Ints
+import com.typesafe.scalalogging.StrictLogging
+import encry.settings.Settings
+import encry.storage.VersionalStorage.StorageKey
+import encry.view.history.storage.HistoryStorage
+import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import scorex.crypto.hash.Digest32
+
+import scala.reflect.ClassTag
+
+trait HistoryStorageApi extends Settings with StrictLogging {
+
+  val storage: HistoryStorage
+
+  val BestHeaderKey: StorageKey =
+    StorageKey @@ Array.fill(settings.constants.ModifierIdSize)(Header.modifierTypeId.untag(ModifierTypeId))
+
+  private def modifierById[T: ClassTag](id: ModifierId): Option[T] = storage
+    .modifierById(id)
+    .collect { case m: T => m }
+
+  def heightByHeaderIdStorageApi(id: ModifierId): Option[Int] = storage
+    .get(headerHeightKey(id))
+    .map(Ints.fromByteArray)
+
+  def bestHeaderId: Option[ModifierId] = storage.get(BestHeaderKey).map(ModifierId @@ _)
+  def bestHeaderHeightStorageApi: Int = bestHeaderId
+    .flatMap(heightByHeaderIdStorageApi)
+    .getOrElse(settings.constants.PreGenesisHeight)
+
+  def headerByIdStorageApi(id: ModifierId): Option[Header] = modifierById[Header](id)
+
+  def headerIdsAtHeightStorageApi(height: Int): List[ModifierId] = storage.get(heightIdsKey(height))
+    .map(_.grouped(32).map(ModifierId @@ _).toList)
+    .getOrElse(List.empty[ModifierId])
+
+  def scoreOf(id: ModifierId): Option[BigInt] = storage.get(headerScoreKey(id)).map(BigInt(_))
+  def bestHeadersChainScore: BigInt = bestHeaderId.flatMap(scoreOf).getOrElse(BigInt(0))
+
+  def bestHeaderIdAtHeightStorageApi(h: Int): Option[ModifierId] = headerIdsAtHeightStorageApi(h).headOption
+  def isInBestChain(h: Header): Boolean = bestHeaderIdAtHeightStorageApi(h.height).exists(_.sameElements(h.id))
+
+  def heightIdsKey(height: Int): StorageKey =
+    StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
+  def headerScoreKey(id: ModifierId): StorageKey =
+    StorageKey @@ Algos.hash("score".getBytes(Algos.charset) ++ id).untag(Digest32)
+  def headerHeightKey(id: ModifierId): StorageKey =
+    StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
+}
