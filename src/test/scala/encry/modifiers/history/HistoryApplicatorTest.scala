@@ -2,43 +2,25 @@ package encry.modifiers.history
 
 import java.io.File
 
-import akka.actor.{ActorRef, ActorSystem, Props}
-import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import akka.util.Timeout
-import encry.EncryApp.settings
+import akka.actor.ActorSystem
+import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import encry.modifiers.InstanceFactory
-import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.ModifiersToNetworkUtils
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, UpdatedHistory}
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.Settings
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.{FileHelper, TestHelper, Utils}
-import encry.utils.ChainUtils.{privKey, _}
-import encry.view.{ModifiersCache, actors}
+import encry.utils.ChainUtils._
+import encry.utils.{ChainUtils, FileHelper}
+import encry.view.actors.HistoryApplicator.StartModifiersApplicationOnStateApplicator
+import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.actors.{HistoryApplicator, StateApplicator}
-import encry.view.actors.HistoryApplicator.{ModifierToHistoryAppending, StartModifiersApplicationOnStateApplicator}
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
-import encry.view.actors.StateApplicator.NotificationAboutSuccessfullyAppliedModifier
 import encry.view.history.History
 import encry.view.state.{BoxHolder, UtxoState}
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.iq80.leveldb.Options
-import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-import akka.testkit.{TestActorRef, TestKit}
-import encry.modifiers.mempool.TransactionFactory
-import io.circe.Decoder.state
-import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 import scala.collection.Seq
 import scala.concurrent.duration._
@@ -66,68 +48,59 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     }
   }
 
-  def blockToModifier(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
+  def blockToModifiers(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
 
-  val numberOfInputsInOneTransaction = 1//10
-  val transactionsNumberInEachBlock = 100//1000
-  val numberOfOutputsInOneTransaction = 2//10
-  val initialboxCount = 10//100000
+  def generateChain(blockQty: Int): (UtxoState, List[Block]) = {
+    val numberOfInputsInOneTransaction = 1//10
+    val transactionsNumberInEachBlock = 100//1000
+    val initialboxCount = 10//100000
+
+    val initialBoxes: IndexedSeq[AssetBox] = (0 until initialboxCount).map(nonce =>
+      genHardcodedBox(privKey.publicImage.address.address, nonce)
+    )
+    val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
+
+    val genesisBlock: Block = ChainUtils.generateGenesisBlock(Height @@ 0)
+
+    val state: UtxoState = utxoFromBoxHolder(boxesHolder, dir, None, settings, VersionalStorage.LevelDB)
+      .applyModifier(genesisBlock).right.get
+
+    val stateGenerationResults: (List[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
+      (0 until blockQty).foldLeft(List.empty[Block], genesisBlock, state, initialBoxes) {
+        case ((blocks, block, stateL, boxes), _) =>
+          val nextBlockMainChain: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
+            block, stateL, block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
+          val stateN: UtxoState = stateL.applyModifier(nextBlockMainChain).right.get
+          (blocks :+ nextBlockMainChain,
+            nextBlockMainChain, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
+          )
+      }
+    (state, genesisBlock +: stateGenerationResults._1)
+  }
+
+  def printIds(blocks: List[Block]) = {
+    blocks.foreach { b =>
+      println(s"header.timestamp: ${b.header.timestamp}")
+      println(s"header.id: ${Algos.encode(b.header.id)}")
+      println(s"header.payloadId: ${Algos.encode(b.header.payloadId)}")
+      println(s"payload.id: ${Algos.encode(b.payload.id)}")
+      println(s"payload.headerId: ${Algos.encode(b.payload.headerId)}")
+    }
+  }
 
   val dir: File = FileHelper.getRandomTempDir
   val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
-//  val bxs: IndexedSeq[AssetBox] = TestHelper.genAssetBoxes
-//  val boxHolder: BoxHolder = BoxHolder(bxs)
-//  val genesisBlock: Block = generateGenesisBlockValidForHistory//generateGenesisBlock(Height @@ 0)
-//  val state: UtxoState = utxoFromBoxHolder(boxHolder, dir, None, settings, VersionalStorage.LevelDB)
-//    .applyModifier(genesisBlock).right.get
 
-  val initialBoxes: IndexedSeq[AssetBox] = (0 until initialboxCount).map(nonce =>
-    genHardcodedBox(privKey.publicImage.address.address, nonce)
-  )
-  val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
-  val state: UtxoState = utxoFromBoxHolder(boxesHolder, dir, None, settings, VersionalStorage.LevelDB)
-  val genesisBlock: Block = generateGenesisBlockValidForState(state)
-  val genesisState: UtxoState = state.applyModifier(genesisBlock).right.get
-
-//  val block: Block = generateNextBlockValidForState(genesisBlock, genesisState,
-//    initialBoxes.take(transactionsNumberInEachBlock * numberOfInputsInOneTransaction),
-//    transactionsNumberInEachBlock, numberOfInputsInOneTransaction,
-//    numberOfOutputsInOneTransaction)
-
-  val stateGenerationResults: (List[(Block, Block)], Block, UtxoState, IndexedSeq[AssetBox]) =
-    (0 until 10).foldLeft(List.empty[(Block, Block)], genesisBlock, state, initialBoxes) {
-      case ((blocks, block, stateL, boxes), _) =>
-        val nextBlockMainChain: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
-          block,
-          stateL,
-          block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
-        val nextBlockFork: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
-          block,
-          stateL,
-          block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq,
-          addDiff = Difficulty @@ BigInt(100)
-        )
-        val stateN: UtxoState = stateL.applyModifier(nextBlockMainChain).right.get
-        (blocks :+ (nextBlockMainChain, nextBlockFork),
-          nextBlockMainChain, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
-        )
-    }
-
-  val chain: List[Block] = genesisBlock +: stateGenerationResults._1.map(_._1)
-  val forkBlocks: List[Block] = genesisBlock +: stateGenerationResults._1.map(_._2)
-  //state = stateGenerationResults._3
-
-//  val initHistory: History = generateDummyHistory(settings)
-//  initHistory.append(genesisBlock.header)
-//  initHistory.append(genesisBlock.payload)
-//  val initialHistory: History = initHistory.reportModifierIsValid(genesisBlock)
-
-//  val block: Block = generateNextBlock(initialHistory)
+  val initialHistory: History = generateDummyHistory(settings)
 
   val nodeViewHolder = TestProbe()
   val influx = TestProbe()
 
   val timeout: FiniteDuration = 10 seconds
+
+  //printIds(chain)
+  //println(s"${settings.constants.RetargetingEpochsQty}")
+  //println(s"${settings.constants.EpochLength}")
 
   //  "HistoryApplicator add locall generated block" should {
   //    "chain synced" in {
@@ -168,15 +141,21 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
   "HistoryApplicator" should {
     "check queues" in {
+
+      val (state, chain) = generateChain(1)
+
+      val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
+      val modifierIds = modifiers.map(_.id)
+
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
           HistoryApplicator.props(initialHistory, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
-      val modifiers: Seq[PersistentModifier] = blockToModifier(block)
-      val modifierIds: Seq[ModifierId] = modifiers.map(_.id)
-
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
+
+      println(s"modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
+      println(s"currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
 
       val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
       modifiersQueue.size shouldBe 2
@@ -199,20 +178,19 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
   "HistoryApplicator" should {
     "check queue for rollback limit" in {
 
-      val initHistory1: History = generateDummyHistory(settings)
+      println(s"maxVersions: ${settings.levelDB.maxVersions}")
+
+      val (state, chain) = generateChain(120)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(initHistory1, settings, stateGenerationResults._3, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(initialHistory, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
             //.withDispatcher("history-applicator-dispatcher"), "historyApplicator"
         )
 
-      val modifiers: Seq[PersistentModifier] =
-        chain
-        //genHistoryBlocks(initialHistory, /*settings.levelDB.maxVersions + */ 10)._2
-          .flatMap(blockToModifier)
+      val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
 
-      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+      //system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 

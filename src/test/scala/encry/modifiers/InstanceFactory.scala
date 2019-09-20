@@ -4,7 +4,7 @@ import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
+import encry.utils.{ChainUtils, EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
@@ -14,7 +14,6 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryPropositio
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
-
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
@@ -47,14 +46,14 @@ trait InstanceFactory extends Keys with EncryGenerator {
   }
 
   def generateGenesisBlock(genesisHeight: Height): Block = {
-    val txs: Seq[Transaction] = Seq(coinbaseTransaction)
+    val txs: Seq[Transaction] = Seq(ChainUtils.coinbaseTransaction(0))
     val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
       height = genesisHeight,
       transactionsRoot = txsRoot
     )
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
+    Block(header, Payload(header.id, txs))
   }
 
   def paymentTransactionDynamic: Transaction = {

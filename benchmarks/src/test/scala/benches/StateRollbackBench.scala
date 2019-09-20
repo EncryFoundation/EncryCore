@@ -66,7 +66,7 @@ object StateRollbackBench extends BenchSettings {
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
-    val genesisBlock: Block = generateGenesisBlockValidForState(state)
+    val genesisBlock: Block = generateGenesisBlockValidForState
 
     state = state.applyModifier(genesisBlock).right.get
 

@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{Settings, EncryAppSettings}
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -60,11 +60,23 @@ object ChainUtils extends Settings with StrictLogging {
         ) :: acc
     }
 
-  def generateGenesisBlockValidForState(state: UtxoState): Block = {
+  def generateGenesisBlockValidForState: Block = {
     val txs = Seq(coinbaseTransaction(0))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
       height = settings.constants.GenesisHeight
+    )
+    Block(header, Payload(header.id, txs))
+  }
+
+  def generateGenesisBlock(genesisHeight: Height): Block = {
+    val txs: Seq[Transaction] = Seq(ChainUtils.coinbaseTransaction(0))
+    val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
+    val header = genHeader.copy(
+      timestamp = System.currentTimeMillis(),
+      parentId = Header.GenesisParentId,
+      height = genesisHeight,
+      transactionsRoot = txsRoot
     )
     Block(header, Payload(header.id, txs))
   }
@@ -113,13 +125,14 @@ object ChainUtils extends Settings with StrictLogging {
                                                             box: Seq[AssetBox],
                                                             splitCoef: Int = 2,
                                                             addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+    val timestamp = System.currentTimeMillis()
 
     val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
       case ((boxes, transactionsL), _) =>
         val tx: Transaction = defaultPaymentTransactionScratch(
           privKey,
           fee = 1,
-          timestamp = 11L,
+          timestamp,
           useBoxes = IndexedSeq(boxes.head),
           recipient = privKey.publicImage.address.address,
           amount = boxes.head.amount - 1,
@@ -132,7 +145,7 @@ object ChainUtils extends Settings with StrictLogging {
       1.toByte,
       prevBlock.id,
       Payload.rootHash(transactions.map(_.id)),
-      System.currentTimeMillis(),
+      timestamp,
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ (BigInt(1) + addDiff),

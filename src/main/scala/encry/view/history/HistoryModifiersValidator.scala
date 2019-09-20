@@ -72,9 +72,9 @@ trait HistoryModifiersValidator extends HistoryApi with Settings {
     _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < settings.constants.MaxRollbackDepth), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
     powSchemeValidationResult = powScheme.verify(h)
-    _ <- Either.cond(powSchemeValidationResult.isRight, (),
-      HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId}" +
-        s" caused: $powSchemeValidationResult"))
+//    _ <- Either.cond(powSchemeValidationResult.isRight, (),
+//      HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId}" +
+//        s" caused: $powSchemeValidationResult"))
     _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
       HeaderFatalValidationError(s"Header ${h.encodedId} is semantically invalid"))
     _ <- Either.cond(h.timestamp - timeProvider.estimatedTime <= settings.constants.MaxTimeDrift, (),
