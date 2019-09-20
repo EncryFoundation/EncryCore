@@ -5,10 +5,16 @@ import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 import cats.instances.int._
 import cats.instances.string._
+import encry.view.state.avlTree.utils.implicits.Hashable
+import org.encryfoundation.common.utils.Algos
 
 import scala.util.Random
 
 class AvlTreeTest extends PropSpec with Matchers with EncryGenerator {
+
+  implicit val hashInt: Hashable[Int] = new Hashable[Int] {
+    override def hash(value: Int): Array[Byte] = Algos.hash(value.toString)
+  }
 
   property("avl should contains all inserted elems"){
 

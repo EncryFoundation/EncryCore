@@ -7,6 +7,8 @@ import encry.view.state.avlTree.AvlTree.Directions.EMPTY
 final case class EmptyNode[K, V] private (key: K, value: V, height: Int, balance: Int) extends Node[K, V] {
 
   override def selfInspection: Node[K, V] = this
+
+  override val hash: Array[Byte] = Array.emptyByteArray
 }
 
 object EmptyNode {

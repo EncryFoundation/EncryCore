@@ -12,7 +12,7 @@ case class AvlVersionalStorage[K: Monoid, V: Monoid] (storage: VersionalStorage,
                                                       convertK: ConvertableToStorage[K],
                                                       value: ConvertableToStorage[V]) extends VersionalStorage {
 
-  val rootHash: Array[Byte] = hash.hash(tree.rootNode.key)
+  val rootHash: Array[Byte] = tree.rootNode.hash
 
   override def get(key: StorageKey): Option[StorageValue] = storage.get(key)
 
@@ -49,7 +49,7 @@ case class AvlVersionalStorage[K: Monoid, V: Monoid] (storage: VersionalStorage,
       toInsert,
       toDelete
     )
-    AvlVersionalStorage(storage, newTreeAfterDelitions)
+    AvlVersionalStorage(storage, newTreeAfterInsertions)
   }
 
   override def close(): Unit = storage.close()

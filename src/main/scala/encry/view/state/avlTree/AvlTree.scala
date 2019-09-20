@@ -7,7 +7,7 @@ import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.Hashable
 
-final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
+final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]]{
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -50,13 +50,14 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
         Some(balance(newNode))
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
+        val hash = implicitly[Hashable[K]]
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
             val newLeftChild = internalNode.leftChild.flatMap(node => delete(node, newKey))
-            internalNode.copy(key = newKey, value = newValue).updateChilds(newLeftChild = newLeftChild)
+            internalNode.copy(key = newKey, value = newValue, hash = hash.hash(newKey)).updateChilds(newLeftChild = newLeftChild)
           case ((newKey, newValue), RIGHT) =>
             val newRightChild = internalNode.rightChild.flatMap(node => delete(node, newKey))
-            internalNode.copy(key = newKey, value = newValue).updateChilds(newRightChild = newRightChild)
+            internalNode.copy(key = newKey, value = newValue, hash = hash.hash(newKey)).updateChilds(newRightChild = newRightChild)
           case ((_, _), EMPTY) => internalNode
         }
         Some(balance(newNode))
@@ -103,8 +104,7 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
       else {
         val newInternalNode = InternalNode[K, V](leafNode.key, leafNode.value, height = 1, balance = 0)
         //todo remove asInstance
-        val newNode = insert(newInternalNode, newKey, newValue).asInstanceOf[InternalNode[K, V]]
-        newNode.copy(balance = newNode.leftChild.map(_.height).getOrElse(-1) - newNode.rightChild.map(_.height).getOrElse(-1))
+        insert(newInternalNode, newKey, newValue).asInstanceOf[InternalNode[K, V]]
       }
     case internalNode: InternalNode[K, V] =>
       if (internalNode.key > newKey) {
@@ -123,9 +123,9 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
   }
 
   private def setToZeroInsertDirection(node: Node[K, V]): Node[K, V] = node match {
-    case internalNode: InternalNode[K, V] => internalNode.copy(
-      leftChild = internalNode.leftChild.map(setToZeroInsertDirection),
-      rightChild = internalNode.rightChild.map(setToZeroInsertDirection)
+    case internalNode: InternalNode[K, V] => internalNode.updateChilds(
+      newLeftChild = internalNode.leftChild.map(setToZeroInsertDirection),
+      newRightChild = internalNode.rightChild.map(setToZeroInsertDirection)
     )
     case leaf => leaf
   }
@@ -187,14 +187,14 @@ final case class AvlTree[K : Order, V](rootNode: Node[K, V]) {
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
       val rotatedRightChild = rightRotation(internalNode.rightChild.get).selfInspection
-      leftRotation(internalNode.copy(rightChild = Some(rotatedRightChild)))
+      leftRotation(internalNode.updateChilds(newRightChild = Some(rotatedRightChild)))
   }
 
   private def lrRotation(node: Node[K, V]): Node[K, V] = node match {
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
       val rotatedLeftChild = leftRotation(internalNode.leftChild.get).selfInspection
-      rightRotation(internalNode.copy(leftChild = Some(rotatedLeftChild)))
+      rightRotation(internalNode.updateChilds(newLeftChild = Some(rotatedLeftChild)))
   }
 
   override def toString: String = rootNode.toString
@@ -209,5 +209,5 @@ object AvlTree {
     case object EMPTY extends Direction
   }
 
-  def apply[K: Monoid : Order, V: Monoid](): AvlTree[K, V] = new AvlTree[K, V](EmptyNode())
+  def apply[K: Monoid : Order : Hashable, V: Monoid](): AvlTree[K, V] = new AvlTree[K, V](EmptyNode())
 }
