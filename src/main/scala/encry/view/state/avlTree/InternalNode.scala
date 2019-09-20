@@ -19,7 +19,7 @@ final case class InternalNode[K, V](key: K,
     this.copy(
       leftChild = newLeftChildAfterInspect,
       rightChild = newRightChildAfterInspect,
-      balance = newLeftChild.map(_.height).getOrElse(-1) - newLeftChild.map(_.height).getOrElse(-1),
+      balance = newLeftChildAfterInspect.map(_.height).getOrElse(-1) - newRightChildAfterInspect.map(_.height).getOrElse(-1),
       height = Math.max(newLeftChildAfterInspect.map(_.height).getOrElse(-1), newRightChildAfterInspect.map(_.height).getOrElse(0)) + 1
     )
   }
