@@ -11,7 +11,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.view.ModifiersCache
-import encry.view.actors.HistoryApplicator.InfoForNVH
+import encry.view.actors.HistoryApplicator.InitialStateHistoryWallet
 import encry.view.actors.NodeViewHolder.ReceivableMessages._
 import encry.view.actors.NodeViewHolder._
 import encry.view.actors.StateApplicator.StateForNVH
@@ -37,14 +37,20 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
 
+  val walletApplicator: ActorRef = context.system.actorOf(WalletApplicator.props, "walletApplicator")
+
   val historyApplicator: ActorRef = context.system.actorOf(
-    HistoryApplicator.props(settings, self, influxRef, timeProvider)
+    HistoryApplicator.props(self, walletApplicator, settings, influxRef, timeProvider)
       .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
+
+  val stateApplicator: ActorRef = context.system.actorOf(
+    StateApplicator.props(settings, historyApplicator, walletApplicator, self)
+      .withDispatcher("state-applicator-dispatcher"), name = "stateApplicator")
 
   override def receive: Receive = awaitingHistory
 
   def awaitingHistory: Receive = {
-    case InfoForNVH(history, w, s) =>
+    case InitialStateHistoryWallet(history, w, s) =>
       influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
         ref ! HeightStatistics(
           history.getBestHeaderHeight,

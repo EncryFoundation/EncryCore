@@ -26,7 +26,9 @@ trait EncryStorage extends AutoCloseable with StrictLogging {
 
   def get(key: StorageKey): Option[Array[Byte]] = store.get(key)
 
-  def rollbackTo(version: VersionTag): Try[Unit] = Try{store.rollbackTo(StorageVersion @@ version.untag(VersionTag))}
+  def rollbackTo(version: VersionTag): Try[Unit] = Try {
+    store.rollbackTo(StorageVersion @@ version.untag(VersionTag))
+  }
 
   override def close(): Unit = {
     logger.info("Closing storage")
