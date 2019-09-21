@@ -13,7 +13,7 @@ trait EncryStorage extends AutoCloseable with StrictLogging {
 
   val store: VersionalStorage
 
-  def insert[F[_]](version: StorageVersion, toInsert: F[(StorageKey, StorageValue)]): Unit =
+  def insert(version: StorageVersion, toInsert: List[(StorageKey, StorageValue)]): Unit =
     store.insert(version, toInsert)
 
   def remove(version: StorageVersion, toRemove: List[StorageKey]): Unit =

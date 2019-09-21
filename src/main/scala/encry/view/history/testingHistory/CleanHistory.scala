@@ -4,15 +4,16 @@ import encry.view.history.History
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
-case class CleanHistory() extends CleanHistoryModifiersProcessor {
+case class CleanHistory() {
+  //extends CleanHistoryModifiersProcessor {
 
-  def append(modifier: PersistentModifier): Either[Throwable, History] = {
+//  def append(modifier: PersistentModifier): Either[Throwable, History] = {
+//
+//  }
 
-  }
+   //def markModifierAsValid(modifier: PersistentModifier): Either[Throwable, History] = ???
 
-   def markModifierAsValid(modifier: PersistentModifier): Either[Throwable, History] = ???
-
-  def markModifierAsInValid(modifier: PersistentModifier): Either[Throwable, History] = ???
+  //def markModifierAsInValid(modifier: PersistentModifier): Either[Throwable, History] = ???
 }
 
 object CleanHistory {
