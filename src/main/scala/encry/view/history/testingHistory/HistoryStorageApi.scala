@@ -25,6 +25,9 @@ trait HistoryStorageApi extends Settings with StrictLogging {
 
   def isBestBlockDefined: Boolean = bestBlockId.isDefined
 
+  def headerOfBestBlockStorageApi: Option[Header] = bestBlockId
+    .flatMap(headerByIdStorageApi)
+
   def heightByHeaderStorageApi(id: ModifierId): Option[Int] = storage
     .get(headerHeightKey(id))
     .map(Ints.fromByteArray)

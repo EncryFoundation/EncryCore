@@ -262,15 +262,8 @@ trait HistoryApi extends HistoryDBApi with Settings { //scalastyle:ignore
                                 startHeader: Header,
                                 limit: Int): (HeaderChain, HeaderChain) = {
       def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
-
       val currentChain: HeaderChain = headerChainBack(limit, startHeader, until)
       (currentChain, otherChain.takeAfter(currentChain.head))
-
-      def takeAfter(h: Header): HeaderChain = {
-        val commonIndex = headers.indexWhere(_.id.sameElements(h.id))
-        val commonBlockThenSuffixes = headers.takeRight(headers.length - commonIndex)
-        HeaderChain(commonBlockThenSuffixes)
-      }
     }
 
     loop(2, HeaderChain(Seq(header2)))

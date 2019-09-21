@@ -47,25 +47,37 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
     }
   }
 
-  private def processBlockFromBestChain() = {}
-
-  private def commonBlockThenSuffixes(firstHeader: Header, secondsHeader: Header) = {
-
-    def commonBlocksThenSuffixes(otherChain: List[Header], startHeader: Header, limit: Int) = {
+  private def processBlockFromBestChain(newBestHeader: Header, fullBlock: Block) = {
+    headerOfBestBlockStorageApi.map { headerOfBestBlock =>
+      val (oldChain: List[Header], newChain: List[Header]) = commonBlockThenSuffixes(headerOfBestBlock, newBestHeader)
+      val toRemove: List[Block] = oldChain.drop(1).flatMap(blockByHeaderStorageApi)
+      val toApply: List[Block] = newChain.drop(1)
+        .flatMap(h => if (h == fullBlock.header) fullBlock.some else blockByHeaderStorageApi(h))
+      //todo add to cache toApply
 
     }
   }
 
-  private def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): List[Header] = {
-    @tailrec def loop(header: Header, acc: List[Header]): List[Header] =
-      if (acc.length == limit || until(header)) acc
-      else headerByIdStorageApi(header.parentId) match {
-        case Some(parentHeader) => loop(parentHeader, parentHeader :: acc)
-        case None if acc.contains(header) => acc
-        case _ => header :: acc
+  private def commonBlockThenSuffixes(firstHeader: Header, secondsHeader: Header): (List[Header], List[Header]) = {
+    val heightDelta: Int = Math.max(firstHeader.height - secondsHeader.height, 0)
+
+    @tailrec def loop(numberBack: Int, otherChain: List[Header]): (List[Header], List[Header]) =
+      commonBlocksThenSuffixes(otherChain, firstHeader, numberBack + heightDelta) match {
+        case (l1@ ::(head1, _), l2@ ::(head2, _)) if head1 == head2 => l1 -> l2
+        case _ => //todo check this logic
+          (computeForkChain(numberBack, otherChain.head, _ => false) ::: otherChain.drop(1)) match {
+            case l@ ::(_, _) || Nil if !otherChain.head.isGenesis => loop(l.length, l)
+            case _ => List.empty -> List.empty //todo new exception here
+          }
       }
-    if (bestHeaderId.isEmpty || limit == 0) List.empty[Header]
-    else loop(startHeader, List(startHeader))
+
+    def commonBlocksThenSuffixes(otherChain: List[Header], startHeader: Header, limit: Int): (List[Header], List[Header]) = {
+      val until: Header => Boolean = header => otherChain.exists(_.id sameElements header.id)
+      val currentChain: List[Header] = computeForkChain(limit, startHeader, until)
+      (currentChain, otherChain.dropWhile(_.id sameElements currentChain.head.id)) //todo check  dropWhile correctness
+    }
+
+    loop(2, List(secondsHeader)) //todo why 2?
   }
 
   private def processFirstBlock(block: Block, newBestHeaderId: ModifierId): Unit = {
