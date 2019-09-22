@@ -10,7 +10,8 @@ import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, Mod
 import HistoryErrors._
 import cats.syntax.option._
 import cats.syntax.either._
-import scala.annotation.tailrec
+
+import scala.annotation.{switch, tailrec}
 
 trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
 
@@ -42,6 +43,7 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
         //todo in this case is it possible to have non empty blocks chain
         processFirstBlock(block, header.id)
       case Some(header) if isBestBlockDefined && isBetter(header.id) =>
+        processBlockFromBestChain(header, block)
       case Some(_) => processBlockFromNonBestChain(block)
       case None => //todo add return type
     }
@@ -54,8 +56,45 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
       val toApply: List[Block] = newChain.drop(1)
         .flatMap(h => if (h == fullBlock.header) fullBlock.some else blockByHeaderStorageApi(h))
       //todo add to cache toApply
+      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(fullBlock) //todo -1?
+      else {
+        val branchPoint: Option[ModifierId] = oldChain.headOption.map(_.id)
+        val heightOfBestHeader: Int = bestHeaderHeightStorageApi //todo check do we need to use best header or best block height
+        val updateBestHeaderOrNot: List[(StorageKey, ModifierId)] = if ((fullBlock.header.height > heightOfBestHeader) ||
+          (fullBlock.header.height == heightOfBestHeader) && scoreOf(fullBlock.id).flatMap(score =>
+            bestHeaderId.flatMap(id => scoreOf(id).map(_ < score))
+          ).getOrElse(false)) List(BestBlockKey -> newBestHeader.id, BestHeaderKey -> newBestHeader.id)
+        else List(BestBlockKey -> newBestHeader.id) //todo check correctness of newBestHeader inserting
+        storage.bulkInsert(fullBlock.payload.id, updateBestHeaderOrNot, Seq(fullBlock.payload))
+        if (settings.node.blocksToKeep >= 0) { //todo >= or >?
+          val updatedBlockDownloadProcessor: CleanBlockDownloadingProcessor = blockDownloadingProcessor.updateBestBlockHeight(fullBlock.header.height)
+          val lastSavedHeight: Int = updatedBlockDownloadProcessor.minimalBlockHeight
+          val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(0)
+          val diff: Int = bestHeight - lastSavedHeight
+          val startPosition: Int = (lastSavedHeight - diff : @switch) match {
+            case n if n < 0 => 0
+            case n => n
+          }
+          storage.removeObjects((startPosition until lastSavedHeight)
+            .flatMap(headerIdsAtHeightStorageApi)
+            .flatMap(headerByIdStorageApi)
+            .map(_.payloadId))
+        }
 
+        //todo return type
+      }
     }
+  }
+
+
+  private def nonBestBlock(block: Block) = {
+    storage.bulkInsert(block.payload.id, Seq.empty, Seq(block.payload))
+  }
+
+  private def updateStorage(modifier: PersistentModifier,
+                            bestFullHeaderId: ModifierId,
+                            updateHeaderInfo: Boolean): Unit = {
+
   }
 
   private def commonBlockThenSuffixes(firstHeader: Header, secondsHeader: Header): (List[Header], List[Header]) = {
@@ -92,7 +131,7 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
   private def isBetter(id: ModifierId): Boolean = (for {
     bestFullBlockId <- bestBlockId
     heightOfThisHeader <- heightByHeaderStorageApi(id)
-    prevBestScore <- scoreOf(bestFullBlockId) //todo add best score inserting to the storage
+    prevBestScore <- scoreOf(bestFullBlockId) //todo add best score inserting to storage
     score <- scoreOf(id)
     bestBlockHeight = bestBlockHeightStorageApi
   } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore))
@@ -105,7 +144,7 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
     continuationHeaderChains(block.header, header => isBlockDefined(header))
       .view
       .map(chain => block :: chain.view.drop(1).flatMap(blockByHeaderStorageApi).toList)
-      .maxBy(_.lastOption.flatMap(b => scoreOf(b.id)).getOrElse(BigInt(0)))
+      .maxBy(_.lastOption.flatMap(b => scoreOf(b.id)).getOrElse(BigInt(0))) //todo add either
 
   private def continuationHeaderChains(header: Header, filterCond: Header => Boolean): List[List[Header]] = {
     @tailrec def loop(height: Int, acc: List[List[Header]]): List[List[Header]] = {
