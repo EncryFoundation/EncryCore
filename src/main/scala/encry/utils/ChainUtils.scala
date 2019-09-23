@@ -167,47 +167,6 @@ object ChainUtils extends Settings with StrictLogging {
     Block(header, Payload(header.id, transactions))
   }
 
-  def generateNextBlockSpend(prevBlock: Block,
-                             state: UtxoState,
-                             box: Seq[AssetBox],
-                             amount: Amount
-                            ): Block = {
-
-    val transactions: Seq[Transaction] = Seq(
-      defaultPaymentTransactionScratch(
-        privKey,
-        fee = 0L,
-        timestamp = System.currentTimeMillis(),
-        useBoxes = box.toIndexedSeq,
-        recipient = randomAddress,
-        amount = amount,
-        numOfOutputs = 1
-      ),
-      defaultPaymentTransactionScratch(
-        privKey,
-        fee = 0L,
-        timestamp = System.currentTimeMillis(),
-        useBoxes = box.toIndexedSeq,
-        recipient = randomAddress,
-        amount = amount,
-        numOfOutputs = 1
-      ),
-      coinbaseTransaction(prevBlock.header.height + 1)
-    )
-
-    val header = Header(
-      1.toByte,
-      prevBlock.id,
-      Payload.rootHash(transactions.map(_.id)),
-      System.currentTimeMillis(),
-      prevBlock.header.height + 1,
-      R.nextLong(),
-      Difficulty @@ BigInt(1),
-      EquihashSolution(Seq(1, 3))
-    )
-    Block(header, Payload(header.id, transactions))
-  }
-
   def generateNextBlockForStateWithInvalidTrans(prevBlock: Block,
                                                 state: UtxoState,
                                                 box: Seq[AssetBox],
@@ -217,15 +176,13 @@ object ChainUtils extends Settings with StrictLogging {
 
     val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
       case ((boxes, transactionsL), _) =>
-        val errorAmount = 1000000000L
-        println(s"amount: ${boxes.head.amount - 1 + errorAmount}")
         val tx: Transaction = defaultPaymentTransactionScratch(
           privKey,
           fee = 1,
           timestamp,
           useBoxes = IndexedSeq(boxes.head),
           recipient = privKey.publicImage.address.address,
-          amount = boxes.head.amount - 1 + errorAmount,
+          amount = boxes.head.amount * 2, //invalid
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
