@@ -199,7 +199,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
-        val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)
+        val bestHeaderOpt: Option[Header] = nodeView.history.bestBlockOpt.map(_.header)
         bestHeaderOpt match {
           case Some(h) => logger.info(s"Best header at height ${h.height}")
           case None => logger.info(s"No best header opt")

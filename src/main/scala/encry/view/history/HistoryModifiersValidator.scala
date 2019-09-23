@@ -7,10 +7,9 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 import cats.syntax.either._
 import encry.consensus.EquihashPowScheme
-import encry.settings.Settings
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 
-trait HistoryModifiersValidator extends HistoryApi with Settings {
+trait HistoryModifiersValidator extends HistoryCacheApi {
 
   val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
     settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
@@ -27,17 +26,17 @@ trait HistoryModifiersValidator extends HistoryApi with Settings {
 
   private def validateHeader(h: Header): Either[ValidationError, Header] =
     if (h.isGenesis) genesisBlockHeaderValidator(h)
-    else getHeaderById(h.parentId)
+    else headerByIdOpt(h.parentId)
       .map(p => headerValidator(h, p))
       .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
 
-  private def validatePayload(mod: Payload): Either[ValidationError, PersistentModifier] = getHeaderById(mod.headerId)
+  private def validatePayload(mod: Payload): Either[ValidationError, PersistentModifier] = headerByIdOpt(mod.headerId)
     .map(header => payloadValidator(mod, header, blockDownloadProcessor.minimalBlockHeight))
     .getOrElse(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history").asLeft[PersistentModifier])
 
   private def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
-  private def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity = historyStorage
+  private def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity = storage
     .get(validityKey(modifierId)) match {
       case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
       case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
@@ -50,7 +49,7 @@ trait HistoryModifiersValidator extends HistoryApi with Settings {
   private def genesisBlockHeaderValidator(h: Header): Either[ValidationError, Header] = for {
     _ <- Either.cond(h.parentId.sameElements(Header.GenesisParentId), (),
       GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} should has genesis parent id"))
-    _ <- Either.cond(getBestHeaderId.isEmpty, (),
+    _ <- Either.cond(bestHeaderIdStorageApi.isEmpty, (),
       GenesisBlockFatalValidationError(s"Genesis block with header ${h.encodedId} appended to non-empty history"))
     _ <- Either.cond(h.height == settings.constants.GenesisHeight, (),
       GenesisBlockFatalValidationError(s"Height of genesis block with header ${h.encodedId} is incorrect"))
@@ -63,7 +62,7 @@ trait HistoryModifiersValidator extends HistoryApi with Settings {
     _ <- Either.cond(h.height == parent.height + 1, (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height}" +
         s" not greater by 1 than parent's ${parent.height}"))
-    _ <- Either.cond(!historyStorage.containsMod(h.id), (),
+    _ <- Either.cond(!storage.containsMod(h.id), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
     _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
@@ -85,7 +84,7 @@ trait HistoryModifiersValidator extends HistoryApi with Settings {
   private def payloadValidator(m: PersistentModifier,
                                header: Header,
                                minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
-    _ <- Either.cond(!historyStorage.containsMod(m.id), (),
+    _ <- Either.cond(!storage.containsMod(m.id), (),
       PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
     _ <- Either.cond(header.isRelated(m), (),
       PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))

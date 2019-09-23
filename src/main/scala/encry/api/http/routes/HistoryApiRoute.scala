@@ -47,7 +47,7 @@ case class HistoryApiRoute(dataHolder: ActorRef,
     }
 
   private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[Block]] = getHistory.map { history =>
-    history.getHeaderById(headerId).flatMap(history.getBlockByHeader)
+    history.headerByIdOpt(headerId).flatMap(history.blockByHeaderOpt)
   }
 
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) => getHeaderIds(offset, limit).okJson() }

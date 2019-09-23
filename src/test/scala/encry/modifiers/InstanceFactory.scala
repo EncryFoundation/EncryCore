@@ -148,8 +148,8 @@ trait InstanceFactory extends Keys with EncryGenerator {
                         txsQty: Int = 100,
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
-      prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
-    val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
+      prevId.getOrElse(history.bestHeaderOpt.map(_.id).getOrElse(Header.GenesisParentId))
+    val requiredDifficulty: Difficulty = history.bestHeaderOpt.map(parent =>
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(history.settings.constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
@@ -224,7 +224,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override  val historyStorage: HistoryStorage = storage
+      override  val storage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }
   }

@@ -16,4 +16,7 @@ object ValidationError {
     case class PayloadNonFatalValidationError(error: String) extends NonFatalValidationError
   }
   case class HistoryApiError(error: String) extends ValidationError
+
+  sealed trait HistoryError
+  case class HistoryProcessingError(error: String) extends HistoryError
 }

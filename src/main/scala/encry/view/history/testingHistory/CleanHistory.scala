@@ -113,24 +113,6 @@ case class CleanHistory(blockDownloadingProcessor: CleanBlockDownloadingProcesso
 
 object CleanHistory {
 
-  final case class HistoryProcessingInfo(blockDownloadingProcessor: CleanBlockDownloadingProcessor,
-                                         branchPoint: Option[ModifierId],
-                                         modifiersToDownload: Option[(ModifierTypeId, ModifierId)],
-                                         modifiersToApply: List[PersistentModifier],
-                                         modifiersToRemove: List[PersistentModifier],
-                                         isHeaderChainSynced: Boolean)
 
-  object HistoryProcessingInfo {
-    def apply(blockDownloadingProcessor: CleanBlockDownloadingProcessor,
-              isHeaderChainSynced: Boolean): HistoryProcessingInfo =
-      new HistoryProcessingInfo(
-        blockDownloadingProcessor,
-        none[ModifierId],
-        none[(ModifierTypeId, ModifierId)],
-        List.empty[PersistentModifier],
-        List.empty[PersistentModifier],
-        isHeaderChainSynced
-      )
-  }
 
 }

@@ -409,7 +409,7 @@ object Utils extends Settings with StrictLogging {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override  val historyStorage: HistoryStorage = storage
+      override  val storage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }
   }

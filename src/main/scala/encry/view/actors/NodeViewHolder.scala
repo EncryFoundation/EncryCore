@@ -85,7 +85,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         s" Type of requesting modifiers is: $modifierTypeId. Requesting ids size are: ${ids.size}." +
         s" Sending RequestFromLocal with ids to $sender." +
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
-      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
+      if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeaderChainSynced && modifierTypeId == Payload.modifierTypeId)))
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
@@ -145,7 +145,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: History): UtxoState =
-    (stateIn.version, history.getBestBlock, stateIn) match {
+    (stateIn.version, history.bestBlockOpt, stateIn) match {
       case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
@@ -157,7 +157,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState()
       case (stateId, Some(historyBestBlock), state: UtxoState) =>
-        val stateBestHeaderOpt = history.getHeaderById(ModifierId !@@ stateId) //todo naming
+        val stateBestHeaderOpt = history.headerByIdOpt(ModifierId !@@ stateId) //todo naming
       val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
@@ -165,7 +165,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
         val toApply = newChain.headers.map { h =>
-          history.getBlockByHeader(h) match {
+          history.blockByHeaderOpt(h) match {
             case Some(fb) => fb
             case None => throw new Exception(s"Failed to get full block for header $h")
           }

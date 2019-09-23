@@ -25,10 +25,8 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
         }
     }
 
-  def processPayload(payload: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] = {
-    blockByPayloadStorageApi(payload).map(processBlock)
-      .getOrElse(putToHistory(payload))
-  }
+  def processPayload(payload: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] =
+    blockByPayloadStorageApi(payload).map(processBlock).getOrElse(putToHistory(payload))
 
   private def putToHistory(payload: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] = {
     storage.insertObjects(Seq(payload))
@@ -127,7 +125,7 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
         case (l1@ ::(head1, _), l2@ ::(head2, _)) if head1 == head2 => (l1 -> l2).asRight[HistoryProcessingError]
         case _ => //todo check this logic
           computeForkChain(numberBack, otherChain.head, _ => false) ::: otherChain.drop(1) match {
-            case l@ ::(_, _) || Nil if !otherChain.head.isGenesis => loop(l, l.length)
+            case l@ ::(_, _) if !otherChain.head.isGenesis => loop(l, l.length)
             case _ => HistoryProcessingError("History has no best header after header application.").asLeft
           }
       }
