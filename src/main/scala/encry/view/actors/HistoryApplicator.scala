@@ -49,12 +49,12 @@ class HistoryApplicator(val history: History,
 
   override def receive: Receive = {
     case ModifierFromRemote(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
-      println("ModifierFromRemote")
+      //println("ModifierFromRemote")
       ModifiersCache.put(toKey(mod.id), mod, history)
       getModifierForApplying()
 
     case ModifierFromRemote(modifier) =>
-      println(s"history.isModifierDefined(mod.id): ${history.isModifierDefined(modifier.id)} ModifiersCache.contains(toKey(mod.id): ${ModifiersCache.contains(toKey(modifier.id))}")
+      //println(s"history.isModifierDefined(mod.id): ${history.isModifierDefined(modifier.id)} ModifiersCache.contains(toKey(mod.id): ${ModifiersCache.contains(toKey(modifier.id))}")
       logger.info(s"Modifier ${modifier.encodedId} contains in history or in modifiers cache. Reject it.")
 
     case LocallyGeneratedBlock(block) =>
@@ -78,7 +78,7 @@ class HistoryApplicator(val history: History,
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
           modifiersQueue = modifiersQueue.enqueue(modifier.encodedId -> progressInfo)
-          println(s"modifiersQueue.enqueue ${modifiersQueue.size}")
+          //println(s"modifiersQueue.enqueue ${modifiersQueue.size}")
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
           influxRef.foreach(ref =>
@@ -91,13 +91,13 @@ class HistoryApplicator(val history: History,
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
           if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
-          println("history.append success")
+          //println("history.append success")
           stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying()
         case Right(progressInfo) =>
           logger.info(s"Progress info is empty after appending to the state.")
           if (!isLocallyGenerated) requestDownloads(progressInfo)
-          println("SemanticallySuccessfulModifier")
+          //println("SemanticallySuccessfulModifier")
           context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
           currentNumberOfAppliedModifiers -= 1
           getModifierForApplying()
@@ -110,13 +110,13 @@ class HistoryApplicator(val history: History,
         sender() ! StartModifiersApplicationOnStateApplicator(pi, IndexedSeq.empty[PersistentModifier])
         modifiersQueue = newQueue
       }
-    println(s"modifiersQueue.dequeue ${modifiersQueue.size}")
+    //println(s"modifiersQueue.dequeue ${modifiersQueue.size}")
 
     case NotificationAboutSuccessfullyAppliedModifier =>
       if (history.isFullChainSynced) {
         logger.info(s"BlockChain is synced on state applicator at height ${history.getBestHeaderHeight}!")
         ModifiersCache.setChainSynced()
-        println("FullBlockChainIsSynced")
+        //println("FullBlockChainIsSynced")
         context.system.eventStream.publish(FullBlockChainIsSynced())
       }
       currentNumberOfAppliedModifiers -= 1
@@ -140,6 +140,7 @@ class HistoryApplicator(val history: History,
 
   def getModifierForApplying(): Unit = {
     println(s"currentNumberOfAppliedModifiers: $currentNumberOfAppliedModifiers")
+    println(s"modifiersQueue.size: ${modifiersQueue.size}")
     if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
       logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
       if (locallyGeneratedModifiers.nonEmpty) locallyGeneratedModifiers.dequeueOption.foreach {
