@@ -1,13 +1,19 @@
 package encry.view.state.avlTree
 
+import java.util
+
 import cats.kernel.Hash
 import cats.{Monoid, Order}
 import cats.syntax.order._
+import cats.syntax.option._
+import encry.storage.VersionalStorage
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.Hashable
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.collection.mutable
 
-final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
+final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V], storage: VersionalStorage) {
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]]{
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -15,9 +21,24 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
 
   def root: K = rootNode.key
 
+  //contains new or changed nodes. Needs for serialization
+  var insertedNodes: HashMap[String, Node[K, V]] = HashMap.empty[String, Node[K, V]]
+
+  //contains deleted nodes. Needs for serialization
+  var deletedNodes: HashSet[String] = HashSet.empty[String]
+
+  //return newAvl, allUpdatedNodes and hashes of deleted.
+  def insertMany(toInsert: List[(K, V)]): (AvlTree[K, V], HashMap[String, Node[K, V]], HashSet[String]) = {
+    val newRoot = toInsert.foldLeft(rootNode){
+      case (prevRoot, (keyToInsert, valueToInsert)) =>
+        setToZeroInsertDirection(balance(insert(prevRoot, keyToInsert, valueToInsert)))
+    }
+    (AvlTree(newRoot, storage), insertedNodes, deletedNodes)
+  }
+
   def insert(k: K, v: V): AvlTree[K, V] = {
     val newNode = balance(insert(rootNode, k, v))
-    AvlTree(setToZeroInsertDirection(newNode))
+    AvlTree(setToZeroInsertDirection(newNode), storage)
   }
 
   def get(k: K): Option[V] = getK(k, rootNode)
@@ -34,11 +55,14 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
     case leafNode: LeafNode[K, V] => if (leafNode.key === key) Some(leafNode.value) else None
   }
 
-  def delete(key: K)(implicit m: Monoid[K], v: Monoid[V]): AvlTree[K, V] = new AvlTree(balance(delete(rootNode, key).get))
+  def delete(key: K)(implicit m: Monoid[K], v: Monoid[V]): AvlTree[K, V] = new AvlTree(balance(delete(rootNode, key).get), storage)
 
   private def delete(node: Node[K, V], key: K)(implicit m: Monoid[K], v: Monoid[V]): Option[Node[K, V]] = node match {
     case leafNode: LeafNode[K, V] =>
-      if (leafNode.key === key) None else Some(leafNode)
+      if (leafNode.key === key) None else {
+        deletedNodes = deletedNodes + util.Arrays.toString(leafNode.hash)
+        Some(leafNode)
+      }
     case internalNode: InternalNode[K, V] =>
       if (internalNode.key > key) {
         val newLeftChild = internalNode.leftChild.flatMap(node => delete(node, key))
@@ -54,10 +78,16 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
             val newLeftChild = internalNode.leftChild.flatMap(node => delete(node, newKey))
-            internalNode.copy(key = newKey, value = newValue, hash = hash.hash(newKey)).updateChilds(newLeftChild = newLeftChild)
+            val newNode = internalNode.copy(key = newKey, value = newValue, hash = hash.hash(newKey)).updateChilds(newLeftChild = newLeftChild)
+            insertedNodes = insertedNodes + (util.Arrays.toString(newNode.hash) -> newNode)
+            newLeftChild.foreach(leftNode => insertedNodes = insertedNodes + (util.Arrays.toString(leftNode.hash) -> leftNode))
+            newNode
           case ((newKey, newValue), RIGHT) =>
             val newRightChild = internalNode.rightChild.flatMap(node => delete(node, newKey))
-            internalNode.copy(key = newKey, value = newValue, hash = hash.hash(newKey)).updateChilds(newRightChild = newRightChild)
+            val newNode = internalNode.copy(key = newKey, value = newValue, hash = hash.hash(newKey)).updateChilds(newRightChild = newRightChild)
+            insertedNodes = insertedNodes + (util.Arrays.toString(newNode.hash) -> newNode)
+            newRightChild.foreach(rightNode => insertedNodes = insertedNodes + (util.Arrays.toString(rightNode.hash) -> rightNode))
+            newNode
           case ((_, _), EMPTY) => internalNode
         }
         Some(balance(newNode))
@@ -104,6 +134,7 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
       else {
         val newInternalNode = InternalNode[K, V](leafNode.key, leafNode.value, height = 1, balance = 0)
         //todo remove asInstance
+        insertedNodes = insertedNodes + (util.Arrays.toString(newInternalNode.hash) -> newInternalNode)
         insert(newInternalNode, newKey, newValue).asInstanceOf[InternalNode[K, V]]
       }
     case internalNode: InternalNode[K, V] =>
@@ -112,12 +143,14 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
           insert(previousLeftChild, newKey, newValue)
         ).getOrElse(LeafNode(newKey, newValue))
         val node = internalNode.updateChilds(newLeftChild = Some(newLeftChild))
+        insertedNodes = insertedNodes + (util.Arrays.toString(node.hash) -> node) + (util.Arrays.toString(newLeftChild.hash) -> newLeftChild)
         balance(node)
       } else {
         val newRightChild = internalNode.rightChild.map(previousRightChild =>
           insert(previousRightChild, newKey, newValue)
         ).getOrElse(LeafNode(newKey, newValue))
         val node = internalNode.updateChilds(newRightChild = Some(newRightChild))
+        insertedNodes = insertedNodes + (util.Arrays.toString(node.hash) -> node) + (util.Arrays.toString(newRightChild.hash) -> newRightChild)
         balance(node)
       }
   }
@@ -168,7 +201,10 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
       val newLeftChildForPrevRoot = newRoot.rightChild
       val prevRoot = internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot.map(_.selfInspection))
       //println(s"prevroot: ${prevRoot}")
-      newRoot.updateChilds(newRightChild = Some(prevRoot.selfInspection))
+      val newUpdatedRoot = newRoot.updateChilds(newRightChild = Some(prevRoot.selfInspection))
+      insertedNodes = insertedNodes + (util.Arrays.toString(prevRoot.hash) -> prevRoot) + (util.Arrays.toString(newUpdatedRoot.hash) -> newUpdatedRoot)
+      deletedNodes = deletedNodes + util.Arrays.toString(internalNode.hash) + util.Arrays.toString(internalNode.leftChild.get.hash)
+      newUpdatedRoot
   }
 
   private def leftRotation(node: Node[K, V]): Node[K, V] = node match {
@@ -180,7 +216,10 @@ final case class AvlTree[K : Order : Hashable, V](rootNode: Node[K, V]) {
       }
       val newRightChildForPrevRoot = newRoot.leftChild
       val prevRoot = internalNode.updateChilds(newRightChild = newRightChildForPrevRoot.map(_.selfInspection)).selfInspection
-      newRoot.updateChilds(newLeftChild = Some(prevRoot)).selfInspection
+      val newUpdatedRoot = newRoot.updateChilds(newLeftChild = Some(prevRoot)).selfInspection
+      insertedNodes = insertedNodes + (util.Arrays.toString(prevRoot.hash) -> prevRoot) + (util.Arrays.toString(newUpdatedRoot.hash) -> newUpdatedRoot)
+      deletedNodes = deletedNodes + util.Arrays.toString(internalNode.hash) + util.Arrays.toString(internalNode.rightChild.get.hash)
+      newUpdatedRoot
   }
 
   private def rlRotation(node: Node[K, V]): Node[K, V] = node match {
@@ -209,5 +248,5 @@ object AvlTree {
     case object EMPTY extends Direction
   }
 
-  def apply[K: Monoid : Order : Hashable, V: Monoid](): AvlTree[K, V] = new AvlTree[K, V](EmptyNode())
+  def apply[K: Monoid : Order : Hashable, V: Monoid](storage: VersionalStorage): AvlTree[K, V] = new AvlTree[K, V](EmptyNode(), storage)
 }

@@ -61,6 +61,6 @@ object AvlVersionalStorage {
                                          (implicit h: Hashable[K],
                                           c: ConvertableToStorage[K],
                                           v: ConvertableToStorage[V]): AvlVersionalStorage[K, V] = {
-    AvlVersionalStorage(storage, AvlTree[K, V]())
+    AvlVersionalStorage(storage, AvlTree[K, V](storage))
   }
 }

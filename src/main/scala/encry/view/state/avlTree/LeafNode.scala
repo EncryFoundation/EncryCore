@@ -1,7 +1,11 @@
 package encry.view.state.avlTree
 
-import encry.view.state.avlTree.utils.implicits.Hashable
+import Node.NodeProtoMsg.NodeTypes.LeafNodeProto
+import com.google.protobuf.ByteString
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import org.encryfoundation.common.utils.Algos
+
+import scala.util.Try
 
 final case class LeafNode[K, V](key: K,
                                 value: V)(implicit hashK: Hashable[K]) extends Node[K, V] {
@@ -16,4 +20,19 @@ final case class LeafNode[K, V](key: K,
 
   override def toString: String = s"($key, $value, height: 0, balance: 0, hash: ${Algos.encode(hash)})"
 
+}
+
+object LeafNode {
+  def toProto[K, V](leaf: LeafNode[K, V])(implicit kSer: Serializer[K],
+                                          vSer: Serializer[V]): LeafNodeProto = LeafNodeProto()
+    .withKey(ByteString.copyFrom(kSer.toBytes(leaf.key)))
+    .withValue(ByteString.copyFrom(vSer.toBytes(leaf.value)))
+
+  def fromProto[K: Hashable, V](leafProto: LeafNodeProto)(implicit kSer: Serializer[K],
+                                                          vSer: Serializer[V]): Try[LeafNode[K, V]] = Try {
+    LeafNode(
+      kSer.fromBytes(leafProto.key.toByteArray),
+      vSer.fromBytes(leafProto.value.toByteArray)
+    )
+  }
 }
