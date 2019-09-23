@@ -28,6 +28,12 @@ trait HistoryStorageApi extends Settings with StrictLogging {
   def headerOfBestBlockStorageApi: Option[Header] = bestBlockId
     .flatMap(headerByIdStorageApi)
 
+  def bestBlockStorageApi: Option[Block] = bestBlockId.flatMap(headerByIdStorageApi)
+    .flatMap(h => payloadByIdStorageApi(h.payloadId).map(p => Block(h, p)))
+
+  def blockByHeaderStorageApi(h: Header): Option[Block] = payloadByIdStorageApi(h.payloadId)
+    .map(p => Block(h, p))
+
   def heightByHeaderStorageApi(id: ModifierId): Option[Int] = storage
     .get(headerHeightKey(id))
     .map(Ints.fromByteArray)
@@ -86,4 +92,7 @@ trait HistoryStorageApi extends Settings with StrictLogging {
 
   def headerHeightKey(id: ModifierId): StorageKey =
     StorageKey @@ Algos.hash("height".getBytes(Algos.charset) ++ id).untag(Digest32)
+
+  def validityKey(id: Array[Byte]): StorageKey =
+    StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
 }

@@ -1,7 +1,7 @@
 package encry.view.history.testingHistory
 
 import com.google.common.primitives.Ints
-import encry.consensus.ConsensusSchemeReaders
+import encry.consensus.ConsensusSchemeReaders._
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.history.testingHistory.CleanHistory.HistoryProcessingInfo
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -10,122 +10,137 @@ import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, Mod
 import HistoryErrors._
 import cats.syntax.option._
 import cats.syntax.either._
-
-import scala.annotation.{switch, tailrec}
+import scala.annotation.tailrec
 
 trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
 
   def processHeader(header: Header): Either[HistoryProcessingError, HistoryProcessingInfo] =
     getHeaderInfoToInsert(header) match {
-      case Nil => HistoryProcessingInfo(
-        blockDownloadingProcessor,
-        none[(ModifierTypeId, ModifierId)],
-        none[PersistentModifier],
-        isHeaderChainSynced
-      ).asRight[HistoryProcessingError]
+      case Nil => HistoryProcessingInfo(blockDownloadingProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
       case elems: List[(StorageKey, StorageValue)] =>
         storage.bulkInsert(header.id, elems, List(header))
         bestHeaderId match {
           case Some(bestHeader) => computeResultAfterHeaderProcessing(header, bestHeader)
-          case None => HistoryProcessingError("History has no best header after header application").asLeft
+          case None => HistoryProcessingError("History has no best header after header application.").asLeft
         }
     }
 
-  def processPayload(payload: Payload): Unit = {
+  def processPayload(payload: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] = {
     blockByPayloadStorageApi(payload).map(processBlock)
+      .getOrElse(putToHistory(payload))
   }
 
-  private def processBlock(block: Block): Unit = {
-    val bestFullChain: List[Block] = calculateBestFullChain(block) //todo do we need such chain calculating
-    //todo add block to cache here
-    bestFullChain.lastOption.map(_.header) match {
-      case Some(header) if isValidFirstBlock(block.header) => //todo we don't need to check this condition all time
-        //todo in this case is it possible to have non empty blocks chain
-        processFirstBlock(block, header.id)
-      case Some(header) if isBestBlockDefined && isBetter(header.id) =>
-        processBlockFromBestChain(header, block)
-      case Some(_) => processBlockFromNonBestChain(block)
-      case None => //todo add return type
+  private def putToHistory(payload: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] = {
+    storage.insertObjects(Seq(payload))
+    HistoryProcessingInfo(blockDownloadingProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
+  }
+
+  private def processBlock(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] =
+    calculateBestFullChain(block) match {
+      case Nil => HistoryProcessingInfo(blockDownloadingProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
+      case fullChain@_ :+ last if isValidFirstBlock(block.header) => processFirstBlock(last.id, fullChain, block)
+      case _ :+ last if isBestBlockDefined && isBetter(last.id) => processBlockFromBestChain(last.header, block)
+      case _ :+ _ => processBlockFromNonBestChain(block)
     }
-  }
 
-  private def processBlockFromBestChain(newBestHeader: Header, fullBlock: Block) = {
+  private def processBlockFromBestChain(newBestHeader: Header,
+                                        fullBlock: Block): Either[HistoryProcessingError, HistoryProcessingInfo] =
     headerOfBestBlockStorageApi.map { headerOfBestBlock =>
-      val (oldChain: List[Header], newChain: List[Header]) = commonBlockThenSuffixes(headerOfBestBlock, newBestHeader)
-      val toRemove: List[Block] = oldChain.drop(1).flatMap(blockByHeaderStorageApi)
-      val toApply: List[Block] = newChain.drop(1)
-        .flatMap(h => if (h == fullBlock.header) fullBlock.some else blockByHeaderStorageApi(h))
-      //todo add to cache toApply
-      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(fullBlock) //todo -1?
-      else {
-        val branchPoint: Option[ModifierId] = oldChain.headOption.map(_.id)
-        val heightOfBestHeader: Int = bestHeaderHeightStorageApi //todo check do we need to use best header or best block height
-        val updateBestHeaderOrNot: List[(StorageKey, ModifierId)] = if ((fullBlock.header.height > heightOfBestHeader) ||
-          (fullBlock.header.height == heightOfBestHeader) && scoreOf(fullBlock.id).flatMap(score =>
-            bestHeaderId.flatMap(id => scoreOf(id).map(_ < score))
-          ).getOrElse(false)) List(BestBlockKey -> newBestHeader.id, BestHeaderKey -> newBestHeader.id)
-        else List(BestBlockKey -> newBestHeader.id) //todo check correctness of newBestHeader inserting
-        storage.bulkInsert(fullBlock.payload.id, updateBestHeaderOrNot, Seq(fullBlock.payload))
-        if (settings.node.blocksToKeep >= 0) { //todo >= or >?
-          val updatedBlockDownloadProcessor: CleanBlockDownloadingProcessor = blockDownloadingProcessor.updateBestBlockHeight(fullBlock.header.height)
-          val lastSavedHeight: Int = updatedBlockDownloadProcessor.minimalBlockHeight
-          val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(0)
-          val diff: Int = bestHeight - lastSavedHeight
-          val startPosition: Int = (lastSavedHeight - diff : @switch) match {
-            case n if n < 0 => 0
-            case n => n
+      commonBlockThenSuffixes(headerOfBestBlock, newBestHeader) match {
+        case l@Left(ex) => ex.asLeft[HistoryProcessingInfo]
+        case Right((oldChain: List[Header], newChain: List[Header])) =>
+          val toApply: List[Block] = newChain.drop(1)
+            .flatMap(h => if (h == fullBlock.header) fullBlock.some else blockByHeaderStorageApi(h))
+          //todo add to cache toApply
+          if (toApply.lengthCompare(newChain.length - 1) != 0) processBlockFromNonBestChain(fullBlock)
+          else {
+            val toRemove: List[Block] = oldChain.drop(1).flatMap(blockByHeaderStorageApi)
+            val branchPoint: Option[ModifierId] =
+              if (toRemove.nonEmpty) oldChain.headOption.map(_.id)
+              else none[ModifierId]
+            val heightOfBestHeader: Int = bestHeaderHeightStorageApi
+            val updateBestHeaderOrNot: List[(StorageKey, StorageValue)] =
+              if (isBetterThan(
+                fullBlock.header.height,
+                heightOfBestHeader,
+                scoreOf(fullBlock.id).getOrElse(BigInt(0)),
+                bestHeaderId.flatMap(id => scoreOf(id)).getOrElse(BigInt(0))))
+                List(BestBlockKey -> StorageValue @@ newBestHeader.id, BestHeaderKey -> StorageValue @@ newBestHeader.id)
+              else
+                List(BestBlockKey -> StorageValue @@ newBestHeader.id)
+            storage.bulkInsert(fullBlock.payload.id, updateBestHeaderOrNot, Seq(fullBlock.payload))
+            if (settings.node.blocksToKeep >= 0) {
+              val updatedBlockDownloadProcessor: CleanBlockDownloadingProcessor =
+                blockDownloadingProcessor.updateBestBlockHeight(fullBlock.header.height)
+              val lastSavedHeight: Int = updatedBlockDownloadProcessor.minimalBlockHeight
+              val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(0)
+              val diff: Int = bestHeight - lastSavedHeight
+              storage.removeObjects(
+                ((lastSavedHeight - diff) until lastSavedHeight).filter(_ >= 0)
+                  .flatMap(headerIdsAtHeightStorageApi)
+                  .flatMap(headerByIdStorageApi)
+                  .map(_.payloadId)
+              )
+              HistoryProcessingInfo(
+                updatedBlockDownloadProcessor, branchPoint, none, toApply, toRemove, isHeaderChainSynced
+              ).asRight[HistoryProcessingError]
+            } else HistoryProcessingInfo(
+              blockDownloadingProcessor, branchPoint, none, toApply, toRemove, isHeaderChainSynced
+            ).asRight[HistoryProcessingError]
           }
-          storage.removeObjects((startPosition until lastSavedHeight)
-            .flatMap(headerIdsAtHeightStorageApi)
-            .flatMap(headerByIdStorageApi)
-            .map(_.payloadId))
-        }
-
-        //todo return type
       }
-    }
+    }.getOrElse(HistoryProcessingError(s"History doesn't contain header of best block.").asLeft[HistoryProcessingInfo])
+
+  private def processFirstBlock(newBestHeaderId: ModifierId,
+                                toApply: List[PersistentModifier],
+                                block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
+    storage.bulkInsert(block.payload.id, Seq(BestBlockKey -> newBestHeaderId), Seq(block.payload))
+    HistoryProcessingInfo(
+      blockDownloadingProcessor,
+      none[ModifierId],
+      none[(ModifierTypeId, ModifierId)],
+      toApply,
+      List.empty[PersistentModifier],
+      isHeaderChainSynced
+    ).asRight[HistoryProcessingError]
   }
 
-
-  private def nonBestBlock(block: Block) = {
+  private def processBlockFromNonBestChain(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
     storage.bulkInsert(block.payload.id, Seq.empty, Seq(block.payload))
+    HistoryProcessingInfo(
+      blockDownloadingProcessor,
+      none[ModifierId],
+      none[(ModifierTypeId, ModifierId)],
+      List.empty[PersistentModifier],
+      List.empty[PersistentModifier],
+      isHeaderChainSynced
+    ).asRight[HistoryProcessingError]
   }
 
-  private def updateStorage(modifier: PersistentModifier,
-                            bestFullHeaderId: ModifierId,
-                            updateHeaderInfo: Boolean): Unit = {
-
-  }
-
-  private def commonBlockThenSuffixes(firstHeader: Header, secondsHeader: Header): (List[Header], List[Header]) = {
+  private def commonBlockThenSuffixes(firstHeader: Header,
+                                      secondsHeader: Header): Either[HistoryProcessingError, (List[Header], List[Header])] = {
     val heightDelta: Int = Math.max(firstHeader.height - secondsHeader.height, 0)
 
-    @tailrec def loop(numberBack: Int, otherChain: List[Header]): (List[Header], List[Header]) =
+    @tailrec def loop(otherChain: List[Header],
+                      numberBack: Int): Either[HistoryProcessingError, (List[Header], List[Header])] =
       commonBlocksThenSuffixes(otherChain, firstHeader, numberBack + heightDelta) match {
-        case (l1@ ::(head1, _), l2@ ::(head2, _)) if head1 == head2 => l1 -> l2
+        case (l1@ ::(head1, _), l2@ ::(head2, _)) if head1 == head2 => (l1 -> l2).asRight[HistoryProcessingError]
         case _ => //todo check this logic
-          (computeForkChain(numberBack, otherChain.head, _ => false) ::: otherChain.drop(1)) match {
-            case l@ ::(_, _) || Nil if !otherChain.head.isGenesis => loop(l.length, l)
-            case _ => List.empty -> List.empty //todo new exception here
+          computeForkChain(numberBack, otherChain.head, _ => false) ::: otherChain.drop(1) match {
+            case l@ ::(_, _) || Nil if !otherChain.head.isGenesis => loop(l, l.length)
+            case _ => HistoryProcessingError("History has no best header after header application.").asLeft
           }
       }
 
-    def commonBlocksThenSuffixes(otherChain: List[Header], startHeader: Header, limit: Int): (List[Header], List[Header]) = {
+    def commonBlocksThenSuffixes(otherChain: List[Header],
+                                 startHeader: Header,
+                                 limit: Int): (List[Header], List[Header]) = {
       val until: Header => Boolean = header => otherChain.exists(_.id sameElements header.id)
       val currentChain: List[Header] = computeForkChain(limit, startHeader, until)
-      (currentChain, otherChain.dropWhile(_.id sameElements currentChain.head.id)) //todo check  dropWhile correctness
+      (currentChain, otherChain.dropWhile(_.id sameElements currentChain.head.id)) //todo check dropWhile correctness
     }
 
-    loop(2, List(secondsHeader)) //todo why 2?
-  }
-
-  private def processFirstBlock(block: Block, newBestHeaderId: ModifierId): Unit = {
-    storage.bulkInsert(block.payload.id, Seq(BestBlockKey -> newBestHeaderId), Seq(block.payload))
-  }
-
-  //todo add return type
-  private def processBlockFromNonBestChain(block: Block): Unit = {
-    storage.bulkInsert(block.payload.id, Seq.empty, Seq(block.payload))
+    loop(List(secondsHeader), 2) //todo why 2?
   }
 
   private def isBetter(id: ModifierId): Boolean = (for {
@@ -133,12 +148,7 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
     heightOfThisHeader <- heightByHeaderStorageApi(id)
     prevBestScore <- scoreOf(bestFullBlockId) //todo add best score inserting to storage
     score <- scoreOf(id)
-    bestBlockHeight = bestBlockHeightStorageApi
-  } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore))
-    .getOrElse(false)
-
-  private def isValidFirstBlock(header: Header): Boolean =
-    header.height == blockDownloadingProcessor.minimalBlockHeight && bestBlockId.isEmpty
+  } yield isBetterThan(bestBlockHeightStorageApi, heightOfThisHeader, score, prevBestScore)).getOrElse(false)
 
   private def calculateBestFullChain(block: Block): List[Block] =
     continuationHeaderChains(block.header, header => isBlockDefined(header))
@@ -146,24 +156,29 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
       .map(chain => block :: chain.view.drop(1).flatMap(blockByHeaderStorageApi).toList)
       .maxBy(_.lastOption.flatMap(b => scoreOf(b.id)).getOrElse(BigInt(0))) //todo add either
 
-  private def continuationHeaderChains(header: Header, filterCond: Header => Boolean): List[List[Header]] = {
-    @tailrec def loop(height: Int, acc: List[List[Header]]): List[List[Header]] = {
-      val nextHeightHeaders: List[Header] = headerIdsAtHeightStorageApi(height + 1)
+  def continuationHeaderChains(header: Header, filterCond: Header => Boolean): List[List[Header]] = {
+    @tailrec def loop(height: Int, acc: List[List[Header]]): List[List[Header]] =
+      headerIdsAtHeightStorageApi(height + 1)
         .view
-        .flatMap(headerByIdStorageApi)
-        .filter(filterCond)
-        .toList
-      if (nextHeightHeaders.nonEmpty) {
-        //todo make attention here. Try to improve updatedChains to notUpdated
-        val updatedChains: List[List[Header]] = nextHeightHeaders.flatMap(header =>
-          acc.find(_.headOption.exists(_.id sameElements header.parentId)).map(header :: _))
-        val notUpdated: List[List[Header]] = acc.filter(chain =>
-          !nextHeightHeaders.exists(_.parentId sameElements chain.head.id))
-        loop(height + 1, updatedChains ::: notUpdated)
-      } else acc
-    }
+        .flatMap(headerByIdStorageApi).filter(filterCond).toList match {
+        case Nil => acc
+        case nextHeightHeaders@ ::(_, _) =>
+          val updatedChains: List[List[Header]] = nextHeightHeaders.flatMap(header =>
+            acc.find(_.headOption.exists(_.id sameElements header.parentId)).map(header :: _))
+          val notUpdated: List[List[Header]] = acc.filter(chain =>
+            !nextHeightHeaders.exists(_.parentId sameElements chain.head.id))
+          loop(height + 1, updatedChains ::: notUpdated)
+      }
 
     loop(header.height, List(List(header)))
+  }
+
+  @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeightStorageApi(height)
+    .find(p)
+    .flatMap(headerByIdStorageApi) match {
+    case h@Some(_)                                         => h
+    case None if height > settings.constants.GenesisHeight => loopHeightDown(height - 1, p)
+    case n@None                                            => n
   }
 
   private def computeResultAfterHeaderProcessing(header: Header,
@@ -174,21 +189,27 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
     if (header.height >= blockDownloadingProcessor.minimalBlockHeight)
       HistoryProcessingInfo(
         blockDownloadingProcessor,
+        none[ModifierId],
         (Payload.modifierTypeId -> header.payloadId).some,
-        modifierToApply,
+        modifierToApply.toList,
+        List.empty[PersistentModifier],
         isHeaderChainSynced
       ).asRight[HistoryProcessingError]
     else if (!isHeaderChainSynced && isNewHeader(header))
       HistoryProcessingInfo(
         blockDownloadingProcessor.updateBestBlockHeight(header.height),
+        none[ModifierId],
         none[(ModifierTypeId, ModifierId)],
-        modifierToApply,
+        modifierToApply.toList,
+        List.empty[PersistentModifier],
         isHeaderChainSynced = true
       ).asRight[HistoryProcessingError]
     else HistoryProcessingInfo(
       blockDownloadingProcessor,
+      none[ModifierId],
       none[(ModifierTypeId, ModifierId)],
-      modifierToApply,
+      modifierToApply.toList,
+      List.empty[PersistentModifier],
       isHeaderChainSynced
     ).asRight[HistoryProcessingError]
   }
@@ -202,25 +223,23 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
         headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height),
         headerScoreKey(header.id) -> StorageValue @@ header.difficulty.toByteArray
       )
-    else scoreOf(header.parentId).map {
-      parentScore =>
-        val headerScore: Difficulty =
-          Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
-        val currentBestHeight: Int = bestHeaderHeightStorageApi
-        val currentBestScore: BigInt = bestHeadersChainScore
-        val newBestHeaderKeyToInsert: List[(StorageKey, StorageValue)] =
-          if ((header.height > currentBestHeight) || (header.height == currentBestHeight && headerScore > currentBestScore))
-            List(BestHeaderKey -> StorageValue @@ header.id)
-          else
-            List.empty[(StorageKey, StorageValue)]
-        val scoreToInsert: (StorageKey, StorageValue) =
-          headerScoreKey(header.id) -> StorageValue @@ headerScore.toByteArray
-        val heightToInsert: (StorageKey, StorageValue) =
-          headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
-        val headerIdsToInsert: List[(StorageKey, StorageValue)] =
-          if (newBestHeaderKeyToInsert.nonEmpty) bestHeaderIds(header, headerScore)
-          else nonBestHeaderIds(header, headerScore)
-        scoreToInsert :: heightToInsert :: newBestHeaderKeyToInsert ::: headerIdsToInsert
+    else scoreOf(header.parentId).map { parentScore =>
+      val headerScore: Difficulty = Difficulty @@ (parentScore + consensusScheme.realDifficulty(header))
+      val currentBestHeight: Int = bestHeaderHeightStorageApi
+      val currentBestScore: BigInt = bestHeadersChainScore
+      val newBestHeaderKeyToInsert: List[(StorageKey, StorageValue)] =
+        if (isBetterThan(header.height, currentBestHeight, headerScore, currentBestScore))
+          List(BestHeaderKey -> StorageValue @@ header.id)
+        else
+          List.empty[(StorageKey, StorageValue)]
+      val newScoreToInsert: (StorageKey, StorageValue) =
+        headerScoreKey(header.id) -> StorageValue @@ headerScore.toByteArray
+      val heightToInsert: (StorageKey, StorageValue) =
+        headerHeightKey(header.id) -> StorageValue @@ Ints.toByteArray(header.height)
+      val headerIdsToInsert: List[(StorageKey, StorageValue)] =
+        if (newBestHeaderKeyToInsert.nonEmpty) bestHeaderIds(header, headerScore)
+        else nonBestHeaderIds(header, headerScore)
+      newScoreToInsert :: heightToInsert :: newBestHeaderKeyToInsert ::: headerIdsToInsert
     }.getOrElse(List.empty[(StorageKey, StorageValue)])
 
   private def nonBestHeaderIds(header: Header, score: Difficulty): List[(StorageKey, StorageValue)] = List(
@@ -228,7 +247,8 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
   )
 
   private def bestHeaderIds(hc: Header, score: Difficulty): List[(StorageKey, StorageValue)] =
-    heightIdsKey(hc.height) -> (StorageValue @@ (hc.id :: headerIdsAtHeightStorageApi(hc.height).filterNot(_ sameElements hc.id)).flatten.toArray) ::
+    (heightIdsKey(hc.height) -> (StorageValue @@ (hc.id :: headerIdsAtHeightStorageApi(hc.height)
+      .filterNot(_ sameElements hc.id)).flatten.toArray)) ::
       headerByIdStorageApi(hc.id)
         .toList.view
         .flatMap(computeForkChain(hc.height, _, header => isInBestChain(header)))
@@ -236,20 +256,26 @@ trait CleanHistoryModifiersProcessor extends CleanHistoryApi {
           StorageValue @@ (h.id :: headerIdsAtHeightStorageApi(h.height).filterNot(_ sameElements h.id)).flatten.toArray)
         .toList
 
-  private def computeForkChain(limit: Int, startHeader: Header, until: Header => Boolean): List[Header] = {
-    @tailrec def loop(localHeader: Header, acc: List[Header]): List[Header] =
-      if (acc.length == limit || until(localHeader)) acc
-      else headerByIdStorageApi(localHeader.parentId) match {
+  def computeForkChain(limit: Int, startHeader: Header, until: Header => Boolean): List[Header] = {
+    @tailrec def loop(loopHeader: Header, acc: List[Header]): List[Header] =
+      if (acc.length == limit || until(loopHeader)) acc
+      else headerByIdStorageApi(loopHeader.parentId) match {
         case Some(parent) => loop(parent, parent :: acc)
-        case None if acc.contains(localHeader) => acc
-        case _ => localHeader :: acc
+        case None if acc.contains(loopHeader) => acc
+        case _ => loopHeader :: acc
       }
 
     if (bestHeaderId.isEmpty || (limit == 0)) List.empty[Header]
-    else loop(startHeader, List(startHeader)) //todo .reverse check correctness
+    else loop(startHeader, List(startHeader))
   }
+
+  private def isValidFirstBlock(header: Header): Boolean =
+    header.height == blockDownloadingProcessor.minimalBlockHeight && bestBlockId.isEmpty
 
   private def isNewHeader(h: Header): Boolean =
     timeProvider.estimatedTime - h.timestamp <
       settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
+
+  private def isBetterThan(currentHeight: Int, bestHeight: Int, currentScore: BigInt, bestScore: BigInt): Boolean =
+    (currentHeight > bestHeight) || (currentHeight == bestHeight && currentScore > bestScore)
 }
