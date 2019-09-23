@@ -12,7 +12,7 @@ import encry.storage.VersionalStorage
 import encry.utils.ChainUtils.{coinbaseTransaction, defaultPaymentTransactionScratch, privKey, _}
 import encry.utils.{ChainUtils, FileHelper, TestHelper}
 import encry.view.actors.HistoryApplicator.StartModifiersApplicationOnStateApplicator
-import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.actors.{HistoryApplicator, StateApplicator}
 import encry.view.history.History
 import encry.view.state.{BoxHolder, UtxoState}
@@ -117,46 +117,25 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
   val timeout: FiniteDuration = 10 seconds
 
-  //printIds(chain)
-  //println(s"${settings.constants.RetargetingEpochsQty}")
-  //println(s"${settings.constants.EpochLength}")
+    "HistoryApplicator add locall generated block" should {
+      "chain sync" in {
 
-  //  "HistoryApplicator add locall generated block" should {
-  //    "chain synced" in {
-  //
-  //      val dir = FileHelper.getRandomTempDir
-  //      val history: History = generateDummyHistory(settings)
-  //      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
-  //
-  //      val bxs = TestHelper.genAssetBoxes
-  //      val boxHolder = BoxHolder(bxs)
-  //      val state = utxoFromBoxHolder(boxHolder, FileHelper.getRandomTempDir, settings)
-  //
-  //      val nodeViewHolder = TestProbe()
-  //      val influx = TestProbe()
-  //
-  //      val historyBlocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
-  //        case ((prevHistory, blocks), _) =>
-  //          val block: Block = generateNextBlock(prevHistory)
-  //          prevHistory.append(block.header)
-  //          prevHistory.append(block.payload)
-  //          (prevHistory.reportModifierIsValid(block), blocks :+ block)
-  //      }
-  //
-  //      val block: Block = generateNextBlock(history)
-  //
-  //      val historyApplicator: TestActorRef[HistoryApplicator] =
-  //        TestActorRef[HistoryApplicator](
-  //          HistoryApplicator.props(history, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
-  //        )
-  //
-  //      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
-  //
-  //      historyApplicator ! LocallyGeneratedBlock(block)
-  //
-  //      expectMsg(timeout, FullBlockChainIsSynced())
-  //    }
-  //  }
+        val blockQty = 10
+
+        val (genesisState, state, chain) = generateChain(blockQty)
+
+        val historyApplicator: TestActorRef[HistoryApplicator] =
+          TestActorRef[HistoryApplicator](
+            HistoryApplicator.props(initialHistory, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          )
+
+        system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+
+        chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
+
+        (0 until (blockQty + 1) * 2).map(n => expectMsg(timeout, FullBlockChainIsSynced()))
+      }
+    }
 
   "HistoryApplicator" should {
     "check queues" in {
