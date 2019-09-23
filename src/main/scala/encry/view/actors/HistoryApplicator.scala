@@ -72,6 +72,7 @@ class HistoryApplicator(val history: History,
       history.append(modifier) match {
         case Left(ex) =>
           currentNumberOfAppliedModifiers -= 1
+          println("unsuccessfully applied to history")
           logger.info(s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.getMessage}." +
             s" Current currentNumberOfAppliedModifiers $currentNumberOfAppliedModifiers.")
           context.system.eventStream.publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.getMessage))))
@@ -91,13 +92,13 @@ class HistoryApplicator(val history: History,
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
           if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
-          //println("history.append success")
+          println("history.append success")
           stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying()
         case Right(progressInfo) =>
           logger.info(s"Progress info is empty after appending to the state.")
           if (!isLocallyGenerated) requestDownloads(progressInfo)
-          //println("SemanticallySuccessfulModifier")
+          println("SemanticallySuccessfulModifier")
           context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
           currentNumberOfAppliedModifiers -= 1
           getModifierForApplying()
@@ -116,7 +117,7 @@ class HistoryApplicator(val history: History,
       if (history.isFullChainSynced) {
         logger.info(s"BlockChain is synced on state applicator at height ${history.getBestHeaderHeight}!")
         ModifiersCache.setChainSynced()
-        //println("FullBlockChainIsSynced")
+        println("FullBlockChainIsSynced")
         context.system.eventStream.publish(FullBlockChainIsSynced())
       }
       currentNumberOfAppliedModifiers -= 1
@@ -130,6 +131,7 @@ class HistoryApplicator(val history: History,
       getModifierForApplying()
 
     case NeedToReportAsInValid(block) =>
+      println(s"NeedToReportAsInValid")
       logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId}.")
       currentNumberOfAppliedModifiers -= 1
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
@@ -139,8 +141,8 @@ class HistoryApplicator(val history: History,
   }
 
   def getModifierForApplying(): Unit = {
-    println(s"currentNumberOfAppliedModifiers: $currentNumberOfAppliedModifiers")
-    println(s"modifiersQueue.size: ${modifiersQueue.size}")
+    //println(s"currentNumberOfAppliedModifiers: $currentNumberOfAppliedModifiers")
+    //println(s"modifiersQueue.size: ${modifiersQueue.size}")
     if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
       logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
       if (locallyGeneratedModifiers.nonEmpty) locallyGeneratedModifiers.dequeueOption.foreach {

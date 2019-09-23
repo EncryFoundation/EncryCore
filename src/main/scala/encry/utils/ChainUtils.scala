@@ -4,6 +4,8 @@ import java.io.File
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp.timeProvider
+import encry.consensus.EncrySupplyController
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
@@ -11,6 +13,7 @@ import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, St
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
+import encry.utils.NetworkTime.Time
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
@@ -70,7 +73,17 @@ object ChainUtils extends Settings with StrictLogging {
   }
 
   def generateGenesisBlock(genesisHeight: Height): Block = {
-    val txs: Seq[Transaction] = Seq(ChainUtils.coinbaseTransaction(0))
+    val supplyTotal: Amount = settings.constants.InitialEmissionAmount
+
+    val coinbaseTrans = TransactionFactory.coinbaseTransactionScratch(
+      privKey.publicImage,
+      System.currentTimeMillis(),
+      supplyTotal,
+      amount = 0L,
+      height = genesisHeight
+    )
+
+    val txs: Seq[Transaction] = Seq(coinbaseTrans)
     val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
     val header = genHeader.copy(
       timestamp = System.currentTimeMillis(),
@@ -136,6 +149,83 @@ object ChainUtils extends Settings with StrictLogging {
           useBoxes = IndexedSeq(boxes.head),
           recipient = privKey.publicImage.address.address,
           amount = boxes.head.amount - 1,
+          numOfOutputs = splitCoef
+        )
+        (boxes.tail, transactionsL :+ tx)
+    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    logger.info(s"Number of generated transactions: ${transactions.size}.")
+    val header = Header(
+      1.toByte,
+      prevBlock.id,
+      Payload.rootHash(transactions.map(_.id)),
+      timestamp,
+      prevBlock.header.height + 1,
+      R.nextLong(),
+      Difficulty @@ (BigInt(1) + addDiff),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, transactions))
+  }
+
+  def generateNextBlockSpend(prevBlock: Block,
+                             state: UtxoState,
+                             box: Seq[AssetBox],
+                             amount: Amount
+                            ): Block = {
+
+    val transactions: Seq[Transaction] = Seq(
+      defaultPaymentTransactionScratch(
+        privKey,
+        fee = 0L,
+        timestamp = System.currentTimeMillis(),
+        useBoxes = box.toIndexedSeq,
+        recipient = randomAddress,
+        amount = amount,
+        numOfOutputs = 1
+      ),
+      defaultPaymentTransactionScratch(
+        privKey,
+        fee = 0L,
+        timestamp = System.currentTimeMillis(),
+        useBoxes = box.toIndexedSeq,
+        recipient = randomAddress,
+        amount = amount,
+        numOfOutputs = 1
+      ),
+      coinbaseTransaction(prevBlock.header.height + 1)
+    )
+
+    val header = Header(
+      1.toByte,
+      prevBlock.id,
+      Payload.rootHash(transactions.map(_.id)),
+      System.currentTimeMillis(),
+      prevBlock.header.height + 1,
+      R.nextLong(),
+      Difficulty @@ BigInt(1),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, transactions))
+  }
+
+  def generateNextBlockForStateWithInvalidTrans(prevBlock: Block,
+                                                state: UtxoState,
+                                                box: Seq[AssetBox],
+                                                splitCoef: Int = 2,
+                                                addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+    val timestamp = System.currentTimeMillis()
+
+    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
+      case ((boxes, transactionsL), _) =>
+        val errorAmount = 1000000000L
+        println(s"amount: ${boxes.head.amount - 1 + errorAmount}")
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 1,
+          timestamp,
+          useBoxes = IndexedSeq(boxes.head),
+          recipient = privKey.publicImage.address.address,
+          amount = boxes.head.amount - 1 + errorAmount,
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
@@ -234,7 +324,7 @@ object ChainUtils extends Settings with StrictLogging {
   def coinbaseTransaction(height: Int): Transaction = TransactionFactory.coinbaseTransactionScratch(
     privKey.publicImage,
     System.currentTimeMillis(),
-    supply = 10000000L,
+    supply = settings.constants.InitialEmissionAmount,
     amount = 1L,
     height = Height @@ height
   )
@@ -420,8 +510,8 @@ object ChainUtils extends Settings with StrictLogging {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override  val historyStorage: HistoryStorage = storage
-      override  val timeProvider: NetworkTimeProvider = ntp
+      override val historyStorage: HistoryStorage = storage
+      override val timeProvider: NetworkTimeProvider = ntp
     }
   }
 

@@ -5,25 +5,31 @@ import java.io.File
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import encry.modifiers.InstanceFactory
+import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DeliveryManagerTests.DMUtils.generateNextBlock
 import encry.settings.Settings
 import encry.storage.VersionalStorage
-import encry.utils.ChainUtils._
-import encry.utils.{ChainUtils, FileHelper}
+import encry.utils.ChainUtils.{coinbaseTransaction, defaultPaymentTransactionScratch, privKey, _}
+import encry.utils.{ChainUtils, FileHelper, TestHelper}
 import encry.view.actors.HistoryApplicator.StartModifiersApplicationOnStateApplicator
 import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.actors.{HistoryApplicator, StateApplicator}
 import encry.view.history.History
 import encry.view.state.{BoxHolder, UtxoState}
 import encry.view.wallet.EncryWallet
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+import scorex.crypto.hash.Digest32
 
 import scala.collection.Seq
 import scala.concurrent.duration._
+import scala.util.Random
 
 class HistoryApplicatorTest extends TestKit(ActorSystem())
   with WordSpecLike
@@ -42,18 +48,18 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     (0 until count).foldLeft(initialHistory, Seq.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
-          prevHistory.append(block.header)
-          prevHistory.append(block.payload)
+        prevHistory.append(block.header)
+        prevHistory.append(block.payload)
         (prevHistory.reportModifierIsValid(block), blocks :+ block)
     }
   }
 
   def blockToModifiers(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
 
-  def generateChain(blockQty: Int): (UtxoState, List[Block]) = {
-    val numberOfInputsInOneTransaction = 1//10
-    val transactionsNumberInEachBlock = 100//1000
-    val initialboxCount = 10//100000
+  def generateChain(blockQty: Int, genInvalidState: Boolean = false): (UtxoState, UtxoState, List[Block]) = {
+    val numberOfInputsInOneTransaction = 1 //10
+    val transactionsNumberInEachBlock = 1 //1000
+    val initialboxCount = 1 //100000
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until initialboxCount).map(nonce =>
       genHardcodedBox(privKey.publicImage.address.address, nonce)
@@ -68,14 +74,19 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     val stateGenerationResults: (List[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
       (0 until blockQty).foldLeft(List.empty[Block], genesisBlock, state, initialBoxes) {
         case ((blocks, block, stateL, boxes), _) =>
-          val nextBlockMainChain: Block = generateNextBlockForStateWithSpendingAllPreviousBoxes(
-            block, stateL, block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
-          val stateN: UtxoState = stateL.applyModifier(nextBlockMainChain).right.get
-          (blocks :+ nextBlockMainChain,
-            nextBlockMainChain, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
+          val nextBlock: Block =
+            if (genInvalidState)
+              generateNextBlockForStateWithInvalidTrans(block, stateL,
+                block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
+            else
+              generateNextBlockSpend(block, stateL,
+                block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
+          val stateN: UtxoState = stateL.applyModifier(nextBlock).right.get
+          (blocks :+ nextBlock,
+            nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
           )
       }
-    (state, genesisBlock +: stateGenerationResults._1)
+    (state, stateGenerationResults._3, genesisBlock +: stateGenerationResults._1)
   }
 
   def printIds(blocks: List[Block]) = {
@@ -142,7 +153,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
   "HistoryApplicator" should {
     "check queues" in {
 
-      val (state, chain) = generateChain(1)
+      val (_, state, chain) = generateChain(1)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
       val modifierIds = modifiers.map(_.id)
@@ -178,40 +189,60 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
   "HistoryApplicator" should {
     "check queue for rollback limit" in {
 
-      println(s"maxVersions: ${settings.levelDB.maxVersions}")
-
-      val (state, chain) = generateChain(120)
+      val (_, state, chain) = generateChain(settings.levelDB.maxVersions + 30)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
           HistoryApplicator.props(initialHistory, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
-            //.withDispatcher("history-applicator-dispatcher"), "historyApplicator"
         )
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
 
-      //system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
-
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      //      println(s"modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
-      //      println(s"currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
+      historyApplicator.underlyingActor.modifiersQueue.size should be <= settings.levelDB.maxVersions
+      //println(s"modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
 
-      //      historyApplicator.underlyingActor.modifiersQueue shouldBe 0
-      //      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
-
-      //val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
-      //val history = historyApplicator.underlyingActor.history
-
-      //expectMsgType[StartModifiersApplicationOnStateApplicator](timeout)
-
-      Thread.sleep(30000)
-
-      //expectMsg(timeout, FullBlockChainIsSynced())
-
-      //      assert(modifierIds.forall(history.isModifierDefined))
-      //      assert(modifierIds.map(Algos.encode) == modifiersQueue.map(_._1))
+      expectMsg(timeout, FullBlockChainIsSynced())
     }
   }
 
+  "HistoryApplicator" should {
+    "check rollback for invalid state" in {
+
+      val (initState, state, chain) = generateChain(1, false)
+
+      state.applyModifier(chain(1))
+
+      initialHistory.append(chain(0).header)
+      initialHistory.append(chain(0).payload)
+      val history = initialHistory.reportModifierIsValid(chain(0))
+
+//      history.append(chain(1).header)
+//      history.append(chain(1).payload)
+//      val history1 = history.reportModifierIsValid(chain(1))
+//      println(history.testApplicable(chain(1).header).right.get)
+
+//      val invalidState = state.applyModifier(chain(0)).right.get
+
+      val historyApplicator: TestActorRef[HistoryApplicator] =
+        TestActorRef[HistoryApplicator](
+          HistoryApplicator.props(history, settings, state, wallet, nodeViewHolder.ref, Some(influx.ref))
+        )
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+
+      //val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
+
+      chain.foreach(b => println(Algos.encode(b.header.id)))
+
+      blockToModifiers(chain(1)).foreach(historyApplicator ! ModifierFromRemote(_))
+      //modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
+
+      historyApplicator.underlyingActor.modifiersQueue.size should be <= settings.levelDB.maxVersions
+      //println(s"modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
+
+      expectMsg(timeout, FullBlockChainIsSynced()) //Thread.sleep(60000)
+    }
+  }
 }

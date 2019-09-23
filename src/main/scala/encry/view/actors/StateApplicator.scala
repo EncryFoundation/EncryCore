@@ -126,6 +126,7 @@ class StateApplicator(settings: EncryAppSettings,
                                      block: Block,
                                      transactions: Seq[Transaction]): Receive = {
     case TransactionValidatedSuccessfully =>
+      println("TransactionValidatedSuccessfully")
       transactionsValidatorsNumber -= 1
       if (transactionsValidatorsNumber == 0) {
         val combinedStateChange = combineAll(transactions.toList.map(UtxoState.tx2StateChange))
@@ -154,6 +155,7 @@ class StateApplicator(settings: EncryAppSettings,
       }
 
     case TransactionValidatedFailure(tx, ex) =>
+      println("TransactionValidatedFailure")
       logger.info(s"Transaction ${tx.encodedId} failed in validation by state.")
       context.children.foreach(_ ! Kill)
       context.system.eventStream.publish(SemanticallyFailedModification(block, List(StateModifierApplyError(s"$ex"))))
