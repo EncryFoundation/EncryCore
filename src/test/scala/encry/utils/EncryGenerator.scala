@@ -30,8 +30,7 @@ trait EncryGenerator extends Settings {
       Blake2b256.hash(
         seed.map {
           Mnemonic.seedFromMnemonic(_)
-        }
-          .getOrElse {
+        }.getOrElse {
             val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
             Mnemonic.seedFromMnemonic(phrase)
           })

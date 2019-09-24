@@ -1,5 +1,5 @@
 package encry.settings
 
 trait Settings {
-  lazy val settings: EncryAppSettings = EncryAppSettings.read()
+  val settings: EncryAppSettings = EncryAppSettings.read()
 }

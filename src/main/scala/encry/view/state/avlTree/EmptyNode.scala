@@ -1,6 +1,6 @@
 package encry.view.state.avlTree
 
-import Node.NodeProtoMsg.NodeTypes.EmptyNodeProto
+import NodeMsg.NodeProtoMsg.NodeTypes.EmptyNodeProto
 import cats.kernel.Monoid
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.EMPTY

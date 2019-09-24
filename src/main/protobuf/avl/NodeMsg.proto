@@ -27,14 +27,14 @@ message NodeProtoMsg {
         }
 
         message EmptyNodeProto {
-
+            bool emptyNode = 1;
         }
 
         oneof nodeProto {
             LeafNodeProto leaf = 1;
             InternalNodeProto internal = 2;
             ShadowNodeProto shadow = 3;
-            EmptyNodeProto empty = 4;
+            EmptyNodeProto emptyNode = 4;
         }
     }
 
