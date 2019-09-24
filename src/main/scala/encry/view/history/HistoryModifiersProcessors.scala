@@ -11,48 +11,79 @@ import cats.syntax.either._
 import encry.consensus.ConsensusSchemeReaders.consensusScheme
 import encry.view.history.History._
 import encry.view.history.ValidationError._
+import org.encryfoundation.common.utils.Algos
 
 trait HistoryModifiersProcessors extends HistoryCacheApi {
 
-  def processHeader(header: Header): Either[HistoryProcessingError, HistoryProcessingInfo] =
+  def processHeader(header: Header): Either[HistoryProcessingError, HistoryProcessingInfo] = {
+    logger.info(s"Have been starting applying header to history at height ${header.height}.")
     getHeaderInfoToInsert(header) match {
-      case Nil => HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
+      case Nil =>
+        logger.info(s"Got empty header info for header ${header.encodedId}. Returned same history case class.")
+        HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
       case elems: List[(StorageKey, StorageValue)] =>
         storage.bulkInsert(header.id, elems, List(header))
         bestHeaderIdStorageApi match {
-          case Some(bestHeader) => computeResultAfterHeaderProcessing(header, bestHeader)
-          case None => HistoryProcessingError("History has no best header after header application.").asLeft
+          case Some(bestHeader) =>
+            logger.info(s"Inserted info about header ${header.encodedId}. Computed result.")
+            computeResultAfterHeaderProcessing(header, bestHeader)
+          case None =>
+            logger.info(s"History didn't contain best header after header insertion.")
+            HistoryProcessingError("History didn't contain best header after header insertion.").asLeft
         }
     }
+  }
 
-  def processPayload(payload: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] =
-    blockByPayloadOpt(payload).map(processBlock).getOrElse(putToHistory(payload))
+  def processPayload(p: Payload): Either[HistoryProcessingError, HistoryProcessingInfo] =
+    blockByPayloadOpt(p).map { b =>
+      logger.info(s"Found block for payload ${p.encodedId}. Have been starting applying block ${b.encodedId} with height ${b.header.height} to history.")
+      processBlock(b)
+    }.getOrElse {
+      logger.info(s"Didn't find block for payload ${p.encodedId}. Inserted info about this payload to history.")
+      putToHistory(p)
+    }
 
   private def processBlock(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] =
     calculateBestFullChain(block) match {
-      case Nil => HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
-      case fullChain@_ :+ last if isValidFirstBlock(block.header) => processFirstBlock(last.id, fullChain, block)
-      case _ :+ last if isBestBlockDefined && isBetter(last.id) => processBlockFromBestChain(last.header, block)
-      case _ :+ _ => processBlockFromNonBestChain(block)
+      case Nil =>
+        logger.info(s"Best full chain for block ${block.encodedId} was empty. Returned same history case class.")
+        HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
+      case fullChain@_ :+ last if isValidFirstBlock(block.header) =>
+        logger.info(s"Got first valid block ${block.encodedId}. Have been starting its applying.")
+        processFirstBlock(last.id, fullChain, block)
+      case _ :+ last if isBestBlockDefined && isBetter(last.id) =>
+        logger.info(s"Got block ${block.encodedId} from best chain. Have been starting its applying.")
+        processBlockFromBestChain(last.header, block)
+      case _ =>
+        logger.info(s"Got block ${block.encodedId} from non best chain. Have been starting its applying.")
+        processBlockFromNonBestChain(block)
     }
 
   private def processFirstBlock(newBestHeaderId: ModifierId,
                                 toApply: List[PersistentModifier],
                                 block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
     storage.bulkInsert(block.payload.id, Seq(BestBlockKey -> newBestHeaderId), Seq(block.payload))
+    logger.info(s"First block ${block.encodedId} applied successfully.")
     HistoryProcessingInfo(blockDownloadProcessor, toApply, isHeaderChainSynced).asRight[HistoryProcessingError]
   }
 
   private def processBlockFromBestChain(newBestHeader: Header,
                                         fullBlock: Block): Either[HistoryProcessingError, HistoryProcessingInfo] =
     headerOfBestBlockOpt.map { headerOfBestBlock =>
+      logger.info(s"Header ${headerOfBestBlock.encodedId} of best block was found while best block ${fullBlock.encodedId} was processing.")
       commonBlockThenSuffixes(headerOfBestBlock, newBestHeader) match {
-        case Left(ex) => ex.asLeft[HistoryProcessingInfo]
+        case Left(ex) =>
+          logger.info(s"Exception ${ex.error} was thrown during computation of common blocks for block ${fullBlock.encodedId}.")
+          ex.asLeft[HistoryProcessingInfo]
         case Right((oldChain: List[Header], newChain: List[Header])) =>
+          logger.info(s"Found common blocks for block ${fullBlock.encodedId}.")
           val toApply: List[Block] = newChain.drop(1)
             .flatMap(h => if (h == fullBlock.header) fullBlock.some else blockByHeaderOpt(h))
           toApply.foreach(addBlockToCacheIfNecessary)
-          if (toApply.lengthCompare(newChain.length - 1) != 0) processBlockFromNonBestChain(fullBlock)
+          if (toApply.lengthCompare(newChain.length - 1) != 0) {
+            logger.info(s"During block ${fullBlock.encodedId} processing it was from non best chain.")
+            processBlockFromNonBestChain(fullBlock)
+          }
           else {
             val toRemove: List[Block] = oldChain.drop(1).flatMap(blockByHeaderOpt)
             val branchPoint: Option[ModifierId] =
@@ -81,18 +112,26 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
                   .flatMap(headerByIdOpt)
                   .map(_.payloadId)
               )
+              logger.info(s"Finished processing block ${fullBlock.encodedId} from best chain. BlocksToKeep >= 0.")
               HistoryProcessingInfo(
                 updatedBlockDownloadProcessor, branchPoint, none, toApply, toRemove, isHeaderChainSynced
               ).asRight[HistoryProcessingError]
-            } else HistoryProcessingInfo(
-              blockDownloadProcessor, branchPoint, none, toApply, toRemove, isHeaderChainSynced
-            ).asRight[HistoryProcessingError]
+            } else {
+              logger.info(s"Finished processing block ${fullBlock.encodedId} from non best chain. BlocksToKeep >= 0.")
+              HistoryProcessingInfo(
+                blockDownloadProcessor, branchPoint, none, toApply, toRemove, isHeaderChainSynced
+              ).asRight[HistoryProcessingError]
+            }
           }
       }
-    }.getOrElse(HistoryProcessingError(s"History doesn't contain header of best block.").asLeft[HistoryProcessingInfo])
+    }.getOrElse {
+      logger.info(s"Finished block ${fullBlock.encodedId} processing with exception: History didn't contain header of best block.")
+      HistoryProcessingError(s"History didn't contain header of best block.").asLeft[HistoryProcessingInfo]
+    }
 
   private def processBlockFromNonBestChain(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
     storage.bulkInsert(block.payload.id, Seq.empty, Seq(block.payload))
+    logger.info(s"Finished non best block ${block.encodedId} processing.")
     HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
   }
 
@@ -121,14 +160,16 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
 
   private def getHeaderInfoToInsert(header: Header): List[(StorageKey, StorageValue)] = {
     addHeaderToCacheIfNecessary(header)
-    if (header.isGenesis)
+    if (header.isGenesis) {
+      logger.info(s"Processed genesis header ${header.encodedId}.")
       List(
         BestHeaderKey               -> StorageValue @@ header.id,
         heightIdsKey(header.height) -> StorageValue @@ header.id,
         headerHeightKey(header.id)  -> StorageValue @@ Ints.toByteArray(header.height),
         headerScoreKey(header.id)   -> StorageValue @@ header.difficulty.toByteArray
       )
-    else scoreOf(header.parentId).map { parentScore =>
+    } else scoreOf(header.parentId).map { parentScore =>
+      logger.info(s"Have been starting processing non genesis header ${header.encodedId}.")
       val headerScore: Difficulty = Difficulty @@ (parentScore + consensusScheme.realDifficulty(header))
       val currentBestHeight: Int = getBestHeaderHeight
       val currentBestScore: BigInt = getBestHeadersChainScore
@@ -145,7 +186,10 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
         if (newBestHeaderKeyToInsert.nonEmpty) bestHeaderIds(header, headerScore)
         else nonBestHeaderIds(header, headerScore)
       newScoreToInsert :: heightToInsert :: newBestHeaderKeyToInsert ::: headerIdsToInsert
-    }.getOrElse(List.empty[(StorageKey, StorageValue)])
+    }.getOrElse {
+      logger.info(s"Header ${header.encodedId} with parent ${Algos.encode(header.parentId)} didn't contain in history.")
+      List.empty[(StorageKey, StorageValue)]
+    }
   }
 
   private def computeResultAfterHeaderProcessing(header: Header,
@@ -183,11 +227,13 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
     score              <- scoreOf(id)
   } yield isBetterThan(bestBlockHeightStorageApi, heightOfThisHeader, score, prevBestScore)).getOrElse(false)
 
-  private def nonBestHeaderIds(header: Header, score: Difficulty): List[(StorageKey, StorageValue)] = List(
-    heightIdsKey(header.height) -> StorageValue @@ (header.id :: headerIdsAtHeight(header.height)).flatten.toArray
-  )
+  private def nonBestHeaderIds(header: Header, score: Difficulty): List[(StorageKey, StorageValue)] = {
+    logger.info(s"Header ${header.encodedId} was from non best chain.")
+    List(heightIdsKey(header.height) -> StorageValue @@ (header.id :: headerIdsAtHeight(header.height)).flatten.toArray)
+  }
 
-  private def bestHeaderIds(hc: Header, score: Difficulty): List[(StorageKey, StorageValue)] =
+  private def bestHeaderIds(hc: Header, score: Difficulty): List[(StorageKey, StorageValue)] = {
+    logger.info(s"Header ${hc.encodedId} was from best chain.")
     (heightIdsKey(hc.height) -> (StorageValue @@ (hc.id :: headerIdsAtHeight(hc.height)
       .filterNot(_ sameElements hc.id)).flatten.toArray)) ::
       headerByIdOpt(hc.id)
@@ -196,6 +242,7 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
         .map(h => heightIdsKey(h.height) ->
           StorageValue @@ (h.id ::  headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray)
         .toList
+  }
 
   private def isBetterThan(currentHeight: Int, bestHeight: Int, currentScore: BigInt, bestScore: BigInt): Boolean =
     (currentHeight > bestHeight) || (currentHeight == bestHeight && currentScore > bestScore)

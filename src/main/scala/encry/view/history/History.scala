@@ -34,8 +34,11 @@ case class History(blockDownloadProcessor: BlockDownloadProcessor,
       case header: Header   => processHeader(header)
       case payload: Payload => processPayload(payload)
     }) match {
-      case Left(value) => value.asLeft[(History, ProgressInfo)]
+      case Left(value) =>
+        logger.info(s"Application failed for modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} with error ${value.error}.")
+        value.asLeft[(History, ProgressInfo)]
       case Right(HistoryProcessingInfo(blockDownloadingProcessor, bp, download, apply, remove, isHeaderChainSynced)) =>
+        logger.info(s"Application finished successfully for modifier ${modifier.encodedId} of type ${modifier.modifierTypeId}.")
         (this.copy(blockDownloadingProcessor, isHeaderChainSynced), ProgressInfo(bp, remove, apply, download))
           .asRight[HistoryProcessingError]
     }
@@ -47,6 +50,7 @@ case class History(blockDownloadProcessor: BlockDownloadProcessor,
   }
 
   def reportModifierIsInvalid(modifier: PersistentModifier): ProgressInfo = {
+    logger.info(s"Have been starting function reportModifierIsInvalid for modifier ${modifier.encodedId} of type ${modifier.modifierTypeId}.")
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
         val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
@@ -106,21 +110,24 @@ case class History(blockDownloadProcessor: BlockDownloadProcessor,
     }
   }
 
-  def reportModifierIsValid(modifier: PersistentModifier): Unit = modifier match {
-    case block: Block =>
-      List(block.header.id, block.payload.id).filter(id => storage.get(validityKey(id)).isEmpty) match {
-        case Nil => ()
-        case list@ ::(head, _) =>
-          storage.insert(
-            StorageVersion @@ validityKey(head).untag(StorageKey),
-            list.map(validityKey(_) -> StorageValue @@ Array(1.toByte))
-          )
-      }
-    case _ =>
-      storage.insert(
-        StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
-        List(validityKey(modifier.id) -> StorageValue @@ Array(1.toByte))
-      )
+  def reportModifierIsValid(modifier: PersistentModifier): Unit = {
+    logger.info(s"Have been starting function reportModifierIsValid for modifier ${modifier.encodedId} of type ${modifier.modifierTypeId}.")
+    modifier match {
+      case block: Block =>
+        List(block.header.id, block.payload.id).filter(id => storage.get(validityKey(id)).isEmpty) match {
+          case Nil => ()
+          case list@ ::(head, _) =>
+            storage.insert(
+              StorageVersion @@ validityKey(head).untag(StorageKey),
+              list.map(validityKey(_) -> StorageValue @@ Array(1.toByte))
+            )
+        }
+      case _ =>
+        storage.insert(
+          StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
+          List(validityKey(modifier.id) -> StorageValue @@ Array(1.toByte))
+        )
+    }
   }
 
   override def close(): Unit = storage.close()
