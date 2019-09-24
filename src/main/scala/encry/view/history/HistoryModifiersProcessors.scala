@@ -195,8 +195,8 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
   private def computeResultAfterHeaderProcessing(header: Header,
                                                  bestHeaderId: ModifierId): Either[HistoryProcessingError, HistoryProcessingInfo] = {
     val modifierToApply: Option[PersistentModifier] =
-      if (bestHeaderId sameElements header.id) none[PersistentModifier]
-      else header.some
+      if (bestHeaderId sameElements header.id) header.some
+      else none[PersistentModifier]
     if (header.height >= blockDownloadProcessor.minimalBlockHeight)
       HistoryProcessingInfo(
         blockDownloadProcessor,

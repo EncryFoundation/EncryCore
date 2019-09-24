@@ -51,6 +51,7 @@ class HistoryApplicator(history: History,
 
   def workBehaviour(historyInReceive: History): Receive = {
     case ModifierFromRemote(mod) if !historyInReceive.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
+      if (mod.modifierTypeId == Payload.modifierTypeId) logger.info(s"Received payload ${mod.encodedId} on History applicator.")
       ModifiersCache.put(toKey(mod.id), mod, historyInReceive)
       getModifierForApplying(historyInReceive)
 
@@ -68,7 +69,7 @@ class HistoryApplicator(history: History,
       historyInReceive.reportModifierIsValid(modifier)
 
     case ModifierToHistoryAppending(modifier, isLocallyGenerated) =>
-      logger.info(s"Starting to apply modifier ${modifier.encodedId} to history.")
+      logger.info(s"Have been starting modifier  ${modifier.encodedId} of type ${modifier.modifierTypeId} appending to history.")
       historyInReceive.append(modifier) match {
         case Left(ex) =>
           currentNumberOfAppliedModifiers -= 1
@@ -95,7 +96,7 @@ class HistoryApplicator(history: History,
           nodeViewHolder ! UpdateHistory(historyNew)
           context.become(workBehaviour(historyNew))
         case Right((historyNew, progressInfo)) =>
-          logger.debug(s"Progress info is empty after appending to the state.")
+          logger.info(s"Modifier ${modifier.encodedId} successfully applied to history. Modifiers to apply collection is empty.")
           if (!isLocallyGenerated) requestDownloads(progressInfo)
           context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
           currentNumberOfAppliedModifiers -= 1
