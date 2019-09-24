@@ -79,7 +79,7 @@ class HistoryApplicator(val history: History,
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
           modifiersQueue = modifiersQueue.enqueue(modifier.encodedId -> progressInfo)
-          //println(s"modifiersQueue.enqueue ${modifiersQueue.size}")
+          println(s"modifiersQueue.enqueue ${modifiersQueue.size}")
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
           influxRef.foreach(ref =>
@@ -111,7 +111,7 @@ class HistoryApplicator(val history: History,
         sender() ! StartModifiersApplicationOnStateApplicator(pi, IndexedSeq.empty[PersistentModifier])
         modifiersQueue = newQueue
       }
-    //println(s"modifiersQueue.dequeue ${modifiersQueue.size}")
+    println(s"modifiersQueue.dequeue ${modifiersQueue.size}")
 
     case NotificationAboutSuccessfullyAppliedModifier =>
       if (history.isFullChainSynced) {

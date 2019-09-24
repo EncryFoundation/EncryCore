@@ -6,32 +6,25 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DeliveryManagerTests.DMUtils.generateNextBlock
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{RollbackSucceed, SemanticallySuccessfulModifier}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Settings
 import encry.storage.VersionalStorage
-import encry.utils.ChainUtils.{coinbaseTransaction, defaultPaymentTransactionScratch, privKey, _}
-import encry.utils.{ChainUtils, FileHelper, TestHelper}
-import encry.view.actors.HistoryApplicator.StartModifiersApplicationOnStateApplicator
-import encry.view.actors.NodeViewHolder.DownloadRequest
+import encry.utils.ChainUtils._
+import encry.utils.{ChainUtils, FileHelper}
+import encry.view.actors.HistoryApplicator
 import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
-import encry.view.actors.{HistoryApplicator, StateApplicator}
 import encry.view.history.History
 import encry.view.state.{BoxHolder, UtxoState}
 import encry.view.wallet.EncryWallet
-import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
-import scorex.crypto.hash.Digest32
 
 import scala.collection.Seq
 import scala.concurrent.duration._
-import scala.util.Random
 
 class HistoryApplicatorTest extends TestKit(ActorSystem())
   with WordSpecLike
@@ -89,6 +82,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
             nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
           )
       }
+    //(genesisBlock +: stateGenerationResults._1).foreach(b => println(s"block.header : ${Algos.encode(b.header.id)}"))
     (state, stateGenerationResults._3, genesisBlock +: stateGenerationResults._1)
   }
 
@@ -120,66 +114,75 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
   val timeout: FiniteDuration = 10 seconds
 
-    "HistoryApplicator add locall generated block" should {
-      "chain sync" in {
+  "HistoryApplicator" should {
 
-        val blockQty = 10
+    "apply locall blocks and chain sync" in {
 
-        val initialHistory: History = generateDummyHistory(settings)
-        val (genesisState, state, chain) = generateChain(blockQty)
+      val blockQty = 10
 
-        val historyApplicator: TestActorRef[HistoryApplicator] =
-          TestActorRef[HistoryApplicator](
-            HistoryApplicator.props(initialHistory, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
-          )
+      val history: History = generateDummyHistory(settings)
+      val (genesisState, state, chain) = generateChain(blockQty)
 
-        system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+      val historyApplicator: TestActorRef[HistoryApplicator] =
+        TestActorRef[HistoryApplicator](
+          HistoryApplicator.props(history, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
+        )
 
-        chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
-        checkFullBlockChainIsSynced((blockQty + 1) * 2)
-      }
+      chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
+
+      checkFullBlockChainIsSynced((blockQty + 1) * 2)
+      history.getBestBlockHeight shouldBe blockQty
     }
 
-  "HistoryApplicator" should {
     "check queues" in {
 
       val initialHistory: History = generateDummyHistory(settings)
       val (genesisState, state, chain) = generateChain(1)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
-      val modifierIds = modifiers.map(_.id)
+      //val modifierIds = modifiers.map(_.id)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
           HistoryApplicator.props(initialHistory, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
+      system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      println(s"modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
-      println(s"currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
+      println(s"test.modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
+      println(s"test.currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
 
-      val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
-      modifiersQueue.size shouldBe 2
-      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
+      receiveN(4, timeout).forall { case _: SemanticallySuccessfulModifier => true }
 
-      historyApplicator ! StateApplicator.RequestNextModifier
+//      val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
+//      modifiersQueue.size shouldBe 2
+//      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
 
-      historyApplicator.underlyingActor.modifiersQueue shouldBe 0
-      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
+      //Thread.sleep(15000)
+      //historyApplicator ! StateApplicator.RequestNextModifier
+//
+//      val msg = receiveWhile(timeout) {
+//        case msg: StartModifiersApplicationOnStateApplicator => msg.progressInfo.toApply.size
+//        case msg: Any => println(msg)
+//      }
+//      println(s"msg: ${msg}")
 
-      val history = historyApplicator.underlyingActor.history
-
-      expectMsgType[StartModifiersApplicationOnStateApplicator](timeout)
-
-      assert(modifierIds.forall(history.isModifierDefined))
-      assert(modifierIds.map(Algos.encode) == modifiersQueue.map(_._1))
+      //      historyApplicator.underlyingActor.modifiersQueue shouldBe 0
+      //      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
+      //
+      //      val history = historyApplicator.underlyingActor.history
+      //
+      //      expectMsgType[StartModifiersApplicationOnStateApplicator](timeout)
+      //
+      //      assert(modifierIds.forall(history.isModifierDefined))
+      //      assert(modifierIds.map(Algos.encode) == modifiersQueue.map(_._1))
     }
-  }
 
-  "HistoryApplicator" should {
-    "check queue for rollback limit" in {
+    "check queue for rollback height" in {
 
       val overQty = 30
 
@@ -203,9 +206,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
       history.getBestBlockHeight shouldBe settings.levelDB.maxVersions + overQty
     }
-  }
 
-  "HistoryApplicator" should {
     "check rollback for invalid state" in {
 
       val history: History = generateDummyHistory(settings)
@@ -218,8 +219,6 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
           HistoryApplicator.props(history, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
       system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
-
-      chain.foreach(b => println(Algos.encode(b.header.id)))
 
       chain
         .flatMap(blockToModifiers)
