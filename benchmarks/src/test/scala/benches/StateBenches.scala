@@ -2,13 +2,16 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
 import benches.Utils._
+import encry.EncryApp
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.IODB
 import encry.view.state.{BoxHolder, UtxoState}
-import encryBenchmark.BenchSettings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.infra.Blackhole

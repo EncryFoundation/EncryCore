@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import benches.SerializedMonetaryTxBenchmark.SerializedMonetaryBenchState
 import benches.Utils._
-import encryBenchmark.BenchSettings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionSerializer}
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.annotations._

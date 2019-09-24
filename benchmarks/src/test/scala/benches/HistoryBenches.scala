@@ -2,10 +2,13 @@ package benches
 
 import java.io.File
 import java.util.concurrent.TimeUnit
+
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import encry.EncryApp
+import encry.settings.EncryAppSettings
 import encry.view.history.History
-import encryBenchmark.BenchSettings
+import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.openjdk.jmh.annotations._
