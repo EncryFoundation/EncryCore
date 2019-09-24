@@ -72,9 +72,9 @@ class HistoryApplicator(val history: History,
       history.append(modifier) match {
         case Left(ex) =>
           currentNumberOfAppliedModifiers -= 1
-          println("unsuccessfully applied to history")
           logger.info(s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.getMessage}." +
             s" Current currentNumberOfAppliedModifiers $currentNumberOfAppliedModifiers.")
+          println("SyntacticallyFailedModification")
           context.system.eventStream.publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.getMessage))))
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
@@ -92,7 +92,7 @@ class HistoryApplicator(val history: History,
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
           if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
-          println("history.append success")
+          //println("history.append success")
           stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying()
         case Right(progressInfo) =>
@@ -131,11 +131,12 @@ class HistoryApplicator(val history: History,
       getModifierForApplying()
 
     case NeedToReportAsInValid(block) =>
-      println(s"NeedToReportAsInValid")
+      //println(s"NeedToReportAsInValid")
       logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId}.")
       currentNumberOfAppliedModifiers -= 1
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
+      //println(s"ha history.height: ${history.getBestBlockHeight}")
 
     case nonsense => logger.info(s"History applicator actor got from $sender message $nonsense.")
   }
@@ -167,6 +168,7 @@ class HistoryApplicator(val history: History,
   def requestDownloads(pi: ProgressInfo): Unit = pi.toDownload.foreach { case (tid, id) =>
     if (tid != Transaction.modifierTypeId)
       logger.debug(s"HistoryApplicator call requestDownloads for modifier ${Algos.encode(id)} of type $tid")
+    println("DownloadRequest")
     context.system.eventStream.publish(DownloadRequest(tid, id))
   }
 
