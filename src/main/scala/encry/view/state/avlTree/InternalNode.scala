@@ -1,7 +1,7 @@
 package encry.view.state.avlTree
 
-import Node.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
-import cats.kernel.Monoid
+import NodeMsg.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
+import cats.Monoid
 import com.google.protobuf.ByteString
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import org.encryfoundation.common.utils.Algos
@@ -61,20 +61,21 @@ object InternalNode {
         .withBalance(rightChild.balance)
         .withHash(ByteString.copyFrom(rightChild.hash))
         .withHeight(rightChild.height)
-      withLeftChild.withLeftChild(shadowNode)
+      withLeftChild.withRightChild(shadowNode)
     }.getOrElse(withLeftChild)
   }
 
-  def fromProto[K: Monoid : Hashable, V: Monoid](protoInternal: InternalNodeProto)(implicit kSer: Serializer[K],
-                                                                vSer: Serializer[V]): Try[InternalNode[K, V]] = Try {
-    InternalNode[K, V](
+  def fromProto[K: Monoid : Hashable, V: Monoid](protoInternal: InternalNodeProto)
+                                                (implicit kSer: Serializer[K],
+                                                vSer: Serializer[V]): Try[InternalNode[K, V]] = Try {
+    new InternalNode(
       key = kSer.fromBytes(protoInternal.key.toByteArray),
       value = vSer.fromBytes(protoInternal.value.toByteArray),
       height = protoInternal.height,
       balance = protoInternal.balance,
       hash = protoInternal.hash.toByteArray,
-      leftChild = protoInternal.leftChild.map(elem => ShadowNode.fromProto(elem).get),
-      rightChild = protoInternal.rightChild.map(elem => ShadowNode.fromProto(elem).get)
+      leftChild = protoInternal.leftChild.map(elem => ShadowNode.fromProto[K, V](elem).get),
+      rightChild = protoInternal.rightChild.map(elem => ShadowNode.fromProto[K, V](elem).get)
     )
   }
 

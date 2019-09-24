@@ -1,6 +1,6 @@
 package encry.view.state.avlTree
 
-import Node.NodeProtoMsg.NodeTypes.LeafNodeProto
+import NodeMsg.NodeProtoMsg.NodeTypes.LeafNodeProto
 import com.google.protobuf.ByteString
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import org.encryfoundation.common.utils.Algos
@@ -16,7 +16,7 @@ final case class LeafNode[K, V](key: K,
 
   override def selfInspection: Node[K, V] = this
 
-  override val hash: Array[Byte] = hashK.hash(key)
+  override val hash: Array[Byte] = Algos.hash(hashK.hash(key) ++ "Leaf".getBytes)
 
   override def toString: String = s"($key, $value, height: 0, balance: 0, hash: ${Algos.encode(hash)})"
 
