@@ -27,11 +27,13 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
+  def append(modifier: PersistentModifier): Either[Throwable, ProgressInfo] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
-      case header: Header   => (this, processHeader(header))
-      case payload: Payload => (this, processPayload(payload))
+      case header: Header   =>
+        logger.info(s"Process header in history.append at height ${header.height}")
+        processHeader(header)
+      case payload: Payload => processPayload(payload)
     })
   }
 
@@ -99,7 +101,7 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
             }
         }
       case None =>
-        // No headers become invalid. Just mark this particular modifier as invalid.
+        logger.info(s"No headers become invalid. Just mark this particular modifier as invalid.")
         historyStorage.insert(
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
@@ -170,7 +172,6 @@ object History extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
     new History {
-      override val settings: EncryAppSettings = settingsEncry
       override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
       override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
     }

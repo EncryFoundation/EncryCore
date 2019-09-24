@@ -6,24 +6,25 @@ import java.util
 import java.text.SimpleDateFormat
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{settings, timeProvider}
+import encry.EncryApp.timeProvider
 import encry.consensus.EncrySupplyController
-import encry.settings.InfluxDBSettings
+import encry.settings.{InfluxDBSettings, NetworkSettings}
 import encry.stats.StatsSender._
-import org.encryfoundation.common.modifiers.history.{Header, Payload}
+import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.constants.Constants
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictLogging {
+class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSettings, constants: Constants) extends Actor with StrictLogging {
 
   var modifiersToDownload: Map[String, (ModifierTypeId, Long)] = Map.empty
   var modifiersToApply: Map[String, (ModifierTypeId, Long)] = Map.empty
 
-  val nodeName: String = settings.network.nodeName match {
+  val nodeName: String = networkSettings.nodeName match {
     case Some(value) => value
-    case None => InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort
+    case None => InetAddress.getLocalHost.getHostAddress + ":" + networkSettings.bindAddress.getPort
   }
   val influxDB: InfluxDB = InfluxDBFactory
     .connect(influxDBSettings.url, influxDBSettings.login, influxDBSettings.password)
@@ -45,7 +46,9 @@ class StatsSender(influxDBSettings: InfluxDBSettings) extends Actor with StrictL
           s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
             s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}", //++
           s"supply,nodeName=$nodeName,height=${fb.height} " +
-            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height])}" //++
+            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height],
+              constants.InitialEmissionAmount, constants.EmissionEpochLength,
+              constants.EmissionDecay)}" //++
         ))
 
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
@@ -156,5 +159,9 @@ object StatsSender {
   final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
   final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
 
-  def props(settings: InfluxDBSettings): Props = Props(new StatsSender(settings))
+  final case class NewHeightByHistory(height: Int) extends AnyVal
+  final case class NewHeightByState(height: Int) extends AnyVal
+
+  def props(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSettings, constants: Constants): Props =
+    Props(new StatsSender(influxDBSettings, networkSettings, constants))
 }

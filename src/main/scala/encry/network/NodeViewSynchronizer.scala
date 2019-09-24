@@ -19,18 +19,19 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
-import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.actors.NodeViewHolder.DownloadRequest
+import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._
 import encry.view.state.UtxoState
-import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentModifier, PersistentNodeViewModifier}
+import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 
@@ -43,7 +44,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
     .withDispatcher("peers-keeper-dispatcher"), "PeersKeeper")
 
-  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings, peersKeeper, self)
+  val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
 
   networkController ! RegisterMessagesHandler(Seq(
@@ -61,16 +62,18 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   var canProcessTransactions: Boolean = true
 
   val downloadedModifiersValidator: ActorRef = context.system
-    .actorOf(DownloadedModifiersValidator.props(settings, nodeViewHolderRef, peersKeeper, self, memoryPoolRef, influxRef)
+    .actorOf(DownloadedModifiersValidator.props(settings.constants.ModifierIdSize, nodeViewHolderRef,
+      peersKeeper, self, memoryPoolRef, influxRef)
       .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
-    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, settings,
-      memoryPoolRef, self, downloadedModifiersValidator)
+    DeliveryManager.props(influxRef, nodeViewHolderRef, networkController, memoryPoolRef, self,
+      downloadedModifiersValidator, settings)
       .withDispatcher("delivery-manager-dispatcher"), "DeliveryManager")
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
+    context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -167,7 +170,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         s" peers for first sync info message. Resending $msg to peers keeper.")
       peersKeeper ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
-    case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
@@ -191,10 +193,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
     case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
-    case FullBlockChainIsSynced =>
+    case FullBlockChainIsSynced() =>
       chainSynced = true
-      deliveryManager ! FullBlockChainIsSynced
-      peersKeeper ! FullBlockChainIsSynced
+      deliveryManager ! FullBlockChainIsSynced()
+      peersKeeper ! FullBlockChainIsSynced()
     case StopTransactionsValidation =>
       deliveryManager ! StopTransactionsValidation
       canProcessTransactions = false

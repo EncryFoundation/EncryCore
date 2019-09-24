@@ -1,12 +1,13 @@
 package encry.cli
 
-import akka.actor.Actor
-import encry.EncryApp.settings
+import akka.actor.{Actor, Props}
 import encry.cli.commands._
+import encry.settings.EncryAppSettings
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsoleListener extends Actor {
+class ConsoleListener(settings: EncryAppSettings) extends Actor {
 
   import ConsoleListener._
 
@@ -64,4 +65,6 @@ object ConsoleListener {
 
   val cmdDictionary: Map[String, Map[String, Command]] =
     ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds
+
+  def props(settings: EncryAppSettings): Props = Props(new ConsoleListener(settings))
 }

@@ -4,13 +4,11 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings
 import encry.it.api.HttpApi
 import encry.it.util.KeyHelper.createPrivKey
-import encry.settings.EncryAppSettings
+import encry.settings.Settings
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 
 import scala.concurrent.duration.FiniteDuration
 
@@ -19,9 +17,8 @@ case class Node(config: Config,
                 containerId: String,
                 nodeIp: String,
                 nodePort: Int,
-                client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi {
+                client: AsyncHttpClient) extends AutoCloseable with StrictLogging with HttpApi with Settings {
 
-  val settings: EncryAppSettings = EncryAppSettings.fromConfig(config)
   val privKey: PrivateKey25519 = createPrivKey(Some(settings.wallet.flatMap(_.seed).getOrElse("")))
   val publicKey: PublicKey25519 = privKey.publicImage
   val address: String = publicKey.address.address
@@ -41,12 +38,12 @@ case class Node(config: Config,
 
 object Node {
 
-  implicit class NodeExt(val n: Node) extends AnyVal {
-    def name: String = n.settings.network.nodeName
-      .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)
+  implicit class NodeExt(val node: Node) extends AnyVal {
+    def name: String = node.settings.network.nodeName
+      .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + node.settings.network.bindAddress.getPort)
 
-    def publicKeyStr: String = n.publicKey.toString
+    def publicKeyStr: String = node.publicKey.toString
 
-    def blockDelay: FiniteDuration = TestNetConstants.DesiredBlockInterval
+    def blockDelay: FiniteDuration = node.settings.constants.DesiredBlockInterval
   }
 }

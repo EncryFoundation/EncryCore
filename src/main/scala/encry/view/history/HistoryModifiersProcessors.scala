@@ -9,7 +9,6 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import cats.syntax.option._
 import scala.annotation.tailrec
 import cats.syntax.either._
@@ -110,6 +109,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
         .view
         .flatMap(getHeaderById)
         .filter(filterCond)
+        .toList
       if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(h =>
@@ -131,11 +131,12 @@ trait HistoryModifiersProcessors extends HistoryApi {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
       Seq(
         BestHeaderKey                                -> StorageValue @@ header.id,
-        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id,
-        headerHeightKey(header.id)                   -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
+        heightIdsKey(settings.constants.GenesisHeight) -> StorageValue @@ header.id,
+        headerHeightKey(header.id)                   -> StorageValue @@ Ints.toByteArray(settings.constants.GenesisHeight),
         headerScoreKey(header.id)                    -> StorageValue @@ header.difficulty.toByteArray
       )
     } else scoreOf(header.parentId).map { parentScore =>
+      logger.info(s"getHeaderInfoUpdate for header $header")
       val score: Difficulty =
         Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
       val bestHeaderHeight: Int = getBestHeaderHeight
@@ -156,15 +157,14 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    logger.info(s"New best header ${h.encodedId} with score: $score")
+    logger.info(s"New best header ${h.encodedId} with score: $score at height ${h.height}")
     val self: (StorageKey, StorageValue) =
       heightIdsKey(h.height) ->
         StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
-    val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
-    val forkHeaders: Seq[(StorageKey, StorageValue)] = parentHeaderOpt
+    val forkHeaders: Seq[(StorageKey, StorageValue)] = getHeaderById(h.parentId)
       .toList
       .view
-      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
+      .flatMap(headerChainBack(h.height, _, h => isInBestChain(h)).headers)
       .filterNot(isInBestChain)
       .map(header =>
         heightIdsKey(header.height) ->

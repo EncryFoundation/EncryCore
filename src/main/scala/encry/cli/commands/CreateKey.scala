@@ -5,7 +5,7 @@ import akka.util.Timeout
 import encry.EncryApp._
 import encry.cli.Response
 import encry.settings.EncryAppSettings
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet

@@ -33,36 +33,35 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
+import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
 import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
-final case class UtxoState(storage: VersionalStorage,
-                           height: Height,
-                           lastBlockTimestamp: Long)
+final case class UtxoState(storage: VersionalStorage, constants: Constants)
   extends StrictLogging with UtxoStateReader with AutoCloseable {
+
+  var height: Height = Height @@ constants.PreGenesisHeight
+  var lastBlockTimestamp: Long = 0L
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(
-          storage,
-          height,
-          header.timestamp
-        ).asRight[List[ModifierApplyError]]
+        UtxoState(storage, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height))
+          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height,
+            constants.InitialEmissionAmount, constants.EmissionEpochLength, constants.EmissionDecay))
           else validate(tx)
         }).toList
           .traverse(Validated.fromEither)
@@ -83,8 +82,7 @@ final case class UtxoState(storage: VersionalStorage,
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
             UtxoState(
               storage,
-              Height @@ block.header.height,
-              block.header.timestamp
+              constants
             ).asRight[List[ModifierApplyError]]
           }
         )
@@ -99,12 +97,10 @@ final case class UtxoState(storage: VersionalStorage,
         logger.info(s"Rollback to version ${Algos.encode(version)}")
         storage.rollbackTo(StorageVersion !@@ version)
         val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
-          .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
-        UtxoState(
-          storage,
-          Height @@ stateHeight,
-          lastBlockTimestamp
-        )
+          .map(d => Ints.fromByteArray(d)).getOrElse(constants.GenesisHeight)
+        val stateNew = UtxoState(storage, constants)
+        stateNew.height = Height @@ stateHeight
+        stateNew
       case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
     }
   }
@@ -132,17 +128,17 @@ final case class UtxoState(storage: VersionalStorage,
         }
 
       val validBalance: Boolean = {
-        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs).map {
+        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs, constants.IntrinsicTokenId).map {
           case (key, value) => Algos.encode(key) -> value
         }
         val creditB: Map[String, Amount] = {
           val balanceSheet: Map[TokenId, Amount] =
-            BalanceCalculator.balanceSheet(tx.newBoxes, excludeTokenIssuance = true)
-          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
-          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+            BalanceCalculator.balanceSheet(tx.newBoxes, constants.IntrinsicTokenId, excludeTokenIssuance = true)
+          val intrinsicBalance: Amount = balanceSheet.getOrElse(constants.IntrinsicTokenId, 0L)
+          balanceSheet.updated(constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
         }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
         creditB.forall { case (tokenId, amount) =>
-          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
+          if (tokenId == Algos.encode(constants.IntrinsicTokenId))
             debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
@@ -191,21 +187,20 @@ object UtxoState extends StrictLogging {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
     }
     val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
-      .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)
+      .map(d => Ints.fromByteArray(d)).getOrElse(settings.constants.PreGenesisHeight)
     val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
       .map(d => Longs.fromByteArray(d)).getOrElse(0L)
-    new UtxoState(
-      versionalStorage,
-      Height @@ stateHeight,
-      lastBlockTimestamp,
-    )
+    val state = new UtxoState(versionalStorage, settings.constants)
+    state.height = Height @@ stateHeight
+    state.lastBlockTimestamp = lastBlockTimestamp
+    state
   }
 
   def genesis(stateDir: File,
@@ -216,7 +211,7 @@ object UtxoState extends StrictLogging {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
@@ -227,11 +222,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-
-    new UtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
-    )
+    UtxoState(storage, settings.constants)
   }
 }

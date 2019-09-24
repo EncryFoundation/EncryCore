@@ -4,9 +4,8 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
-import encry.settings.EncryAppSettings
 import encry.view.history.History
-import encryBenchmark.Settings
+import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.openjdk.jmh.annotations._
@@ -22,7 +21,9 @@ class HistoryBenches {
     bh.consume {
       val history: History = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
-        historyL.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block)
+        historyL.append(block.header)
+        historyL.append(block.payload)
+        historyL.reportModifierIsValid(block)
       }
       history.closeStorage()
     }
@@ -37,9 +38,7 @@ class HistoryBenches {
   }
 }
 
-object HistoryBenches {
-
-  val benchSettings: Settings = Settings.read
+object HistoryBenches extends BenchSettings {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -60,9 +59,8 @@ object HistoryBenches {
   }
 
   @State(Scope.Benchmark)
-  class HistoryBenchState {
+  class HistoryBenchState extends encry.settings.Settings {
 
-    val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
     val initialHistory: History = generateHistory(settings, tmpDir)
 
@@ -74,8 +72,9 @@ object HistoryBenches {
               generateNextBlockValidForHistory(
                 prevHistory, 0, prevBlock,  Seq.empty[Transaction]
               )
-            (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
-              Some(block), vector :+ block)
+            prevHistory.append(block.header)
+            prevHistory.append(block.payload)
+            (prevHistory.reportModifierIsValid(block), Some(block), vector :+ block)
         }
     resultedHistory._1.closeStorage()
 

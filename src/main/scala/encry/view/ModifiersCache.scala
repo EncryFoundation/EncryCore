@@ -1,8 +1,6 @@
 package encry.view
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.view.history.History
 import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -32,7 +30,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: PersistentModifier, history: History): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -44,7 +42,7 @@ object ModifiersCache extends StrictLogging {
       case _ =>
     }
 
-    if (size > settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
+    if (size > history.settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
       history.testApplicable(modifier) match {
         case Right(_) | Left(_: NonFatalValidationError) => false
         case _ => true
@@ -116,7 +114,7 @@ object ModifiersCache extends StrictLogging {
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
-                (history.getBestHeaderHeight == TestNetConstants.PreGenesisHeight &&
+                (history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
                   ) || history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
@@ -125,9 +123,10 @@ object ModifiersCache extends StrictLogging {
           value.map(id => new mutable.WrappedArray.ofByte(id)).filterNot(res.contains).foreach(cache.remove)
           res
         case None =>
+          logger.debug(s"${history.getBestHeader}")
           logger.debug(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
-            s"Trying to find in range [${history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
-          (history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
+            s"Trying to find in range [${history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
+          (history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
           ).toList
       }

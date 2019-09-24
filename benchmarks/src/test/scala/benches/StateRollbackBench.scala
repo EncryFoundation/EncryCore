@@ -5,11 +5,10 @@ import java.util.concurrent.TimeUnit
 
 import benches.StateRollbackBench.StateRollbackState
 import benches.Utils._
-import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.{BoxHolder, UtxoState}
-import encryBenchmark.Settings
+import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.encryfoundation.common.utils.TaggedTypes.Difficulty
@@ -37,9 +36,7 @@ class StateRollbackBench {
   }
 }
 
-object StateRollbackBench {
-
-  val benchSettings: Settings = Settings.read
+object StateRollbackBench extends BenchSettings {
 
   @throws[RunnerException]
   def main(args: Array[String]): Unit = {
@@ -60,9 +57,8 @@ object StateRollbackBench {
   }
 
   @State(Scope.Benchmark)
-  class StateRollbackState {
+  class StateRollbackState extends encry.settings.Settings {
 
-    val settings: EncryAppSettings = EncryAppSettings.read
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>

@@ -13,13 +13,13 @@ import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.history.History
-import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.mempool.MemoryPool.NewTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import scala.util.{Failure, Success, Try}
 
-class DownloadedModifiersValidator(settings: EncryAppSettings,
+class DownloadedModifiersValidator(modifierIdSize: Int,
                                    nodeViewHolder: ActorRef,
                                    peersKeeper: ActorRef,
                                    nodeViewSync: ActorRef,
@@ -35,7 +35,7 @@ class DownloadedModifiersValidator(settings: EncryAppSettings,
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
       filteredModifiers.foreach { case (id, bytes) =>
         ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
-          case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier) =>
+          case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize) =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
@@ -81,13 +81,13 @@ object DownloadedModifiersValidator {
 
   final case class InvalidModifier(ids: ModifierId) extends AnyVal
 
-  def props(settings: EncryAppSettings,
+  def props(modifierIdSize: Int,
             nodeViewHolder: ActorRef,
             peersKeeper: ActorRef,
             nodeViewSync: ActorRef,
             memoryPoolRef: ActorRef,
             influxRef: Option[ActorRef]): Props =
-    Props(new DownloadedModifiersValidator(settings, nodeViewHolder, peersKeeper, nodeViewSync, memoryPoolRef, influxRef))
+    Props(new DownloadedModifiersValidator(modifierIdSize, nodeViewHolder, peersKeeper, nodeViewSync, memoryPoolRef, influxRef))
 
   class DownloadedModifiersValidatorPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

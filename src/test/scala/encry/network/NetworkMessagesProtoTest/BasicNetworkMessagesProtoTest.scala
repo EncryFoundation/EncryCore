@@ -4,8 +4,9 @@ import java.net.InetSocketAddress
 
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
+import encry.EncryApp
 import encry.modifiers.InstanceFactory
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
@@ -15,14 +16,14 @@ import org.scalatest.{Matchers, PropSpec}
 
 import scala.util.Try
 
-class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory {
+class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory with Settings {
 
-  val settings: EncryAppSettings = EncryAppSettings.read
   val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
     case ((prevHistory, blocks), _) =>
       val block: Block = generateNextBlock(prevHistory)
-      (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block),
-        blocks :+ block)
+      prevHistory.append(block.header)
+      prevHistory.append(block.payload)
+      (prevHistory.reportModifierIsValid(block), blocks :+ block)
   }._2
   val testedTransaction: Seq[Transaction] = genValidPaymentTxs(10)
 

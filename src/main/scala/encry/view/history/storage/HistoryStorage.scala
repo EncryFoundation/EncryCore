@@ -9,10 +9,14 @@ import scorex.utils.{Random => ScorexRandom}
 import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.modifiers.history.{Header, HistoryModifiersProtoSerializer}
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.util.{Failure, Random, Success}
 import cats.syntax.option._
+import org.encryfoundation.common.utils.{Algos, TaggedTypes}
+import org.encryfoundation.common.utils.constants.TestNetConstants
+import supertagged.@@
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
@@ -62,6 +66,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
       )
     case _: VLDBWrapper =>
+      logger.info(s"for header ${Algos.encode(version)} inserting ${objectsToInsert.mkString(",")}")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>

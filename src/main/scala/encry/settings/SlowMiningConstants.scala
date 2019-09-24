@@ -3,17 +3,18 @@ package encry.settings
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty, Height}
 import org.encryfoundation.common.utils.constants.Constants
+
 import scala.concurrent.duration._
 
-case object TestConstants extends Constants {
+case object SlowMiningConstants extends Constants {
 
   val DigestLength: Int = 32
 
   val ModifierIdSize: Int = DigestLength
 
-  val PayloadMaxSize: Int = 999999999
+  val PayloadMaxSize: Int = 1000000
 
-  val HeaderMaxSize: Int = 322
+  val HeaderMaxSize: Int = 200
 
   val DefaultKeepVersions: Int = 200
 
@@ -45,13 +46,13 @@ case object TestConstants extends Constants {
 
   val EmissionEpochLength: Int = 5040
 
-  val DesiredBlockInterval: FiniteDuration = 120.seconds
+  val DesiredBlockInterval: FiniteDuration = 5 minutes//120.seconds
 
   val NewHeaderTimeMultiplier: Int = 5
 
-  val RetargetingEpochsQty: Int = 4
+  val RetargetingEpochsQty: Int = 2//4
 
-  val EpochLength: Int = 100
+  val EpochLength: Int = 3//100
 
   val GenesisHeight: Height = Height @@ 0
 
