@@ -37,7 +37,7 @@ class AvlTreeTest extends PropSpec with Matchers with EncryGenerator {
 
     val avl = AvlTree[Int, Int](storage)
 
-    val elems = (0 to 100).map(_ => Random.nextInt()).toList
+    val elems = (0 to 1000).map(_ => Random.nextInt()).toList
 
     val startTime = System.currentTimeMillis()
 

@@ -1,22 +1,17 @@
 package encry.view.state.avlTree
 
-import java.util
-
-import cats.kernel.Hash
-import cats.{Monoid, Order}
 import cats.syntax.order._
-import cats.syntax.option._
+import cats.{Monoid, Order}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.state.avlTree
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import org.encryfoundation.common.utils.Algos
+import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
-import scala.collection.immutable.{HashMap, HashSet}
-import scala.collection.mutable
+import scala.collection.immutable.HashMap
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) {
 
@@ -29,29 +24,32 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   val rootHash: Array[Byte] = rootNode.hash
 
   //contains new or changed nodes. Needs for serialization
-  var insertedNodes: HashMap[String, Node[K, V]] = HashMap.empty[String, Node[K, V]]
+  var insertedNodes: Map[String, Node[K, V]] = Map.empty[String, Node[K, V]]
 
   //contains deleted nodes. Needs for serialization
-  var deletedNodes: HashSet[String] = HashSet.empty[String]
+  var deletedNodes: List[String] = List.empty[String]
 
   //return newAvl, allUpdatedNodes and hashes of deleted.
   def insertMany(toInsert: List[(K, V)])
                 (implicit kSer: Serializer[K],
                  vSer: Serializer[V],
                  kM: Monoid[K],
-                 vM: Monoid[V]): (AvlTree[K, V], HashMap[String, Node[K, V]], HashSet[String]) = {
+                 vM: Monoid[V]): (AvlTree[K, V], Map[String, Node[K, V]], List[String]) = {
     val startTime = System.currentTimeMillis()
     val newRoot = toInsert.foldLeft(rootNode){
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         setToZeroInsertDirection(insert(prevRoot, keyToInsert, valueToInsert))
     }
     println(s"new root getting: ${(System.currentTimeMillis() - startTime)/1000L} s")
+    val deletedNodesUpdated = deletedNodes.filterNot(insertedNodes.contains)
+    val newInserted = insertedNodes -- deletedNodesUpdated
+    val shadowedRoot = ShadowNode.childsToShadowNode(newRoot)
     storage.insert(StorageVersion @@ Random.randomBytes(),
       toInsert.map{case (key, value) => StorageKey @@ Algos.hash(kSer.toBytes(key)) -> StorageValue @@ vSer.toBytes(value)} ++
-      insertedNodes.filterKeys(key => !deletedNodes.contains(key)).values.map(node => StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))).toList,
-      deletedNodes.map(key => StorageKey @@ Algos.decode(key).get).toList
+        newInserted.values.map(node => StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))).toList :+
+        (AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash),
+      deletedNodesUpdated.map(key => StorageKey @@ Algos.decode(key).get)
     )
-    val shadowedRoot = ShadowNode.childsToShadowNode(newRoot)
     (AvlTree(shadowedRoot, storage), insertedNodes, deletedNodes)
   }
 
@@ -90,7 +88,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       delete(restoredNode, key)
     case leafNode: LeafNode[K, V] =>
       if (leafNode.key === key) None else {
-        deletedNodes = deletedNodes + Algos.encode(leafNode.hash)
+        deletedNodes = Algos.encode(leafNode.hash) +: deletedNodes
         Some(leafNode)
       }
     case internalNode: InternalNode[K, V] =>
@@ -184,7 +182,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       if (leafNode.key === newKey) leafNode.copy(value = newValue)
       else {
         val newInternalNode = InternalNode[K, V](leafNode.key, leafNode.value, height = 1, balance = 0)
-        //todo remove asInstance
         addToActionInfo(
           List(Algos.encode(newInternalNode.hash) -> newInternalNode),
           List(Algos.encode(leafNode.hash))
@@ -220,9 +217,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     addToActionInfo(HashMap[String, Node[K, V]](toInsert: _*), toDelete)
 
   private def addToActionInfo(toInsert: HashMap[String, Node[K, V]], toDelete: List[String]): Unit = {
-    val newDeleted = (deletedNodes ++ toDelete).diff(toInsert.keySet)
-    insertedNodes ++= (insertedNodes ++ toInsert).filterKeys(key => !(deletedNodes ++ toDelete).contains(key))
-    deletedNodes = newDeleted
+    //val newDeleted = (deletedNodes ::: toDelete).diff(toInsert.keySet.toList)
+    insertedNodes ++= toInsert
+    deletedNodes :::= toDelete
   }
 
   private def setToZeroInsertDirection(node: Node[K, V]): Node[K, V] = node match {
@@ -343,6 +340,8 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 }
 
 object AvlTree {
+
+  val rootNodeKey: StorageKey = StorageKey !@@ Algos.hash("root_node")
 
   sealed trait Direction
   object Directions {

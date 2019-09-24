@@ -10,6 +10,8 @@ import org.iq80.leveldb.{DB, ReadOptions}
 import supertagged.TaggedType
 import java.util
 
+import com.google.common.primitives.Bytes
+
 case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
 
   var versionsList: List[LevelDBVersion] = versionsListInDB()
@@ -75,7 +77,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       batch.put(VERSIONS_LIST, newElem.version.untag(LevelDBVersion) ++ versionsList.flatten)
       //Ids of all elements, added by newElem
       versionsList = newElem.version +: versionsList
-      batch.put(versionKey(newElem.version), newElem.elemsToInsert.flatMap(_._1).toArray)
+      batch.put(versionKey(newElem.version), Bytes.concat(newElem.elemsToInsert.map(_._1): _*))
       //Ids of all elements, deleted by newElem
       batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
       newElem.elemsToInsert.foreach {
