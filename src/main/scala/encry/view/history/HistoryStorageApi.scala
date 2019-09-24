@@ -24,35 +24,27 @@ trait HistoryStorageApi extends Settings with StrictLogging {
     .modifierById(id)
     .collect { case m: T => m }
 
-  def heightByHeaderStorageApi(id: ModifierId): Option[Int] = storage
-    .get(headerHeightKey(id))
-    .map(Ints.fromByteArray)
+  def heightByHeaderStorageApi(id: ModifierId): Option[Int] = storage.get(headerHeightKey(id)).map(Ints.fromByteArray)
 
   def headerByIdStorageApi(id: ModifierId): Option[Header] = modifierByIdStorageApi[Header](id)
-
   def payloadByIdStorageApi(pId: ModifierId): Option[Payload] = modifierByIdStorageApi[Payload](pId)
-
   def blockByIdStorageApi(id: ModifierId): Option[Block] = headerByIdStorageApi(id)
-    .flatMap(h => modifierByIdStorageApi[Payload](h.payloadId).map(p => Block(h, p)))
+    .flatMap(h => modifierByIdStorageApi[Payload](h.payloadId).map(Block(h, _)))
 
   def bestHeaderIdStorageApi: Option[ModifierId] = storage.get(BestHeaderKey).map(ModifierId @@ _)
-
   def bestHeaderStorageApi: Option[Header] = bestHeaderIdStorageApi.flatMap(headerByIdStorageApi)
-
   def bestHeaderHeightStorageApi: Int = bestHeaderIdStorageApi
     .flatMap(heightByHeaderStorageApi)
     .getOrElse(settings.constants.PreGenesisHeight)
 
   def bestBlockIdStorageApi: Option[ModifierId] = storage.get(BestBlockKey).map(ModifierId @@ _)
-
   def bestBlockStorageApi: Option[Block] = bestBlockIdStorageApi.flatMap(blockByIdStorageApi)
-
   def bestBlockHeightStorageApi: Int = bestBlockIdStorageApi
     .flatMap(heightByHeaderStorageApi)
     .getOrElse(settings.constants.PreGenesisHeight)
 
   def blockByHeaderStorageApi(header: Header): Option[Block] = modifierByIdStorageApi[Payload](header.payloadId)
-    .map(payload => Block(header, payload))
+    .map(Block(header, _))
 
   def modifierBytesByIdStorageApi(id: ModifierId): Option[Array[Byte]] = storage.modifiersBytesById(id)
 
@@ -78,9 +70,9 @@ trait HistoryStorageApi extends Settings with StrictLogging {
   //todo .getOrElse(BigInt(0))
   def getBestHeadersChainScore: BigInt = bestHeaderIdStorageApi.flatMap(scoreOf).getOrElse(BigInt(0))
 
-  def scoreOf(id: ModifierId): Option[BigInt] = storage.get(headerScoreKey(id)).map(d => BigInt(d))
+  def scoreOf(id: ModifierId): Option[BigInt] = storage.get(headerScoreKey(id)).map(BigInt(_))
 
-  def heightOf(id: ModifierId): Option[Height] = storage.get(headerHeightKey(id)).map(d => Height @@ Ints.fromByteArray(d))
+  def heightOf(id: ModifierId): Option[Height] = storage.get(headerHeightKey(id)).map(Height @@ Ints.fromByteArray(_))
 
   def heightIdsKey(height: Int): StorageKey = StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)
 

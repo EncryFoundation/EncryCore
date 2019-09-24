@@ -41,7 +41,7 @@ object DMUtils extends InstanceFactory {
         prevHistory.append(block.header)
         prevHistory.append(block.payload)
         val a = prevHistory.reportModifierIsValid(block)
-        (a, blocks :+ block)
+        (prevHistory, blocks :+ block)
     }
 
   def toKey(id: ModifierId): WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)

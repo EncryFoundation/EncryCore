@@ -5,14 +5,14 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{Settings, EncryAppSettings}
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
-import encry.view.history.History
+import encry.view.history.{BlockDownloadProcessor, History}
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
@@ -408,10 +408,7 @@ object Utils extends Settings with StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
-    new History {
-      override  val storage: HistoryStorage = storage
-      override  val timeProvider: NetworkTimeProvider = ntp
-    }
+    History(BlockDownloadProcessor(settings), isHeaderChainSynced = false, ntp, HistoryStorage(vldbInit))
   }
 
 }

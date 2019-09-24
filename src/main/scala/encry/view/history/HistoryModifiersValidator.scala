@@ -20,7 +20,7 @@ trait HistoryModifiersValidator extends HistoryCacheApi {
       case payload: Payload => validatePayload(payload)
       case mod              => UnknownModifierFatalError(s"Modifier $mod has incorrect type.").asLeft[PersistentModifier]
     }) match {
-      case l@Left(value) => logger.info(s"Validation result for ${modifier.encodedId} failed cause $value"); l
+      case l@Left(value) => logger.info(s"Validation result for ${modifier.encodedId} failed cause $value."); l
       case r@Right(_)    => r
     }
 
@@ -28,11 +28,11 @@ trait HistoryModifiersValidator extends HistoryCacheApi {
     if (h.isGenesis) genesisBlockHeaderValidator(h)
     else headerByIdOpt(h.parentId)
       .map(p => headerValidator(h, p))
-      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
+      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history.").asLeft[Header])
 
   private def validatePayload(mod: Payload): Either[ValidationError, PersistentModifier] = headerByIdOpt(mod.headerId)
     .map(header => payloadValidator(mod, header, blockDownloadProcessor.minimalBlockHeight))
-    .getOrElse(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history").asLeft[PersistentModifier])
+    .getOrElse(PayloadNonFatalValidationError(s"Header for ${mod.encodedId} doesn't contain in history.").asLeft[PersistentModifier])
 
   private def realDifficulty(h: Header): Difficulty = Difficulty !@@ powScheme.realDifficulty(h)
 
@@ -63,7 +63,7 @@ trait HistoryModifiersValidator extends HistoryCacheApi {
       HeaderFatalValidationError(s"Header ${h.encodedId} has height ${h.height}" +
         s" not greater by 1 than parent's ${parent.height}"))
     _ <- Either.cond(!storage.containsMod(h.id), (),
-      HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
+      HeaderFatalValidationError(s"Header ${h.encodedId} has already been in history"))
     _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
     _ <- Either.cond(requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
@@ -85,11 +85,11 @@ trait HistoryModifiersValidator extends HistoryCacheApi {
                                header: Header,
                                minimalHeight: Int): Either[ValidationError, PersistentModifier] = for {
     _ <- Either.cond(!storage.containsMod(m.id), (),
-      PayloadFatalValidationError(s"Modifier ${m.encodedId} is already in history"))
+      PayloadFatalValidationError(s"Payload ${m.encodedId} has already been in history"))
     _ <- Either.cond(header.isRelated(m), (),
-      PayloadFatalValidationError(s"Modifier ${m.encodedId} does not corresponds to header ${header.encodedId}"))
+      PayloadFatalValidationError(s"Payload ${m.encodedId} doesn't correspond to header ${header.encodedId}"))
     _ <- Either.cond(isSemanticallyValid(header.id) != ModifierSemanticValidity.Invalid, (),
-      PayloadFatalValidationError(s"Header ${header.encodedId} for modifier ${m.encodedId} is semantically invalid"))
+      PayloadFatalValidationError(s"Header ${header.encodedId} for payload ${m.encodedId} is semantically invalid"))
     _ <- Either.cond(header.height >= minimalHeight, (),
       PayloadNonFatalValidationError(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight"))
   } yield m

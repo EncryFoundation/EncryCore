@@ -118,7 +118,8 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
           val block: Block = generateNextBlock(prevHistory)
           prevHistory.append(block.header)
           prevHistory.append(block.payload)
-          (prevHistory.reportModifierIsValid(block), blocks :+ block)
+          prevHistory.reportModifierIsValid(block)
+          (prevHistory, blocks :+ block)
       }
 
       val payload = Payload(ModifierId @@ scorex.utils.Random.randomBytes(), Seq(coinbaseTransaction))

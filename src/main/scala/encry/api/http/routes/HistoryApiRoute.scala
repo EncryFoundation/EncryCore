@@ -38,7 +38,7 @@ case class HistoryApiRoute(dataHolder: ActorRef,
   }
 
   private def getLastHeaders(n: Int): Future[Json] = getHistory.map {
-    _.lastHeaders(n).headers.map(_.asJson).asJson
+    _.lastHeaders(n).map(_.asJson).asJson
   }
 
   private def getHeaderIds(offset: Int, limit: Int): Future[Json] =

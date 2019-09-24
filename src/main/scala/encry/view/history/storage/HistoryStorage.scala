@@ -9,31 +9,30 @@ import scorex.utils.{Random => ScorexRandom}
 import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Header, HistoryModifiersProtoSerializer}
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.util.{Failure, Random, Success}
 import cats.syntax.option._
-import org.encryfoundation.common.utils.{Algos, TaggedTypes}
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
   def modifierById(id: ModifierId): Option[PersistentModifier] = (store match {
     case iodb: IODBHistoryWrapper => iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data)
-    case _: VLDBWrapper => store.get(StorageKey @@ id.untag(ModifierId))
+    case _: VLDBWrapper           => store.get(StorageKey @@ id.untag(ModifierId))
   })
-    .flatMap(res => HistoryModifiersProtoSerializer.fromProto(res) match {
+    .flatMap(HistoryModifiersProtoSerializer.fromProto(_) match {
       case Success(b) => b.some
       case Failure(e) => logger.warn(s"Failed to parse block from db: $e"); none
     })
 
   def containsMod(id: ModifierId): Boolean = store match {
     case iodb: IODBHistoryWrapper => iodb.objectStore.get(ByteArrayWrapper(id)).isDefined
-    case _: VLDBWrapper => store.contains(StorageKey @@ id.untag(ModifierId))
+    case _: VLDBWrapper           => store.contains(StorageKey @@ id.untag(ModifierId))
   }
 
   def modifiersBytesById(id: ModifierId): Option[Array[Byte]] = store match {
-    case iodb: IODBHistoryWrapper => iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.tail)
-    case _: VLDBWrapper => store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
+    case iodb: IODBHistoryWrapper => iodb.objectStore.get(ByteArrayWrapper(id)).map(_.data.drop(1))
+    case _: VLDBWrapper           => store.get(StorageKey @@ id.untag(ModifierId)).map(_.drop(1))
   }
 
   def insertObjects(objectsToInsert: Seq[PersistentModifier]): Unit = store match {
@@ -41,12 +40,13 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
       iodb.objectStore.update(
         Random.nextLong(),
         Seq.empty,
-        objectsToInsert.map(obj => ByteArrayWrapper(obj.id) ->
-          ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj)))
+        objectsToInsert.map(obj =>
+          ByteArrayWrapper(obj.id) -> ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj))
+        )
       )
     case _: VLDBWrapper =>
       insert(
-        StorageVersion @@ objectsToInsert.head.id.untag(ModifierId),
+        StorageVersion @@ objectsToInsert.head.id.untag(ModifierId), //todo unsafe .head
         objectsToInsert.map(obj =>
           StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
         ).toList,
@@ -63,7 +63,6 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         indexesToInsert.toList.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }
       )
     case _: VLDBWrapper =>
-      logger.info(s"for header ${Algos.encode(version)} inserting ${objectsToInsert.mkString(",")}")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>

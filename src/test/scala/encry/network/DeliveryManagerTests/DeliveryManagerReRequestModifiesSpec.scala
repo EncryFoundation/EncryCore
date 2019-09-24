@@ -134,9 +134,9 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
         Map(headerIds.head -> headerBytes)), cp1)
 
       history.append(blocks.head.header)
-      val uHistory: History = history.reportModifierIsValid(blocks.head.header)
+      history.reportModifierIsValid(blocks.head.header)
 
-      deliveryManager ! UpdatedHistory(uHistory)
+      deliveryManager ! UpdatedHistory(history)
 
       deliveryManager ! SemanticallySuccessfulModifier(blocks.head.header)
 

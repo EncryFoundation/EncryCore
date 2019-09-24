@@ -18,8 +18,8 @@ class ModifiersValidationTest extends WordSpecLike
       val genesisBlock: Block = generateGenesisBlock(testNetSettings.constants.GenesisHeight)
       newHistory.testApplicable(genesisBlock.header).isRight shouldBe true
       newHistory.append(genesisBlock.header)
-      val updatedHistory: History = newHistory.reportModifierIsValid(genesisBlock.header)
-      updatedHistory.testApplicable(genesisBlock.payload).isRight shouldBe true
+      newHistory.reportModifierIsValid(genesisBlock.header)
+      newHistory.testApplicable(genesisBlock.payload).isRight shouldBe true
     }
     "reject incorrect modifiers" in {
       val blocks: List[Block] = generateBlocks(2, generateDummyHistory(testNetSettings))._2
@@ -31,6 +31,7 @@ class ModifiersValidationTest extends WordSpecLike
         history.testApplicable(block.payload).isRight shouldBe true
         history.append(block.payload)
         history.reportModifierIsValid(block)
+          history
       }
       blocks.takeRight(1).foldLeft(newHistory) { case (history, block) =>
         history.testApplicable(block.header).isRight shouldBe false
@@ -39,6 +40,7 @@ class ModifiersValidationTest extends WordSpecLike
         history.testApplicable(block.payload).isRight shouldBe true
         history.append(block.payload)
         history.reportModifierIsValid(block)
+          history
       }
     }
   }

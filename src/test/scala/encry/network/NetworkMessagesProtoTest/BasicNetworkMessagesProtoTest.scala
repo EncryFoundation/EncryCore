@@ -23,7 +23,8 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
       val block: Block = generateNextBlock(prevHistory)
       prevHistory.append(block.header)
       prevHistory.append(block.payload)
-      (prevHistory.reportModifierIsValid(block), blocks :+ block)
+      prevHistory.reportModifierIsValid(block)
+      (prevHistory, blocks :+ block)
   }._2
   val testedTransaction: Seq[Transaction] = genValidPaymentTxs(10)
 

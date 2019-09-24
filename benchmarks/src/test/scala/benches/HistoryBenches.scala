@@ -27,6 +27,7 @@ class HistoryBenches {
         historyL.append(block.header)
         historyL.append(block.payload)
         historyL.reportModifierIsValid(block)
+          historyL
       }
       history.closeStorage()
     }
@@ -77,7 +78,8 @@ object HistoryBenches extends BenchSettings {
               )
             prevHistory.append(block.header)
             prevHistory.append(block.payload)
-            (prevHistory.reportModifierIsValid(block), Some(block), vector :+ block)
+            prevHistory.reportModifierIsValid(block)
+            (prevHistory, Some(block), vector :+ block)
         }
     resultedHistory._1.closeStorage()
 

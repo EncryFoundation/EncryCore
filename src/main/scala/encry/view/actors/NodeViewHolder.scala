@@ -26,7 +26,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
+import encry.EncryApp.nodeViewSynchronizer
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -67,6 +67,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
+    case UpdateHistory(h) =>
+      nodeView = nodeView.copy(history = h)
+      dataHolder ! UpdatedHistory(h)
+      nodeViewSynchronizer ! ChangedHistory(h)
+    case UpdateState(updateState) =>
+      nodeView = nodeView.copy(state = updateState)
+      dataHolder ! ChangedState(updateState)
     case msg@ModifierFromRemote(_) => historyApplicator ! msg
     case msg@LocallyGeneratedBlock(_) => historyApplicator ! msg
     case GetDataFromCurrentView(f) =>
@@ -158,13 +165,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         getRecreatedState()
       case (stateId, Some(historyBestBlock), state: UtxoState) =>
         val stateBestHeaderOpt = history.headerByIdOpt(ModifierId !@@ stateId) //todo naming
-      val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
+      val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header).toOption.get
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
           .getOrElse(getRecreatedState())
-        val toApply = newChain.headers.map { h =>
+        val toApply = newChain.map { h =>
           history.blockByHeaderOpt(h) match {
             case Some(fb) => fb
             case None => throw new Exception(s"Failed to get full block for header $h")
@@ -190,6 +197,9 @@ object NodeViewHolder {
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
 
   object ReceivableMessages {
+
+    final case class UpdateHistory(history: History) extends AnyVal
+    final case class UpdateState(state: UtxoState) extends AnyVal
 
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean)
 

@@ -40,4 +40,8 @@ object HistoryConsensus {
       s" to remove: ${toRemove.map(_.encodedId)}, to apply: ${toApply.map(_.encodedId)})"
   }
 
+  object ProgressInfo {
+    def empty: ProgressInfo = ProgressInfo(None, Seq.empty, Seq.empty, None)
+  }
+
 }

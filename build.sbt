@@ -60,7 +60,6 @@ libraryDependencies ++= Seq(
   "org.iq80.leveldb" % "leveldb" % "0.9",
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
-  "dev.zio" %% "zio" % "1.0.0-RC12-1",
   "com.typesafe" % "config" % "1.3.3",
   "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
   "org.whispersystems" % "curve25519-java" % "0.5.0",

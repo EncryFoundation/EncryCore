@@ -9,13 +9,14 @@ import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.iq80.leveldb.Options
 import cats.syntax.either._
 import cats.syntax.option._
+import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.view.history.History.HistoryProcessingInfo
 import encry.view.history.ValidationError.HistoryProcessingError
 
@@ -26,61 +27,50 @@ case class History(blockDownloadProcessor: BlockDownloadProcessor,
   extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
   def isFullChainSynced: Boolean = bestHeaderIdStorageApi
-    .exists(bestHeaderId => bestBlockIdStorageApi.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
+    .exists(bestHeaderId => bestBlockIdStorageApi.exists(_.sameElements(bestHeaderId)))
 
-  def append(modifier: PersistentModifier): Either[HistoryProcessingError, (History, HistoryProcessingInfo)] =
+  def append(modifier: PersistentModifier): Either[HistoryProcessingError, (History, ProgressInfo)] =
     (modifier match {
-      case header: Header => processHeader(header)
+      case header: Header   => processHeader(header)
       case payload: Payload => processPayload(payload)
     }) match {
-      case Left(value) => value.asLeft[(History, HistoryProcessingInfo)]
-      case Right(h@HistoryProcessingInfo(blockDownloadingProcessor, _, _, _, _, isHeaderChainSynced)) =>
-        (this.copy(blockDownloadingProcessor, isHeaderChainSynced), h).asRight[HistoryProcessingError]
+      case Left(value) => value.asLeft[(History, ProgressInfo)]
+      case Right(HistoryProcessingInfo(blockDownloadingProcessor, bp, download, apply, remove, isHeaderChainSynced)) =>
+        (this.copy(blockDownloadingProcessor, isHeaderChainSynced), ProgressInfo(bp, remove, apply, download))
+          .asRight[HistoryProcessingError]
     }
 
-  /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
-    case header: Header => Some(header)
-    case block: Block => Some(block.header)
+    case header: Header   => Some(header)
+    case block: Block     => Some(block.header)
     case payload: Payload => headerByIdOpt(payload.headerId)
   }
 
-  /**
-    * Marks modifier and all modifiers in child chains as invalid
-    *
-    * @param modifier that is invalid against the State
-    * @return ProgressInfo with next modifier to try to apply
-    */
-  def reportModifierIsInvalid(modifier: PersistentModifier): (History, HistoryProcessingInfo) = {
-    logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
+  def reportModifierIsInvalid(modifier: PersistentModifier): ProgressInfo = {
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
         val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
         val validityRow: List[(StorageKey, StorageValue)] = invalidatedHeaders
-          .flatMap(h => Seq(h.id, h.payloadId)
-            .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))).toList
-        logger.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
+          .flatMap(h =>
+            Seq(h.id, h.payloadId).map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))
+          ).toList
         val bestHeaderIsInvalidated: Boolean = bestHeaderIdStorageApi.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         val bestFullIsInvalidated: Boolean = bestBlockIdStorageApi.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         (bestHeaderIsInvalidated, bestFullIsInvalidated) match {
           case (false, false) =>
-            // Modifiers from best header and best full chain are not involved, no rollback and links change required.
             storage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), validityRow)
-            this -> HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced)
+            ProgressInfo.empty
           case _ =>
-            // Modifiers from best header and best full chain are involved, links change required.
             val newBestHeader: Header =
               loopHeightDown(getBestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
                 .ensuring(_.isDefined, "Where unable to find new best header, can't invalidate genesis block")
                 .get
-
             if (!bestFullIsInvalidated) {
-              // Only headers chain involved.
               storage.insert(
                 StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
                 List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
               )
-              this -> HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced)
+              ProgressInfo.empty
             } else {
               val invalidatedChain: Seq[Block] = bestBlockOpt.toSeq
                 .flatMap(f => computeForkChain(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)))
@@ -98,13 +88,11 @@ case class History(blockDownloadProcessor: BlockDownloadProcessor,
                 )
               val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
               storage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
-              this -> HistoryProcessingInfo(
-                blockDownloadProcessor,
+              ProgressInfo(
                 branchPoint.id.some,
-                none,
-                validChain.drop(1).toList,
                 invalidatedChain.drop(1).toList,
-                isHeaderChainSynced
+                validChain.drop(1).toList,
+                none
               )
             }
         }
@@ -114,23 +102,25 @@ case class History(blockDownloadProcessor: BlockDownloadProcessor,
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
         )
-        this -> HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced)
+        ProgressInfo.empty
     }
   }
 
-  def reportModifierIsValid(modifier: PersistentModifier): History = modifier match {
+  def reportModifierIsValid(modifier: PersistentModifier): Unit = modifier match {
     case block: Block =>
       List(block.header.id, block.payload.id).filter(id => storage.get(validityKey(id)).isEmpty) match {
-        case Nil => this
-        case list@ ::(head, _) => storage.insert(
-          StorageVersion @@ validityKey(head).untag(StorageKey),
-          list.map(validityKey(_) -> StorageValue @@ Array(1.toByte)))
-          this
+        case Nil => ()
+        case list@ ::(head, _) =>
+          storage.insert(
+            StorageVersion @@ validityKey(head).untag(StorageKey),
+            list.map(validityKey(_) -> StorageValue @@ Array(1.toByte))
+          )
       }
-    case _ => storage.insert(
-      StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
-      List(validityKey(modifier.id) -> StorageValue @@ Array(1.toByte)))
-      this
+    case _ =>
+      storage.insert(
+        StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
+        List(validityKey(modifier.id) -> StorageValue @@ Array(1.toByte))
+      )
   }
 
   override def close(): Unit = storage.close()
@@ -158,6 +148,19 @@ object History extends StrictLogging {
         List.empty[PersistentModifier],
         isHeaderChainSynced
       )
+
+    def apply(blockDownloadingProcessor: BlockDownloadProcessor,
+              modifiersToApply: List[PersistentModifier],
+              isHeaderChainSynced: Boolean
+             ): HistoryProcessingInfo =
+      new HistoryProcessingInfo(
+        blockDownloadingProcessor,
+        none[ModifierId],
+        none[(ModifierTypeId, ModifierId)],
+        modifiersToApply,
+        List.empty[PersistentModifier],
+        isHeaderChainSynced
+      )
   }
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {
@@ -172,25 +175,22 @@ object History extends StrictLogging {
     dir
   }
 
-  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): History = {
+  def readOrGenerate(settings: EncryAppSettings, ntp: NetworkTimeProvider): History = {
 
-    val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
+    val historyIndexDir: File = getHistoryIndexDir(settings)
     //Check what kind of storage in settings:
-    val vldbInit = settingsEncry.storage.history match {
+    val vldbInit = settings.storage.history match {
       case VersionalStorage.IODB =>
         logger.info("Init history with iodb storage")
-        val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
+        val historyObjectsDir: File = getHistoryObjectsDir(settings)
         val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
         val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
         IODBHistoryWrapper(indexStore, objectsStore)
       case VersionalStorage.LevelDB =>
         logger.info("Init history with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB))
     }
-    new History {
-      override val storage: HistoryStorage = HistoryStorage(vldbInit)
-      override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
-    }
+    History(BlockDownloadProcessor(settings), isHeaderChainSynced = false, ntp, HistoryStorage(vldbInit))
   }
 }

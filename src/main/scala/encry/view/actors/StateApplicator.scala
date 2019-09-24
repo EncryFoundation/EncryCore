@@ -24,8 +24,10 @@ import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
 import encry.stats.StatsSender.{ModifierAppendedToState, TransactionsInBlock}
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import encry.view.actors.NodeViewHolder.ReceivableMessages.UpdateState
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import org.encryfoundation.common.utils.Algos
+
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
@@ -34,7 +36,8 @@ class StateApplicator(settings: EncryAppSettings,
                       historyApplicator: ActorRef,
                       state: UtxoState,
                       walletApplicator: ActorRef,
-                      influxRef: Option[ActorRef]) extends Actor with StrictLogging {
+                      influxRef: Option[ActorRef],
+                      nodeViewHolder: ActorRef) extends Actor with StrictLogging {
 
   var transactionsValidatorsNumber: Int = 0
   var isInProgress: Boolean = false
@@ -114,6 +117,7 @@ class StateApplicator(settings: EncryAppSettings,
       case _ =>
         logger.info(s"Send request for the next modifier to the history applicator")
         historyApplicator ! NotificationAboutSuccessfullyAppliedModifier
+        nodeViewHolder ! UpdateState(state)
         if (ui.suffix.nonEmpty) walletApplicator ! WalletNeedScanPersistent(ui.suffix)
         isInProgress = false
         context.become(updateState)
@@ -252,6 +256,7 @@ object StateApplicator {
             historyApplicator: ActorRef,
             state: UtxoState,
             walletApplicator: ActorRef,
-            influxRef: Option[ActorRef]): Props =
-    Props(new StateApplicator(setting, history, historyApplicator, state, walletApplicator, influxRef))
+            influxRef: Option[ActorRef],
+            nvh: ActorRef): Props =
+    Props(new StateApplicator(setting, history, historyApplicator, state, walletApplicator, influxRef, nvh))
 }
