@@ -1,9 +1,7 @@
 package encry.view.history
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
@@ -14,29 +12,25 @@ import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.iq80.leveldb.Options
 import cats.syntax.either._
-import cats.syntax.option.none
+import cats.syntax.option._
 import encry.view.history.History.HistoryProcessingInfo
 import encry.view.history.ValidationError.HistoryProcessingError
-import encry.view.history.testingHistory.CleanHistory
 
-/**
-  * History implementation. It is processing persistent modifiers generated locally or received from the network.
-  **/
-case class History(blockDownloadingProcessor: BlockDownloadProcessor,
+case class History(blockDownloadProcessor: BlockDownloadProcessor,
                    isHeaderChainSynced: Boolean,
                    timeProvider: NetworkTimeProvider,
-                   storage: HistoryStorage) extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
+                   storage: HistoryStorage)
+  extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
   def isFullChainSynced: Boolean = bestHeaderIdStorageApi
     .exists(bestHeaderId => bestBlockIdStorageApi.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   def append(modifier: PersistentModifier): Either[HistoryProcessingError, (History, HistoryProcessingInfo)] =
     (modifier match {
-      case header: Header   => processHeader(header)
+      case header: Header => processHeader(header)
       case payload: Payload => processPayload(payload)
     }) match {
       case Left(value) => value.asLeft[(History, HistoryProcessingInfo)]
@@ -57,7 +51,7 @@ case class History(blockDownloadingProcessor: BlockDownloadProcessor,
     * @param modifier that is invalid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
-  def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) = {
+  def reportModifierIsInvalid(modifier: PersistentModifier): (History, HistoryProcessingInfo) = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
@@ -72,7 +66,7 @@ case class History(blockDownloadingProcessor: BlockDownloadProcessor,
           case (false, false) =>
             // Modifiers from best header and best full chain are not involved, no rollback and links change required.
             storage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), validityRow)
-            this -> ProgressInfo(None, Seq.empty, Seq.empty, None)
+            this -> HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced)
           case _ =>
             // Modifiers from best header and best full chain are involved, links change required.
             val newBestHeader: Header =
@@ -86,17 +80,17 @@ case class History(blockDownloadingProcessor: BlockDownloadProcessor,
                 StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
                 List(BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId))
               )
-              this -> ProgressInfo(None, Seq.empty, Seq.empty, None)
+              this -> HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced)
             } else {
               val invalidatedChain: Seq[Block] = bestBlockOpt.toSeq
-                .flatMap(f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
-                .flatMap(h => blockByHeaderOpt(h))
+                .flatMap(f => computeForkChain(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)))
+                .flatMap(blockByHeaderOpt)
                 .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
               val branchPoint: Block = invalidatedChain.head
               val validChain: Seq[Block] =
                 continuationHeaderChains(branchPoint.header, h => blockByHeaderOpt(h).isDefined && !invalidatedHeaders.contains(h))
                   .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
-                  .flatMap(h => blockByHeaderOpt(h))
+                  .flatMap(blockByHeaderOpt)
               val changedLinks: Seq[(StorageKey, StorageValue)] =
                 List(
                   BestBlockKey -> StorageValue @@ validChain.last.id.untag(ModifierId),
@@ -104,7 +98,14 @@ case class History(blockDownloadingProcessor: BlockDownloadProcessor,
                 )
               val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
               storage.insert(StorageVersion @@ validityKey(modifier.id).untag(StorageKey), toInsert)
-              this -> ProgressInfo(Some(branchPoint.id), invalidatedChain.tail, validChain.tail, None)
+              this -> HistoryProcessingInfo(
+                blockDownloadProcessor,
+                branchPoint.id.some,
+                none,
+                validChain.drop(1).toList,
+                invalidatedChain.drop(1).toList,
+                isHeaderChainSynced
+              )
             }
         }
       case None =>
@@ -113,7 +114,7 @@ case class History(blockDownloadingProcessor: BlockDownloadProcessor,
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
         )
-        this -> ProgressInfo(None, Seq.empty, Seq.empty, None)
+        this -> HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced)
     }
   }
 
