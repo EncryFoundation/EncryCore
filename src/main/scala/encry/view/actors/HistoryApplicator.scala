@@ -75,6 +75,7 @@ class HistoryApplicator(history: History,
           context.system.eventStream.publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.getMessage))))
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
+          logger.info(s"Progress info after appending ${modifier.encodedId} to history is $progressInfo")
           modifiersQueue = modifiersQueue.enqueue(modifier.encodedId -> progressInfo)
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
@@ -123,9 +124,13 @@ class HistoryApplicator(history: History,
       getModifierForApplying()
 
     case NeedToReportAsInValid(block) =>
-      logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId}.")
-      currentNumberOfAppliedModifiers -= 1
+      logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId} at height ${block.header.height}.")
+      currentNumberOfAppliedModifiers -= 1 //todo stop node if failed modifier outranges rollback depth
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
+      newProgressInfo.toRemove.foreach(mod => context.system.eventStream.publish(SyntacticallyFailedModification(mod, List.empty[HistoryApplyError])))
+      val blocksToRemove = newProgressInfo.toRemove.map(_.encodedId).toSet
+      modifiersQueue = modifiersQueue.filterNot { case (id, _) => blocksToRemove.contains(id)}
+      logger.info(s"New progress info after invalidating ${block.encodedId} is $newProgressInfo")
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
 
     case nonsense => logger.info(s"History applicator actor got from $sender message $nonsense.")
@@ -137,7 +142,7 @@ class HistoryApplicator(history: History,
       case (modifier, newQueue) =>
         locallyGeneratedModifiers = newQueue
         currentNumberOfAppliedModifiers += 1
-        logger.debug(s"Found new local modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
+        logger.info(s"Found new local modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
           s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
           s" Current locally generated modifiers size ${locallyGeneratedModifiers.size}.")
         self ! ModifierToHistoryAppending(modifier, isLocallyGenerated = true)
