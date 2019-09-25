@@ -46,96 +46,71 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     TestKit.shutdownActorSystem(system)
   }
 
-  def genHistoryBlocks(initialHistory: History, count: Int): (History, Seq[Block]) = {
-    (0 until count).foldLeft(initialHistory, Seq.empty[Block]) {
-      case ((prevHistory, blocks), _) =>
-        val block: Block = generateNextBlock(prevHistory)
-        prevHistory.append(block.header)
-        prevHistory.append(block.payload)
-        (prevHistory.reportModifierIsValid(block), blocks :+ block)
-    }
-  }
+  //  def genHistoryBlocks(initialHistory: History, count: Int): (History, Seq[Block]) = {
+  //    (0 until count).foldLeft(initialHistory, Seq.empty[Block]) {
+  //      case ((prevHistory, blocks), _) =>
+  //        val block: Block = generateNextBlock(prevHistory)
+  //        prevHistory.append(block.header)
+  //        prevHistory.append(block.payload)
+  //        (prevHistory.reportModifierIsValid(block), blocks :+ block)
+  //    }
+  //  }
 
   def blockToModifiers(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
 
   def rndAddress: Address = Pay2PubKeyAddress(PublicKey @@ ScorexRandom.randomBytes()).address
 
-  def generateNextBlockForState(prevBlock: Block, state: UtxoState, box: Seq[AssetBox], splitCoef: Int = 2,
-                                addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+  def genNextBlockForState(prevBlock: Block, state: UtxoState, boxes: Seq[AssetBox], invalid: Boolean = false,
+                           addDiff: Difficulty = Difficulty @@ BigInt(0)): (Block, Seq[AssetBox]) = {
     val timestamp = System.currentTimeMillis()
 
-    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
-      case ((boxes, transactionsL), _) =>
-        val payTx: Transaction = TransactionFactory.defaultPaymentTransactionScratch(privKey, 0L, timestamp, IndexedSeq(boxes.head),
-          rndAddress, 1)
+    val amount = if(invalid) boxes.map(_.amount).sum + 1L else 1L
 
-        val backTx: Transaction = TransactionFactory.defaultPaymentTransactionScratch(privKey, 0L, timestamp, IndexedSeq(boxes.head),
-          privKey.publicImage.address.address, boxes.head.amount - 1)
-
-        (boxes.tail, transactionsL :+ payTx :+ backTx)
-    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(ChainUtils.coinbaseTransaction(prevBlock.header.height + 1))
-
-    println(s"transactions.size: ${transactions.size}")
+    val transactions: Seq[Transaction] =
+      boxes.map(b => TransactionFactory.defaultPaymentTransactionScratch(privKey, 1L, timestamp, IndexedSeq(b), rndAddress, amount)) :+
+        ChainUtils.coinbaseTransaction(prevBlock.header.height + 1)
 
     val header = Header(1.toByte, prevBlock.id, Payload.rootHash(transactions.map(_.id)), timestamp,
       prevBlock.header.height + 1, Random.nextLong(), Difficulty @@ (BigInt(1) + addDiff), EquihashSolution(Seq(1, 3)))
 
-    Block(header, Payload(header.id, transactions))
+    val newBoxes = transactions.filter(_.newBoxes.size > 1).map(_.newBoxes.toSeq(1).asInstanceOf[AssetBox])
+    (Block(header, Payload(header.id, transactions)), newBoxes)
   }
 
-  def genHardcodedBox(address: Address, nonce: Long): AssetBox =
-    AssetBox(EncryProposition.addressLocked(address), nonce, 10L)
+  def genForkBlock(boxQty: Int, prevBlock: Block, box: AssetBox, addDiff: Difficulty = Difficulty @@ BigInt(0)): (Block, Seq[AssetBox]) = {
+    val timestamp = System.currentTimeMillis()
 
-  def generateChain(blockQty: Int, genInvalidBlockFrom: Option[Int] = None): (UtxoState, UtxoState, List[Block]) = {
-    val numberOfInputsInOneTransaction = 1 //10
-    val numberOfOutputsInOneTransaction = 1 //10
-    val transactionsNumberInEachBlock = 1000 //1000
-    val initialboxCount = 100000 //100000
-
-    val initialBoxes: IndexedSeq[AssetBox] = (0 until initialboxCount).map(nonce =>
-      genHardcodedBox(privKey.publicImage.address.address, nonce)
+    val transactions: Seq[Transaction] = Seq(
+      ChainUtils.defaultPaymentTransactionScratch(privKey, 1L, timestamp, IndexedSeq(box), rndAddress, 1000L, None, boxQty),
+      ChainUtils.coinbaseTransaction(prevBlock.header.height + 1)
     )
-    val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
+
+    val header = Header(1.toByte, prevBlock.id, Payload.rootHash(transactions.map(_.id)), timestamp,
+      prevBlock.header.height + 1, Random.nextLong(), Difficulty @@ (BigInt(1) + addDiff), EquihashSolution(Seq(1, 3)))
+
+    (Block(header, Payload(header.id, transactions)), transactions.head.newBoxes.tail.map(_.asInstanceOf[AssetBox]).toSeq)
+  }
+
+  def genChain(blockQty: Int, transPerBlock: Int = 1, genInvalidBlockFrom: Option[Int] = None): (UtxoState, UtxoState, List[Block]) = {
+    assert(blockQty >= 2, "chain at least 2 blocks")
 
     val genesisBlock: Block = ChainUtils.generateGenesisBlock(Height @@ 0)
 
-    val state: UtxoState = utxoFromBoxHolder(boxesHolder, dir, None, settings, VersionalStorage.LevelDB)
+    val state: UtxoState = utxoFromBoxHolder(BoxHolder(Seq.empty), dir, None, settings, VersionalStorage.LevelDB)
       .applyModifier(genesisBlock).right.get
 
-    //1000000000
-    val stateGenerationResults: (List[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
-      (0 until blockQty).foldLeft(List.empty[Block], genesisBlock, state, initialBoxes) {
-        case ((blocks, block, stateL, boxes), height) =>
-          val genInvalid = genInvalidBlockFrom.exists(height + 1 >= _)
-          val nextBlock: Block =
-            if (genInvalid)
-              generateNextBlockForStateWithInvalidTrans(block, stateL,
-                block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
-            else
-              generateNextBlockForState(block, stateL,
-                //block.payload.txs.flatMap(_.newBoxes.map(_.asInstanceOf[AssetBox])).toIndexedSeq)
-                boxes.take(transactionsNumberInEachBlock * numberOfInputsInOneTransaction))
+    val (forkBlock, forkBoxes) = genForkBlock(transPerBlock, genesisBlock, genesisBlock.payload.txs.head.newBoxes.map(_.asInstanceOf[AssetBox]).head)
+    val forkState = state.applyModifier(forkBlock).right.get
 
-          val stateN: UtxoState = if (genInvalid) stateL else stateL.applyModifier(nextBlock).right.get
-          (blocks :+ nextBlock,
-            nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
-          )
+    val (chain, _, newState, _) =
+      (2 until blockQty).foldLeft(List(genesisBlock, forkBlock), forkBlock, forkState, forkBoxes) {
+        case ((blocks, blockL, stateL, boxes), height) =>
+          val invalid = genInvalidBlockFrom.exists(height + 1 >= _)
+          val (newBlock, newBoxes) = genNextBlockForState(blockL, stateL, boxes, invalid)
+          val newState = if(invalid) stateL else stateL.applyModifier(newBlock).right.get
+          (blocks :+ newBlock, newBlock, newState, newBoxes)
       }
-//    val stateGenerationResults: (Vector[Block], Block, UtxoState, IndexedSeq[AssetBox]) =
-//    (0 until blockQty).foldLeft(Vector[Block](), genesisBlock, state, initialBoxes) {
-//      case ((blocks, block, stateL, boxes), _) =>
-//        val nextBlock: Block = generateNextBlockValidForState(
-//          block, stateL, boxes.take(transactionsNumberInEachBlock * numberOfInputsInOneTransaction),
-//          transactionsNumberInEachBlock, numberOfInputsInOneTransaction, numberOfOutputsInOneTransaction
-//        )
-//        val stateN: UtxoState = stateL.applyModifier(nextBlock).right.get
-//        (blocks :+ nextBlock, nextBlock, stateN, boxes.drop(transactionsNumberInEachBlock * numberOfInputsInOneTransaction)
-//        )
-//    }
-
-    //(genesisBlock +: stateGenerationResults._1).foreach(b => println(s"block.header : ${Algos.encode(b.header.id)}"))
-
-    (state, stateGenerationResults._3, genesisBlock +: stateGenerationResults._1.toList)
+    (state, newState, chain)
   }
 
   def applyBlocksToHistory(history: History, blocks: Seq[Block]): History =
@@ -173,7 +148,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       val blockQty = 10
 
       val history: History = generateDummyHistory(settings)
-      val (genesisState, state, chain) = generateChain(blockQty)
+      val (genesisState, state, chain) = genChain(blockQty)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
@@ -191,7 +166,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
     "check queues" in {
 
       val initialHistory: History = generateDummyHistory(settings)
-      val (genesisState, state, chain) = generateChain(1)
+      val (genesisState, state, chain) = genChain(1)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
       //val modifierIds = modifiers.map(_.id)
@@ -210,18 +185,18 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
       receiveN(4, timeout).forall { case _: SemanticallySuccessfulModifier => true }
 
-//      val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
-//      modifiersQueue.size shouldBe 2
-//      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
+      //      val modifiersQueue = historyApplicator.underlyingActor.modifiersQueue
+      //      modifiersQueue.size shouldBe 2
+      //      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
 
       //Thread.sleep(15000)
       //historyApplicator ! StateApplicator.RequestNextModifier
-//
-//      val msg = receiveWhile(timeout) {
-//        case msg: StartModifiersApplicationOnStateApplicator => msg.progressInfo.toApply.size
-//        case msg: Any => println(msg)
-//      }
-//      println(s"msg: ${msg}")
+      //
+      //      val msg = receiveWhile(timeout) {
+      //        case msg: StartModifiersApplicationOnStateApplicator => msg.progressInfo.toApply.size
+      //        case msg: Any => println(msg)
+      //      }
+      //      println(s"msg: ${msg}")
 
       //      historyApplicator.underlyingActor.modifiersQueue shouldBe 0
       //      historyApplicator.underlyingActor.currentNumberOfAppliedModifiers shouldBe 2
@@ -239,7 +214,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       val overQty = 30
 
       val history: History = generateDummyHistory(settings)
-      val (genesisState, state, chain) = generateChain(settings.levelDB.maxVersions + overQty)
+      val (genesisState, state, chain) = genChain(settings.levelDB.maxVersions + overQty)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
@@ -264,7 +239,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       val history: History = generateDummyHistory(settings)
 
       //generate invalid blocks begining from 2 blocks
-      val (genesisState, state, chain) = generateChain(3, Some(2))
+      val (genesisState, state, chain) = genChain(3, 1, Some(2))
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
@@ -288,7 +263,9 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       val history: History = generateDummyHistory(settings)
 
       //generate invalid blocks begining from 6 blocks
-      val (genesisState, state, chain) = generateChain(1)
+      val (genesisState, state, chain) = genChain(10, 5, Some(6))
+
+      chain.foreach(b => println(s"block.header : ${Algos.encode(b.header.id)}"))
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
@@ -300,12 +277,11 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
         .flatMap(blockToModifiers)
         .foreach(historyApplicator ! ModifierFromRemote(_))
 
-      Thread.sleep(60000)
-//      checkFullBlockChainIsSynced(3 * 2)
+      checkFullBlockChainIsSynced(10)
 
-//      history.getBestBlockHeight shouldBe 1
-//      history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(chain(1).id))
-//      history.getBestBlockHeightDB shouldBe 1
+      history.getBestBlockHeight shouldBe Height @@ 4
+      history.getBestBlockHeightDB shouldBe Height @@ 4
+      history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(chain(4).id))
     }
 
   }
