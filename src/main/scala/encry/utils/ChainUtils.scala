@@ -73,12 +73,10 @@ object ChainUtils extends Settings with StrictLogging {
   }
 
   def generateGenesisBlock(genesisHeight: Height): Block = {
-    val supplyTotal: Amount = settings.constants.InitialEmissionAmount
-
     val coinbaseTrans = TransactionFactory.coinbaseTransactionScratch(
       privKey.publicImage,
       System.currentTimeMillis(),
-      supplyTotal,
+      settings.constants.InitialEmissionAmount,
       amount = 0L,
       height = genesisHeight
     )
@@ -154,6 +152,9 @@ object ChainUtils extends Settings with StrictLogging {
         (boxes.tail, transactionsL :+ tx)
     }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
+
+    println(s"transactions.size: ${transactions.size}")
+
     val header = Header(
       1.toByte,
       prevBlock.id,
