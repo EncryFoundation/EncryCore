@@ -82,7 +82,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   def awaitingHistoryCycle: Receive = {
     case ChangedHistory(reader: History) =>
       logger.info(s"get history: $reader from $sender")
-      dataHolder ! ChangedHistory(reader)
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
@@ -184,7 +183,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
     case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
-      dataHolder ! ChangedHistory(reader)
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
