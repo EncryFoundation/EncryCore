@@ -62,9 +62,9 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
   }
 
   private def processFirstBlock(newBestHeaderId: ModifierId,
-                                toApply: List[PersistentModifier],
+                                toApply: List[Block],
                                 block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
-    storage.bulkInsert(block.payload.id, Seq(BestBlockKey -> newBestHeaderId), Seq(block.payload))
+    storage.bulkInsert(block.payload.id, List(BestBlockKey -> newBestHeaderId), List(block.payload))
     logger.info(s"First block ${block.encodedId} applied successfully.")
     HistoryProcessingInfo(blockDownloadProcessor, toApply, isHeaderChainSynced).asRight[HistoryProcessingError]
   }
@@ -101,7 +101,7 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
                 List(BestBlockKey -> StorageValue @@ newBestHeader.id, BestHeaderKey -> StorageValue @@ newBestHeader.id)
               else
                 List(BestBlockKey -> StorageValue @@ newBestHeader.id)
-            storage.bulkInsert(fullBlock.payload.id, updateBestHeaderOrNot, Seq(fullBlock.payload))
+            storage.bulkInsert(fullBlock.payload.id, updateBestHeaderOrNot, List(fullBlock.payload))
             if (settings.node.blocksToKeep >= 0) {
               val updatedBlockDownloadProcessor: BlockDownloadProcessor =
                 blockDownloadProcessor.updateBestBlockHeight(fullBlock.header.height)
@@ -132,7 +132,7 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
     }
 
   private def processBlockFromNonBestChain(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
-    storage.bulkInsert(block.payload.id, Seq.empty, Seq(block.payload))
+    storage.bulkInsert(block.payload.id, List.empty, List(block.payload))
     logger.info(s"Finished non best block ${block.encodedId} processing.")
     HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
   }
@@ -140,8 +140,8 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
   private def calculateBestFullChain(block: Block): List[Block] =
     continuationHeaderChains(block.header, header => isBlockDefined(header))
       .view
-      .map(chain => block :: chain.view.drop(1).flatMap(blockByHeaderOpt).toList)
-      .maxBy(_.lastOption.flatMap(b => scoreOf(b.id)).getOrElse(BigInt(0)))
+      .map(chain => block :: chain.drop(1).flatMap(blockByHeaderOpt))
+      .maxBy(_.lastOption.flatMap(b => scoreOf(b.id)).get)
 
   def continuationHeaderChains(header: Header, filterCond: Header => Boolean): List[List[Header]] = {
     @tailrec def loop(height: Int, acc: List[List[Header]]): List[List[Header]] =

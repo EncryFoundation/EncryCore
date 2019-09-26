@@ -229,7 +229,7 @@ trait HistoryCacheApi extends HistoryStorageApi {
     def commonBlocksThenSuffixes(otherChain: List[Header],
                                  startHeader: Header,
                                  limit: Int): (List[Header], List[Header]) = {
-      val until: Header => Boolean = header => otherChain.exists(_.id sameElements header.id)
+      def until(h: Header): Boolean = otherChain.exists(_.id sameElements h.id)
       val currentChain: List[Header] = computeForkChain(limit, startHeader, until)
       (currentChain, otherChain.dropWhile(elem => !(elem.id sameElements currentChain.head.id)))
     }

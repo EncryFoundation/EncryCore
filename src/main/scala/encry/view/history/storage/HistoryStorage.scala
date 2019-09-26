@@ -54,13 +54,13 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
   }
 
   def bulkInsert(version: Array[Byte],
-                 indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                 objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+                 indexesToInsert: List[(Array[Byte], Array[Byte])],
+                 objectsToInsert: List[PersistentModifier]): Unit = store match {
     case _: IODBHistoryWrapper =>
       insertObjects(objectsToInsert)
       insert(
         StorageVersion @@ version,
-        indexesToInsert.toList.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }
+        indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }
       )
     case _: VLDBWrapper =>
       insert(
@@ -69,7 +69,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
           StorageKey @@ key -> StorageValue @@ value
         } ++ objectsToInsert.map(obj =>
           StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
-        )).toList
+        ))
       )
   }
 
