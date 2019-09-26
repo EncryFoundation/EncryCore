@@ -3,6 +3,7 @@ package encry.view.actors
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props, Stash}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
+import akka.util.Timeout
 import encry.EncryApp.timeProvider
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
@@ -11,10 +12,11 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.view.ModifiersCache
-import encry.view.actors.HistoryApplicator.InitialStateHistoryWallet
+import encry.view.actors.HistoryApplicator.{GetHistory, InitialStateHistoryWallet}
 import encry.view.actors.NodeViewHolder.ReceivableMessages._
 import encry.view.actors.NodeViewHolder._
-import encry.view.actors.StateApplicator.StateForNVH
+import encry.view.actors.StateApplicator.{GetState, StateForNVH}
+import encry.view.actors.WalletApplicator.GetWallet
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
@@ -24,6 +26,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -37,14 +40,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
 
-  val walletApplicator: ActorRef = context.system.actorOf(WalletApplicator.props, "walletApplicator")
+  val walletApplicator: ActorRef = context.system.actorOf(WalletApplicator.props, "walletApplicator1")
 
   val historyApplicator: ActorRef = context.system.actorOf(
-    HistoryApplicator.props(self, walletApplicator, stateApplicator, settings, influxRef, timeProvider)
+    HistoryApplicator.props(self, walletApplicator, stateApplicator, settings, influxRef, dataHolder, timeProvider)
       .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
 
   lazy val stateApplicator: ActorRef = context.system.actorOf(
-    StateApplicator.props(settings, walletApplicator, self)
+    StateApplicator.props(settings, walletApplicator, dataHolder, self)
       .withDispatcher("state-applicator-dispatcher"), name = "stateApplicator")
 
   override def receive: Receive = awaitingHistory
@@ -67,11 +70,21 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     case msg@ModifierFromRemote(_) => historyApplicator ! msg
     case msg@LocallyGeneratedBlock(_) => historyApplicator ! msg
     case GetDataFromCurrentView(f) =>
-      println("get GetDataFromCurrentView")
-      f(CurrentView(history, state, wallet)) match {
-        case resultFuture: Future[_] => resultFuture.pipeTo(sender())
-        case result => sender() ! result
-      }
+      val senderRef = sender()
+      implicit val timeout: Timeout = 30 seconds
+      val newHistory = historyApplicator ? GetHistory
+      val newState = stateApplicator ? GetState
+      val newWallet = walletApplicator ? GetWallet
+      newHistory.foreach(
+        his => newState.foreach {
+          st => newWallet.foreach {
+            wal => f(CurrentView(his, st, wal)) match {
+              case result =>
+                senderRef ! result
+            }
+          }
+        }
+      )
     case GetNodeViewChanges(historyL, stateL, _) =>
       if (historyL) sender() ! ChangedHistory(history)
       if (stateL) sender() ! ChangedState(state)

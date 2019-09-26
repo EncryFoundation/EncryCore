@@ -84,6 +84,7 @@ object InfoApiRoute {
                    constants: Constants
                   ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
+    val stateRoot: Option[String] = readers.s.map(_.tree.rootHash).map(Algos.encode)
     val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     Map(
       "name"                      -> nodeName.asJson,
@@ -95,6 +96,7 @@ object InfoApiRoute {
       "difficulty"                -> block.map(_.header.difficulty.toString)
         .getOrElse(constants.InitialDifficulty.toString).asJson,
       "unconfirmedCount"          -> mempoolSize.asJson,
+      "stateRoot"                 -> stateRoot.asJson,
       "stateType"                 -> stateType.asJson,
       "stateVersion"              -> stateVersion.asJson,
       "isMining"                  -> minerInfo.isMining.asJson,

@@ -96,6 +96,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
         case None =>
           logger.info("Candidate is empty! Producing new candidate!")
           logger.info("send")
+          Thread.sleep(1000)
           produceCandidate()
       }
     case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
@@ -197,15 +198,12 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     })
       .getOrElse(settings.constants.InitialDifficulty)
 
-    val prevVersion = view.state.tree.storage.currentVersion
+    logger.info(s"Before test appl in miner: ${Algos.encode(view.state.tree.rootHash)}")
 
-    val stateRoot = view.state.tree.insertAndDeleteMany(
-      StorageVersion @@ Random.randomBytes(),
+    val stateRoot = view.state.tree.getOperationsRootHash(
       combinedStateChange.outputsToDb.toList,
       combinedStateChange.inputsToDb.toList
-    )._1.rootHash
-
-    view.state.rollbackTo(VersionTag !@@ prevVersion)
+    )
 
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, settings.constants.Version, txs, timestamp, difficulty, stateRoot)
@@ -217,7 +215,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     candidate
   }
 
-  def produceCandidate(): Unit =
+  def produceCandidate(): Unit = {
     nodeViewHolder ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
@@ -242,6 +240,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
           } else CandidateEnvelope.empty
         candidate
     }
+  }
 }
 
 object Miner {

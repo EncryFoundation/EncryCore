@@ -46,7 +46,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         setToZeroInsertDirection(insert(prevRoot, keyToInsert, valueToInsert))
     }
-    println(s"new root getting: ${(System.currentTimeMillis() - startTime)/1000L} s")
     val deletedNodesUpdated = deletedNodes.filterNot(insertedNodes.contains)
     val newInserted = insertedNodes -- deletedNodesUpdated
     val shadowedRoot = ShadowNode.childsToShadowNode(newRoot)
@@ -57,6 +56,24 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       deletedNodesUpdated.map(key => StorageKey @@ Algos.decode(key).get)
     )
     (AvlTree(shadowedRoot, storage), insertedNodes, deletedNodes)
+  }
+
+  def getOperationsRootHash(toInsert: List[(K, V)],
+                            toDelete: List[K])
+                           (implicit kSer: Serializer[K],
+                            vSer: Serializer[V],
+                            kM: Monoid[K],
+                            vM: Monoid[V]): Array[Byte] = {
+    val rootAfterDelete = toDelete.foldLeft(rootNode) {
+      case (prevRoot, toDelete) => delete(toDelete, prevRoot)
+    }
+    val newRoot = toInsert.foldLeft(rootAfterDelete){
+      case (prevRoot, (keyToInsert, valueToInsert)) =>
+        setToZeroInsertDirection(insert(prevRoot, keyToInsert, valueToInsert))
+    }
+    insertedNodes = Map.empty[String, Node[K, V]]
+    deletedNodes = List.empty[String]
+    newRoot.hash
   }
 
   def insert(k: K, v: V): AvlTree[K, V] = {
