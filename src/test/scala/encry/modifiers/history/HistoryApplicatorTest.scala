@@ -46,7 +46,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       .flatMap(blockToModifiers)
       .foreach(historyApplicator ! ModifierFromRemote(_))
 
-    Thread.sleep(5000 + transQty/30)
+    Thread.sleep(3000 + transQty/30)
     //receiveN(6 * 2, 120 seconds)
 
     history.getBestBlockHeight shouldBe 4
