@@ -46,7 +46,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       .flatMap(blockToModifiers)
       .foreach(historyApplicator ! ModifierFromRemote(_))
 
-    receiveN(6 * 2, 120 seconds)
+    Thread.sleep(5000 + transQty/30)
+    //receiveN(6 * 2, 120 seconds)
 
     history.getBestBlockHeight shouldBe 4
     history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(chain(4).id))
@@ -110,11 +111,9 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-//      receiveN(blockQty * 2, timeout).forall { case _: SemanticallySuccessfulModifier => true }
-//      chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
+      Thread.sleep(5000)
 
       expectMsg(timeout, FullBlockChainIsSynced())
-
       history.getBestBlockHeight shouldBe blockQty - 1
     }
 
@@ -137,7 +136,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       historyApplicator.underlyingActor.modifiersQueue.size should be <= settings.levelDB.maxVersions
 
-      receiveN((settings.levelDB.maxVersions + overQty) * 2, 120 seconds)
+      Thread.sleep(10000)
+      //receiveN((settings.levelDB.maxVersions + overQty) * 2, 120 seconds)
 
       history.getBestBlockHeight shouldBe settings.levelDB.maxVersions + overQty - 1
     }
