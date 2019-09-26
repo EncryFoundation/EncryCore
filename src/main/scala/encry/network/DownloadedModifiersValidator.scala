@@ -35,13 +35,14 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
     case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
       filteredModifiers.foreach { case (id, bytes) =>
         ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
-          case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize) =>
+          case Success(modifier) if ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize).isSuccess =>
             logger.debug(s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
               s"Sending validated modifier to NodeViewHolder")
             influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
             nodeViewHolder ! ModifierFromRemote(modifier)
           case Success(modifier) =>
-            logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of: isSyntacticallyValid = false")
+            logger.info(s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of:" +
+              s" ${ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize)}")
             peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
             nodeViewSync ! InvalidModifier(id)
           case Failure(ex) =>
@@ -57,7 +58,7 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
           Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
             case Success(tx) if tx.semanticValidity.isSuccess => memoryPoolRef ! NewTransaction(tx)
             case Success(tx) =>
-              logger.info(s"Payload with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
+              logger.info(s"Transaction with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
               context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
               nodeViewSync ! InvalidModifier(id)
             case Failure(ex) =>

@@ -8,7 +8,7 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.ModifierAppendedToHistory
+import encry.stats.StatsSender.{BestHeightByBlocks, BestHeightByHeaders, ModifierAppendedToHistory}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
@@ -21,10 +21,11 @@ import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 
@@ -66,6 +67,11 @@ class HistoryApplicator(history: History,
 
     case NeedToReportAsValid(modifier) =>
       logger.info(s"Modifier ${modifier.encodedId} should be marked as valid.")
+      influxRef.foreach(ref =>
+        modifier match {
+          case h: Header => ref ! BestHeightByHeaders(h.height)
+          case b: Block  => ref ! BestHeightByBlocks(b.header.height)
+        })
       historyInReceive.reportModifierIsValid(modifier)
 
     case ModifierToHistoryAppending(modifier, isLocallyGenerated) =>
@@ -75,6 +81,12 @@ class HistoryApplicator(history: History,
           currentNumberOfAppliedModifiers -= 1
           logger.info(s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.error}." +
             s" Current currentNumberOfAppliedModifiers $currentNumberOfAppliedModifiers.")
+          influxRef.foreach(ref =>
+            ref ! ModifierAppendedToHistory(modifier match {
+              case _: Header  => true
+              case _: Payload => false
+            }, success = false)
+          )
           context.system.eventStream.publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.error))))
         case Right((historyNew, progressInfo)) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
@@ -92,12 +104,19 @@ class HistoryApplicator(history: History,
           if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
           stateApplicator ! NotificationAboutNewModifier
-          getModifierForApplying(historyInReceive)
           nodeViewHolder ! UpdateHistory(historyNew)
+          getModifierForApplying(historyInReceive)
           context.become(workBehaviour(historyNew))
         case Right((historyNew, progressInfo)) =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history. Modifiers to apply collection is empty.")
           if (!isLocallyGenerated) requestDownloads(progressInfo)
+          influxRef.foreach(ref =>
+            modifier match {
+              case h: Header =>
+                ref ! ModifierAppendedToHistory(isHeader = true, success = true)
+                ref ! BestHeightByHeaders(h.height)
+              case _ => false
+            })
           context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
           currentNumberOfAppliedModifiers -= 1
           getModifierForApplying(historyInReceive)

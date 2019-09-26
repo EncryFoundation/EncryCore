@@ -43,21 +43,23 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
       putToHistory(p)
     }
 
-  private def processBlock(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] =
+  private def processBlock(block: Block): Either[HistoryProcessingError, HistoryProcessingInfo] = {
+    addBlockToCacheIfNecessary(block)
     calculateBestFullChain(block) match {
       case Nil =>
         logger.info(s"Best full chain for block ${block.encodedId} was empty. Returned same history case class.")
         HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight[HistoryProcessingError]
-      case fullChain@_ :+ last if isValidFirstBlock(block.header) =>
-        logger.info(s"Got first valid block ${block.encodedId}. Have been starting its applying.")
-        processFirstBlock(last.id, fullChain, block)
-      case _ :+ last if isBestBlockDefined && isBetter(last.id) =>
+      case _ :+ last if isBestBlockDefined && isBetter(last.header) =>
         logger.info(s"Got block ${block.encodedId} from best chain. Have been starting its applying.")
         processBlockFromBestChain(last.header, block)
+      case fullChain@_ :+ last if isValidFirstBlock(block.header.height) =>
+        logger.info(s"Got first valid block ${block.encodedId}. Have been starting its applying.")
+        processFirstBlock(last.id, fullChain, block)
       case _ =>
         logger.info(s"Got block ${block.encodedId} from non best chain. Have been starting its applying.")
         processBlockFromNonBestChain(block)
     }
+  }
 
   private def processFirstBlock(newBestHeaderId: ModifierId,
                                 toApply: List[PersistentModifier],
@@ -143,16 +145,14 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
 
   def continuationHeaderChains(header: Header, filterCond: Header => Boolean): List[List[Header]] = {
     @tailrec def loop(height: Int, acc: List[List[Header]]): List[List[Header]] =
-      headerIdsAtHeight(height + 1)
-        .view
-        .flatMap(headerByIdOpt).filter(filterCond).toList match {
+      headerIdsAtHeight(height + 1).view.flatMap(headerByIdOpt).filter(filterCond).toList match {
         case Nil => acc
-        case nextHeightHeaders@ ::(_, _) =>
+        case nextHeightHeaders@ _ =>
           val updatedChains: List[List[Header]] = nextHeightHeaders.flatMap(header =>
             acc.find(_.headOption.exists(_.id sameElements header.parentId)).map(header :: _))
-          val notUpdated: List[List[Header]] = acc.filter(chain =>
-            !nextHeightHeaders.exists(_.parentId sameElements chain.head.id))
-          loop(height + 1, updatedChains ::: notUpdated)
+          val notUpdatedChains: List[List[Header]] =
+            acc.filterNot(_.headOption.exists(h => nextHeightHeaders.exists(_.parentId sameElements h.id)))
+          loop(height + 1, updatedChains ::: notUpdatedChains)
       }
 
     loop(header.height, List(List(header)))
@@ -220,12 +220,11 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
     HistoryProcessingInfo(blockDownloadProcessor, isHeaderChainSynced).asRight
   }
 
-  private def isBetter(id: ModifierId): Boolean = (for {
+  private def isBetter(header: Header): Boolean = (for {
     bestFullBlockId    <- bestBlockIdStorageApi
-    heightOfThisHeader <- heightByHeaderStorageApi(id)
     prevBestScore      <- scoreOf(bestFullBlockId) //todo add best score inserting to storage
-    score              <- scoreOf(id)
-  } yield isBetterThan(bestBlockHeightStorageApi, heightOfThisHeader, score, prevBestScore)).getOrElse(false)
+    score              <- scoreOf(header.id)
+  } yield isBetterThan(header.height, bestBlockHeightStorageApi, score, prevBestScore)).getOrElse(false)
 
   private def nonBestHeaderIds(header: Header, score: Difficulty): List[(StorageKey, StorageValue)] = {
     logger.info(s"Header ${header.encodedId} was from non best chain.")
@@ -251,6 +250,6 @@ trait HistoryModifiersProcessors extends HistoryCacheApi {
     timeProvider.estimatedTime - h.timestamp <
       settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
 
-  private def isValidFirstBlock(header: Header): Boolean =
-    header.height == blockDownloadProcessor.minimalBlockHeight && bestBlockIdStorageApi.isEmpty
+  private def isValidFirstBlock(headerHeight: Int): Boolean =
+    headerHeight == blockDownloadProcessor.minimalBlockHeight && bestBlockIdStorageApi.isEmpty
 }

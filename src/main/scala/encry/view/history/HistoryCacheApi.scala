@@ -218,10 +218,10 @@ trait HistoryCacheApi extends HistoryStorageApi {
     @tailrec def loop(otherChain: List[Header],
                       numberBack: Int): Either[HistoryProcessingError, (List[Header], List[Header])] =
       commonBlocksThenSuffixes(otherChain, firstHeader, numberBack + heightDelta) match {
-        case (l1@ ::(head1, _), l2@ ::(head2, _)) if head1 == head2 => (l1 -> l2).asRight[HistoryProcessingError]
+        case l1@ (::(head1, _), ::(head2, _)) if head1 == head2 => l1.asRight[HistoryProcessingError]
         case _ =>
-          computeForkChain(numberBack, otherChain.head, _ => false) ::: otherChain.drop(1) match {
-            case l@ ::(_, _) if !otherChain.head.isGenesis => loop(l, l.length)
+          (computeForkChain(numberBack, otherChain.head, _ => false) ::: otherChain.drop(1)) match {
+            case l@ _ if !otherChain.head.isGenesis => loop(l, l.length)
             case _ => HistoryProcessingError("History has no best header after header application.").asLeft
           }
       }
@@ -231,7 +231,7 @@ trait HistoryCacheApi extends HistoryStorageApi {
                                  limit: Int): (List[Header], List[Header]) = {
       val until: Header => Boolean = header => otherChain.exists(_.id sameElements header.id)
       val currentChain: List[Header] = computeForkChain(limit, startHeader, until)
-      (currentChain, otherChain.dropWhile(_.id sameElements currentChain.head.id)) //todo check dropWhile correctness
+      (currentChain, otherChain.dropWhile(elem => !(elem.id sameElements currentChain.head.id)))
     }
 
     loop(List(secondsHeader), 2) //todo why 2?

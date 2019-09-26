@@ -35,6 +35,10 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
   val sdf: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   override def receive: Receive = {
+    case BestHeightByHeaders(h) =>
+      influxDB.write(influxDBSettings.udpPort, s"bestHeightByHeaders,nodeName=$nodeName value=$h")
+    case BestHeightByBlocks(h) =>
+      influxDB.write(influxDBSettings.udpPort, s"bestHeightByBlocks,nodeName=$nodeName value=$h")
     case BestHeaderInChain(fb) =>
       influxDB.write(
         influxDBSettings.udpPort,
@@ -141,6 +145,8 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
 }
 
 object StatsSender {
+  final case class BestHeightByHeaders(height: Int) extends AnyVal
+  final case class BestHeightByBlocks(height: Int) extends AnyVal
   final case class BestHeaderInChain(bestHeader: Header) extends AnyVal
   final case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
   final case class TransactionsInBlock(txsNum: Int) extends AnyVal

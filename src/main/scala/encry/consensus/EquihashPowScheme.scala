@@ -8,13 +8,16 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import scorex.crypto.hash.Digest32
-
 import scala.math.BigInt
 import cats.syntax.either._
 import encry.crypto.equihash.EquihashValidationErrors._
+import org.encryfoundation.common.utils.constants.Constants
 
-case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: Height, maxTarget: BigInt)
-  extends ConsensusScheme {
+final case class EquihashPowScheme(n: Char,
+                                   k: Char,
+                                   version: Byte,
+                                   preGenesisHeight: Height,
+                                   maxTarget: BigInt) extends ConsensusScheme {
 
   private val seed: Array[Byte] =
     "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
@@ -60,8 +63,18 @@ case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: 
   def verify(header: Header): Either[EquihashValidationErrors, Boolean] = Equihash
     .validateSolution(n, k, seed, Equihash.nonceToLeBytes(header.nonce), header.equihashSolution.indexedSeq)
 
-  override def realDifficulty(header: Header): Difficulty =
-    Difficulty @@ (maxTarget / BigInt(1, header.powHash))
+  override def realDifficulty(header: Header): Difficulty = Difficulty @@ (maxTarget / BigInt(1, header.powHash))
 
   override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"
+}
+
+object EquihashPowScheme {
+  def apply(constants: Constants): EquihashPowScheme =
+    new EquihashPowScheme(
+      constants.n,
+      constants.k,
+      constants.Version,
+      constants.PreGenesisHeight,
+      constants.MaxTarget
+    )
 }
