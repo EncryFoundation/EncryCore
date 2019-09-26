@@ -116,7 +116,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
       //Thread.sleep(3000)
-      receiveN((blockQty - 1) * 2, timeout)
+      receiveN(8 * 2, timeout)
       //checkFullBlockChainIsSynced((blockQty - 1) * 2)
       //expectMsg(timeout, FullBlockChainIsSynced())
       history.getBestBlockHeight shouldBe blockQty - 1
