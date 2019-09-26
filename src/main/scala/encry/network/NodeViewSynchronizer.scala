@@ -183,9 +183,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
-    case ChangedHistory(reader: History) if reader.isInstanceOf[History] =>
-      println(reader.isInstanceOf[History])
-      println("ChangedHistory")
+    case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
       dataHolder ! ChangedHistory(reader)
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
