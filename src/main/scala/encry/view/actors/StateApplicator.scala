@@ -159,7 +159,7 @@ class StateApplicator(settings: EncryAppSettings,
   def awaitingNewProgressInfo(block: Block, ui: UpdateInformation, toApply: Seq[PersistentModifier]): Receive = {
     case NewProgressInfoAfterMarkingAsInValid(pi) =>
       self ! StartModifiersApplying
-      logger.info(s"Switching into modifierApplication with toApply = ${toApply.map(_.encodedId).mkString(", ")}")
+      logger.debug(s"Switching into modifierApplication with toApply = ${toApply.map(_.encodedId).mkString(", ")}")
       context.become(
         modifierApplication(
           toApply.toList,

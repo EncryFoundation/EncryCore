@@ -75,7 +75,7 @@ class HistoryApplicator(history: History,
           context.system.eventStream.publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.getMessage))))
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
-          logger.info(s"Progress info after appending ${modifier.encodedId} to history is $progressInfo")
+          logger.debug(s"Progress info after appending ${modifier.encodedId} to history is $progressInfo")
           modifiersQueue = modifiersQueue.enqueue(modifier.encodedId -> progressInfo)
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
