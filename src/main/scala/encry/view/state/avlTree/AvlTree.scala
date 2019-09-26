@@ -8,8 +8,6 @@ import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import org.encryfoundation.common.utils.Algos
-import scorex.crypto.hash.Digest32
-import scorex.utils.Random
 
 import scala.collection.immutable.HashMap
 import scala.util.Try
@@ -44,7 +42,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     }
     val newRoot = toInsert.foldLeft(rootAfterDelete){
       case (prevRoot, (keyToInsert, valueToInsert)) =>
-        setToZeroInsertDirection(insert(prevRoot, keyToInsert, valueToInsert))
+        insert(prevRoot, keyToInsert, valueToInsert)
     }
     val deletedNodesUpdated = deletedNodes.filterNot(insertedNodes.contains)
     val newInserted = insertedNodes -- deletedNodesUpdated
@@ -69,7 +67,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     }
     val newRoot = toInsert.foldLeft(rootAfterDelete){
       case (prevRoot, (keyToInsert, valueToInsert)) =>
-        setToZeroInsertDirection(insert(prevRoot, keyToInsert, valueToInsert))
+        insert(prevRoot, keyToInsert, valueToInsert)
     }
     insertedNodes = Map.empty[String, Node[K, V]]
     deletedNodes = List.empty[String]
@@ -78,7 +76,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   def insert(k: K, v: V): AvlTree[K, V] = {
     val newNode = balance(insert(rootNode, k, v))
-    AvlTree(setToZeroInsertDirection(newNode), storage)
+    AvlTree(newNode, storage)
   }
 
   def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] = storage.get(StorageKey !@@ Algos.hash(kSer.toBytes(k))).map(vSer.fromBytes)
@@ -249,23 +247,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     //val newDeleted = (deletedNodes ::: toDelete).diff(toInsert.keySet.toList)
     insertedNodes ++= toInsert
     deletedNodes :::= toDelete
-  }
-
-  private def setToZeroInsertDirection(node: Node[K, V]): Node[K, V] = node match {
-    case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
-      setToZeroInsertDirection(restoredNode)
-    case internalNode: InternalNode[K, V] =>
-      val newNode = internalNode.updateChilds(
-        newLeftChild = internalNode.leftChild.map(setToZeroInsertDirection),
-        newRightChild = internalNode.rightChild.map(setToZeroInsertDirection)
-      )
-      addToActionInfo(
-        List(Algos.encode(newNode.hash) -> newNode),
-        List(Algos.encode(internalNode.hash))
-      )
-      newNode
-    case leaf => leaf
   }
 
   private def balance(node: Node[K, V]): Node[K, V] = node match {
