@@ -47,7 +47,6 @@ class StateApplicator(settings: EncryAppSettings,
         case header: Header =>
           state.lastBlockTimestamp = header.timestamp
           historyApplicator ! NeedToReportAsValid(header)
-          println("stateApplicator.SemanticallySuccessfulModifier")
           context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
           val newToApply: List[PersistentModifier] = toApply.drop(1)
           if (newToApply.nonEmpty) {
@@ -135,7 +134,6 @@ class StateApplicator(settings: EncryAppSettings,
           combinedStateChange.outputsToDb.toList,
           combinedStateChange.inputsToDb.toList
         )
-        println("stateApplicator.SemanticallySuccessfulModifier")
         context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
         historyApplicator ! NeedToReportAsValid(block)
         influxRef.foreach { ref =>
@@ -158,7 +156,6 @@ class StateApplicator(settings: EncryAppSettings,
     case TransactionValidatedFailure(tx, ex) =>
       logger.info(s"Transaction ${tx.encodedId} failed in validation by state.")
       context.children.foreach(_ ! Kill)
-      println("stateApplicator.SemanticallyFailedModification")
       context.system.eventStream.publish(SemanticallyFailedModification(block, List(StateModifierApplyError(s"$ex"))))
       historyApplicator ! NeedToReportAsInValid(block)
       context.become(awaitingNewProgressInfo(block, ui, toApply))
@@ -201,12 +198,10 @@ class StateApplicator(settings: EncryAppSettings,
         else Success(state) -> suffixApplied
       stateToApplyTry match {
         case Failure(exception) =>
-          println("stateApplicator.RollbackFailed")
           context.system.eventStream.publish(RollbackFailed(branchPointOpt))
           EncryApp.forceStopApplication(500, s"Rollback failed: $exception.")
         case Success(stateToApply) =>
           logger.info(s"Successfully applied to the state. Starting modifiers applying.")
-          println("stateApplicator.RollbackSucceed")
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
           self ! StartModifiersApplying
           context.become(modifierApplication(
@@ -228,7 +223,6 @@ class StateApplicator(settings: EncryAppSettings,
   def requestDownloads(pi: ProgressInfo): Unit = pi.toDownload.foreach { case (tid, id) =>
     if (tid != Transaction.modifierTypeId)
       logger.debug(s"StateApplicator call requestDownloads for modifier ${Algos.encode(id)} of type $tid")
-    println("stateApplicator.DownloadRequest")
     context.system.eventStream.publish(DownloadRequest(tid, id))
   }
 }

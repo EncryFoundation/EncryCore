@@ -1,7 +1,7 @@
 package encry.modifiers
 
 import encry.consensus.EquihashPowScheme
-import encry.crypto.equihash.{Equihash, EquihashValidationErrors}
+import encry.crypto.equihash.EquihashValidationErrors
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
@@ -16,6 +16,7 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryPropositio
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
+
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
@@ -23,7 +24,6 @@ import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
-import scala.math.BigInt
 import scala.util.{Random => Scarand}
 
 trait InstanceFactory extends Keys with EncryGenerator {
@@ -214,8 +214,6 @@ trait InstanceFactory extends Keys with EncryGenerator {
         }
     }._2
   }
-
-
 
   def generateDummyHistory(settings: EncryAppSettings): History = {
 

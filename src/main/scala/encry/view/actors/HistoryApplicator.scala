@@ -49,12 +49,10 @@ class HistoryApplicator(history: History,
 
   override def receive: Receive = {
     case ModifierFromRemote(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
-      //println("ModifierFromRemote")
       ModifiersCache.put(toKey(mod.id), mod, history)
       getModifierForApplying()
 
     case ModifierFromRemote(modifier) =>
-      //println(s"history.isModifierDefined(mod.id): ${history.isModifierDefined(modifier.id)} ModifiersCache.contains(toKey(mod.id): ${ModifiersCache.contains(toKey(modifier.id))}")
       logger.info(s"Modifier ${modifier.encodedId} contains in history or in modifiers cache. Reject it.")
 
     case LocallyGeneratedBlock(block) =>
@@ -74,12 +72,10 @@ class HistoryApplicator(history: History,
           currentNumberOfAppliedModifiers -= 1
           logger.info(s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.getMessage}." +
             s" Current currentNumberOfAppliedModifiers $currentNumberOfAppliedModifiers.")
-          println("SyntacticallyFailedModification")
           context.system.eventStream.publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.getMessage))))
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
           modifiersQueue = modifiersQueue.enqueue(modifier.encodedId -> progressInfo)
-          println(s"modifiersQueue.enqueue ${modifiersQueue.size}")
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
           influxRef.foreach(ref =>
@@ -92,13 +88,11 @@ class HistoryApplicator(history: History,
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
           if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
-          //println("history.append success")
           stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying()
         case Right(progressInfo) =>
           logger.info(s"Progress info is empty after appending to the state.")
           if (!isLocallyGenerated) requestDownloads(progressInfo)
-          println("SemanticallySuccessfulModifier")
           context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
           currentNumberOfAppliedModifiers -= 1
           getModifierForApplying()
@@ -111,13 +105,11 @@ class HistoryApplicator(history: History,
         sender() ! StartModifiersApplicationOnStateApplicator(pi, IndexedSeq.empty[PersistentModifier])
         modifiersQueue = newQueue
       }
-    println(s"modifiersQueue.dequeue ${modifiersQueue.size}")
 
     case NotificationAboutSuccessfullyAppliedModifier =>
       if (history.isFullChainSynced) {
         logger.info(s"BlockChain is synced on state applicator at height ${history.getBestHeaderHeight}!")
         ModifiersCache.setChainSynced()
-        println("FullBlockChainIsSynced")
         context.system.eventStream.publish(FullBlockChainIsSynced())
       }
       currentNumberOfAppliedModifiers -= 1
@@ -131,44 +123,37 @@ class HistoryApplicator(history: History,
       getModifierForApplying()
 
     case NeedToReportAsInValid(block) =>
-      //println(s"NeedToReportAsInValid")
       logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId}.")
       currentNumberOfAppliedModifiers -= 1
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
-      //println(s"ha history.height: ${history.getBestBlockHeight}")
 
     case nonsense => logger.info(s"History applicator actor got from $sender message $nonsense.")
   }
 
-  def getModifierForApplying(): Unit = {
-    //println(s"currentNumberOfAppliedModifiers: $currentNumberOfAppliedModifiers")
-    //println(s"modifiersQueue.size: ${modifiersQueue.size}")
-    if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
-      logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
-      if (locallyGeneratedModifiers.nonEmpty) locallyGeneratedModifiers.dequeueOption.foreach {
-        case (modifier, newQueue) =>
-          locallyGeneratedModifiers = newQueue
-          currentNumberOfAppliedModifiers += 1
-          logger.debug(s"Found new local modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
-            s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
-            s" Current locally generated modifiers size ${locallyGeneratedModifiers.size}.")
-          self ! ModifierToHistoryAppending(modifier, isLocallyGenerated = true)
-      }
-      else ModifiersCache.popCandidate(history).foreach { modifier =>
+  def getModifierForApplying(): Unit = if (currentNumberOfAppliedModifiers < setting.levelDB.maxVersions) {
+    logger.debug(s"It's possible to append new modifier to history. Trying to get new one from the cache.")
+    if (locallyGeneratedModifiers.nonEmpty) locallyGeneratedModifiers.dequeueOption.foreach {
+      case (modifier, newQueue) =>
+        locallyGeneratedModifiers = newQueue
         currentNumberOfAppliedModifiers += 1
-        logger.debug(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
+        logger.debug(s"Found new local modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
           s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
-          s" Current mod cache size ${ModifiersCache.size}")
-        self ! ModifierToHistoryAppending(modifier)
-      }
+          s" Current locally generated modifiers size ${locallyGeneratedModifiers.size}.")
+        self ! ModifierToHistoryAppending(modifier, isLocallyGenerated = true)
+    }
+    else ModifiersCache.popCandidate(history).foreach { modifier =>
+      currentNumberOfAppliedModifiers += 1
+      logger.debug(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
+        s"currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
+        s" Current mod cache size ${ModifiersCache.size}")
+      self ! ModifierToHistoryAppending(modifier)
     }
   }
 
   def requestDownloads(pi: ProgressInfo): Unit = pi.toDownload.foreach { case (tid, id) =>
     if (tid != Transaction.modifierTypeId)
       logger.debug(s"HistoryApplicator call requestDownloads for modifier ${Algos.encode(id)} of type $tid")
-    println("DownloadRequest")
     context.system.eventStream.publish(DownloadRequest(tid, id))
   }
 
