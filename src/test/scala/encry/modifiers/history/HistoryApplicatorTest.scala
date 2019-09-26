@@ -5,6 +5,7 @@ import java.io.File
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import encry.modifiers.InstanceFactory
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.Settings
 import encry.utils.ChainGenerator._
@@ -31,14 +32,13 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
   def blockToModifiers(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
 
   def rollbackTest(transQty: Int) {
-
     val history: History = generateDummyHistory(settings)
     //generate invalid blocks begining from 6 blocks
-    val (genesisState, state, chain) = genChain(privKey, dir, settings, 10, transQty, Some(6))
+    val (initialState, state, chain) = genChain(privKey, dir, settings, 10, transQty, Some(6))
 
     val historyApplicator: TestActorRef[HistoryApplicator] =
       TestActorRef[HistoryApplicator](
-        HistoryApplicator.props(history, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
+        HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
       )
     system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
 
@@ -61,7 +61,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 //        prevHistory.reportModifierIsValid(block)
 //    }
 
-  //def checkFullBlockChainIsSynced(qty: Int): Unit = (0 until qty).foreach(_ => expectMsg(timeout, FullBlockChainIsSynced()))
+  def checkFullBlockChainIsSynced(qty: Int): Unit = (0 until qty).foreach(_ => expectMsg(timeout, FullBlockChainIsSynced()))
 
   val dir: File = FileHelper.getRandomTempDir
   val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
@@ -77,54 +77,52 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       val blockQty = 10
       val history: History = generateDummyHistory(settings)
-      val (genesisState, state, chain) = genChain(privKey, dir, settings, blockQty)
+      val (initialState, state, chain) = genChain(privKey, dir, settings, blockQty)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(history, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
-      system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
 
-      receiveN(blockQty * 2, 30 seconds)
+      checkFullBlockChainIsSynced(blockQty * 2)
+      //receiveN(blockQty * 2, 30 seconds)
       history.getBestBlockHeight shouldBe blockQty - 1
     }
 
-    "check SemanticallySuccessfulModifier per block" in {
+    "apply remote blocks and check SemanticallySuccessfulModifier" in {
 
       val blockQty = 2
       val initialHistory: History = generateDummyHistory(settings)
-      val (genesisState, state, chain) = genChain(privKey, dir, settings, blockQty)
+      val (initialState, state, chain) = genChain(privKey, dir, settings, blockQty)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(initialHistory, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(initialHistory, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
       system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
 
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      //println(s"test.modifiersQueue: ${historyApplicator.underlyingActor.modifiersQueue.size}")
-      //println(s"test.currentNumberOfAppliedModifiers: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
-
       receiveN(blockQty * 2, timeout).forall { case _: SemanticallySuccessfulModifier => true }
     }
 
-    "check queue for rollback height" in {
+    "apply remote blocks and check queue for rollback height" in {
 
       val overQty = 30
 
       val history: History = generateDummyHistory(settings)
-      val (genesisState, state, chain) = genChain(privKey, dir, settings, settings.levelDB.maxVersions + overQty, 10)
+      val (initialState, state, chain) = genChain(privKey, dir, settings, settings.levelDB.maxVersions + overQty, 10)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(history, settings, genesisState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
       system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
 
@@ -140,11 +138,11 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       history.getBestBlockHeight shouldBe settings.levelDB.maxVersions + overQty - 1
     }
 
-    "check history rollback for invalid state" in {
+    "apply remote blocks and check history rollback for invalid state" in {
       rollbackTest(100)
     }
 
-    "check history rollback on fat blocks" in {
+    "apply remote blocks and check history rollback on fat blocks" in {
       rollbackTest(5000)
     }
 

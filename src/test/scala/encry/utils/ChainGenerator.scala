@@ -145,11 +145,11 @@ object ChainGenerator {
     val genesisBlock: Block = generateGenesisBlock(Height @@ 0)
 
     val state: UtxoState = utxoFromBoxHolder(BoxHolder(Seq.empty), dir, None, settings, VersionalStorage.LevelDB)
-      .applyModifier(genesisBlock).right.get
+    val genesisState = state.applyModifier(genesisBlock).right.get
 
     val (forkBlock, forkBoxes) =
       genForkBlock(transPerBlock, genesisBlock, genesisBlock.payload.txs.head.newBoxes.map(_.asInstanceOf[AssetBox]).head, randomAddress)
-    val forkState = state.applyModifier(forkBlock).right.get
+    val forkState = genesisState.applyModifier(forkBlock).right.get
 
     val (chain, _, newState, _) =
       (2 until blockQty).foldLeft(List(genesisBlock, forkBlock), forkBlock, forkState, forkBoxes) {
