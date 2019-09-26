@@ -19,16 +19,11 @@ import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import io.iohk.iodb.LSMStore
 import cats.data.Validated
-import cats.{Order, Traverse}
 import cats.syntax.traverse._
 import cats.instances.list._
-import cats.kernel.Monoid
 import cats.syntax.either._
-import cats.syntax.validated._
 import encry.view.state.UtxoState.StateChange
-import encry.view.state.avlTree.AvlVersionalStorage
-import encry.view.state.avlTree.utils.implicits.Hashable
-import org.bouncycastle.util.Arrays
+import encry.view.state.avlTree.{AvlTree, AvlVersionalStorage}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -43,27 +38,23 @@ import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
+import encry.view.state.avlTree.utils.implicits.Instances._
 import scala.util.Try
 
-final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
-                           constants: Constants,
-                           height: Height,
-                           lastBlockTimestamp: Long) extends StrictLogging with UtxoStateReader with AutoCloseable {
+final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
+                           constants: Constants) extends StrictLogging with UtxoStateReader with AutoCloseable {
 
   def applyValidModifier(block: Block): UtxoState = {
     logger.info(s"Block validated successfully. Inserting changes to storage.")
     val combinedStateChange: StateChange = combineAll(block.payload.txs.toList.map(UtxoState.tx2StateChange))
-    storage.insert(
+    val newTree = tree.insertAndDeleteMany(
       StorageVersion !@@ block.id,
       combinedStateChange.outputsToDb.toList,
       combinedStateChange.inputsToDb.toList
     )
     UtxoState(
-      storage,
+      newTree._1,
       constants,
-      Height @@ block.header.height,
-      block.header.timestamp
     )
   }
 
@@ -72,16 +63,17 @@ final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(storage, constants, height, header.timestamp).asRight[List[ModifierApplyError]]
+        UtxoState(tree, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height,
+          if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
+            totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height,
             constants.InitialEmissionAmount, constants.EmissionEpochLength, constants.EmissionDecay))
-          else validate(tx)
+          else validate(tx, block.header.timestamp, Height @@ block.header.height)
         }).toList
           .traverse(Validated.fromEither)
           .toEither
@@ -93,17 +85,15 @@ final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
             val combinedStateChange: UtxoState.StateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
             logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart) / 1000L} s")
             val insertTimestart = System.currentTimeMillis()
-            storage.insert(
+            val newTree = tree.insertAndDeleteMany(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
               combinedStateChange.inputsToDb.toList
             )
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
             UtxoState(
-              storage,
+              newTree._1,
               constants,
-              Height @@ block.header.height,
-              block.header.timestamp
             ).asRight[List[ModifierApplyError]]
           }
         )
@@ -112,21 +102,15 @@ final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
     result
   }
 
-  def rollbackTo(version: VersionTag): Try[UtxoState] = Try(
-    storage.versions.find(_ sameElements version) match {
-      case Some(_) =>
-        logger.info(s"Trying rollback to version ${Algos.encode(version)}.")
-        storage.rollbackTo(StorageVersion !@@ version)
-        val stateHeight: Height = Height @@ storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
-          .map(d => Ints.fromByteArray(d)).getOrElse(constants.GenesisHeight)
-        this.copy(height = stateHeight)
-      case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
-    })
+  def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
+    val rollbackedAvl = tree.rollbackTo[StorageKey, StorageValue](StorageVersion !@@ version).get
+    UtxoState(rollbackedAvl, constants)
+  }
 
-  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
+  def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
-      val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)
+      val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => tree.get(StorageKey !@@ input.boxId)
         .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input))
         .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
@@ -175,7 +159,7 @@ final case class UtxoState(storage: AvlVersionalStorage[ADKey, Array[Byte]],
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
 
-  def close(): Unit = storage.close()
+  def close(): Unit = tree.close()
 }
 
 object UtxoState extends StrictLogging {
@@ -208,16 +192,10 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
     }
-    val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
-      .map(d => Ints.fromByteArray(d)).getOrElse(settings.constants.PreGenesisHeight)
-    val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
-      .map(d => Longs.fromByteArray(d)).getOrElse(0L)
     logger.info(s"State created.")
     UtxoState(
-      AvlVersionalStorage[ADKey, Array[Byte]](versionalStorage),
-      settings.constants,
-      Height @@ stateHeight,
-      lastBlockTimestamp
+      AvlTree[StorageKey, StorageValue](versionalStorage),
+      settings.constants
     )
   }
 
@@ -236,6 +214,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-    UtxoState(AvlVersionalStorage[ADKey, Array[Byte]](storage), settings.constants, settings.constants.PreGenesisHeight, 0L)
+    UtxoState(AvlTree[StorageKey, StorageValue](storage), settings.constants)
   }
 }

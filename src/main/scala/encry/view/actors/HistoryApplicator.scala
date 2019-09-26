@@ -32,6 +32,7 @@ import scala.util.{Failure, Success}
 
 class HistoryApplicator(nodeViewHolder: ActorRef,
                         walletApplicator: ActorRef,
+                        stateApplicator: ActorRef,
                         settings: EncryAppSettings,
                         influxRef: Option[ActorRef],
                         networkTimeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
@@ -49,7 +50,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
   def initializeHistory(history: History): Receive = {
     case HistoryInitializedSuccessfully =>
       logger.info(s"History initialized successfully. Published history link.")
-      context.system.eventStream.publish(InitialInfoForStateInitialization(history, networkTimeProvider))
+      stateApplicator ! InitialInfoForStateInitialization(history, self, networkTimeProvider)
     case StateApplicatorStarted(historyUpdated, state, wallet) =>
       logger.info(s"History applicator got confirmation that state initialized successfully.")
       nodeViewHolder ! InitialStateHistoryWallet(historyUpdated, wallet, state)
@@ -87,7 +88,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
             walletApplicator ! WalletNeedRollbackTo(VersionTag !@@ progressInfo.branchPoint.get)
           if (progressInfo.toRemove.nonEmpty)
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
-          context.system.eventStream.publish(NotificationAboutNewModifier())
+          stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying(history)
         case Right(progressInfo) =>
           logger.info(s"Progress info is empty after appending to the state.")
@@ -196,11 +197,11 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
 
 object HistoryApplicator {
 
-  final case class InitialInfoForStateInitialization(history: History, networkTimeProvider: NetworkTimeProvider)
+  final case class InitialInfoForStateInitialization(history: History, historyAppl: ActorRef, networkTimeProvider: NetworkTimeProvider)
 
   case object HistoryInitializedSuccessfully
 
-  final case class NotificationAboutNewModifier()
+  final case object NotificationAboutNewModifier
 
   final case class InitialStateHistoryWallet(history: History, wallet: EncryWallet, state: UtxoState)
 
@@ -222,6 +223,7 @@ object HistoryApplicator {
 
   def props(nodeViewHolder: ActorRef,
             walletApplicator: ActorRef,
+            stateRef: ActorRef,
             settings: EncryAppSettings,
             influxRef: Option[ActorRef],
             networkTimeProvider: NetworkTimeProvider): Props =
@@ -229,6 +231,7 @@ object HistoryApplicator {
       new HistoryApplicator(
         nodeViewHolder,
         walletApplicator,
+        stateRef,
         settings,
         influxRef,
         networkTimeProvider

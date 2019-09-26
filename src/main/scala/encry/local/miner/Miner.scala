@@ -23,6 +23,7 @@ import encry.view.history.History
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+import encry.utils.implicits.UTXO._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -32,6 +33,12 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import encry.EncryApp.{ec, nodeViewHolder, timeProvider}
+import encry.storage.VersionalStorage.StorageVersion
+import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.implicits.UTXO.combineAll
+import org.encryfoundation.common.utils.constants.TestNetConstants
+import scorex.utils.Random
+import encry.view.state.avlTree.utils.implicits.Instances._
 
 import scala.collection._
 import scala.concurrent.duration._
@@ -88,6 +95,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None =>
           logger.info("Candidate is empty! Producing new candidate!")
+          logger.info("send")
           produceCandidate()
       }
     case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
@@ -160,7 +168,8 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
 
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x).isRight).distinct
+    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
+    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x, System.currentTimeMillis(), height).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
         if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
@@ -168,15 +177,18 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
         } else usedInputsIds -> acc
     }._2
     val timestamp: Time = timeProvider.estimatedTime
-    val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
     val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
-    val supplyTotal: Amount = EncrySupplyController.supplyAt(view.state.height, settings.constants.InitialEmissionAmount,
+    val stateHeight = bestHeaderOpt.map(header => Height @@ header.height)
+      .getOrElse(TestNetConstants.GenesisHeight)
+    val supplyTotal: Amount = EncrySupplyController.supplyAt(stateHeight, settings.constants.InitialEmissionAmount,
       settings.constants.EmissionEpochLength, settings.constants.EmissionDecay)
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
     val coinbase: Transaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, view.state.height)
+      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, stateHeight)
 
     val txs: Seq[Transaction] = filteredTxsWithoutDuplicateInputs.sortBy(_.timestamp) :+ coinbase
+
+    val combinedStateChange: UtxoState.StateChange = combineAll(txs.map(UtxoState.tx2StateChange).toList)
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
       case Right(value) => value
@@ -184,8 +196,18 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     })
       .getOrElse(settings.constants.InitialDifficulty)
 
+    val prevVersion = view.state.tree.storage.currentVersion
+
+    val stateRoot = view.state.tree.insertAndDeleteMany(
+      StorageVersion @@ Random.randomBytes(),
+      combinedStateChange.outputsToDb.toList,
+      combinedStateChange.inputsToDb.toList
+    )._1.rootHash
+
+    view.state.rollbackTo(VersionTag !@@ prevVersion)
+
     val candidate: CandidateBlock =
-      CandidateBlock(bestHeaderOpt, settings.constants.Version, txs, timestamp, difficulty)
+      CandidateBlock(bestHeaderOpt, settings.constants.Version, txs, timestamp, difficulty, stateRoot)
 
     logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height.")

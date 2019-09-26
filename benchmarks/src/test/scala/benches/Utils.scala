@@ -14,10 +14,10 @@ import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
-import encry.view.state.avlTree.AvlVersionalStorage
+import encry.view.state.avlTree.{AvlTree, AvlVersionalStorage}
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
-import encry.utils.implicits.UTXO._
+import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -130,7 +130,7 @@ object Utils extends Settings with StrictLogging {
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
-    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    }._2.filter(tx => state.validate(tx, prevBlock.header.timestamp, Height @@ prevBlock.header.height).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
     val header = Header(
       1.toByte,
@@ -195,7 +195,7 @@ object Utils extends Settings with StrictLogging {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(AvlVersionalStorage[ADKey, Array[Byte]](storage), settings.constants, height = Height @@ 0, lastBlockTimestamp = R.nextLong())
+    new UtxoState(AvlTree[StorageKey, StorageValue](storage), settings.constants)
   }
 
   def getRandomTempDir: File = {

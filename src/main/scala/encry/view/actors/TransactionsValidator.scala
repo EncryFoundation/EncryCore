@@ -11,6 +11,7 @@ import org.encryfoundation.common.validation.ValidationResult
 
 class TransactionsValidator(state: UtxoState,
                             totalFees: Amount,
+                            blockTimestamp: Long,
                             transaction: Transaction,
                             height: Height) extends Actor with StrictLogging {
 
@@ -18,7 +19,7 @@ class TransactionsValidator(state: UtxoState,
 
   override def receive: Receive = {
     case StartValidation =>
-      state.validate(transaction, totalFees) match {
+      state.validate(transaction, blockTimestamp, height, totalFees) match {
         case Left(value) => context.parent ! TransactionValidatedFailure(transaction, value)
         case Right(_)    => context.parent ! TransactionValidatedSuccessfully
       }
@@ -29,8 +30,9 @@ class TransactionsValidator(state: UtxoState,
 object TransactionsValidator {
   def props(state: UtxoState,
             totalFees: Amount,
+            blockTimestamp: Long,
             transaction: Transaction,
-            height: Height): Props = Props(new TransactionsValidator(state, totalFees, transaction, height))
+            height: Height): Props = Props(new TransactionsValidator(state, totalFees, blockTimestamp, transaction, height))
 
   case object StartValidation
   case object TransactionValidatedSuccessfully
