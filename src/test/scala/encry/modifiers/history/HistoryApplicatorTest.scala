@@ -7,7 +7,8 @@ import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
-import encry.settings.Settings
+import encry.settings.{EncryAppSettings, Settings}
+import encry.storage.VersionalStorage
 import encry.utils.ChainGenerator._
 import encry.utils.FileHelper
 import encry.view.actors.HistoryApplicator
@@ -23,22 +24,23 @@ import scala.collection.Seq
 import scala.concurrent.duration._
 
 class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  with ImplicitSender  with BeforeAndAfterAll  with Matchers
-  with InstanceFactory  with OneInstancePerTest  with Settings {
+  with InstanceFactory with OneInstancePerTest with Settings {
 
   override def afterAll: Unit = {
     TestKit.shutdownActorSystem(system)
   }
+  val testSettings: EncryAppSettings = settings.copy(storage = settings.storage.copy(state = VersionalStorage.LevelDB))
 
   def blockToModifiers(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
 
   def rollbackTest(transQty: Int) {
-    val history: History = generateDummyHistory(settings)
+    val history: History = generateDummyHistory(testSettings)
     //generate invalid blocks begining from 6 blocks
-    val (initialState, state, chain) = genChain(privKey, dir, settings, 10, transQty, Some(6))
+    val (initialState, state, chain) = genChain(privKey, dir, testSettings, 10, transQty, Some(6))
 
     val historyApplicator: TestActorRef[HistoryApplicator] =
       TestActorRef[HistoryApplicator](
-        HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+        HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
       )
     system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
 
@@ -65,7 +67,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
   def checkFullBlockChainIsSynced(qty: Int): Unit = (0 until qty).foreach(_ => expectMsg(timeout, FullBlockChainIsSynced()))
 
   val dir: File = FileHelper.getRandomTempDir
-  val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
+  val wallet: EncryWallet = EncryWallet.readOrGenerate(testSettings.copy(directory = dir.getAbsolutePath))
 
   val nodeViewHolder = TestProbe()
   val influx = TestProbe()
@@ -77,12 +79,12 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
     "apply locall blocks and check chain sync" in {
 
       val blockQty = 10
-      val history: History = generateDummyHistory(settings)
-      val (initialState, state, chain) = genChain(privKey, dir, settings, blockQty)
+      val history: History = generateDummyHistory(testSettings)
+      val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
       system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
@@ -97,21 +99,21 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
     "apply remote blocks and check chain sync" in {
 
       val blockQty = 10
-      val history: History = generateDummyHistory(settings)
-      val (initialState, state, chain) = genChain(privKey, dir, settings, blockQty)
+      val history: History = generateDummyHistory(testSettings)
+      val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
       system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      Thread.sleep(5000)
+      Thread.sleep(3000)
 
       expectMsg(timeout, FullBlockChainIsSynced())
       history.getBestBlockHeight shouldBe blockQty - 1
@@ -121,12 +123,12 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       val overQty = 30
 
-      val history: History = generateDummyHistory(settings)
-      val (initialState, state, chain) = genChain(privKey, dir, settings, settings.levelDB.maxVersions + overQty, 10)
+      val history: History = generateDummyHistory(testSettings)
+      val (initialState, state, chain) = genChain(privKey, dir, testSettings, testSettings.levelDB.maxVersions + overQty, 10)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
       system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
 
@@ -134,12 +136,12 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
         .flatMap(blockToModifiers)
         .foreach(historyApplicator ! ModifierFromRemote(_))
 
-      historyApplicator.underlyingActor.modifiersQueue.size should be <= settings.levelDB.maxVersions
+      historyApplicator.underlyingActor.modifiersQueue.size should be <= testSettings.levelDB.maxVersions
 
-      Thread.sleep(10000)
-      //receiveN((settings.levelDB.maxVersions + overQty) * 2, 120 seconds)
+      Thread.sleep(5000)
+      //receiveN((testSettings.levelDB.maxVersions + overQty) * 2, 120 seconds)
 
-      history.getBestBlockHeight shouldBe settings.levelDB.maxVersions + overQty - 1
+      history.getBestBlockHeight shouldBe testSettings.levelDB.maxVersions + overQty - 1
     }
 
     "apply remote blocks and check history rollback for invalid state" in {
