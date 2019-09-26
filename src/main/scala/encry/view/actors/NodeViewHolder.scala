@@ -54,7 +54,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     HistoryApplicator.props(nodeView.history, settings, nodeView.state, nodeView.wallet, self, influxRef)
       .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
 
-  override def preStart(): Unit = logger.info(s"Node view holder started.")
+  override def preStart(): Unit = {
+    logger.info(s"Node view holder started.")
+    context.system.scheduler.schedule(5.seconds, 5.seconds) {
+      dataHolder ! ChangedHistory(nodeView.history)
+    }
+  }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
