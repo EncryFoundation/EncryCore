@@ -46,7 +46,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       .flatMap(blockToModifiers)
       .foreach(historyApplicator ! ModifierFromRemote(_))
 
-    receiveN(6 * 2, 30 seconds)
+    receiveN(6 * 2, 120 seconds)
 
     history.getBestBlockHeight shouldBe 4
     history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(chain(4).id))
@@ -73,7 +73,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
   "HistoryApplicator" should {
 
-    "apply locall blocks and chain sync" in {
+    "apply locall blocks and check chain sync" in {
 
       val blockQty = 10
       val history: History = generateDummyHistory(settings)
@@ -88,29 +88,34 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
 
-      checkFullBlockChainIsSynced(blockQty * 2)
+      expectMsg(timeout, FullBlockChainIsSynced())
 
       history.getBestBlockHeight shouldBe blockQty - 1
     }
 
-    "apply remote blocks and check SemanticallySuccessfulModifier" in {
+    "apply remote blocks and check chain sync" in {
 
-      val blockQty = 2
-      val initialHistory: History = generateDummyHistory(settings)
+      val blockQty = 10
+      val history: History = generateDummyHistory(settings)
       val (initialState, state, chain) = genChain(privKey, dir, settings, blockQty)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
         TestActorRef[HistoryApplicator](
-          HistoryApplicator.props(initialHistory, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+          HistoryApplicator.props(history, settings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
 
-      system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      receiveN(blockQty * 2, timeout).forall { case _: SemanticallySuccessfulModifier => true }
+//      receiveN(blockQty * 2, timeout).forall { case _: SemanticallySuccessfulModifier => true }
+//      chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
+
+      expectMsg(timeout, FullBlockChainIsSynced())
+
+      history.getBestBlockHeight shouldBe blockQty - 1
     }
 
     "apply remote blocks and check queue for rollback height" in {
@@ -132,7 +137,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       historyApplicator.underlyingActor.modifiersQueue.size should be <= settings.levelDB.maxVersions
 
-      receiveN((settings.levelDB.maxVersions + overQty) * 2, 30 seconds)
+      receiveN((settings.levelDB.maxVersions + overQty) * 2, 120 seconds)
 
       history.getBestBlockHeight shouldBe settings.levelDB.maxVersions + overQty - 1
     }
