@@ -29,21 +29,27 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.util.{Failure, Success}
+import scala.concurrent.duration._
 
 class HistoryApplicator(nodeViewHolder: ActorRef,
                         walletApplicator: ActorRef,
                         stateApplicator: ActorRef,
                         settings: EncryAppSettings,
                         influxRef: Option[ActorRef],
+                        dataHolder: ActorRef,
                         networkTimeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
 
   //todo 1. add history.close in postStop
+
+  import context.dispatcher
 
   var modifiersQueue: Queue[(PersistentModifier, ProgressInfo)] = Queue.empty[(PersistentModifier, ProgressInfo)]
   var currentNumberOfAppliedModifiers: Int = 0
   var locallyGeneratedModifiers: Queue[PersistentModifier] = Queue.empty[PersistentModifier]
 
-  override def preStart(): Unit = self ! HistoryInitializedSuccessfully
+  override def preStart(): Unit = {
+    self ! HistoryInitializedSuccessfully
+  }
 
   override def receive: Receive = initializeHistory(restoreHistory)
 
@@ -58,6 +64,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
   }
 
   def mainBehaviour(history: History): Receive = {
+    case GetHistory => sender() ! history
     case ModifierFromRemote(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
       ModifiersCache.put(toKey(mod.id), mod, history)
       getModifierForApplying(history)
@@ -90,9 +97,11 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
             nodeViewHolder ! TransactionsForWallet(progressInfo.toRemove)
           stateApplicator ! NotificationAboutNewModifier
           getModifierForApplying(history)
+          dataHolder ! ChangedHistory(history)
         case Right(progressInfo) =>
           logger.info(s"Progress info is empty after appending to the state.")
           if (!isLocallyGenerated) requestDownloads(progressInfo)
+          dataHolder ! ChangedHistory(history)
           context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
           currentNumberOfAppliedModifiers -= 1
           getModifierForApplying(history)
@@ -201,6 +210,8 @@ object HistoryApplicator {
 
   case object HistoryInitializedSuccessfully
 
+  case object GetHistory
+
   final case object NotificationAboutNewModifier
 
   final case class InitialStateHistoryWallet(history: History, wallet: EncryWallet, state: UtxoState)
@@ -226,6 +237,7 @@ object HistoryApplicator {
             stateRef: ActorRef,
             settings: EncryAppSettings,
             influxRef: Option[ActorRef],
+            dataHolder: ActorRef,
             networkTimeProvider: NetworkTimeProvider): Props =
     Props(
       new HistoryApplicator(
@@ -234,6 +246,7 @@ object HistoryApplicator {
         stateRef,
         settings,
         influxRef,
+        dataHolder,
         networkTimeProvider
       ))
 }

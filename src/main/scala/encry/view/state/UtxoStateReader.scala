@@ -14,7 +14,7 @@ trait UtxoStateReader {
 
   implicit val hf: Algos.HF = Algos.hash
 
-  protected val tree: AvlTree[StorageKey, StorageValue]
+  val tree: AvlTree[StorageKey, StorageValue]
 
   def version: VersionTag = VersionTag !@@ tree.storage.currentVersion
 
