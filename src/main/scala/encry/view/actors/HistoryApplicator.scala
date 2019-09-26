@@ -28,7 +28,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 
-class HistoryApplicator(val history: History,
+class HistoryApplicator(history: History,
                         state: UtxoState,
                         wallet: EncryWallet,
                         setting: EncryAppSettings,
@@ -172,6 +172,10 @@ class HistoryApplicator(val history: History,
     context.system.eventStream.publish(DownloadRequest(tid, id))
   }
 
+  type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
+
+  def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
+
 }
 
 object HistoryApplicator {
@@ -193,9 +197,6 @@ object HistoryApplicator {
         case PoisonPill => 5
         case otherwise => 4
       })
-
-  type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
-  def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
 
   def props(history: History,
             setting: EncryAppSettings,

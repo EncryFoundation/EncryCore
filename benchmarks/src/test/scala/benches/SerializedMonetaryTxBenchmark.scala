@@ -3,7 +3,7 @@ package benches
 import java.util.concurrent.TimeUnit
 
 import benches.SerializedMonetaryTxBenchmark.SerializedMonetaryBenchState
-import encry.utils.ChainUtils._
+import benches.Utils._
 import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionSerializer}
 import org.encryfoundation.common.modifiers.state.box.AssetBox

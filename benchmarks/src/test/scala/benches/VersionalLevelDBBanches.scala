@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 import benches.VersionalLevelDBBanches.VersionalLevelDBState
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VersionalLevelDBCompanion}
-import encry.utils.{ChainUtils, FileHelper}
+import encry.utils.FileHelper
 import org.iq80.leveldb.Options
 import org.openjdk.jmh.annotations.{Benchmark, Mode, Scope, State}
 import org.openjdk.jmh.infra.Blackhole
@@ -55,7 +55,7 @@ object VersionalLevelDBBanches {
 
     //val elems1k = Utils.generateRandomLevelDbElemsWithoutDeletions(1000, 100)
     //val elems5k = Utils.generateRandomLevelDbElemsWithoutDeletions(5000, 100)
-    val elems10k = ChainUtils.generateRandomLevelDbElemsWithoutDeletions(10000, 100)
+    val elems10k = Utils.generateRandomLevelDbElemsWithoutDeletions(10000, 100)
     //val elems30k = Utils.generateRandomLevelDbElemsWithoutDeletions(30000, 100)
   }
 }

@@ -89,7 +89,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
 
       checkFullBlockChainIsSynced(blockQty * 2)
-      //receiveN(blockQty * 2, 30 seconds)
+
       history.getBestBlockHeight shouldBe blockQty - 1
     }
 
@@ -130,7 +130,6 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
         .flatMap(blockToModifiers)
         .foreach(historyApplicator ! ModifierFromRemote(_))
 
-      //println(s"modifiersQueue.size: ${historyApplicator.underlyingActor.currentNumberOfAppliedModifiers}")
       historyApplicator.underlyingActor.modifiersQueue.size should be <= settings.levelDB.maxVersions
 
       receiveN((settings.levelDB.maxVersions + overQty) * 2, 30 seconds)

@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
-import encry.utils.ChainUtils._
+import benches.Utils._
 import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
@@ -73,7 +73,7 @@ object StateBenches extends BenchSettings {
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
-    val genesisBlock: Block = generateGenesisBlockValidForState
+    val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
     state = state.applyModifier(genesisBlock).right.get
 

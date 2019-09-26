@@ -1,19 +1,17 @@
-package encry.utils
+package benches
 
 import java.io.File
 
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.timeProvider
-import encry.consensus.EncrySupplyController
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.{Settings, EncryAppSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
-import encry.utils.NetworkTime.Time
+import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.{BoxHolder, UtxoState}
@@ -36,7 +34,7 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-object ChainUtils extends Settings with StrictLogging {
+object Utils extends Settings with StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
@@ -63,31 +61,11 @@ object ChainUtils extends Settings with StrictLogging {
         ) :: acc
     }
 
-  def generateGenesisBlockValidForState: Block = {
+  def generateGenesisBlockValidForState(state: UtxoState): Block = {
     val txs = Seq(coinbaseTransaction(0))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
       height = settings.constants.GenesisHeight
-    )
-    Block(header, Payload(header.id, txs))
-  }
-
-  def generateGenesisBlock(genesisHeight: Height): Block = {
-    val coinbaseTrans = TransactionFactory.coinbaseTransactionScratch(
-      privKey.publicImage,
-      System.currentTimeMillis(),
-      settings.constants.InitialEmissionAmount,
-      amount = 0L,
-      height = genesisHeight
-    )
-
-    val txs: Seq[Transaction] = Seq(coinbaseTrans)
-    val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
-    val header = genHeader.copy(
-      timestamp = System.currentTimeMillis(),
-      parentId = Header.GenesisParentId,
-      height = genesisHeight,
-      transactionsRoot = txsRoot
     )
     Block(header, Payload(header.id, txs))
   }
@@ -136,14 +114,13 @@ object ChainUtils extends Settings with StrictLogging {
                                                             box: Seq[AssetBox],
                                                             splitCoef: Int = 2,
                                                             addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
-    val timestamp = System.currentTimeMillis()
 
     val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
       case ((boxes, transactionsL), _) =>
         val tx: Transaction = defaultPaymentTransactionScratch(
           privKey,
           fee = 1,
-          timestamp,
+          timestamp = 11L,
           useBoxes = IndexedSeq(boxes.head),
           recipient = privKey.publicImage.address.address,
           amount = boxes.head.amount - 1,
@@ -152,48 +129,11 @@ object ChainUtils extends Settings with StrictLogging {
         (boxes.tail, transactionsL :+ tx)
     }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
-
-    println(s"transactions.size: ${transactions.size}")
-
     val header = Header(
       1.toByte,
       prevBlock.id,
       Payload.rootHash(transactions.map(_.id)),
-      timestamp,
-      prevBlock.header.height + 1,
-      R.nextLong(),
-      Difficulty @@ (BigInt(1) + addDiff),
-      EquihashSolution(Seq(1, 3))
-    )
-    Block(header, Payload(header.id, transactions))
-  }
-
-  def generateNextBlockForStateWithInvalidTrans(prevBlock: Block,
-                                                state: UtxoState,
-                                                box: Seq[AssetBox],
-                                                splitCoef: Int = 2,
-                                                addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
-    val timestamp = System.currentTimeMillis()
-
-    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
-      case ((boxes, transactionsL), _) =>
-        val tx: Transaction = defaultPaymentTransactionScratch(
-          privKey,
-          fee = 1,
-          timestamp,
-          useBoxes = IndexedSeq(boxes.head),
-          recipient = privKey.publicImage.address.address,
-          amount = boxes.head.amount * 2, //invalid
-          numOfOutputs = splitCoef
-        )
-        (boxes.tail, transactionsL :+ tx)
-    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
-    logger.info(s"Number of generated transactions: ${transactions.size}.")
-    val header = Header(
-      1.toByte,
-      prevBlock.id,
-      Payload.rootHash(transactions.map(_.id)),
-      timestamp,
+      System.currentTimeMillis(),
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ (BigInt(1) + addDiff),
@@ -282,7 +222,7 @@ object ChainUtils extends Settings with StrictLogging {
   def coinbaseTransaction(height: Int): Transaction = TransactionFactory.coinbaseTransactionScratch(
     privKey.publicImage,
     System.currentTimeMillis(),
-    supply = settings.constants.InitialEmissionAmount,
+    supply = 10000000L,
     amount = 1L,
     height = Height @@ height
   )
@@ -459,6 +399,7 @@ object ChainUtils extends Settings with StrictLogging {
   }
 
   def generateHistory(settings: EncryAppSettings, file: File): History = {
+
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
@@ -468,8 +409,8 @@ object ChainUtils extends Settings with StrictLogging {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override val historyStorage: HistoryStorage = storage
-      override val timeProvider: NetworkTimeProvider = ntp
+      override  val historyStorage: HistoryStorage = storage
+      override  val timeProvider: NetworkTimeProvider = ntp
     }
   }
 

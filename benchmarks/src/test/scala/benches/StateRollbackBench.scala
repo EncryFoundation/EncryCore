@@ -4,7 +4,7 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.StateRollbackBench.StateRollbackState
-import encry.utils.ChainUtils._
+import benches.Utils._
 import encry.storage.VersionalStorage
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.{BoxHolder, UtxoState}
@@ -66,7 +66,7 @@ object StateRollbackBench extends BenchSettings {
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
-    val genesisBlock: Block = generateGenesisBlockValidForState
+    val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
     state = state.applyModifier(genesisBlock).right.get
 
