@@ -40,11 +40,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   val walletApplicator: ActorRef = context.system.actorOf(WalletApplicator.props, "walletApplicator")
 
   val historyApplicator: ActorRef = context.system.actorOf(
-    HistoryApplicator.props(self, walletApplicator, settings, influxRef, timeProvider)
+    HistoryApplicator.props(self, walletApplicator, stateApplicator, settings, influxRef, timeProvider)
       .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
 
-  val stateApplicator: ActorRef = context.system.actorOf(
-    StateApplicator.props(settings, historyApplicator, walletApplicator, self)
+  lazy val stateApplicator: ActorRef = context.system.actorOf(
+    StateApplicator.props(settings, walletApplicator, self)
       .withDispatcher("state-applicator-dispatcher"), name = "stateApplicator")
 
   override def receive: Receive = awaitingHistory
@@ -67,6 +67,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     case msg@ModifierFromRemote(_) => historyApplicator ! msg
     case msg@LocallyGeneratedBlock(_) => historyApplicator ! msg
     case GetDataFromCurrentView(f) =>
+      println("get GetDataFromCurrentView")
       f(CurrentView(history, state, wallet)) match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender())
         case result => sender() ! result

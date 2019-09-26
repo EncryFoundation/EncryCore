@@ -12,8 +12,9 @@ import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
 import scala.collection.immutable.HashMap
+import scala.util.Try
 
-final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) {
+final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable {
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]]{
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -30,13 +31,18 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   var deletedNodes: List[String] = List.empty[String]
 
   //return newAvl, allUpdatedNodes and hashes of deleted.
-  def insertMany(toInsert: List[(K, V)])
-                (implicit kSer: Serializer[K],
-                 vSer: Serializer[V],
-                 kM: Monoid[K],
-                 vM: Monoid[V]): (AvlTree[K, V], Map[String, Node[K, V]], List[String]) = {
+  def insertAndDeleteMany(version: StorageVersion,
+                          toInsert: List[(K, V)],
+                          toDelete: List[K])
+                         (implicit kSer: Serializer[K],
+                         vSer: Serializer[V],
+                         kM: Monoid[K],
+                         vM: Monoid[V]): (AvlTree[K, V], Map[String, Node[K, V]], List[String]) = {
     val startTime = System.currentTimeMillis()
-    val newRoot = toInsert.foldLeft(rootNode){
+    val rootAfterDelete = toDelete.foldLeft(rootNode) {
+      case (prevRoot, toDelete) => delete(toDelete, prevRoot)
+    }
+    val newRoot = toInsert.foldLeft(rootAfterDelete){
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         setToZeroInsertDirection(insert(prevRoot, keyToInsert, valueToInsert))
     }
@@ -44,7 +50,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     val deletedNodesUpdated = deletedNodes.filterNot(insertedNodes.contains)
     val newInserted = insertedNodes -- deletedNodesUpdated
     val shadowedRoot = ShadowNode.childsToShadowNode(newRoot)
-    storage.insert(StorageVersion @@ Random.randomBytes(),
+    storage.insert(version,
       toInsert.map{case (key, value) => StorageKey @@ Algos.hash(kSer.toBytes(key)) -> StorageValue @@ vSer.toBytes(value)} ++
         newInserted.values.map(node => StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))).toList :+
         (AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash),
@@ -80,7 +86,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     case leafNode: LeafNode[K, V] => if (leafNode.key === key) Some(leafNode.value) else None
   }
 
-  def delete(key: K)(implicit m: Monoid[K], v: Monoid[V]): AvlTree[K, V] = new AvlTree(balance(delete(rootNode, key).get), storage)
+  def delete(key: K, node: Node[K, V])(implicit m: Monoid[K], v: Monoid[V]): Node[K, V] = balance(delete(node, key).get)
 
   private def delete(node: Node[K, V], key: K)(implicit m: Monoid[K], v: Monoid[V]): Option[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
@@ -149,6 +155,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
           onRight
         }.map(node => node._1.key -> node._1.value -> node._2).get
     }
+  }
+
+  def rollbackTo[K: Monoid : Serializer : Hashable : Order, V: Monoid : Serializer](to: StorageVersion): Try[AvlTree[K, V]] = Try {
+    storage.rollbackTo(to)
+    val rootNode = NodeSerilalizer.fromBytes[K, V](storage.get(AvlTree.rootNodeKey).get).get
+    AvlTree(rootNode, storage)
   }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
@@ -336,10 +348,17 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       rightRotation(internalNode.updateChilds(newLeftChild = Some(rotatedLeftChild)))
   }
 
+  override def close(): Unit = storage.close()
+
   override def toString: String = rootNode.toString
 }
 
 object AvlTree {
+
+  def restore[K: Monoid : Serializer : Hashable : Order, V: Monoid : Serializer](storage: VersionalStorage): Try[AvlTree[K, V]] = Try {
+    val rootNode = NodeSerilalizer.fromBytes[K, V](storage.get(AvlTree.rootNodeKey).get).get
+    AvlTree(rootNode, storage)
+  }
 
   val rootNodeKey: StorageKey = StorageKey !@@ Algos.hash("root_node")
 

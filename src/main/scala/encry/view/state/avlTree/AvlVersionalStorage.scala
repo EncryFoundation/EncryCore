@@ -32,25 +32,25 @@ case class AvlVersionalStorage[K: Monoid, V: Monoid] (storage: VersionalStorage,
 
   }
 
-  def insertWithTree(version: StorageVersion,
-                     toInsert: List[(StorageKey, StorageValue)],
-                     toDelete: List[StorageKey]): AvlVersionalStorage[K, V] = {
-    val newTreeAfterDelitions = toDelete.foldLeft(tree){
-      case (prevTree, keyToDelete) => prevTree.delete(convertK.convertToStorage(keyToDelete))
-    }
-
-    val newTreeAfterInsertions = toInsert.foldLeft(newTreeAfterDelitions){
-      case (prevTree, (keyToInsert, valueToInsert)) =>
-        prevTree.insert(convertK.convertToStorage(keyToInsert), value.convertToStorageValue(valueToInsert))
-    }
-
-    val newStorage = storage.insert(
-      version,
-      toInsert,
-      toDelete
-    )
-    AvlVersionalStorage(storage, newTreeAfterInsertions)
-  }
+//  def insertWithTree(version: StorageVersion,
+//                     toInsert: List[(StorageKey, StorageValue)],
+//                     toDelete: List[StorageKey]): AvlVersionalStorage[K, V] = {
+//    val newTreeAfterDelitions = toDelete.foldLeft(tree){
+//      case (prevTree, keyToDelete) => prevTree.delete(convertK.convertToStorage(keyToDelete))
+//    }
+//
+//    val newTreeAfterInsertions = toInsert.foldLeft(newTreeAfterDelitions){
+//      case (prevTree, (keyToInsert, valueToInsert)) =>
+//        prevTree.insert(convertK.convertToStorage(keyToInsert), value.convertToStorageValue(valueToInsert))
+//    }
+//
+//    val newStorage = storage.insert(
+//      version,
+//      toInsert,
+//      toDelete
+//    )
+//    AvlVersionalStorage(storage, newTreeAfterInsertions)
+//  }
 
   override def close(): Unit = storage.close()
 }

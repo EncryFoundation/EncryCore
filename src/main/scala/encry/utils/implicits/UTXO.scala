@@ -24,33 +24,10 @@ object UTXO {
       StateChange(x.inputsToDb ++ y.inputsToDb, x.outputsToDb ++ y.outputsToDb)
   }
 
-  implicit def adKeyMonoid: Monoid[ADKey] = new Monoid[ADKey] {
-
-    override def empty: ADKey = ADKey @@ Array.emptyByteArray
-
-    override def combine(x: ADKey, y: ADKey): ADKey = ADKey @@ (x ++ y)
-  }
-
-  implicit def adKeyOrder: Order[ADKey] = new Order[ADKey] {
-    override def compare(x: ADKey, y: ADKey): Int = Arrays.compareUnsigned(x, y)
-  }
-
-  implicit def adKeyHashable: Hashable[ADKey] = new Hashable[ADKey] {
-    override def hash(value: ADKey): Array[Byte] = Algos.hash(value)
-  }
-
-  implicit def arrayMonoid: Monoid[Array[Byte]] = new Monoid[Array[Byte]] {
-
-    override def empty: Array[Byte] = Array.emptyByteArray
-
-    override def combine(x: Array[Byte], y: Array[Byte]): Array[Byte] = x ++ y
-  }
-
-  implicit def adKeyConvert: ConvertableToStorage[ADKey] = new ConvertableToStorage[ADKey] {
-    override def convertToStorage(firstValue: StorageKey): ADKey = ADKey !@@ firstValue
-  }
-
-  implicit def arrayByteConvert: ConvertableToStorage[Array[Byte]] = new ConvertableToStorage[Array[Byte]] {
-    override def convertToStorage(firstValue: StorageKey): Array[Byte] = firstValue
-  }
+//  implicit def arrayMonoid: Monoid[Array[Byte]] = new Monoid[Array[Byte]] {
+//
+//    override def empty: Array[Byte] = Array.emptyByteArray
+//
+//    override def combine(x: Array[Byte], y: Array[Byte]): Array[Byte] = x ++ y
+//  }
 }

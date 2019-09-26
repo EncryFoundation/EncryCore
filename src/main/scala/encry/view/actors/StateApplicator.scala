@@ -1,6 +1,7 @@
 package encry.view.actors
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, Kill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
@@ -19,7 +20,7 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
 import encry.modifiers.history.HeaderChain
 import encry.utils.NetworkTimeProvider
@@ -28,30 +29,34 @@ import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.utils.Algos
+
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
 class StateApplicator(settings: EncryAppSettings,
-                      historyApplicator: ActorRef,
                       walletApplicator: ActorRef,
                       nodeViewHolder: ActorRef) extends Actor with StrictLogging {
 
   //todo 1. add supervisor strategy
 
+  var historyApplicator: ActorRef = ActorRef.noSender
+
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[InitialInfoForStateInitialization])
-    context.system.eventStream.subscribe(self, classOf[NotificationAboutNewModifier])
+    //context.system.eventStream.subscribe(self, classOf[NotificationAboutNewModifier])
   }
 
   override def receive: Receive = initializingState
 
   def initializingState: Receive = {
-    case InitialInfoForStateInitialization(history, ntp) =>
+    case InitialInfoForStateInitialization(history, historyAppl, ntp) =>
       val (state, historyUpdated, wallet) = initializeState(history, settings) match {
         case Some((state, wallet)) => (state, history , wallet)
         case None                  => initializeGenesisNodeState(ntp)
       }
+      historyApplicator = historyAppl
       logger.info(s"State restored successfully. Now StateApplicator is working on full.")
+      logger.info(s"sender: $sender()")
       sender() ! StateApplicatorStarted(historyUpdated, state, wallet)
       walletApplicator ! NewWalletForWalletApplicator(wallet)
       context.become(updateState(state, isInProgress = false))
@@ -60,12 +65,12 @@ class StateApplicator(settings: EncryAppSettings,
   }
 
   def updateState(state: UtxoState, isInProgress: Boolean): Receive = {
-    case NotificationAboutNewModifier() if !isInProgress =>
+    case NotificationAboutNewModifier if !isInProgress =>
       logger.info(s"StateApplicator got notification about new modifier and sent request for another one.")
       sender() ! RequestNextModifier
       context.become(updateState(state, isInProgress = true))
 
-    case NotificationAboutNewModifier() =>
+    case NotificationAboutNewModifier =>
       logger.info(s"StateApplicator got notification about new modifier but inProgress was $isInProgress.")
 
     case StartModifiersApplicationOnStateApplicator(progressInfo, suffixApplied) =>
@@ -88,6 +93,7 @@ class StateApplicator(settings: EncryAppSettings,
           logger.info(s"Successfully applied to the state. Starting modifiers applying.")
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
           self ! StartModifiersApplying
+          logger.info(progressInfo.toApply.toList.map(mod => mod.encodedId).mkString(","))
           context.become(modifierApplication(
             progressInfo.toApply.toList,
             UpdateInformation(none, none, suffixTrimmed),
@@ -102,6 +108,7 @@ class StateApplicator(settings: EncryAppSettings,
                           currentState: UtxoState): Receive = {
     case StartModifiersApplying if updateInformation.failedMod.isEmpty => toApply.headOption.foreach {
       case header: Header =>
+        logger.info(s"hisAppl: $historyApplicator")
         historyApplicator ! NeedToReportAsValid(header)
         context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
         val newToApply: List[PersistentModifier] = toApply.drop(1)
@@ -112,7 +119,7 @@ class StateApplicator(settings: EncryAppSettings,
           context.become(modifierApplication(
             newToApply,
             UpdateInformation(none, none, updateInformation.suffix :+ header),
-            currentState.copy(lastBlockTimestamp = header.timestamp)
+            currentState
           ))
         } else {
           logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted." +
@@ -130,15 +137,19 @@ class StateApplicator(settings: EncryAppSettings,
         block.payload.txs.foreach {
           case tx if tx.id sameElements lastTxId => context.actorOf(
             TransactionsValidator.props(
-              currentState, totalFees + EncrySupplyController.supplyAt(
-                currentState.height, settings.constants.InitialEmissionAmount,
+              currentState,
+              totalFees + EncrySupplyController.supplyAt(
+                Height @@ block.header.height, settings.constants.InitialEmissionAmount,
                 settings.constants.EmissionEpochLength, settings.constants.EmissionDecay
-              ), tx, currentState.height)
+              ),
+              block.header.timestamp,
+              tx,
+              Height @@ block.header.height)
               .withDispatcher("transaction-validator-dispatcher"),
             s"validatorFor:${tx.encodedId}"
           )
           case tx => context.actorOf(
-            TransactionsValidator.props(currentState, 0L, tx, currentState.height)
+            TransactionsValidator.props(currentState, 0L, block.header.timestamp, tx, Height @@ block.header.height)
               .withDispatcher("transaction-validator-dispatcher"),
             s"validatorFor:${tx.encodedId}"
           )
@@ -195,7 +206,7 @@ class StateApplicator(settings: EncryAppSettings,
         val prevVersion: VersionTag = currentState.version
         val updatedState: UtxoState = currentState.applyValidModifier(block)
         /* */
-        if (!(updatedState.storage.rootHash sameElements block.header.stateRoot)) {
+        if (!(updatedState.tree.rootHash sameElements block.header.stateRoot)) {
           //rollback state
           //updatedState.rollbackTo(prevVersion) match {
           //  case Failure(exception) => //stop app
@@ -296,7 +307,7 @@ class StateApplicator(settings: EncryAppSettings,
         logger.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed."); stateIn
       case (_, None) =>
         logger.info(s"History is empty, creating genesis state.")
-        stateIn.storage.close()
+        stateIn.tree.close()
         emptyState(settings)
       case (stateId, Some(historyBestBlock)) =>
         val (rollbackId: Option[ModifierId], newChain: HeaderChain) =
@@ -357,8 +368,8 @@ object StateApplicator {
                                      suffix: IndexedSeq[PersistentModifier])
 
   def props(setting: EncryAppSettings,
-            historyApplicator: ActorRef,
             walletApplicator: ActorRef,
-            nodeViewHolder: ActorRef): Props =
-    Props(new StateApplicator(setting, historyApplicator, walletApplicator, nodeViewHolder))
+            nodeViewHolder: ActorRef): Props = {
+    Props(new StateApplicator(setting, walletApplicator, nodeViewHolder))
+  }
 }

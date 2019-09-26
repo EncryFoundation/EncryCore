@@ -37,7 +37,7 @@ case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: 
       0L,
       candidateBlock.difficulty,
       EquihashSolution.empty,
-      Array.emptyByteArray
+      candidateBlock.stateRoot
     )
     for {
       possibleHeader <- generateHeader(startingNonce, digest, header, difficulty)
