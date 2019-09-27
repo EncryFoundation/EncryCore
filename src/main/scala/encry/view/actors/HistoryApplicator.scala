@@ -16,7 +16,7 @@ import encry.view.NodeViewErrors.ModifierApplyError.{HistoryApplyError, StateMod
 import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
 import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.actors.HistoryApplicator._
-import encry.view.actors.StateApplicator.{RollbackHistoryToVersion, _}
+import encry.view.actors.StateApplicator._
 import encry.view.actors.WalletApplicator.WalletNeedRollbackTo
 import encry.view.history.History
 import encry.view.state.UtxoState
@@ -137,19 +137,6 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
       currentNumberOfAppliedModifiers -= 1
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
-
-    case RollbackHistoryToVersion(version, block) =>
-      logger.info(s"History got RollbackHistoryToVersion message with version ${Algos.encode(version)}." +
-        s" State failed on block ${block.encodedId} at height ${block.header.height}.")
-      context.system.eventStream.publish(
-        SemanticallyFailedModification(block, List(StateModifierApplyError(s"Invalid modifier by state")))
-      )
-      history.historyStorage.rollbackTo(version) match {
-        case Failure(exception) => //stop app
-        case Success(rolledBackHistory) =>
-          modifiersQueue.foreach { case (mod, _) => self ! ModifierFromRemote(mod) }
-          modifiersQueue = Queue.empty
-      }
 
     case NotificationAboutSuccessfullyAppliedModifier =>
       if (history.isFullChainSynced) {
