@@ -12,7 +12,7 @@ import encry.stats.StatsSender.ModifierAppendedToHistory
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
-import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
+import encry.view.actors.NodeViewHolder.{DownloadRequest, GetBlockInfo, TransactionsForWallet}
 import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
@@ -25,6 +25,7 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 
@@ -63,6 +64,9 @@ class HistoryApplicator(history: History,
 
     case NeedToReportAsValid(modifier) =>
       logger.info(s"Modifier ${modifier.encodedId} should be marked as valid.")
+      nodeViewHolder ! GetBlockInfo(
+        history.reportModifierIsValid(modifier).getBestHeader,
+        history.reportModifierIsValid(modifier).getBestBlock)
       history.reportModifierIsValid(modifier)
 
     case ModifierToHistoryAppending(modifier, isLocallyGenerated) =>

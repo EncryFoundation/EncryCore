@@ -57,10 +57,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   override def preStart(): Unit = {
     logger.info(s"Node view holder started.")
-    context.system.scheduler.schedule(5.seconds, 5.seconds) {
-      dataHolder ! BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
-
-    }
   }
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
@@ -84,6 +80,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     case GetNodeViewChanges(history, state, _) =>
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
+    case GetBlockInfo(header, block) => dataHolder ! BlockAndHeaderInfo(header, block)
     case TransactionsForWallet(toRemove) => sendUpdatedInfoToMemoryPool(toRemove)
     case CompareViews(peer, modifierTypeId, modifierIds) =>
       val ids: Seq[ModifierId] = modifierIds
@@ -193,6 +190,8 @@ object NodeViewHolder {
 
   final case class DownloadRequest(modifierTypeId: ModifierTypeId,
                                    modifierId: ModifierId) extends NodeViewHolderEvent
+
+  final case class GetBlockInfo(header: Option[Header], block: Option[Block])
 
   case class CurrentView[HIS, MS, VL](history: HIS, state: MS, vault: VL)
 
