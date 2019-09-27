@@ -64,10 +64,10 @@ class HistoryApplicator(history: History,
 
     case NeedToReportAsValid(modifier) =>
       logger.info(s"Modifier ${modifier.encodedId} should be marked as valid.")
-      nodeViewHolder ! GetBlockInfo(
-        history.reportModifierIsValid(modifier).getBestHeader,
-        history.reportModifierIsValid(modifier).getBestBlock)
       history.reportModifierIsValid(modifier)
+      nodeViewHolder ! GetBlockInfo(
+        history.getBestHeader,
+        history.getBestBlock)
 
     case ModifierToHistoryAppending(modifier, isLocallyGenerated) =>
       logger.info(s"Starting to apply modifier ${modifier.encodedId} to history.")
