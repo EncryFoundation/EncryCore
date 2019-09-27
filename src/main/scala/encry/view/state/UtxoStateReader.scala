@@ -1,14 +1,13 @@
 package encry.view.state
 
-import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.state.avlTree.{AvlTree, AvlVersionalStorage}
+import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
-import encry.view.state.avlTree.utils.implicits.Instances._
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 
 trait UtxoStateReader {
 
