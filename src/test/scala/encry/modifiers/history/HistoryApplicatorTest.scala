@@ -6,7 +6,6 @@ import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.utils.ChainGenerator._
@@ -42,29 +41,20 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       TestActorRef[HistoryApplicator](
         HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
       )
-    system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+    system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
     chain
       .flatMap(blockToModifiers)
       .foreach(historyApplicator ! ModifierFromRemote(_))
 
-    //Thread.sleep(3000 + transQty)
-    receiveN(6 * 2, timeout)
+    expectMsg(timeout, FullBlockChainIsSynced())
 
-    history.getBestBlockHeight shouldBe 4
+    Thread.sleep(1000 + transQty/2)
+
+    awaitCond(history.getBestBlockHeight == 4, timeout)
     history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(chain(4).id))
     history.getBestBlockHeightDB shouldBe 4
   }
-
-//  def applyBlocksToHistory(history: History, blocks: Seq[Block]): History =
-//    blocks.foldLeft(history) {
-//      case (prevHistory, block) =>
-//        prevHistory.append(block.header)
-//        prevHistory.append(block.payload)
-//        prevHistory.reportModifierIsValid(block)
-//    }
-
-  def checkFullBlockChainIsSynced(qty: Int): Unit = (0 until qty).foreach(_ => expectMsg(30 seconds, FullBlockChainIsSynced()))
 
   val dir: File = FileHelper.getRandomTempDir
   val wallet: EncryWallet = EncryWallet.readOrGenerate(testSettings.copy(directory = dir.getAbsolutePath))
@@ -91,11 +81,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       chain.foreach(historyApplicator ! LocallyGeneratedBlock(_))
 
-      receiveN((blockQty - 1) * 2, timeout)
-      //checkFullBlockChainIsSynced((blockQty - 1) * 2)
-      //expectMsg(timeout, FullBlockChainIsSynced())
-
-      history.getBestBlockHeight shouldBe blockQty - 1
+      expectMsg(timeout, FullBlockChainIsSynced())
+      awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
     }
 
     "apply remote blocks and check chain sync" in {
@@ -115,11 +102,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       modifiers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      //Thread.sleep(3000)
-      receiveN(6 * 2, timeout)
-      //checkFullBlockChainIsSynced((blockQty - 1) * 2)
-      //expectMsg(timeout, FullBlockChainIsSynced())
-      history.getBestBlockHeight shouldBe blockQty - 1
+      expectMsg(timeout, FullBlockChainIsSynced())
+      awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
     }
 
     "apply remote blocks and check queue for rollback height" in {
@@ -133,7 +117,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
         TestActorRef[HistoryApplicator](
           HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
         )
-      system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
 
       chain
         .flatMap(blockToModifiers)
@@ -141,11 +125,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       historyApplicator.underlyingActor.modifiersQueue.size should be <= testSettings.levelDB.maxVersions
 
-      //Thread.sleep(5000)
-      //checkFullBlockChainIsSynced((testSettings.levelDB.maxVersions + overQty) * 2)
-      receiveN((testSettings.levelDB.maxVersions + overQty) * 2, timeout)
-
-      history.getBestBlockHeight shouldBe testSettings.levelDB.maxVersions + overQty - 1
+      expectMsg(timeout, FullBlockChainIsSynced())
+      awaitCond(history.getBestBlockHeight == testSettings.levelDB.maxVersions + overQty - 1)
     }
 
     "apply remote blocks and check history rollback for invalid state" in {
