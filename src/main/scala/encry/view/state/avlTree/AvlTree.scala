@@ -295,6 +295,11 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       val newRoot = internalNode.leftChild.get match {
         case LeafNode(key, value) => InternalNode(key, value, 0, 0)
         case internalNode: InternalNode[K, V] => internalNode
+        case shadowNode: ShadowNode[K, V] =>
+          shadowNode.restoreFullNode(storage).get match {
+            case LeafNode(key, value) => InternalNode(key, value, 0, 0)
+            case internalNode: InternalNode[K, V] => internalNode
+          }
       }
       val newLeftChildForPrevRoot = newRoot.rightChild
       val prevRoot = internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot.map(_.selfInspection)).selfInspection
@@ -315,6 +320,11 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       val newRoot = internalNode.rightChild.get match {
         case LeafNode(key, value) => InternalNode(key, value, 0, 0)
         case internalNode: InternalNode[K, V] => internalNode
+        case shadowNode: ShadowNode[K, V] =>
+          shadowNode.restoreFullNode(storage).get match {
+            case LeafNode(key, value) => InternalNode(key, value, 0, 0)
+            case internalNode: InternalNode[K, V] => internalNode
+          }
       }
       val newRightChildForPrevRoot = newRoot.leftChild
       val prevRoot = internalNode.updateChilds(newRightChild = newRightChildForPrevRoot.map(_.selfInspection)).selfInspection
