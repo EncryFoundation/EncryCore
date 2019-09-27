@@ -1,7 +1,6 @@
 package benches
 
 import java.io.File
-
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
@@ -32,7 +31,6 @@ import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
-
 import scala.collection.immutable
 import scala.util.{Random => R}
 
