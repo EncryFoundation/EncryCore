@@ -6,6 +6,7 @@ import java.util.concurrent.TimeUnit
 import benches.StateRollbackBench.StateRollbackState
 import benches.Utils._
 import encry.storage.VersionalStorage
+import encry.utils.ChainGenerator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.{BoxHolder, UtxoState}
 import encryBenchmark.{BenchSettings, Settings}
@@ -17,6 +18,7 @@ import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
+import encry.utils.FileHelper.getRandomTempDir
 
 class StateRollbackBench {
 
@@ -24,7 +26,7 @@ class StateRollbackBench {
   def applyBlocksToTheState(stateBench: StateRollbackState, bh: Blackhole): Unit = {
     bh.consume {
       val innerState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
+        ChainGenerator.utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
       val newState = stateBench.chain.foldLeft(innerState -> List.empty[VersionTag]) { case ((state, rootHashes), block) =>
         val newState = state.applyModifier(block).right.get
         newState -> (rootHashes :+ newState.version)
@@ -65,7 +67,7 @@ object StateRollbackBench extends BenchSettings {
       genHardcodedBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
-    var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
+    var state: UtxoState = ChainGenerator.utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
     val genesisBlock: Block = generateGenesisBlockValidForState(state)
 
     state = state.applyModifier(genesisBlock).right.get

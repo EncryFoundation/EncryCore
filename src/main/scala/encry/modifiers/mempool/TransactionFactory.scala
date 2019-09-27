@@ -2,7 +2,7 @@ package encry.modifiers.mempool
 
 import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.modifiers.mempool.directive.{Directive, TransferDirective}
+import org.encryfoundation.common.modifiers.mempool.directive.{DataDirective, Directive, TransferDirective}
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
@@ -102,4 +102,58 @@ object TransactionFactory extends StrictLogging {
       IndexedSeq(TransferDirective(recipient, howMuchWillTransfer, tokenIdOpt))
     prepareTransaction(privKey, fee, timestamp, useOutputs, directives, change, tokenIdOpt)
   }
+
+  def paymentTransactionWithMultipleOutputs(privKey: PrivateKey25519, fee: Amount, timestamp: Long, useBoxes: IndexedSeq[MonetaryBox],
+                                            recipient: Address, amount: Amount, tokenIdOpt: Option[ADKey] = None,
+                                            numOfOutputs: Int): Transaction = {
+
+    val pubKey: PublicKey25519 = privKey.publicImage
+    val uInputs: IndexedSeq[Input] = useBoxes
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
+    val directives: IndexedSeq[TransferDirective] =
+      if (change > 0) TransferDirective(recipient, amount, tokenIdOpt) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, tokenIdOpt))
+      else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
+  def dataTransactionScratch(privKey: PrivateKey25519,
+                             fee: Long,
+                             timestamp: Long,
+                             useOutputs: IndexedSeq[MonetaryBox],
+                             amount: Long,
+                             data: Array[Byte],
+                             numOfOutputs: Int = 5): Transaction = {
+
+    val pubKey: PublicKey25519 = privKey.publicImage
+
+    val uInputs: IndexedSeq[Input] = useOutputs
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useOutputs.map(_.amount).sum - (amount + fee)
+
+    val directives: IndexedSeq[DataDirective] =
+      (0 until numOfOutputs).foldLeft(IndexedSeq.empty[DataDirective]) { case (directivesAll, _) =>
+        directivesAll :+ DataDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, data)
+      }
+
+    val newDirectives: IndexedSeq[Directive] =
+      if (change > 0) TransferDirective(pubKey.address.address, amount, None) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, None)) ++: directives
+      else directives
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, newDirectives)
+
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
 }

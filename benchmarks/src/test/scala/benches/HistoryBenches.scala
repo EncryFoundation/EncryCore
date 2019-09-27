@@ -4,9 +4,10 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.HistoryBenches.HistoryBenchState
-import benches.Utils.{generateHistory, generateNextBlockValidForHistory, getRandomTempDir}
+import benches.Utils.{generateHistory, generateNextBlockValidForHistory}
 import encry.EncryApp
 import encry.settings.EncryAppSettings
+import encry.utils.FileHelper
 import encry.view.history.History
 import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
@@ -22,7 +23,7 @@ class HistoryBenches {
   @Benchmark
   def appendBlocksToHistoryBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
-      val history: History = generateHistory(benchStateHistory.settings, getRandomTempDir)
+      val history: History = generateHistory(benchStateHistory.settings, FileHelper.getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
         historyL.append(block.header)
         historyL.append(block.payload)
@@ -64,7 +65,7 @@ object HistoryBenches extends BenchSettings {
   @State(Scope.Benchmark)
   class HistoryBenchState extends encry.settings.Settings {
 
-    val tmpDir: File = getRandomTempDir
+    val tmpDir: File = FileHelper.getRandomTempDir
     val initialHistory: History = generateHistory(settings, tmpDir)
 
     val resultedHistory: (History, Option[Block], Vector[Block]) =

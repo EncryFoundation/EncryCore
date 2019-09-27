@@ -52,8 +52,15 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
     Thread.sleep(1000 + transQty/2)
 
     awaitCond(history.getBestBlockHeight == 4, timeout)
-    history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(chain(4).id))
-    history.getBestBlockHeightDB shouldBe 4
+
+    checkBestBlock(history, chain(4))
+  }
+
+  def checkBestBlock(history: History, expectBlock: Block) {
+    history.getBestHeaderHeight shouldBe expectBlock.header.height
+    history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(expectBlock.header.id))
+    history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(expectBlock.id))
+    history.getBestBlockHeightDB shouldBe expectBlock.header.height
   }
 
   val dir: File = FileHelper.getRandomTempDir
@@ -83,6 +90,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
+
+      checkBestBlock(history, chain(blockQty - 1))
     }
 
     "apply remote blocks and check chain sync" in {
@@ -104,6 +113,8 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
+
+      checkBestBlock(history, chain(blockQty - 1))
     }
 
     "apply remote blocks and check queue for rollback height" in {
@@ -127,15 +138,77 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == testSettings.levelDB.maxVersions + overQty - 1)
+
+      checkBestBlock(history, chain(testSettings.levelDB.maxVersions + overQty - 1))
     }
 
-    "apply remote blocks and check history rollback for invalid state" in {
+    "should sync and check history rollback on invalid block " in {
       rollbackTest(100)
     }
 
-    "apply remote blocks and check history rollback on fat blocks" in {
+    "should sync and check history rollback on invalid block for fat blocks" in {
       rollbackTest(5000)
     }
+
+    "sync when apply headers and payloads separately" in {
+      val blockQty = 10
+      val history: History = generateDummyHistory(testSettings)
+      val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty)
+
+      val headers: Seq[PersistentModifier] = chain.map(_.header)
+      val payloads: Seq[PersistentModifier] = chain.map(_.payload)
+
+      val historyApplicator: TestActorRef[HistoryApplicator] =
+        TestActorRef[HistoryApplicator](
+          HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+        )
+
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+
+      headers.foreach(historyApplicator ! ModifierFromRemote(_))
+
+      awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout)
+      history.getBestHeaderHeight shouldBe blockQty - 1
+      history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(chain(blockQty - 1).header.id))
+
+      payloads.foreach(historyApplicator ! ModifierFromRemote(_))
+
+      expectMsg(timeout, FullBlockChainIsSynced())
+      awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
+      checkBestBlock(history, chain(blockQty - 1))
+    }
+
+    "sync and rollback headers for invalid payload" in {
+      val blockQty = 10
+      val history: History = generateDummyHistory(testSettings)
+      //generate invalid blocks begining from 6 blocks
+      val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty, 100, Some(6))
+
+      val headers: Seq[PersistentModifier] = chain.map(_.header)
+      val payloads: Seq[PersistentModifier] = chain.map(_.payload)
+
+      val historyApplicator: TestActorRef[HistoryApplicator] =
+        TestActorRef[HistoryApplicator](
+          HistoryApplicator.props(history, testSettings, initialState, wallet, nodeViewHolder.ref, Some(influx.ref))
+        )
+
+      system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+
+      headers.foreach(historyApplicator ! ModifierFromRemote(_))
+
+      awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout, 100 millis,
+        s"history.getBestBlockHeight ${history.getBestHeaderHeight} expected ${blockQty - 1}")
+      history.getBestHeaderHeight shouldBe blockQty - 1
+      history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(chain(blockQty - 1).header.id))
+
+      payloads.foreach(historyApplicator ! ModifierFromRemote(_))
+
+      expectMsg(timeout, FullBlockChainIsSynced())
+      awaitCond(history.getBestBlockHeight == 4, timeout, 100 millis,
+        s"history.getBestBlockHeight ${history.getBestBlockHeight} expected 4")
+      checkBestBlock(history, chain(4))
+    }
+
 
   }
 }

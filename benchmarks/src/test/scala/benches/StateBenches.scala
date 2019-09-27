@@ -10,6 +10,9 @@ import encry.EncryApp
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.IODB
+import encry.utils.{ChainGenerator, FileHelper}
+import encry.utils.ChainGenerator._
+import encry.utils.FileHelper.getRandomTempDir
 import encry.view.state.{BoxHolder, UtxoState}
 import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.history.Block
@@ -25,7 +28,7 @@ class StateBenches {
   def applyBlocksToTheState(stateBench: StateBenchState, bh: Blackhole): Unit = {
     bh.consume {
       val innerState: UtxoState =
-        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
+         utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.LevelDB)
       stateBench.chain.foldLeft(innerState) { case (state, block) =>
         state.applyModifier(block).right.get
       }

@@ -31,7 +31,7 @@ import scala.util.Random
 
 object ChainGenerator {
 
-  def genChain(privKey: PrivateKey25519, dir: File, settings: EncryAppSettings, blockQty: Int, transPerBlock: Int = 1,
+  def genChain(privKey: PrivateKey25519, dir: File, settings: EncryAppSettings, blockQty: Int, transPerBlock: Int = 100,
                genInvalidBlockFrom: Option[Int] = None): (UtxoState, UtxoState, List[Block]) = {
 
     def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ ScorexRandom.randomBytes()).address
@@ -59,26 +59,6 @@ object ChainGenerator {
           (blocks :+ newBlock, newBlock, newState, newBoxes)
       }
     (state, newState, chain)
-  }
-
-  def paymentTransactionWithMultipleOutputs(privKey: PrivateKey25519, fee: Amount, timestamp: Long, useBoxes: IndexedSeq[MonetaryBox],
-                                            recipient: Address, amount: Amount, tokenIdOpt: Option[ADKey] = None,
-                                            numOfOutputs: Int): Transaction = {
-
-    val pubKey: PublicKey25519 = privKey.publicImage
-    val uInputs: IndexedSeq[Input] = useBoxes
-      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
-      .toIndexedSeq
-
-    val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
-    val directives: IndexedSeq[TransferDirective] =
-      if (change > 0) TransferDirective(recipient, amount, tokenIdOpt) +: (0 until numOfOutputs).map(_ =>
-        TransferDirective(pubKey.address.address, change / numOfOutputs, tokenIdOpt))
-      else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
-
-    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
-    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
-    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
   def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef], settings: EncryAppSettings,
@@ -129,7 +109,7 @@ object ChainGenerator {
     val timestamp = System.currentTimeMillis()
 
     val transactions: Seq[Transaction] = Seq(
-      paymentTransactionWithMultipleOutputs(privKey, 1L, timestamp, IndexedSeq(box), recipient, 1L, None, boxQty),
+      TransactionFactory.paymentTransactionWithMultipleOutputs(privKey, 1L, timestamp, IndexedSeq(box), recipient, 1L, None, boxQty),
       TransactionFactory.coinbaseTransactionScratch(privKey.publicImage, System.currentTimeMillis(), initialEmissionAmount,
         1L, Height @@ (prevBlock.header.height + 1))
     )

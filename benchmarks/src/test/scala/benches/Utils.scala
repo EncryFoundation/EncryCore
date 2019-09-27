@@ -34,6 +34,8 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
+import encry.utils.ChainGenerator._
+
 object Utils extends Settings with StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
@@ -68,11 +70,6 @@ object Utils extends Settings with StrictLogging {
       height = settings.constants.GenesisHeight
     )
     Block(header, Payload(header.id, txs))
-  }
-
-  def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = settings.constants.GenesisHeight)
-    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
   def generateNextBlockValidForState(prevBlock: Block,
@@ -170,35 +167,6 @@ object Utils extends Settings with StrictLogging {
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
-
-  def utxoFromBoxHolder(bh: BoxHolder,
-                        dir: File,
-                        nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings,
-                        storageType: StorageType): UtxoState = {
-    val storage = settings.storage.state match {
-      case VersionalStorage.IODB =>
-        logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        logger.info("Init state with levelDB storage")
-        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-    }
-
-    storage.insert(
-      StorageVersion @@ Array.fill(32)(0: Byte),
-      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
-    )
-
-    new UtxoState(storage, settings.constants)
-  }
-
-  def getRandomTempDir: File = {
-    val dir = java.nio.file.Files.createTempDirectory("encry_test_" + R.alphanumeric.take(15).mkString).toFile
-    dir.deleteOnExit()
-    dir
-  }
 
   def genHeader: Header = {
     val random = new scala.util.Random

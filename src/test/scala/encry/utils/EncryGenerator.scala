@@ -1,6 +1,7 @@
 package encry.utils
 
 import encry.modifiers.mempool.TransactionFactory
+import encry.modifiers.mempool.TransactionFactory.{dataTransactionScratch, paymentTransactionWithMultipleOutputs}
 import encry.settings.Settings
 import encry.utils.TestHelper.Props
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
@@ -162,7 +163,7 @@ trait EncryGenerator extends Settings {
                                   numberOfOutputs: Int): Vector[Transaction] =
     (0 until boxes.size / numberOfInputs).foldLeft(boxes, Vector.empty[Transaction]) {
       case ((boxesLocal, transactions), _) =>
-        val tx: Transaction = defaultPaymentTransactionScratch(
+        val tx: Transaction = paymentTransactionWithMultipleOutputs(
           privKey,
           fee = 111,
           timestamp = 11L,
@@ -207,68 +208,6 @@ trait EncryGenerator extends Settings {
         )
         (boxesLocal.drop(numberOfInputs), tx +: transactions)
     }._2
-
-  def defaultPaymentTransactionScratch(privKey: PrivateKey25519,
-                                       fee: Amount,
-                                       timestamp: Long,
-                                       useBoxes: IndexedSeq[MonetaryBox],
-                                       recipient: Address,
-                                       amount: Amount,
-                                       tokenIdOpt: Option[ADKey] = None,
-                                       numOfOutputs: Int = 5): Transaction = {
-
-    val pubKey: PublicKey25519 = privKey.publicImage
-
-    val uInputs: IndexedSeq[Input] = useBoxes
-      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
-      .toIndexedSeq
-
-    val change: Amount = useBoxes.map(_.amount).sum - (amount + fee)
-
-    val directives: IndexedSeq[TransferDirective] =
-      if (change > 0) TransferDirective(recipient, amount, tokenIdOpt) +: (0 until numOfOutputs).map(_ =>
-        TransferDirective(pubKey.address.address, change / numOfOutputs, tokenIdOpt))
-      else IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
-
-    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, directives)
-
-    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
-
-    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
-  }
-
-  def dataTransactionScratch(privKey: PrivateKey25519,
-                             fee: Long,
-                             timestamp: Long,
-                             useOutputs: IndexedSeq[MonetaryBox],
-                             amount: Long,
-                             data: Array[Byte],
-                             numOfOutputs: Int = 5): Transaction = {
-
-    val pubKey: PublicKey25519 = privKey.publicImage
-
-    val uInputs: IndexedSeq[Input] = useOutputs
-      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
-      .toIndexedSeq
-
-    val change: Amount = useOutputs.map(_.amount).sum - (amount + fee)
-
-    val directives: IndexedSeq[DataDirective] =
-      (0 until numOfOutputs).foldLeft(IndexedSeq.empty[DataDirective]) { case (directivesAll, _) =>
-        directivesAll :+ DataDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, data)
-      }
-
-    val newDirectives: IndexedSeq[Directive] =
-      if (change > 0) TransferDirective(pubKey.address.address, amount, None) +: (0 until numOfOutputs).map(_ =>
-        TransferDirective(pubKey.address.address, change / numOfOutputs, None)) ++: directives
-      else directives
-
-    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, newDirectives)
-
-    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
-
-    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
-  }
 
   def assetIssuingTransactionScratch(privKey: PrivateKey25519,
                                      fee: Long,
