@@ -4,12 +4,13 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp.{miner, nodeViewSynchronizer}
 import encry.api.http.DataHolderForApi._
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.state.UtxoStateReader
-import encry.local.miner.Miner.MinerStatus
+import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.history.History
@@ -79,6 +80,10 @@ class DataHolderForApi(settings: EncryAppSettings,
     case GetBlockInfo           => sender() ! blockInfo
     case GetAllPeers            => sender() ! allPeers
     case GetBannedPeers         => sender() ! blackList
+    case StartMiner             => context.system.eventStream.publish(EnableMining)
+                                   context.system.eventStream.publish(StartMining)
+    case StopMiner              => context.system.eventStream.publish(DisableMining)
+
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
@@ -107,6 +112,10 @@ object DataHolderForApi {
                                      blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))])
 
   final case class BlockAndHeaderInfo(header: Option[Header], block: Option[Block])
+
+  case object StartMiner
+
+  case object StopMiner
 
   case object GetTransactionsNumber
 

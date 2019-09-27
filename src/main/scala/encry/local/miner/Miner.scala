@@ -55,6 +55,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
+    context.system.eventStream.subscribe(self, classOf[Mining])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
@@ -224,11 +225,13 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
 
 object Miner {
 
-  case object DisableMining
+   trait Mining
 
-  case object EnableMining
+  case object DisableMining extends Mining
 
-  case object StartMining
+  case object EnableMining extends Mining
+
+  case object StartMining extends Mining
 
   case class MinedBlock(block: Block, workerIdx: Int)
 

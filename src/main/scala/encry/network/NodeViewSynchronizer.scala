@@ -8,7 +8,9 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.cli.commands.AddPeer.PeerFromCli
 import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.HistoryConsensus._
-import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.api.http.DataHolderForApi.StartMiner
+import encry.local.miner.Miner
+import encry.local.miner.Miner.{DisableMining, Mining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
@@ -74,6 +76,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
+    context.system.eventStream.subscribe(self, classOf[Mining])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -86,7 +89,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
-    case msg => logger.info(s"Nvsh got strange message: $msg during history awaiting.")
+    case msg => println(s"Nvsh got strange message: $msg during history awaiting.")
   }
 
   def workingCycle(history: History): Receive = {
@@ -176,8 +179,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! msg
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
-    case msg@StartMining => deliveryManager ! msg
-    case msg@DisableMining => deliveryManager ! msg
+    case msg@StartMining => println("MINER")
+      deliveryManager ! msg
+    case msg@DisableMining =>
+      println("DISABLE")
+      deliveryManager ! msg
     case msg@BanPeer(_, _) => peersKeeper ! msg
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
