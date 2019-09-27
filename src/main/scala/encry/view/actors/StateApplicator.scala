@@ -224,6 +224,7 @@ class StateApplicator(settings: EncryAppSettings,
           context.system.eventStream.publish(SemanticallyFailedModification(
             block, List(StateModifierApplyError(s"Root hash is incorrect after modifier"))
           ))
+
           context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState))
         } else {
           //all is ok
