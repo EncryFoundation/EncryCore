@@ -35,6 +35,17 @@ class DataHolderForApi(settings: EncryAppSettings,
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
+    case BlockAndHeaderInfo(header, block) =>
+      context.become(workingCycle(
+      blackList,
+      connectedPeers,
+      history,
+      state,
+      transactionsOnMinerActor,
+      minerStatus,
+      BlockAndHeaderInfo(header, block),
+      allPeers))
+
     case ChangedHistory(reader: History) =>
       context.become(workingCycle(
         blackList,
@@ -43,7 +54,7 @@ class DataHolderForApi(settings: EncryAppSettings,
         state,
         transactionsOnMinerActor,
         minerStatus,
-        BlockAndHeaderInfo(reader.getBestHeader, reader.getBestBlock),
+        blockInfo,
         allPeers))
 
     case ChangedState(reader: UtxoStateReader)  =>

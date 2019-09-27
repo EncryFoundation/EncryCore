@@ -8,6 +8,7 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.timeProvider
+import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -57,7 +58,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   override def preStart(): Unit = {
     logger.info(s"Node view holder started.")
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
-      dataHolder ! ChangedHistory(nodeView.history)
+      dataHolder ! BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
+
     }
   }
 
