@@ -220,16 +220,11 @@ class StateApplicator(settings: EncryAppSettings,
         logger.info(s"block.header.stateRoot: ${Algos.encode(block.header.stateRoot)}")
         if (!(updatedState.tree.rootHash sameElements block.header.stateRoot)) {
           //rollback state
-          updatedState.rollbackTo(prevVersion) match {
-            case Failure(exception) => //stop app
-            case Success(rolledBackState) =>
-              historyApplicator ! RollbackHistoryToVersion(prevVersion, block)
-              context.become(awaitingRollbackHistory(rolledBackState))
-           }
           historyApplicator ! NeedToReportAsInValid(block)
-          context.system.eventStream.publish(
-            SemanticallyFailedModification(block, List(StateModifierApplyError(s"Invalid modifier by state")))
-          )
+          context.system.eventStream.publish(SemanticallyFailedModification(
+            block, List(StateModifierApplyError(s"Root hash is incorrect after modifier"))
+          ))
+
           context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState))
         } else {
           //all is ok
@@ -349,8 +344,6 @@ class StateApplicator(settings: EncryAppSettings,
 }
 
 object StateApplicator {
-
-  final case class RollbackHistoryToVersion(version: VersionTag, failedBlock: Block)
 
   final case class StateApplicatorStarted(history: History, state: UtxoState, wallet: EncryWallet)
 
