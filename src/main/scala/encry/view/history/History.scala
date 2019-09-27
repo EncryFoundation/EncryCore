@@ -70,7 +70,7 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
             // Modifiers from best header and best full chain are involved, links change required.
             val newBestHeader: Header =
               loopHeightDown(getBestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
-                .ensuring(_.isDefined, "Where unable to find new best header, can't invalidate genesis block")
+                .ensuring(_.isDefined, "Were unable to find new best header, can't invalidate genesis block")
                 .get
 
             if (!bestFullIsInvalidated) {
