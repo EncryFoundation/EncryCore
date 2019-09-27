@@ -1,8 +1,11 @@
 package encry.view.state
 
 import java.io.File
-
-import com.google.common.primitives.{Ints, Longs}
+import cats.data.Validated
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
+import encry.utils.implicits.Validation._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
@@ -14,16 +17,12 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
-import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
-import io.iohk.iodb.LSMStore
-import cats.data.Validated
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.syntax.either._
 import encry.view.state.UtxoState.StateChange
-import encry.view.state.avlTree.{AvlTree, AvlVersionalStorage}
+import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.utils.implicits.Instances._
+import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -32,13 +31,12 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, Height}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
 import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-import encry.view.state.avlTree.utils.implicits.Instances._
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],

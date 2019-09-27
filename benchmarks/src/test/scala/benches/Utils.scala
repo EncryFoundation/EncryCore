@@ -14,7 +14,7 @@ import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
-import encry.view.state.avlTree.{AvlTree, AvlVersionalStorage}
+import encry.view.state.avlTree.AvlTree
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
 import encry.view.state.avlTree.utils.implicits.Instances._
