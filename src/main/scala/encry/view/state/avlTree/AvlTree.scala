@@ -6,7 +6,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
-import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 

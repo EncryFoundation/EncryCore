@@ -5,7 +5,7 @@ import cats.Monoid
 import com.google.protobuf.ByteString
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageKey
-import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 

@@ -3,7 +3,6 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg.NodeTypes.EmptyNodeProto
 import cats.kernel.Monoid
 import encry.view.state.avlTree.AvlTree.Directions.EMPTY
-import encry.view.state.avlTree.utils.implicits.NodeWithOpInfo
 import io.iohk.iodb.ByteArrayWrapper
 
 import scala.util.Try
