@@ -186,10 +186,13 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     }
   }
 
-  def rollbackTo[K: Monoid : Serializer : Hashable : Order, V: Monoid : Serializer](to: StorageVersion): Try[AvlTree[K, V]] = Try {
+  //[K: Monoid : Serializer : Hashable : Order, V: Monoid : Serializer]
+  def rollbackTo(to: StorageVersion)(implicit kMonoid: Monoid[K], kSer: Serializer[K],
+                                     vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] = Try {
     storage.rollbackTo(to)
-    val rootNode = NodeSerilalizer.fromBytes[K, V](storage.get(AvlTree.rootNodeKey).get).get
-    AvlTree(rootNode, storage)
+    println(s"after rollback rootnode hash: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
+    val rootNode = NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get).get
+    AvlTree[K, V](rootNode, storage)
   }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {

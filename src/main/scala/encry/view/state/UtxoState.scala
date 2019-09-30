@@ -101,7 +101,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   }
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
-    val rollbackedAvl = tree.rollbackTo[StorageKey, StorageValue](StorageVersion !@@ version).get
+    val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
     UtxoState(rollbackedAvl, constants)
   }
 
