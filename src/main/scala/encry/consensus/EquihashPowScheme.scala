@@ -6,30 +6,29 @@ import org.bouncycastle.crypto.digests.Blake2bDigest
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import scorex.crypto.hash.Digest32
-
 import scala.math.BigInt
 import cats.syntax.either._
 import encry.crypto.equihash.EquihashValidationErrors._
+import org.encryfoundation.common.utils.constants.Constants
 
-case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: Height, maxTarget: BigInt)
-  extends ConsensusScheme {
+case class EquihashPowScheme(constants: Constants) extends ConsensusScheme {
 
   private val seed: Array[Byte] =
-    "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(n) ++ Chars.toByteArray(k)
+    "equi_seed_12".getBytes(Algos.charset) ++ Chars.toByteArray(constants.n) ++ Chars.toByteArray(constants.k)
 
   override def verifyCandidate(candidateBlock: CandidateBlock,
                                startingNonce: Long): Either[EquihashValidationErrors, Block] = {
     val difficulty = candidateBlock.difficulty
     val parentId: ModifierId = candidateBlock.parentOpt.map(_.id).getOrElse(Header.GenesisParentId)
     val txsRoot: Digest32 = Payload.rootHash(candidateBlock.transactions.map(_.id))
-    val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(preGenesisHeight) + 1
-    val bytesPerWord: Int = n / 8
-    val wordsPerHash: Int = 512 / n
+    val height: Int = candidateBlock.parentOpt.map(_.height).getOrElse(constants.PreGenesisHeight) + 1
+    val bytesPerWord: Int = constants.n / 8
+    val wordsPerHash: Int = 512 / constants.n
     val digest: Blake2bDigest = new Blake2bDigest(null, bytesPerWord * wordsPerHash, null, seed)
     val header: Header = Header(
-      version,
+      constants.Version,
       parentId,
       txsRoot,
       candidateBlock.timestamp,
@@ -54,7 +53,7 @@ case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: 
                              difficulty: Difficulty): Either[EquihashValidationErrors, Header] = {
     val currentDigest = new Blake2bDigest(digest)
     Equihash.hashNonce(currentDigest, nonce)
-    val solutions = Equihash.gbpBasic(currentDigest, n, k)
+    val solutions = Equihash.gbpBasic(currentDigest, constants.n, constants.k)
     solutions
       .map(solution => header.copy(nonce = nonce, equihashSolution = solution))
       .find(newHeader => correctWorkDone(realDifficulty(newHeader), difficulty))
@@ -65,10 +64,10 @@ case class EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: 
   }
 
   def verify(header: Header): Either[EquihashValidationErrors, Boolean] = Equihash
-    .validateSolution(n, k, seed, Equihash.nonceToLeBytes(header.nonce), header.equihashSolution.indexedSeq)
+    .validateSolution(constants.n, constants.k, seed, Equihash.nonceToLeBytes(header.nonce), header.equihashSolution.indexedSeq)
 
   override def realDifficulty(header: Header): Difficulty =
-    Difficulty @@ (maxTarget / BigInt(1, header.powHash))
+    Difficulty @@ (constants.MaxTarget / BigInt(1, header.powHash))
 
-  override def toString: String = s"EquihashPowScheme(n = ${n.toInt}, k = ${k.toInt})"
+  override def toString: String = s"EquihashPowScheme(n = ${constants.n.toInt}, k = ${constants.k.toInt})"
 }

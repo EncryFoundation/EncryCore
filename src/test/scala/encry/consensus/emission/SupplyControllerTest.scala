@@ -1,6 +1,6 @@
 package encry.consensus.emission
 
-import encry.consensus.EncrySupplyController
+import encry.consensus.SupplyController
 import encry.settings.Settings
 import encry.utils.EncryGenerator
 import org.encryfoundation.common.utils.TaggedTypes.Height
@@ -8,7 +8,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
 
-class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerator with Settings {
+class SupplyControllerTest extends PropSpec with Matchers with EncryGenerator with Settings {
 
   val epochLen = 10
 
@@ -18,8 +18,7 @@ class EncrySupplyControllerTest extends PropSpec with Matchers with EncryGenerat
 
   property("testSupplyAt") {
 
-    val epochSupply = (0 until blocksPerYear * epochLen).map(h => EncrySupplyController.supplyAt(Height @@ h,
-      settings.constants.InitialEmissionAmount, settings.constants.EmissionEpochLength, settings.constants.EmissionDecay))
+    val epochSupply = (0 until blocksPerYear * epochLen).map(h => SupplyController.supplyAt(Height @@ h, settings.constants))
 
     val atEndEpochSupply = epochSupply.last
 

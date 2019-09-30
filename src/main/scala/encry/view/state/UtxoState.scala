@@ -7,7 +7,7 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import encry.utils.implicits.Validation._
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.EncrySupplyController
+import encry.consensus.SupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
@@ -69,8 +69,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
           if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
-            totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height,
-            constants.InitialEmissionAmount, constants.EmissionEpochLength, constants.EmissionDecay))
+            totalFees + SupplyController.supplyAt(Height @@ block.header.height, constants))
           else validate(tx, block.header.timestamp, Height @@ block.header.height)
         }).toList
           .traverse(Validated.fromEither)

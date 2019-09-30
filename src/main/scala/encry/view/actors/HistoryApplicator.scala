@@ -5,6 +5,7 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
+import encry.local.miner.Miner.{CandidateEnvelope, NewCandidate, StartProducingNewCandidate, WrongConditionsForNewBlock}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
@@ -26,6 +27,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.immutable.Queue
 import scala.collection.mutable
 import scala.util.{Failure, Success}
@@ -65,6 +67,26 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
 
   def mainBehaviour(history: History): Receive = {
     case GetHistory => sender() ! history
+    case msg@StartProducingNewCandidate(_, _, _) if (history.isFullChainSynced && history.isBestBlockDefined)
+                                                                               || settings.node.offlineGeneration =>
+      logger.info(s"History applicator got StartProducingNewCandidate. history.isFullChainSynced = ${history.isFullChainSynced}" +
+        s" history.isBestBlockDefined = ${history.isBestBlockDefined}. settings.node.offlineGeneration = ${settings.node.offlineGeneration}.")
+      val header: Option[Header] = history.getHeaderOfBestBlock
+      stateApplicator ! msg.copy(
+        bestHeaderOpt = header,
+        difficulty = header.map(history.requiredDifficultyAfter(_) match {
+          case Left(value)  => logger.info(s"$value"); sys.exit(999)
+          case Right(value) => value
+        }) getOrElse settings.constants.InitialDifficulty
+      )
+    case StartProducingNewCandidate(txs, _, _) =>
+      logger.info(s"History applicator got StartProducingNewCandidate with out if condition. history.isFullChainSynced = ${history.isFullChainSynced}" +
+        s" history.isBestBlockDefined = ${history.isBestBlockDefined}. settings.node.offlineGeneration = ${settings.node.offlineGeneration}.")
+      sender() ! WrongConditionsForNewBlock(txs)
+    case msg@NewCandidate(_, _, _, _, _) =>
+      logger.info(s"History applicator got NewCandidate. Send to NVH")
+      nodeViewHolder ! msg
+
     case ModifierFromRemote(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
       ModifiersCache.put(toKey(mod.id), mod, history)
       getModifierForApplying(history)
@@ -88,7 +110,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
           influxRef.foreach(_ ! ModifierAppendedToHistory(modifier match {
-            case _: Header  => true
+            case _: Header => true
             case _: Payload => false
           }, success = true))
           if (progressInfo.chainSwitchingNeeded)

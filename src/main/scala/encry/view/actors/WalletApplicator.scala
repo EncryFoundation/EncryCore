@@ -2,6 +2,7 @@ package encry.view.actors
 
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.local.miner.Miner.{CandidateWithOutMandatoryAccount, NewCandidate}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.actors.StateApplicator.NewWalletForWalletApplicator
 import encry.view.actors.WalletApplicator.{GetWallet, WalletNeedRollbackTo, WalletNeedScanPersistent}
@@ -20,6 +21,9 @@ class WalletApplicator extends Actor with StrictLogging {
 
   def mainBehaviour(wallet: EncryWallet): Receive = {
     case GetWallet => sender() ! wallet
+    case CandidateWithOutMandatoryAccount(validatedTxs, header, difficulty, stateRoot) =>
+      logger.info(s"Got CandidateWithOutMandatoryAccount on Wallet Holder")
+      sender() ! NewCandidate(validatedTxs, header, difficulty, stateRoot, wallet.accountManager.mandatoryAccount)
     case WalletNeedRollbackTo(version) =>
       logger.info(s"Wallet need to rollback.")
       wallet.rollback(version)

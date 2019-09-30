@@ -7,6 +7,7 @@ import akka.util.Timeout
 import encry.EncryApp.timeProvider
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.local.miner.Miner.{CandidateEnvelope, NewCandidate, StartProducingNewCandidate, WrongConditionsForNewBlock}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -26,6 +27,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import encry.EncryApp.miner
 
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
@@ -55,10 +57,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def awaitingHistory: Receive = {
     case InitialStateHistoryWallet(history, w, s) =>
       influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-        ref ! HeightStatistics(
-          history.getBestHeaderHeight,
-          history.getBestBlockHeight
-        )
+        ref ! HeightStatistics(history.getBestHeaderHeight, history.getBestBlockHeight)
       })
       unstashAll()
       context.become(mainBehaviour(history, w, s))
@@ -67,6 +66,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def mainBehaviour(history: History, wallet: EncryWallet, state: UtxoState): Receive = {
     case StateForNVH(stateNew) => context.become(mainBehaviour(history, wallet, stateNew))
+    case msg@StartProducingNewCandidate(_, _, _) =>
+      logger.info("Nvh got message StartProducingNewCandidate. Send it to history applicator.")
+      historyApplicator ! msg
+    case msg@NewCandidate(_, _, _, _, _) =>
+      logger.info(s"NVH got NewCandidate. send to miner")
+      miner ! msg
+    case msg@WrongConditionsForNewBlock(_) =>
+      logger.info(s"Send WrongConditionsForNewBlock to miner form nvh")
+      miner ! msg
     case msg@ModifierFromRemote(_) => historyApplicator ! msg
     case msg@LocallyGeneratedBlock(_) => historyApplicator ! msg
     case GetDataFromCurrentView(f) =>
