@@ -1,26 +1,29 @@
 package benches
 
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.HistoryBenches.HistoryBenchState
-import benches.Utils.{coinbaseTransaction, generateHistory, generateNextBlockValidForHistory}
-import encry.utils.FileHelper
+import encry.utils.TestEntityGenerator.coinbaseTransaction
+import encry.utils.HistoryGenerator
 import encry.view.history.History
 import encryBenchmark.BenchSettings
-import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
+import scala.util.Random
 
 class HistoryBenches {
 
   @Benchmark
   def appendBlocksToHistoryBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
-      val history: History = generateHistory(benchStateHistory.settings, FileHelper.getRandomTempDir)
+      val history: History = HistoryGenerator.dummyHistory(benchStateHistory.settings)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
         historyL.append(block.header)
         historyL.append(block.payload)
@@ -33,7 +36,7 @@ class HistoryBenches {
   @Benchmark
   def readHistoryFileBench(benchStateHistory: HistoryBenchState, bh: Blackhole): Unit = {
     bh.consume {
-      val history: History = generateHistory(benchStateHistory.settings, benchStateHistory.tmpDir)
+      val history: History = HistoryGenerator.dummyHistory(benchStateHistory.settings)
       history.closeStorage()
     }
   }
@@ -62,15 +65,14 @@ object HistoryBenches extends BenchSettings {
   @State(Scope.Benchmark)
   class HistoryBenchState extends encry.settings.Settings {
 
-    val tmpDir: File = FileHelper.getRandomTempDir
-    val initialHistory: History = generateHistory(settings, tmpDir)
+    val initialHistory: History = HistoryGenerator.dummyHistory(settings)
 
     val resultedHistory: (History, Option[Block], Vector[Block]) =
       (0 until benchSettings.historyBenchSettings.blocksNumber)
         .foldLeft(initialHistory, Option.empty[Block], Vector.empty[Block]) {
           case ((prevHistory, prevBlock, vector), _) =>
             val block: Block =
-              generateNextBlockValidForHistory(prevHistory, 0, prevBlock,  Seq(coinbaseTransaction(0)))
+              generateNextBlockValidForHistory(prevHistory, 0, prevBlock,  Seq(coinbaseTransaction(0)), settings.constants.InitialDifficulty)
             prevHistory.append(block.header)
             prevHistory.append(block.payload)
             (prevHistory.reportModifierIsValid(block), Some(block), vector :+ block)
@@ -79,4 +81,27 @@ object HistoryBenches extends BenchSettings {
 
     val blocks: Vector[Block] = resultedHistory._3
   }
+
+  def generateNextBlockValidForHistory(history: History,
+                                       difficultyDiff: BigInt = 0,
+                                       prevBlock: Option[Block],
+                                       txs: Seq[Transaction],
+                                       initialDifficulty: Difficulty): Block = {
+    val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
+    val requiredDifficulty: Difficulty = prevBlock.map(b =>
+      history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
+      .getOrElse(initialDifficulty)
+    val header = Header(
+      1.toByte,
+      previousHeaderId,
+      Payload.rootHash(txs.map(_.id)),
+      Math.abs(Random.nextLong()),
+      history.getBestHeaderHeight + 1,
+      Random.nextLong(),
+      Difficulty @@ (requiredDifficulty + difficultyDiff),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, txs))
+  }
+
 }

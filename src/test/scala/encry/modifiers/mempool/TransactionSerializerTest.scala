@@ -21,7 +21,7 @@ class TransactionSerializerTest extends FunSuite {
 
   test("toBytes & parseBytes (Coinbase)") {
 
-    val tx = coinbaseTransaction
+    val tx = coinbaseTransaction(0)
 
     val txSerialized = tx.bytes
 

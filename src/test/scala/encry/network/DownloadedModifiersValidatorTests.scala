@@ -122,7 +122,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
           (prevHistory.reportModifierIsValid(block), blocks :+ block)
       }
 
-      val payload = Payload(ModifierId @@ scorex.utils.Random.randomBytes(), Seq(coinbaseTransaction))
+      val payload = Payload(ModifierId @@ scorex.utils.Random.randomBytes(), Seq(coinbaseTransaction(0)))
 
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(historyWith10Blocks._1))
 

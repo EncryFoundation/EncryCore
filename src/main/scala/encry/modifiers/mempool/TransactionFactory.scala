@@ -50,6 +50,21 @@ object TransactionFactory extends StrictLogging {
     Transaction(0, timestamp, IndexedSeq.empty, directives, None)
   }
 
+  def defaultPaymentTransaction(privKey: PrivateKey25519,
+                                fee: Long,
+                                timestamp: Long,
+                                useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
+                                recipient: String,
+                                amount: Long,
+                                tokenIdOpt: Option[ADKey] = None): Transaction = {
+    val howMuchCanTransfer: Long = useOutputs.map(_._1.amount).sum - fee
+    val howMuchWillTransfer: Long = howMuchCanTransfer - Math.abs(Random.nextLong % howMuchCanTransfer)
+    val change: Long = howMuchCanTransfer - howMuchWillTransfer
+    val directives: IndexedSeq[TransferDirective] =
+      IndexedSeq(TransferDirective(recipient, howMuchWillTransfer, tokenIdOpt))
+    prepareTransaction(privKey, fee, timestamp, useOutputs, directives, change, tokenIdOpt)
+  }
+
   def prepareTransaction(privKey: PrivateKey25519,
                          fee: Long,
                          timestamp: Long,
@@ -86,21 +101,6 @@ object TransactionFactory extends StrictLogging {
     val proofs: IndexedSeq[Seq[Proof]] = useOutputs.flatMap(_._2.map(_._2)).toIndexedSeq
 
     uTransaction.toSigned(proofs, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
-  }
-
-  def defaultPaymentTransaction(privKey: PrivateKey25519,
-                                fee: Long,
-                                timestamp: Long,
-                                useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
-                                recipient: String,
-                                amount: Long,
-                                tokenIdOpt: Option[ADKey] = None): Transaction = {
-    val howMuchCanTransfer: Long = useOutputs.map(_._1.amount).sum - fee
-    val howMuchWillTransfer: Long = howMuchCanTransfer - Math.abs(Random.nextLong % howMuchCanTransfer)
-    val change: Long = howMuchCanTransfer - howMuchWillTransfer
-    val directives: IndexedSeq[TransferDirective] =
-      IndexedSeq(TransferDirective(recipient, howMuchWillTransfer, tokenIdOpt))
-    prepareTransaction(privKey, fee, timestamp, useOutputs, directives, change, tokenIdOpt)
   }
 
   def paymentTransactionWithMultipleOutputs(privKey: PrivateKey25519, fee: Amount, timestamp: Long, useBoxes: IndexedSeq[MonetaryBox],

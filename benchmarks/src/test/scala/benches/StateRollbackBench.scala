@@ -4,12 +4,12 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.StateRollbackBench.StateRollbackState
-import benches.Utils._
+import encry.modifiers.mempool.TransactionFactory.paymentTransactionWithMultipleOutputs
 import encry.storage.VersionalStorage
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.{BoxHolder, UtxoState}
 import encryBenchmark.BenchSettings
-import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.encryfoundation.common.utils.TaggedTypes.Difficulty
 import org.openjdk.jmh.annotations.{Benchmark, Mode, Scope, State}
@@ -18,7 +18,12 @@ import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 import encry.utils.FileHelper.getRandomTempDir
-import encry.utils.ChainGenerator.{utxoFromBoxHolder, genGenesisBlock}
+import encry.utils.ChainGenerator.{genGenesisBlock, utxoFromBoxHolder}
+import encry.utils.TestEntityGenerator
+import org.encryfoundation.common.crypto.equihash.EquihashSolution
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+
+import scala.util.Random
 
 class StateRollbackBench {
 
@@ -64,7 +69,7 @@ object StateRollbackBench extends BenchSettings {
     val tmpDir: File = getRandomTempDir
 
     val initialBoxes: IndexedSeq[AssetBox] = (0 until benchSettings.stateBenchSettings.totalBoxesNumber).map(nonce =>
-      genHardcodedBox(privKey.publicImage.address.address, nonce)
+      TestEntityGenerator.genHardcodedBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
@@ -99,5 +104,37 @@ object StateRollbackBench extends BenchSettings {
     val forkBlocks: List[Block] = genesisBlock +: stateGenerationResults._1.map(_._2)
     state = stateGenerationResults._3
     state.close()
+  }
+
+  def generateNextBlockForStateWithSpendingAllPreviousBoxes(prevBlock: Block,
+                                                            state: UtxoState,
+                                                            box: Seq[AssetBox],
+                                                            splitCoef: Int = 2,
+                                                            addDiff: Difficulty = Difficulty @@ BigInt(0)): Block = {
+
+    val transactions: Seq[Transaction] = box.indices.foldLeft(box, Seq.empty[Transaction]) {
+      case ((boxes, transactionsL), _) =>
+        val tx: Transaction = paymentTransactionWithMultipleOutputs(
+          privKey,
+          fee = 1,
+          timestamp = 11L,
+          useBoxes = IndexedSeq(boxes.head),
+          recipient = privKey.publicImage.address.address,
+          amount = boxes.head.amount - 1,
+          numOfOutputs = splitCoef
+        )
+        (boxes.tail, transactionsL :+ tx)
+    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(TestEntityGenerator.coinbaseTransaction(prevBlock.header.height + 1))
+        val header = Header(
+      1.toByte,
+      prevBlock.id,
+      Payload.rootHash(transactions.map(_.id)),
+      System.currentTimeMillis(),
+      prevBlock.header.height + 1,
+      Random.nextLong(),
+      Difficulty @@ (BigInt(1) + addDiff),
+      EquihashSolution(Seq(1, 3))
+    )
+    Block(header, Payload(header.id, transactions))
   }
 }

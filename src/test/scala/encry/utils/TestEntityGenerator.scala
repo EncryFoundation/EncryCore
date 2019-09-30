@@ -24,7 +24,13 @@ import scorex.utils.{Random => ScorexRandom}
 
 object TestEntityGenerator extends Keys with Settings {
 
-  def timestamp: Long = System.currentTimeMillis()
+  def timestamp(): Long = System.currentTimeMillis()
+
+  def genHardcodedBox(address: Address, nonce: Long): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), nonce, 10000000L, None)
+
+  def generateInitialBoxes(qty: Int): IndexedSeq[AssetBox] =
+    (0 until qty).map(_ => TestEntityGenerator.genAssetBox(privKey.publicImage.address.address))
 
   def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), Random.nextLong(), amount, tokenIdOpt)
@@ -52,12 +58,19 @@ object TestEntityGenerator extends Keys with Settings {
 
   def genValidPaymentTxs(qty: Int): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
-    val now = System.currentTimeMillis()
 
     keys.map { k =>
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genAssetBox(k.publicImage.address.address))
       defaultPaymentTransactionScratch(k, Props.txFee,
-        now + Random.nextInt(5000), useBoxes, randomAddress, Props.boxValue)
+        timestamp() + Random.nextInt(5000), useBoxes, randomAddress, Props.boxValue)
+    }
+  }
+
+  def genInvalidPaymentTxs(qty: Int): Seq[Transaction] = {
+    genPrivKeys(qty).map { key =>
+      val useBoxes: IndexedSeq[AssetBox] =
+        IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ ScorexRandom.randomBytes(32)).address.address))
+      defaultPaymentTransactionScratch(key, -100, timestamp(), useBoxes, randomAddress, Props.boxValue)
     }
   }
 
@@ -82,36 +95,24 @@ object TestEntityGenerator extends Keys with Settings {
       case (seq, _) => seq :+ (ADKey @@ ScorexRandom.randomBytes())
     }
     val pksZipTokens: Seq[(PrivateKey25519, ADKey)] = keys.zip(tokens)
-    val timestamp: Amount = System.currentTimeMillis()
     pksZipTokens.map { k =>
       val useBoxes = IndexedSeq(genAssetBox(address, tokenIdOpt = Some(k._2)))
       defaultPaymentTransactionScratch(k._1, Props.txFee,
-        timestamp, useBoxes, address, Props.boxValue, tokenIdOpt = Some(k._2))
+        timestamp(), useBoxes, address, Props.boxValue, tokenIdOpt = Some(k._2))
     }
   }
 
   def genSelfSpendingTxs(qty: Int): Seq[Transaction] = {
     val keys: Seq[PrivateKey25519] = genPrivKeys(qty)
-    val timestamp: Amount = System.currentTimeMillis()
     keys.foldLeft(Seq[Transaction]()) { (seq, key) =>
       val useBoxes: IndexedSeq[MonetaryBox] = if (seq.isEmpty) IndexedSeq(genAssetBox(key.publicImage.address.address))
       else seq.last.newBoxes.map(_.asInstanceOf[MonetaryBox]).toIndexedSeq
       seq :+ defaultPaymentTransactionScratch(key, Props.txFee,
-        timestamp, useBoxes, randomAddress, Props.boxValue)
-    }
-  }
-
-  def genInvalidPaymentTxs(qty: Int): Seq[Transaction] = {
-    val timestamp: Amount = System.currentTimeMillis()
-    genPrivKeys(qty).map { key =>
-      val useBoxes: IndexedSeq[AssetBox] =
-        IndexedSeq(genAssetBox(PublicKey25519(PublicKey @@ ScorexRandom.randomBytes(32)).address.address))
-      defaultPaymentTransactionScratch(key, -100, timestamp, useBoxes, randomAddress, Props.boxValue)
+        timestamp(), useBoxes, randomAddress, Props.boxValue)
     }
   }
 
   def genHeader: Header = {
-    val random = new scala.util.Random
     Header(
       1.toByte,
       ModifierId @@ ScorexRandom.randomBytes(),
@@ -196,7 +197,7 @@ object TestEntityGenerator extends Keys with Settings {
     val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(genHelper.genAssetBox(publicKey.address.address),
       genHelper.genAssetBox(publicKey.address.address))
 
-    TransactionFactory.defaultPaymentTransactionScratch(privKey, fee, timestamp, useBoxes,
+    TransactionFactory.defaultPaymentTransactionScratch(privKey, fee, timestamp(), useBoxes,
       publicKey.address.address, genHelper.Props.txAmount)
   }
 
@@ -214,8 +215,16 @@ object TestEntityGenerator extends Keys with Settings {
       publicKey.address.address, genHelper.Props.txAmount)
   }
 
-  def coinbaseTransaction: Transaction = {
-    TransactionFactory.coinbaseTransactionScratch(publicKey, timestamp, 10L, 0, Height @@ 100)
+  //  def coinbaseTransaction(height: Int): Transaction = TransactionFactory.coinbaseTransactionScratch(
+  //    publicKey,
+  //    System.currentTimeMillis(),
+  //    supply = 10000000L,
+  //    amount = 1L,
+  //    height = Height @@ height
+  //  )
+
+  def coinbaseTransaction(height: Int): Transaction = {
+    TransactionFactory.coinbaseTransactionScratch(publicKey, timestamp(), 10000000L, 1L, Height @@ height)
   }
 
   def generateNextBlock(history: History,
@@ -229,7 +238,7 @@ object TestEntityGenerator extends Keys with Settings {
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(history.settings.constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Random.nextInt(txsQty)) else Seq.empty) ++
-      Seq(coinbaseTransaction)
+      Seq(coinbaseTransaction(0))
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.getBestHeaderHeight + 1,

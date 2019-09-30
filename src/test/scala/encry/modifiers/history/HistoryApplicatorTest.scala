@@ -203,7 +203,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       headers.foreach(historyApplicator ! ModifierFromRemote(_))
 
       awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout, 500 millis,
-        s"history.getBestBlockHeight ${history.getBestHeaderHeight} expected ${blockQty - 1}")
+        s"history.getBestHeaderHeight ${history.getBestHeaderHeight} expected ${blockQty - 1}")
       history.getBestHeaderHeight shouldBe blockQty - 1
       history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(chain(blockQty - 1).header.id))
 

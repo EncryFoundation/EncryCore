@@ -30,20 +30,7 @@ object TestHelper {
       }
   }
 
-  def genAssetBoxes: IndexedSeq[AssetBox] = {
-    val rnd: Random = new scala.util.Random(genesisSeed)
-    genKeys(Props.keysQty).foldLeft(IndexedSeq[AssetBox]()) { case (bxs, pk) =>
-      bxs :+ AssetBox(
-        EncryProposition.pubKeyLocked(pk.publicKeyBytes),
-        rnd.nextLong(), Props.boxValue)
-    }
-  }
-
   def genAssetBox(address: EncryAddress.Address, amount: Amount = 9L): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), amount, Props.boxValue)
 
-  def genTxOutputs(boxes: Traversable[EncryBaseBox]): IndexedSeq[ADKey] =
-    boxes.foldLeft(IndexedSeq[ADKey]()) { case(s, box) =>
-      s :+ box.id
-    }
 }

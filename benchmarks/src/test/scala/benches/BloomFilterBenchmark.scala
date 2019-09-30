@@ -1,7 +1,6 @@
 //package benches
 //
 //import java.util.concurrent.TimeUnit
-//import benches.Utils._
 //import akka.actor.ActorSystem
 //import benches.BloomFilterBenchmark.BloomFilterBenchmarkState
 //import encry.modifiers.mempool.Transaction
