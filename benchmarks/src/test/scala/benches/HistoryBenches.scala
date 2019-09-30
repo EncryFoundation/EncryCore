@@ -4,14 +4,11 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 
 import benches.HistoryBenches.HistoryBenchState
-import benches.Utils.{generateHistory, generateNextBlockValidForHistory}
-import encry.EncryApp
-import encry.settings.EncryAppSettings
+import benches.Utils.{coinbaseTransaction, generateHistory, generateNextBlockValidForHistory}
 import encry.utils.FileHelper
 import encry.view.history.History
-import encryBenchmark.{BenchSettings, Settings}
+import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.history.Block
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
@@ -73,9 +70,7 @@ object HistoryBenches extends BenchSettings {
         .foldLeft(initialHistory, Option.empty[Block], Vector.empty[Block]) {
           case ((prevHistory, prevBlock, vector), _) =>
             val block: Block =
-              generateNextBlockValidForHistory(
-                prevHistory, 0, prevBlock,  Seq.empty[Transaction]
-              )
+              generateNextBlockValidForHistory(prevHistory, 0, prevBlock,  Seq(coinbaseTransaction(0)))
             prevHistory.append(block.header)
             prevHistory.append(block.payload)
             (prevHistory.reportModifierIsValid(block), Some(block), vector :+ block)
