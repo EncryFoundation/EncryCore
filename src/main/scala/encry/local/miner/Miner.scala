@@ -27,7 +27,6 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import encry.utils.NetworkTimeProvider
 import encry.EncryApp.nodeViewHolder
-
 import scala.collection._
 import scala.concurrent.duration._
 import SupplyController._
@@ -79,11 +78,13 @@ class Miner(dataHolder: ActorRef,
       candidateOpt.foreach(candidate => context.children.foreach(_ ! NextChallenge(candidate)))
     case StartMining if isSyncingDone =>
       logger.info(s"Miner got StartMining but candidateOpt = $candidateOpt. Create new candidate.")
+      val coinbase: Transaction = TransactionFactory
+        .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, currentHeight)
       nodeViewHolder ! StartProducingNewCandidate(transactionsPool, none, Difficulty @@ BigInt(0))
       transactionsPool = IndexedSeq.empty[Transaction] //tmp decision
     case StartMining => logger.info(s"Miner -> isSyncingDone = $isSyncingDone.")
     case NewCandidate(txs, header, difficulty, stateRoot, account) =>
-      logger.info(s"Miner got NewCandidate. start processing new candidate.")
+      logger.info(s"\n\nMiner got NewCandidate. start processing new candidate. ${Algos.encode(stateRoot)}.\n\n")
       self ! createNewCandidateBlock(txs, header, account, difficulty, stateRoot)
     case WrongConditionsForNewBlock(txs) =>
       logger.info(s"Miner got wrong condition.")
@@ -156,7 +157,7 @@ class Miner(dataHolder: ActorRef,
                               bestHeaderOpt: Option[Header],
                               minerSecret: PrivateKey25519,
                               difficulty: Difficulty,
-                              stateRoot: Array[Byte]): CandidateBlock = {
+                              stateRoot: Array[Byte]): CandidateEnvelope = {
     val filteredTxs: IndexedSeq[Transaction] = validatedTxs.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
         if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId))))
@@ -168,10 +169,10 @@ class Miner(dataHolder: ActorRef,
     val timestamp: Time = timeProvider.estimatedTime
     val feesTotal: Amount = filteredTxs.map(_.fee).sum
     val supplyTotal: Amount = supplyAt(currentHeight, settings.constants)
-    val coinbase: Transaction = TransactionFactory
-      .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, currentHeight)
-    val candidate: CandidateBlock =
-      CandidateBlock(bestHeaderOpt, settings.constants.Version, filteredTxs :+ coinbase, timestamp, difficulty, stateRoot)
+    val candidate: CandidateEnvelope =
+      CandidateEnvelope.fromCandidate(
+        CandidateBlock(bestHeaderOpt, settings.constants.Version, filteredTxs, timestamp, difficulty, stateRoot)
+      )
     logger.info(s"$candidate at height $newHeight.")
     transactionsPool = IndexedSeq.empty[Transaction]
     candidate

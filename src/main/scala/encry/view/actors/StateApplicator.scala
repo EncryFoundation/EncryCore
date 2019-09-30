@@ -264,9 +264,12 @@ class StateApplicator(settings: EncryAppSettings,
       val validatedTxs: IndexedSeq[Transaction] =
         txs.filter(x => state.validate(x, System.currentTimeMillis(), height).isRight).distinct
       val combinedStateChange: UtxoState.StateChange = combineAll(validatedTxs.map(UtxoState.tx2StateChange).toList)
+
+      logger.info(s"combinedStateChange -> ${combinedStateChange.outputsToDb.length}")
       val stateRoot: Array[Byte] = state.tree.getOperationsRootHash(
         combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
       )
+      logger.info(s"StartProducingNewCandidate -> -> -> -> ${Algos.encode(stateRoot)}")
       walletApplicator ! CandidateWithOutMandatoryAccount(validatedTxs, header, difficulty, stateRoot)
     case msg@NewCandidate(_, _, _, _, _) =>
       logger.info(s"Got NewCandidate on state applicator.")
