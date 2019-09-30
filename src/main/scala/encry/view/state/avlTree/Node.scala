@@ -3,7 +3,7 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg
 import NodeMsg.NodeProtoMsg.NodeTypes
 import cats.Monoid
-import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 
 import scala.util.Try

@@ -1,6 +1,4 @@
-package encry.view.state.avlTree.utils.implicits
-
-import encry.view.state.avlTree.{Node, OperationInfo}
+package encry.view.state.avlTree
 
 case class NodeWithOpInfo[K, V](node: Node[K, V], opInfo: OperationInfo[K, V] = OperationInfo.empty[K, V]) {
 

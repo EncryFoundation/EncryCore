@@ -2,7 +2,7 @@ package encry.view.state.avlTree
 
 import NodeMsg.NodeProtoMsg.NodeTypes.LeafNodeProto
 import com.google.protobuf.ByteString
-import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
