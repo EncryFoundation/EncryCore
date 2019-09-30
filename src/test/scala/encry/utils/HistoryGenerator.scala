@@ -13,15 +13,15 @@ import org.iq80.leveldb.Options
 
 object HistoryGenerator {
 
-  def dummyHistory(settings: EncryAppSettings, withoutPow: Boolean = false): History = {
+  def dummyHistory(historySettings: EncryAppSettings, withoutPow: Boolean = false): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB))
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, historySettings.levelDB))
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+    val ntp: NetworkTimeProvider = new NetworkTimeProvider(historySettings.ntp)
 
     class EquihashPowSchemeWithoutValidateSolution(n: Char, k: Char, version: Byte, preGenesisHeight: Height, maxTarget: BigInt)
       extends EquihashPowScheme(n: Char, k: Char, version: Byte, preGenesisHeight: Height, maxTarget: BigInt) {
@@ -33,8 +33,8 @@ object HistoryGenerator {
         override val historyStorage: HistoryStorage = storage
         override val timeProvider: NetworkTimeProvider = ntp
         override val powScheme: EquihashPowScheme =
-          new EquihashPowSchemeWithoutValidateSolution(settings.constants.n, settings.constants.k,
-            settings.constants.Version, settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
+          new EquihashPowSchemeWithoutValidateSolution(historySettings.constants.n, historySettings.constants.k,
+            historySettings.constants.Version, historySettings.constants.PreGenesisHeight, historySettings.constants.MaxTarget)
       }
     } else
       new History {
