@@ -2,16 +2,17 @@ package encry.view.state.avlTree
 
 import NodeMsg.NodeProtoMsg.NodeTypes.EmptyNodeProto
 import cats.kernel.Monoid
-import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.EMPTY
+import encry.view.state.avlTree.utils.implicits.NodeWithOpInfo
+import io.iohk.iodb.ByteArrayWrapper
 
 import scala.util.Try
 
 final case class EmptyNode[K, V] private (key: K, value: V, height: Int, balance: Int) extends Node[K, V] {
 
-  override def selfInspection: Node[K, V] = this
-
   override val hash: Array[Byte] = Array.emptyByteArray
+
+  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = NodeWithOpInfo(this, prevOpsInfo)
 }
 
 object EmptyNode {

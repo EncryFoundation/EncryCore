@@ -5,7 +5,8 @@ import cats.Monoid
 import com.google.protobuf.ByteString
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.StorageKey
-import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
 import scala.util.Try
@@ -18,10 +19,11 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](hash: Array[Byte],
   override val value: V = vM.empty
 
   def restoreFullNode(storage: VersionalStorage): Try[Node[K, V]] = {
+    println(s"Trying to restore: ${Algos.encode(hash)}")
     NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey @@ hash).get)
   }
 
-  override def selfInspection: Node[K, V] = this
+  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = NodeWithOpInfo(this, prevOpsInfo)
 }
 
 object ShadowNode {

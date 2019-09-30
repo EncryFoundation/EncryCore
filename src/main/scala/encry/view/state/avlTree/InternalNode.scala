@@ -3,7 +3,8 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
 import cats.Monoid
 import com.google.protobuf.ByteString
-import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
 import scala.util.Try
@@ -16,14 +17,27 @@ final case class InternalNode[K: Hashable, V](key: K,
                                               rightChild: Option[Node[K, V]],
                                               hash: Array[Byte]) extends Node[K, V] {
 
-  override def selfInspection: Node[K, V] = if (leftChild.isEmpty & rightChild.isEmpty) LeafNode(key, value)
-                                            else this
+  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] =
+    if (leftChild.isEmpty & rightChild.isEmpty) {
+      val leaf = LeafNode(key, value)
+      NodeWithOpInfo(leaf, prevOpsInfo.update(ByteArrayWrapper(leaf.hash) -> leaf, ByteArrayWrapper(hash)))
+    }
+    else NodeWithOpInfo(this, prevOpsInfo)
 
   def updateChilds(newLeftChild: Option[Node[K, V]] = leftChild,
-                   newRightChild: Option[Node[K, V]] = rightChild): InternalNode[K, V] = {
-    val newLeftChildAfterInspect = newLeftChild.map(_.selfInspection)
-    val newRightChildAfterInspect = newRightChild.map(_.selfInspection)
-    this.copy(
+                   newRightChild: Option[Node[K, V]] = rightChild,
+                   prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = {
+    val (newLeftChildAfterInspect, leftInfo) =
+      newLeftChild.map{node =>
+        val resOp = node.selfInspection(prevOpsInfo)
+        (Some(resOp.node), resOp.opInfo)
+      }.getOrElse(Option.empty[Node[K, V]], prevOpsInfo)
+    val (newRightChildAfterInspect, rightInfo) =
+      newRightChild.map{node =>
+        val resOp = node.selfInspection(leftInfo)
+        (Some(resOp.node), resOp.opInfo)
+      }.getOrElse(Option.empty[Node[K, V]], leftInfo)
+    val newNode = this.copy(
       leftChild = newLeftChildAfterInspect,
       rightChild = newRightChildAfterInspect,
       balance = newLeftChildAfterInspect.map(_.height).getOrElse(-1) - newRightChildAfterInspect.map(_.height).getOrElse(-1),
@@ -32,6 +46,7 @@ final case class InternalNode[K: Hashable, V](key: K,
         newLeftChildAfterInspect.map(_.hash).getOrElse(Array.emptyByteArray) ++
         newRightChildAfterInspect.map(_.hash).getOrElse(Array.emptyByteArray))
     )
+    NodeWithOpInfo(newNode, rightInfo)
   }
 
   override def toString: String = s"[($key," +

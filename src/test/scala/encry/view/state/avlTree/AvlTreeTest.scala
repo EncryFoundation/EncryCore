@@ -28,28 +28,28 @@ class AvlTreeTest extends PropSpec with Matchers with EncryGenerator {
 
   property("avl should contains all inserted elems"){
 
-    val dir = FileHelper.getRandomTempDir
-
-    val storage = {
-      val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
-      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-    }
-
-    val avl = AvlTree[Int, Int](storage)
-
-    val elems = (0 to 1000).map(_ => Random.nextInt()).toList
-
-    val startTime = System.currentTimeMillis()
-
-    val (newAvl, _, _) = avl.insertMany(elems.map(i => i -> i))
-
-    println(s"insert time: ${(System.currentTimeMillis() - startTime)/1000L} s")
-
-    println(Algos.encode(newAvl.rootHash))
-
-    println(newAvl.rootNode)
-
-    elems.forall(newAvl.containsInTree) shouldBe true
+//    val dir = FileHelper.getRandomTempDir
+//
+//    val storage = {
+//      val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+//      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+//    }
+//
+//    val avl = AvlTree[Int, Int](storage)
+//
+//    val elems = (0 to 1000).map(_ => Random.nextInt()).toList
+//
+//    val startTime = System.currentTimeMillis()
+//
+//    val (newAvl, _, _) = avl.insertAndDeleteMany(elems.map(i => i -> i))
+//
+//    println(s"insert time: ${(System.currentTimeMillis() - startTime)/1000L} s")
+//
+//    println(Algos.encode(newAvl.rootHash))
+//
+//    println(newAvl.rootNode)
+//
+//    elems.forall(newAvl.containsInTree) shouldBe true
   }
 //
 //  property("avl should shouldn't contains deleted elems"){
