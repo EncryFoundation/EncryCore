@@ -3,7 +3,8 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg
 import NodeMsg.NodeProtoMsg.NodeTypes
 import cats.Monoid
-import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
+import encry.view.state.avlTree.utils.implicits.{Hashable, NodeWithOpInfo, Serializer}
+import io.iohk.iodb.ByteArrayWrapper
 
 import scala.util.Try
 
@@ -13,7 +14,7 @@ trait Node[K, V] {
   val height: Int
   val balance: Int
   val hash: Array[Byte]
-  def selfInspection: Node[K, V]
+  def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V]
 }
 
 object NodeSerilalizer {
