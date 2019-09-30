@@ -2,12 +2,11 @@ package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
 
-import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
+import encry.network.DeliveryManagerTests.DeliveryManagerUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
 import encry.consensus.HistoryConsensus
 import encry.consensus.HistoryConsensus.{Equal, Older, Younger}
-import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
@@ -20,11 +19,11 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoS
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+import encry.utils.HistoryGenerator.dummyHistory
 
 class DeliveryManagerPriorityTests extends WordSpecLike
   with BeforeAndAfterAll
   with Matchers
-  with InstanceFactory
   with OneInstancePerTest
   with TestNetSettings {
 
@@ -45,7 +44,7 @@ class DeliveryManagerPriorityTests extends WordSpecLike
     val (_: InetSocketAddress, cp7: ConnectedPeer) = createPeer(9007, "172.16.13.16", testNetSettings)
     val (_: InetSocketAddress, cp8: ConnectedPeer) = createPeer(9008, "172.16.13.17", testNetSettings)
     val (_: InetSocketAddress, cp9: ConnectedPeer) = createPeer(9009, "172.16.13.18", testNetSettings)
-    val blocks: List[Block] = generateBlocks(10, generateDummyHistory(testNetSettings))._2
+    val blocks: List[Block] = generateBlocks(10, dummyHistory(testNetSettings))._2
     val headersIds: List[ModifierId] = blocks.map(_.header.id)
     (deliveryManager, cp1, cp2, cp3, cp4, cp5, cp6,cp7, cp8, cp9, blocks, headersIds)
   }

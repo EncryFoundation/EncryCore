@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
@@ -14,16 +13,19 @@ import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import encry.utils.HistoryGenerator.dummyHistory
+import encry.utils.TestEntityGenerator._
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
+import encry.utils.Utils.protocolToBytes
 
-object DMUtils extends InstanceFactory {
+object DeliveryManagerUtils {
 
   def initialiseDeliveryManager(isBlockChainSynced: Boolean,
                                 isMining: Boolean,
                                 settings: EncryAppSettings)
                                (implicit actorSystem: ActorSystem): (TestActorRef[DeliveryManager], History) = {
-    val history: History = generateDummyHistory(settings)
+    val history: History = dummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
       TestActorRef[DeliveryManager](DeliveryManager
         .props(None, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, settings))

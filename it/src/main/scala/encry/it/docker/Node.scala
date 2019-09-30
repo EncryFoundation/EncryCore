@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress, URL}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.api.HttpApi
-import encry.it.util.KeyHelper.createPrivKey
+import encry.utils.Utils.createPrivKey
 import encry.settings.Settings
 import org.asynchttpclient._
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}

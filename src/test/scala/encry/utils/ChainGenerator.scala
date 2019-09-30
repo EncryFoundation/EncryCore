@@ -11,30 +11,24 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.modifiers.mempool.directive.TransferDirective
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
-import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Pay2PubKeyAddress, Proof, PubKeyLockedContract, Transaction, UnsignedTransaction}
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox}
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty, Height}
-import org.encryfoundation.prismlang.core.wrapped.BoxedValue
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.AssetBox
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.PublicKey
+import encry.utils.Utils.randomAddress
 
 import scala.collection.Seq
-import scorex.utils.{Random => ScorexRandom}
 import scala.util.Random
 
 object ChainGenerator {
 
   def genChain(privKey: PrivateKey25519, dir: File, settings: EncryAppSettings, blockQty: Int, transPerBlock: Int = 100,
                genInvalidBlockFrom: Option[Int] = None): (UtxoState, UtxoState, List[Block]) = {
-
-    def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ ScorexRandom.randomBytes()).address
 
     assert(blockQty >= 2, "chain at least 2 blocks")
 
@@ -80,9 +74,10 @@ object ChainGenerator {
   }
 
   def genGenesisBlock(pubKey: PublicKey25519, initialEmissionAmount: Int, initialDifficulty: Difficulty, genesisHeight: Height): Block = {
+    val timestamp = System.currentTimeMillis()
     val coinbaseTrans = TransactionFactory.coinbaseTransactionScratch(
       pubKey,
-      System.currentTimeMillis(),
+      timestamp,
       initialEmissionAmount,
       amount = 0L,
       height = genesisHeight
@@ -90,12 +85,11 @@ object ChainGenerator {
 
     val txs: Seq[Transaction] = Seq(coinbaseTrans)
     val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
-    val header =
-      Header(
+    val header = Header(
         1.toByte,
         Header.GenesisParentId,
         txsRoot,
-        System.currentTimeMillis(),
+        timestamp,
         genesisHeight,
         Random.nextLong(),
         initialDifficulty,

@@ -14,11 +14,12 @@ import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationStat
 import encry.network.PeerConnectionHandler.ReceivableMessages._
 import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
 import encry.settings.NetworkSettings
+import encry.utils.Utils.protocolToBytes
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 import org.encryfoundation.common.utils.Algos
 
 import scala.annotation.tailrec
-import scala.collection.immutable.{HashMap, SortedMap}
+import scala.collection.immutable. SortedMap
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Success}
@@ -281,7 +282,6 @@ class PeerConnectionHandler(connection: ActorRef,
     multiPacket(List[ByteString](), data)
   }
 
-  private def protocolToBytes(protocol: String): Array[Byte] = protocol.split("\\.").map(elem => elem.toByte)
 }
 
 object PeerConnectionHandler {

@@ -4,7 +4,6 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import encry.modifiers.InstanceFactory
 import encry.network.BlackList.BanReason._
 import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
@@ -20,11 +19,13 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
+import encry.utils.HistoryGenerator.dummyHistory
+import encry.utils.Utils.protocolToBytes
+import encry.utils.TestEntityGenerator._
 
 class DownloadedModifiersValidatorTests extends WordSpecLike
   with Matchers
   with BeforeAndAfterAll
-  with InstanceFactory
   with OneInstancePerTest
   with TestNetSettings {
 
@@ -43,7 +44,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
         testNetSettings.constants.ModifierIdSize, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
-      val history: History = generateDummyHistory(testNetSettings)
+      val history: History = dummyHistory(testNetSettings)
 
       val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9000)
       val peerHandler: TestProbe = TestProbe()
@@ -111,7 +112,7 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
       val downloadedModifiersValidator = TestActorRef[DownloadedModifiersValidator](DownloadedModifiersValidator.props(
         testNetSettings.constants.ModifierIdSize, nodeViewHolder.ref, peersKeeper.ref, nodeViewSync.ref, mempool.ref, None)
       )
-      val history: History = generateDummyHistory(testNetSettings)
+      val history: History = dummyHistory(testNetSettings)
 
       val historyWith10Blocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>

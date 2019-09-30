@@ -5,8 +5,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
-import encry.it.util.KeyHelper._
-import org.encryfoundation.common.crypto.PrivateKey25519
+import encry.utils.Keys
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
@@ -19,6 +18,7 @@ import scala.concurrent.duration._
 class DataTransactionTest extends AsyncFunSuite
   with Matchers
   with ScalaFutures
+  with Keys
   with StrictLogging
   with NodesFromDocker {
 
@@ -30,8 +30,6 @@ class DataTransactionTest extends AsyncFunSuite
 
     val firstHeightToWait: Int = 5
     val secondHeightToWait: Int = 8
-    val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
-    val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration = 30.minutes
     val fee: Long = scala.util.Random.nextInt(500)
 
@@ -44,7 +42,7 @@ class DataTransactionTest extends AsyncFunSuite
       fee,
       System.currentTimeMillis(),
       IndexedSeq(oneBox).map(_ -> None),
-      PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
+      PubKeyLockedContract(publicKey.pubKeyBytes).contract,
       Random.randomBytes(32)
     )
 

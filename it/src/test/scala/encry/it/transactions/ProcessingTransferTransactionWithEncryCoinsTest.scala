@@ -6,9 +6,9 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
-import encry.it.util.KeyHelper._
+import encry.utils.Keys
 import encry.settings.Settings
-import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -28,6 +28,7 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
   with ScalaFutures
   with StrictLogging
   with NodesFromDocker
+  with Keys
   with Settings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
@@ -40,8 +41,6 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
     val fee: Long = scala.util.Random.nextInt(500)
     val firstHeightToWait: Int = 5
     val secondHeightToWait: Int = 8
-    val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
-    val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
     val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
     val waitTime: FiniteDuration = 30.minutes
 

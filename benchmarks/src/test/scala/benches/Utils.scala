@@ -2,19 +2,15 @@ package benches
 
 import java.io.File
 
-import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{Settings, EncryAppSettings}
-import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
-import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
-import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
+import encry.utils.{FileHelper, Keys, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
-import encry.view.state.{BoxHolder, UtxoState}
+import encry.view.state.UtxoState
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -27,19 +23,16 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryPropositio
 import org.encryfoundation.common.utils.TaggedTypes._
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
-import scorex.crypto.hash.{Blake2b256, Digest32}
-import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
+import scorex.crypto.hash.Digest32
 import scorex.utils.Random
+import encry.utils.Utils.randomAddress
 
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-import encry.utils.ChainGenerator._
-
-object Utils extends Settings with StrictLogging {
-
-  val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
-  val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
+object Utils extends Keys
+  with Settings
+  with StrictLogging {
 
   val defaultKeySize: Int = 32
   val defaultValueSize: Int = 256
@@ -62,15 +55,6 @@ object Utils extends Settings with StrictLogging {
           List((0 until qtyOfElemsToInsert).map(_ => genRandomInsertValue()): _*)
         ) :: acc
     }
-
-  def generateGenesisBlockValidForState(state: UtxoState): Block = {
-    val txs = Seq(coinbaseTransaction(0))
-    val header = genHeader.copy(
-      parentId = Header.GenesisParentId,
-      height = settings.constants.GenesisHeight
-    )
-    Block(header, Payload(header.id, txs))
-  }
 
   def generateNextBlockValidForState(prevBlock: Block,
                                      state: UtxoState,
@@ -185,8 +169,6 @@ object Utils extends Settings with StrictLogging {
   def genHardcodedBox(address: Address, nonce: Long): AssetBox =
     AssetBox(EncryProposition.addressLocked(address), nonce, 10000000L, None)
 
-  def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address
-
   def coinbaseTransaction(height: Int): Transaction = TransactionFactory.coinbaseTransactionScratch(
     privKey.publicImage,
     System.currentTimeMillis(),
@@ -194,30 +176,6 @@ object Utils extends Settings with StrictLogging {
     amount = 1L,
     height = Height @@ height
   )
-
-  lazy val coinbaseTransaction: Transaction = {
-    TransactionFactory.coinbaseTransactionScratch(
-      privKey.publicImage,
-      System.currentTimeMillis(),
-      10L,
-      0,
-      Height @@ 100
-    )
-  }
-
-  def createPrivKey(seed: Option[String]): PrivateKey25519 = {
-    val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
-      Blake2b256.hash(
-        seed.map {
-          Mnemonic.seedFromMnemonic(_)
-        }
-          .getOrElse {
-            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-            Mnemonic.seedFromMnemonic(phrase)
-          })
-    )
-    PrivateKey25519(privateKey, publicKey)
-  }
 
   def generateInitialBoxes(qty: Int): immutable.IndexedSeq[AssetBox] =
     (0 until qty).map(_ => genAssetBox(privKey.publicImage.address.address))

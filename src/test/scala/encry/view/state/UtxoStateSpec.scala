@@ -9,7 +9,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.{EncryGenerator, FileHelper, TestHelper}
+import encry.utils.{TestEntityGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.utils.constants.TestNetConstants
@@ -18,7 +18,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.ExecutionContextExecutor
 
-class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
+class UtxoStateSpec extends PropSpec with Matchers {
 
 //  def utxoFromBoxHolder(bh: BoxHolder,
 //                        dir: File,

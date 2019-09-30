@@ -6,19 +6,19 @@ import java.util.concurrent.TimeUnit
 import benches.StateRollbackBench.StateRollbackState
 import benches.Utils._
 import encry.storage.VersionalStorage
-import encry.utils.ChainGenerator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.{BoxHolder, UtxoState}
-import encryBenchmark.{BenchSettings, Settings}
+import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Difficulty}
+import org.encryfoundation.common.utils.TaggedTypes.Difficulty
 import org.openjdk.jmh.annotations.{Benchmark, Mode, Scope, State}
 import org.openjdk.jmh.infra.Blackhole
 import org.openjdk.jmh.profile.GCProfiler
 import org.openjdk.jmh.runner.{Runner, RunnerException}
 import org.openjdk.jmh.runner.options.{OptionsBuilder, TimeValue, VerboseMode}
 import encry.utils.FileHelper.getRandomTempDir
+import encry.utils.ChainGenerator.{utxoFromBoxHolder, genGenesisBlock}
 
 class StateRollbackBench {
 
@@ -26,7 +26,7 @@ class StateRollbackBench {
   def applyBlocksToTheState(stateBench: StateRollbackState, bh: Blackhole): Unit = {
     bh.consume {
       val innerState: UtxoState =
-        ChainGenerator.utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
+        utxoFromBoxHolder(stateBench.boxesHolder, getRandomTempDir, None, stateBench.settings, VersionalStorage.IODB)
       val newState = stateBench.chain.foldLeft(innerState -> List.empty[VersionTag]) { case ((state, rootHashes), block) =>
         val newState = state.applyModifier(block).right.get
         newState -> (rootHashes :+ newState.version)
@@ -67,8 +67,9 @@ object StateRollbackBench extends BenchSettings {
       genHardcodedBox(privKey.publicImage.address.address, nonce)
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
-    var state: UtxoState = ChainGenerator.utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
-    val genesisBlock: Block = generateGenesisBlockValidForState(state)
+    var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
+    val genesisBlock: Block = genGenesisBlock(privKey.publicImage, settings.constants.InitialEmissionAmount,
+      settings.constants.InitialDifficulty, settings.constants.GenesisHeight)
 
     state = state.applyModifier(genesisBlock).right.get
 

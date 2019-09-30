@@ -4,12 +4,11 @@ import java.io.File
 
 import akka.actor.ActorSystem
 import akka.testkit.{ImplicitSender, TestActorRef, TestKit, TestProbe}
-import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.utils.ChainGenerator._
-import encry.utils.FileHelper
+import encry.utils.{FileHelper, Keys}
 import encry.view.actors.HistoryApplicator
 import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.history.History
@@ -18,22 +17,28 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+import encry.utils.HistoryGenerator.dummyHistory
 
 import scala.collection.Seq
 import scala.concurrent.duration._
 
-class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  with ImplicitSender  with BeforeAndAfterAll  with Matchers
-  with InstanceFactory with OneInstancePerTest with Settings {
+class HistoryApplicatorTest extends TestKit(ActorSystem())
+  with WordSpecLike
+  with ImplicitSender
+  with BeforeAndAfterAll
+  with Matchers
+  with OneInstancePerTest
+  with Keys
+  with Settings {
 
-  override def afterAll: Unit = {
-    TestKit.shutdownActorSystem(system)
-  }
+  override def afterAll: Unit = shutdown(system)
+
   val testSettings: EncryAppSettings = settings.copy(storage = settings.storage.copy(state = VersionalStorage.LevelDB))
 
   def blockToModifiers(block: Block): Seq[PersistentModifier] = Seq(block.header, block.payload)
 
   def rollbackTest(transQty: Int) {
-    val history: History = generateDummyHistory(testSettings)
+    val history: History = dummyHistory(testSettings, withoutPow = true)
     //generate invalid blocks begining from 6 blocks
     val (initialState, state, chain) = genChain(privKey, dir, testSettings, 10, transQty, Some(6))
 
@@ -76,7 +81,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
     "apply locall blocks and check chain sync" in {
 
       val blockQty = 10
-      val history: History = generateDummyHistory(testSettings)
+      val history: History = dummyHistory(testSettings, withoutPow = true)
       val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
@@ -94,10 +99,11 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       checkBestBlock(history, chain(blockQty - 1))
     }
 
+
     "apply remote blocks and check chain sync" in {
 
       val blockQty = 10
-      val history: History = generateDummyHistory(testSettings)
+      val history: History = dummyHistory(testSettings, withoutPow = true)
       val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty)
 
       val modifiers: Seq[PersistentModifier] = chain.flatMap(blockToModifiers)
@@ -121,7 +127,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       val overQty = 30
 
-      val history: History = generateDummyHistory(testSettings)
+      val history: History = dummyHistory(testSettings, withoutPow = true)
       val (initialState, state, chain) = genChain(privKey, dir, testSettings, testSettings.levelDB.maxVersions + overQty, 10)
 
       val historyApplicator: TestActorRef[HistoryApplicator] =
@@ -152,7 +158,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
     "sync when apply headers and payloads separately" in {
       val blockQty = 10
-      val history: History = generateDummyHistory(testSettings)
+      val history: History = dummyHistory(testSettings, withoutPow = true)
       val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty)
 
       val headers: Seq[PersistentModifier] = chain.map(_.header)
@@ -180,7 +186,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
     "sync and rollback headers for invalid payload" in {
       val blockQty = 10
-      val history: History = generateDummyHistory(testSettings)
+      val history: History = dummyHistory(testSettings, withoutPow = true)
       //generate invalid blocks begining from 6 blocks
       val (initialState, state, chain) = genChain(privKey, dir, testSettings, blockQty, 100, Some(6))
 
@@ -196,7 +202,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
 
       headers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout, 100 millis,
+      awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout, 500 millis,
         s"history.getBestBlockHeight ${history.getBestHeaderHeight} expected ${blockQty - 1}")
       history.getBestHeaderHeight shouldBe blockQty - 1
       history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(chain(blockQty - 1).header.id))
@@ -204,11 +210,10 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())  with WordSpecLike  w
       payloads.foreach(historyApplicator ! ModifierFromRemote(_))
 
       expectMsg(timeout, FullBlockChainIsSynced())
-      awaitCond(history.getBestBlockHeight == 4, timeout, 100 millis,
+      awaitCond(history.getBestBlockHeight == 4, timeout, 500 millis,
         s"history.getBestBlockHeight ${history.getBestBlockHeight} expected 4")
       checkBestBlock(history, chain(4))
     }
-
 
   }
 }

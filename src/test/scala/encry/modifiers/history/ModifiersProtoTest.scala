@@ -5,25 +5,65 @@ import BoxesProto.BoxProtoMessage
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import TransactionProto.TransactionProtoMessage
-import encry.modifiers.InstanceFactory
+import encry.utils.TestEntityGenerator._
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.directive._
-import org.encryfoundation.common.modifiers.mempool.transaction.{Pay2PubKeyAddress, PubKeyLockedContract, Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.modifiers.mempool.transaction._
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.signatures.PublicKey
 import scorex.utils.Random
 
 import scala.util.Try
 
-class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
+class ModifiersProtoTest extends PropSpec with Matchers {
 
   //todo add tests for merkel root, sing
 
+  def universalTransactionScratch(privKey: PrivateKey25519,
+                                  fee: Long,
+                                  timestamp: Long,
+                                  useOutputs: IndexedSeq[MonetaryBox],
+                                  amount: Long,
+                                  numOfOutputs: Int = 5): Transaction = {
+    val directives: IndexedSeq[Directive] = IndexedSeq(
+      AssetIssuingDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, amount),
+      DataDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, Random.randomBytes()),
+      ScriptedAssetDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, 10L,
+        Option(ADKey @@ Random.randomBytes())),
+      ScriptedAssetDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, 10L,
+        Option.empty[ADKey]),
+      TransferDirective(publicKey.address.address, 10L, Option(ADKey @@ Random.randomBytes())),
+      TransferDirective(publicKey.address.address, 10L, Option.empty[ADKey])
+    )
+
+    val pubKey: PublicKey25519 = publicKey
+
+    val uInputs: IndexedSeq[Input] = useOutputs
+      .map(bx => Input.unsigned(bx.id, Right(PubKeyLockedContract(pubKey.pubKeyBytes))))
+      .toIndexedSeq
+
+    val change: Amount = useOutputs.map(_.amount).sum - (amount + fee)
+
+    val newDirectives: IndexedSeq[Directive] =
+      if (change > 0) TransferDirective(pubKey.address.address, amount, None) +: (0 until numOfOutputs).map(_ =>
+        TransferDirective(pubKey.address.address, change / numOfOutputs, None)) ++: directives
+      else directives
+
+    val uTransaction: UnsignedTransaction = UnsignedTransaction(fee, timestamp, uInputs, newDirectives)
+
+    val signature: Signature25519 = privKey.sign(uTransaction.messageToSign)
+
+    uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
+  }
+
   property("AssetIssuingDirective should be serialized correctly") {
     val assetIssuingDirective: AssetIssuingDirective =
-      AssetIssuingDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, 1000L)
+      AssetIssuingDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, 1000L)
     val assetIssuingDirectiveToProto: TransactionProtoMessage.DirectiveProtoMessage = assetIssuingDirective.toDirectiveProto
     val assetIssuingDirectiveFromProto: Option[AssetIssuingDirective] =
       AssetIssuingDirectiveProtoSerializer.fromProto(assetIssuingDirectiveToProto)
@@ -34,7 +74,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
 
   property("DataDirective should be serialized correctly") {
     val dataDirective: DataDirective =
-      DataDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, Random.randomBytes())
+      DataDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, Random.randomBytes())
     val dataDirectiveToProto: TransactionProtoMessage.DirectiveProtoMessage = dataDirective.toDirectiveProto
     val dataDirectiveFromProto = DataDirectiveProtoSerializer.fromProto(dataDirectiveToProto)
     dataDirectiveFromProto.isDefined shouldBe true
@@ -44,7 +84,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
 
   property("ScriptedAssetDirective should be serialized correctly") {
     val scriptedAssetDirectiveWithTokenId: ScriptedAssetDirective =
-      ScriptedAssetDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, 10L,
+      ScriptedAssetDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, 10L,
         Option(ADKey @@ Random.randomBytes()))
     val scriptedAssetDirectiveWithTokenIdToProto: TransactionProtoMessage.DirectiveProtoMessage =
       scriptedAssetDirectiveWithTokenId.toDirectiveProto
@@ -56,7 +96,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     scriptedAssetDirectiveWithTokenId.tokenIdOpt.get.sameElements(scriptedAssetDirectiveWithTokenIdFromProto.get.tokenIdOpt.get)
 
     val scriptedAssetDirectiveWithoutTokenId: ScriptedAssetDirective =
-      ScriptedAssetDirective(PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract.hash, 10L,
+      ScriptedAssetDirective(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash, 10L,
         Option.empty[ADKey])
     val scriptedAssetDirectiveWithoutTokenIdToProto: TransactionProtoMessage.DirectiveProtoMessage =
       scriptedAssetDirectiveWithoutTokenId.toDirectiveProto
@@ -70,7 +110,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
 
   property("TransferDirective should be serialized correctly") {
     val transferDirectiveWithTokenId: TransferDirective =
-      TransferDirective(privKey.publicImage.address.address, 10L, Option(ADKey @@ Random.randomBytes()))
+      TransferDirective(publicKey.address.address, 10L, Option(ADKey @@ Random.randomBytes()))
     val transferDirectiveDirectiveWithTokenIdToProto: TransactionProtoMessage.DirectiveProtoMessage =
       transferDirectiveWithTokenId.toDirectiveProto
     val transferDirectiveWithTokenIdFromProto: Option[TransferDirective] =
@@ -81,7 +121,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
     transferDirectiveWithTokenId.tokenIdOpt.get.sameElements(transferDirectiveWithTokenIdFromProto.get.tokenIdOpt.get)
 
     val transferDirectiveWithoutTokenId: TransferDirective =
-      TransferDirective(privKey.publicImage.address.address, 10L, Option.empty[ADKey])
+      TransferDirective(publicKey.address.address, 10L, Option.empty[ADKey])
     val transferDirectiveWithoutTokenIdToProto: TransactionProtoMessage.DirectiveProtoMessage =
       transferDirectiveWithoutTokenId.toDirectiveProto
     val transferDirectiveWithoutTokenIdFromProto: Option[TransferDirective] =
@@ -93,7 +133,7 @@ class ModifiersProtoTest extends PropSpec with Matchers with InstanceFactory {
   }
 
   property("Transaction should be serialized correctly") {
-    val boxes: Seq[AssetBox] = (0 to 10).map(_ => genAssetBox(privKey.publicImage.address.address))
+    val boxes: Seq[AssetBox] = (0 to 10).map(_ => genAssetBox(publicKey.address.address))
     val transaction: Transaction =
       universalTransactionScratch(privKey, 10, 10, boxes.toIndexedSeq, 10, 1)
     val transactionToProto: TransactionProtoMessage = transaction.toTransactionProto

@@ -1,10 +1,9 @@
 package encry.view.state
 
-import encry.utils.EncryGenerator
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.scalatest.{Matchers, PropSpec}
 
-class EncryStateSpec extends PropSpec with Matchers with EncryGenerator {
+class EncryStateSpec extends PropSpec with Matchers {
 
   property("EncryState.genesisBoxes() output equality") {
 

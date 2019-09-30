@@ -6,9 +6,9 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
-import encry.it.util.KeyHelper._
+import encry.utils.Keys
 import encry.settings.Settings
-import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
@@ -29,6 +29,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
   with ScalaFutures
   with StrictLogging
   with NodesFromDocker
+  with Keys
   with Settings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
@@ -41,8 +42,6 @@ class AssetTokenTransactionTest extends AsyncFunSuite
     val firstHeightToWait: Int = 5
     val secondHeightToWait: Int = 8
     val thirdHeightToWait: Int = 11
-    val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
-    val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration = 30.minutes
     val amount: Int = scala.util.Random.nextInt(2000)
     val fee: Int = scala.util.Random.nextInt(500)

@@ -6,15 +6,12 @@ import java.util.concurrent.TimeUnit
 import benches.StateBenches.StateBenchState
 import org.openjdk.jmh.annotations._
 import benches.Utils._
-import encry.EncryApp
-import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.IODB
-import encry.utils.{ChainGenerator, FileHelper}
 import encry.utils.ChainGenerator._
 import encry.utils.FileHelper.getRandomTempDir
 import encry.view.state.{BoxHolder, UtxoState}
-import encryBenchmark.{BenchSettings, Settings}
+import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.infra.Blackhole
@@ -76,7 +73,8 @@ object StateBenches extends BenchSettings {
     )
     val boxesHolder: BoxHolder = BoxHolder(initialBoxes)
     var state: UtxoState = utxoFromBoxHolder(boxesHolder, tmpDir, None, settings, VersionalStorage.LevelDB)
-    val genesisBlock: Block = generateGenesisBlockValidForState(state)
+    val genesisBlock: Block = genGenesisBlock(privKey.publicImage, settings.constants.InitialEmissionAmount,
+      settings.constants.InitialDifficulty, settings.constants.GenesisHeight)
 
     state = state.applyModifier(genesisBlock).right.get
 

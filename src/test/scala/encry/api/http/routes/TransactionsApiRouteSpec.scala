@@ -1,12 +1,12 @@
 package encry.api.http.routes
 
-import encry.modifiers.InstanceFactory
 import io.circe.Decoder.Result
 import io.circe.Json
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.scalatest.{Matchers, PropSpec}
+import encry.utils.TestEntityGenerator.paymentTransactionValid
 
-class TransactionsApiRouteSpec extends PropSpec with Matchers with InstanceFactory {
+class TransactionsApiRouteSpec extends PropSpec with Matchers {
 
   private val tx = paymentTransactionValid
 
