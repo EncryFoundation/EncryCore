@@ -1,11 +1,11 @@
 package encry.it.transactions
 
-import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
+import encry.modifiers.mempool.TransactionFactory
 import encry.utils.Keys
 import encry.settings.Settings
 import org.encryfoundation.common.crypto.PublicKey25519
@@ -53,11 +53,11 @@ class ProcessingTransferTransactionWithEncryCoinsTest extends AsyncFunSuite
 
     val boxes: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
     val oneBox: AssetBox = boxes.collect { case ab: AssetBox => ab }.head
-    val transaction: Transaction = CreateTransaction.defaultPaymentTransaction(
+    val transaction: Transaction = TransactionFactory.defaultPaymentTransactionScratch(
       privKey,
       fee,
       System.currentTimeMillis(),
-      IndexedSeq(oneBox).map(_ -> None),
+      IndexedSeq(oneBox),
       recipientAddress,
       amount
     )

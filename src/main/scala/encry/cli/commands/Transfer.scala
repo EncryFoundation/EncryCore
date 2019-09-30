@@ -37,11 +37,11 @@ object Transfer extends Command {
             .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) { case (seq, box) =>
             if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
           }.toIndexedSeq
-          TransactionFactory.defaultPaymentTransaction(
+          TransactionFactory.defaultPaymentTransactionScratch(
             secret,
             fee,
             System.currentTimeMillis(),
-            boxes.map(_ -> None),
+            boxes,
             recipient,
             amount)
         }.toOption

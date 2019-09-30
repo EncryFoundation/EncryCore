@@ -1,10 +1,10 @@
 package encry.it.transactions
 
-import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
+import encry.modifiers.mempool.TransactionFactory
 import encry.utils.Keys
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
@@ -12,6 +12,7 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.utils.Random
+
 import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
 
@@ -37,12 +38,12 @@ class DataTransactionTest extends AsyncFunSuite
 
     val boxes: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
     val oneBox: AssetBox = boxes.collect { case ab: AssetBox => ab }.head
-    val transaction: Transaction = CreateTransaction.dataTransactionScratch(
+    val transaction: Transaction = TransactionFactory.dataTransactionScratch(
       privKey,
       fee,
       System.currentTimeMillis(),
-      IndexedSeq(oneBox).map(_ -> None),
-      PubKeyLockedContract(publicKey.pubKeyBytes).contract,
+      IndexedSeq(oneBox),
+      0,
       Random.randomBytes(32)
     )
 
