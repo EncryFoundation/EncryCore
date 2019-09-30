@@ -27,7 +27,7 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     val avlStorage = AvlTree[StorageKey, StorageValue](storage)
 
-    val boxes = (0 to 100).map{i =>
+    val boxes = (0 to 10000).map{i =>
       val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
       genAssetBox(addr, i, nonce = i)
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
@@ -44,7 +44,7 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
 
-    println(newAvl._1)
+    boxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
   }
 
   property("avl test") {
@@ -86,14 +86,14 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     println("------")
 
-    println(newAvl._1)
+    println(newAvl)
 
     println("right:")
 
-    println(newAvl._1.rootNode.asInstanceOf[InternalNode[Int, Int]].rightChild.get.asInstanceOf[ShadowNode[Int, Int]].restoreFullNode(storage))
+    println(newAvl.rootNode.asInstanceOf[InternalNode[Int, Int]].rightChild.get.asInstanceOf[ShadowNode[Int, Int]].restoreFullNode(storage))
 
     println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
 
-    println(Algos.encode(newAvl._1.rootHash))
+    println(Algos.encode(newAvl.rootHash))
   }
 }

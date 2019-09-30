@@ -51,7 +51,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       combinedStateChange.inputsToDb.toList
     )
     UtxoState(
-      newTree._1,
+      newTree,
       constants,
     )
   }
@@ -90,7 +90,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             )
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
             UtxoState(
-              newTree._1,
+              newTree,
               constants,
             ).asRight[List[ModifierApplyError]]
           }
