@@ -259,7 +259,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     nodeWithOpsInfo.node match {
       case shadowNode: ShadowNode[K, V] =>
         val restoredNode = shadowNode.restoreFullNode(storage).get
-        balance(nodeWithOpsInfo)
+        balance(nodeWithOpsInfo.copy(node = restoredNode))
       case internalNode: InternalNode[K, V] =>
         val newAdditionalInfo = (
           Math.abs(internalNode.balance),
