@@ -1,4 +1,4 @@
-package encry.it.variousСompound
+package encry.it.net
 
 import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf

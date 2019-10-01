@@ -1,4 +1,4 @@
-package encry.it.variousСompound
+package encry.it.net
 
 import java.nio.file.Paths
 

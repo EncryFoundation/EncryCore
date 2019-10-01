@@ -92,8 +92,8 @@ trait HttpApi { // scalastyle:ignore
 
   def bestFullHeaderId: Future[String] = get("/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
-    val eitherHeight = response.hcursor.downField("bestFullHeaderId").as[Option[String]]
-    eitherHeight.fold[Future[String]](
+    val eitherId = response.hcursor.downField("bestFullHeaderId").as[Option[String]]
+    eitherId.fold[Future[String]](
       e => Future.failed(new Exception(s"Error getting `bestFullHeaderId` from /info response: $e\n$response", e)),
       maybeId => Future.successful(maybeId.getOrElse(""))
     )
@@ -171,5 +171,9 @@ trait HttpApi { // scalastyle:ignore
 
   def postJson[A: Encoder](path: String, body: A): Future[Response] =
     post(path, body.asJson.toString())
+
+  def error(): Unit = {
+
+  }
 
 }

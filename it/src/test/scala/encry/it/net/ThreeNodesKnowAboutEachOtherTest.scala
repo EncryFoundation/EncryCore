@@ -1,4 +1,4 @@
-package encry.it.variousСompound
+package encry.it.net
 
 import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
@@ -9,12 +9,12 @@ import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.duration._
 
-class TwoNodesСonnectedThroughOneTest extends FunSuite with Matchers with DockerAfterAll {
+class ThreeNodesKnowAboutEachOtherTest extends FunSuite with Matchers with DockerAfterAll {
 
   implicit val futureDuration: FiniteDuration = 10 minutes
   val heightSeparation = 10 //blocks
 
-  test("nodes connected with first should sync") {
+  test("nodes know about each other should sync") {
 
     val node1 = docker
       .startNodeInternal(Configs.nodeName("node1")
@@ -32,9 +32,11 @@ class TwoNodesСonnectedThroughOneTest extends FunSuite with Matchers with Docke
         .withFallback(Configs.mining(true))
         .withFallback(Configs.offlineGeneration(false))
         .withFallback(Configs.networkAddress("0.0.0.0:9001"))
-        .withFallback(Configs.knownPeers(Seq()))
+        .withFallback(Configs.knownPeers(Seq((node1.nodeIp, 9001))))
         .withFallback(defaultConf)
       )
+
+    node1.connect(s"${node2.nodeIp}:9001").run
 
     node1.waitForFullHeight(heightSeparation * 2).run
 

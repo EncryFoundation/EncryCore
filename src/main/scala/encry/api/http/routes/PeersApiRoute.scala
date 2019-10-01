@@ -6,7 +6,6 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.EncryApp.nodeViewSynchronizer
 import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeers, GetConnectedPeers}
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
 import encry.cli.commands.AddPeer.PeerFromCli
@@ -20,8 +19,8 @@ import io.circe.generic.semiauto._
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
-case class PeersApiRoute(override val settings: RESTApiSettings,
-                         dataHolder: ActorRef)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
+case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: ActorRef, nodeViewSynchronizer: ActorRef)
+                        (implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
 
   override lazy val route: Route = pathPrefix("peers") {
    connectedPeers ~ connectPeer ~ allPeers ~ bannedList
