@@ -88,19 +88,11 @@ class StateApplicator(settings: EncryAppSettings,
           }
           context.become(awaitingTransactionsValidation(toApply.drop(1), updateInformation, block, block.payload.txs))
       }
-    case StartModifiersApplying => //todo redundant iterations while updateInformation.failedMod.nonEmpty
-      val newToApply: List[PersistentModifier] = toApply.drop(1)
-      if (newToApply.nonEmpty) {
-        self ! StartModifiersApplying
-        logger.info(s"StartModifiersApplying updateInformation.failedMod.nonEmpty")
-        context.become(modifierApplication(newToApply, updateInformation))
-      } else {
-        logger.info(s"StartModifiersApplying w/0 if case to apply is empty")
-        self ! ModifiersApplicationFinished
-        context.become(modifiersApplicationCompleted(
-          UpdateInformation(none, none, updateInformation.suffix)
-        ))
-      }
+    case StartModifiersApplying =>
+      logger.debug("Switching into modifiersApplicationCompleted due to non empty failed mod")
+      self ! ModifiersApplicationFinished
+      context.become(modifiersApplicationCompleted(updateInformation))
+
     case msg => logger.info(s"Got $msg in modifierApplication")
   }
 
@@ -157,6 +149,7 @@ class StateApplicator(settings: EncryAppSettings,
       logger.info(s"Transaction ${tx.encodedId} failed in validation by state.")
       context.children.foreach(_ ! Kill)
       context.system.eventStream.publish(SemanticallyFailedModification(block, List(StateModifierApplyError(s"$ex"))))
+      transactionsValidatorsNumber = 0
       historyApplicator ! NeedToReportAsInValid(block)
       context.become(awaitingNewProgressInfo(block, ui, toApply))
 
@@ -166,6 +159,7 @@ class StateApplicator(settings: EncryAppSettings,
   def awaitingNewProgressInfo(block: Block, ui: UpdateInformation, toApply: Seq[PersistentModifier]): Receive = {
     case NewProgressInfoAfterMarkingAsInValid(pi) =>
       self ! StartModifiersApplying
+      logger.debug(s"Switching into modifierApplication with toApply = ${toApply.map(_.encodedId).mkString(", ")}")
       context.become(
         modifierApplication(
           toApply.toList,
@@ -203,11 +197,13 @@ class StateApplicator(settings: EncryAppSettings,
         case Success(stateToApply) =>
           logger.info(s"Successfully applied to the state. Starting modifiers applying.")
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
-          self ! StartModifiersApplying
-          context.become(modifierApplication(
-            progressInfo.toApply.toList,
-            UpdateInformation(none, none, suffixTrimmed)
-          ))
+          if (progressInfo.toApply.nonEmpty) {
+            self ! StartModifiersApplying
+            context.become(modifierApplication(
+              progressInfo.toApply.toList,
+              UpdateInformation(none, none, suffixTrimmed)
+            ))
+          } else historyApplicator ! RequestNextModifier
       }
     case msg => logger.info(s"Got $msg in updateState")
   }
@@ -231,7 +227,7 @@ object StateApplicator {
 
   final case class NeedToReportAsValid(modifier: PersistentModifier) extends AnyVal
 
-  final case class NeedToReportAsInValid(modifier: PersistentModifier) extends AnyVal
+  final case class NeedToReportAsInValid(modifier: Block) extends AnyVal
 
   final case class NewProgressInfoAfterMarkingAsInValid(pi: ProgressInfo) extends AnyVal
 
