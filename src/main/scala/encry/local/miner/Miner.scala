@@ -2,35 +2,27 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
-
-import akka.actor.{Actor, ActorRef, Kill, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{UpdatingMinerStatus, UpdatingTransactionsNumberForApi}
 import encry.consensus.{CandidateBlock, EquihashPowScheme, SupplyController}
 import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
-import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
-import encry.utils.NetworkTime.Time
 import encry.view.actors.NodeViewHolder.ReceivableMessages.LocallyGeneratedBlock
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import encry.utils.NetworkTimeProvider
 import encry.EncryApp.nodeViewHolder
 import scala.collection._
 import scala.concurrent.duration._
-import SupplyController._
-import cats.syntax.option._
+import encry.view.actors.NodeViewHolder.{InfoForCandidateIsReady, StartAggregatingInfoForCandidateBlock, WrongConditionsForCandidate}
 
 class Miner(dataHolder: ActorRef,
             influx: Option[ActorRef],
@@ -59,16 +51,25 @@ class Miner(dataHolder: ActorRef,
 
   override def postStop(): Unit = killAllWorkers()
 
-  def killAllWorkers(): Unit = context.children.foreach(_ ! Kill)
+  def killAllWorkers(): Unit = context.children.foreach(context.stop)
 
   def needNewCandidate(b: Block): Boolean = !candidateOpt.flatMap(_.parentOpt.map(_.id)).exists(_ sameElements b.header.id)
 
   override def receive: Receive = if (settings.node.mining && isSyncingDone) miningEnabled else miningDisabled
 
   def mining: Receive = {
+    case WrongConditionsForCandidate(txs) =>
+      logger.info(s"Miner got message WrongConditionsForCandidate.")
+      transactionsPool ++= txs
+      self ! CandidateEnvelope.empty
+    case InfoForCandidateIsReady(header, txs, timestamp, difficulty, stateRoot) =>
+      logger.info(s"Got InfoForCandidateIsReady on miner")
+      self ! CandidateEnvelope.fromCandidate(
+        CandidateBlock(header, settings.constants.Version, txs, timestamp, difficulty, stateRoot)
+      )
     case msg@StartMining if context.children.nonEmpty && isSyncingDone =>
-      logger.info(s"Miner got StartMining but context.children.nonEmpty = ${context.children.nonEmpty}.")
-      killAllWorkers(); self ! msg
+      killAllWorkers()
+      self ! msg
     case StartMining if candidateOpt.nonEmpty && isSyncingDone =>
       logger.info(s"Miner got StartMining and candidateOpt = $candidateOpt && isSyncingDone = $isSyncingDone.")
       for (i <- 0 until settings.node.numberOfMiningWorkers) yield context.actorOf(Props(
@@ -78,25 +79,18 @@ class Miner(dataHolder: ActorRef,
       candidateOpt.foreach(candidate => context.children.foreach(_ ! NextChallenge(candidate)))
     case StartMining if isSyncingDone =>
       logger.info(s"Miner got StartMining but candidateOpt = $candidateOpt. Create new candidate.")
-      val coinbase: Transaction = TransactionFactory
-        .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, currentHeight)
-      nodeViewHolder ! StartProducingNewCandidate(transactionsPool, none, Difficulty @@ BigInt(0))
+      nodeViewHolder ! StartAggregatingInfoForCandidateBlock(transactionsPool)
       transactionsPool = IndexedSeq.empty[Transaction] //tmp decision
     case StartMining => logger.info(s"Miner -> isSyncingDone = $isSyncingDone.")
-    case NewCandidate(txs, header, difficulty, stateRoot, account) =>
-      logger.info(s"\n\nMiner got NewCandidate. start processing new candidate. ${Algos.encode(stateRoot)}.\n\n")
-      self ! createNewCandidateBlock(txs, header, account, difficulty, stateRoot)
-    case WrongConditionsForNewBlock(txs) =>
-      logger.info(s"Miner got wrong condition.")
-      transactionsPool ++= txs; self ! CandidateEnvelope.empty
     case TransactionsForMiner(transactions) => transactionsPool ++= transactions
-    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.timestamp == block.header.timestamp) =>
+    case MinedBlock(block, workerIdx) if candidateOpt.exists(_.stateRoot sameElements block.header.stateRoot) =>
       logger.info(s"Going to propagate new block " +
         s"\n (${block.header.height}, ${block.payload.encodedId} ${block.header.encodedId}, ${block.payload.txs.size}" +
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       killAllWorkers()
       nodeViewHolder ! LocallyGeneratedBlock(block)
       candidateOpt = None
+    case MinedBlock(_, workerIdx) => logger.info(s"get mined block from worker ${workerIdx}")
     case DisableMining if context.children.nonEmpty =>
       killAllWorkers()
       candidateOpt = None
@@ -124,8 +118,8 @@ class Miner(dataHolder: ActorRef,
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
-      nodeViewHolder ! StartProducingNewCandidate(transactionsPool, none, Difficulty @@ BigInt(0))
-      transactionsPool = IndexedSeq.empty[Transaction] //tmp decisio
+      nodeViewHolder ! StartAggregatingInfoForCandidateBlock(transactionsPool)
+      transactionsPool = IndexedSeq.empty[Transaction]
     case SemanticallySuccessfulModifier(_) =>
   }
 
@@ -152,51 +146,9 @@ class Miner(dataHolder: ActorRef,
     candidateOpt = Some(c)
     self ! StartMining
   }
-
-  def createNewCandidateBlock(validatedTxs: IndexedSeq[Transaction],
-                              bestHeaderOpt: Option[Header],
-                              minerSecret: PrivateKey25519,
-                              difficulty: Difficulty,
-                              stateRoot: Array[Byte]): CandidateEnvelope = {
-    val filteredTxs: IndexedSeq[Transaction] = validatedTxs.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
-      case ((usedInputsIds, acc), tx) =>
-        if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId))))
-          (usedInputsIds ++ tx.inputs.map(input => Algos.encode(input.boxId))) -> (acc :+ tx)
-        else usedInputsIds -> acc
-    }._2
-    val currentHeight: Height = Height @@ (bestHeaderOpt map (_.height) getOrElse settings.constants.PreGenesisHeight)
-    val newHeight: Height = Height @@ (currentHeight + 1)
-    val timestamp: Time = timeProvider.estimatedTime
-    val feesTotal: Amount = filteredTxs.map(_.fee).sum
-    val supplyTotal: Amount = supplyAt(currentHeight, settings.constants)
-    val candidate: CandidateEnvelope =
-      CandidateEnvelope.fromCandidate(
-        CandidateBlock(bestHeaderOpt, settings.constants.Version, filteredTxs, timestamp, difficulty, stateRoot)
-      )
-    logger.info(s"$candidate at height $newHeight.")
-    transactionsPool = IndexedSeq.empty[Transaction]
-    candidate
-  }
 }
 
 object Miner {
-
-  final case class StartProducingNewCandidate(txs: IndexedSeq[Transaction],
-                                              bestHeaderOpt: Option[Header],
-                                              difficulty: Difficulty)
-
-  final case class CandidateWithOutMandatoryAccount(validatedTxs: IndexedSeq[Transaction],
-                                                    bestHeaderOpt: Option[Header],
-                                                    difficulty: Difficulty,
-                                                    stateRoot: Array[Byte])
-
-  final case class NewCandidate(validatedTxs: IndexedSeq[Transaction],
-                                bestHeaderOpt: Option[Header],
-                                difficulty: Difficulty,
-                                stateRoot: Array[Byte],
-                                account: PrivateKey25519)
-
-  final case class WrongConditionsForNewBlock(txs: IndexedSeq[Transaction]) extends AnyVal
 
   final case class CandidateEnvelope(c: Option[CandidateBlock]) extends AnyVal
 

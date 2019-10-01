@@ -5,7 +5,6 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.local.miner.Miner.{CandidateEnvelope, NewCandidate, StartProducingNewCandidate, WrongConditionsForNewBlock}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
@@ -13,8 +12,8 @@ import encry.stats.StatsSender.{ModifierAppendedToHistory, ModifierAppendedToSta
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
-import encry.view.NodeViewErrors.ModifierApplyError.{HistoryApplyError, StateModifierApplyError}
-import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
+import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
+import encry.view.actors.NodeViewHolder._
 import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
@@ -26,12 +25,9 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import scala.collection.immutable.Queue
 import scala.collection.mutable
-import scala.util.{Failure, Success}
-import scala.concurrent.duration._
 
 class HistoryApplicator(nodeViewHolder: ActorRef,
                         walletApplicator: ActorRef,
@@ -42,8 +38,6 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
                         networkTimeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
 
   //todo 1. add history.close in postStop
-
-  import context.dispatcher
 
   var modifiersQueue: Queue[(PersistentModifier, ProgressInfo)] = Queue.empty[(PersistentModifier, ProgressInfo)]
   var currentNumberOfAppliedModifiers: Int = 0
@@ -66,27 +60,19 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
   }
 
   def mainBehaviour(history: History): Receive = {
-    case GetHistory => sender() ! history
-    case msg@StartProducingNewCandidate(_, _, _) if (history.isFullChainSynced && history.isBestBlockDefined)
-                                                                               || settings.node.offlineGeneration =>
-      logger.info(s"History applicator got StartProducingNewCandidate. history.isFullChainSynced = ${history.isFullChainSynced}" +
-        s" history.isBestBlockDefined = ${history.isBestBlockDefined}. settings.node.offlineGeneration = ${settings.node.offlineGeneration}.")
+    case InfoForCandidateWithMandatoryAccount(txs, acc) if (history.isFullChainSynced && history.isBestBlockDefined)
+                                                                                      || settings.node.offlineGeneration =>
+      logger.info(s"History applicator got request from node view holder for info for candidate.")
       val header: Option[Header] = history.getHeaderOfBestBlock
-      stateApplicator ! msg.copy(
-        bestHeaderOpt = header,
-        difficulty = header.map(history.requiredDifficultyAfter(_) match {
-          case Left(value)  => logger.info(s"$value"); sys.exit(999)
-          case Right(value) => value
-        }) getOrElse settings.constants.InitialDifficulty
-      )
-    case StartProducingNewCandidate(txs, _, _) =>
-      logger.info(s"History applicator got StartProducingNewCandidate with out if condition. history.isFullChainSynced = ${history.isFullChainSynced}" +
-        s" history.isBestBlockDefined = ${history.isBestBlockDefined}. settings.node.offlineGeneration = ${settings.node.offlineGeneration}.")
-      sender() ! WrongConditionsForNewBlock(txs)
-    case msg@NewCandidate(_, _, _, _, _) =>
-      logger.info(s"History applicator got NewCandidate. Send to NVH")
-      nodeViewHolder ! msg
-
+      val difficulty: Difficulty = header map(history.requiredDifficultyAfter(_) match {
+        case Left(value)  => logger.info(s"$value"); sys.exit(999)
+        case Right(value) => value
+      }) getOrElse settings.constants.InitialDifficulty
+      stateApplicator ! InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty)
+    case InfoForCandidateWithMandatoryAccount(txs, _) =>
+      logger.info(s"Can not aggregate info for new candidate.")
+      sender() ! WrongConditionsForCandidate(txs)
+    case GetHistory => sender() ! history
     case ModifierFromRemote(mod) if !history.isModifierDefined(mod.id) && !ModifiersCache.contains(toKey(mod.id)) =>
       ModifiersCache.put(toKey(mod.id), mod, history)
       getModifierForApplying(history)

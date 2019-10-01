@@ -8,7 +8,7 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.actors.NodeViewHolder.DownloadRequest
+import encry.view.actors.NodeViewHolder.{DownloadRequest, InfoForCandidateIsReady, InfoForCandidateWithDifficultyAndHeaderOfBestBlock}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
@@ -21,8 +21,8 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
 import encry.consensus.SupplyController._
-import encry.local.miner.Miner.{CandidateWithOutMandatoryAccount, NewCandidate, StartProducingNewCandidate}
 import encry.modifiers.history.HeaderChain
+import encry.modifiers.mempool.TransactionFactory._
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
@@ -31,6 +31,7 @@ import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.utils.Algos
 import encry.utils.implicits.UTXO._
 import encry.view.state.avlTree.utils.implicits.Instances._
+import EncryApp.timeProvider
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
@@ -258,22 +259,27 @@ class StateApplicator(settings: EncryAppSettings,
   }
 
   def processNewCandidate(state: UtxoState): Receive = {
-    case StartProducingNewCandidate(txs, header, difficulty) =>
-      logger.info(s"Got StartProducingNewCandidate on state applicator.")
+    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) =>
+      logger.info(s"State applicator have been starting processing txs for new candidate.")
+      val timestamp = timeProvider.estimatedTime
       val height: Height = Height @@ (header.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
-      val validatedTxs: IndexedSeq[Transaction] =
-        txs.filter(x => state.validate(x, System.currentTimeMillis(), height).isRight).distinct
-      val combinedStateChange: UtxoState.StateChange = combineAll(validatedTxs.map(UtxoState.tx2StateChange).toList)
-
-      logger.info(s"combinedStateChange -> ${combinedStateChange.outputsToDb.length}")
+      val validatedTxs: IndexedSeq[Transaction] = txs.filter(state.validate(_, timestamp, height).isRight).distinct
+      val filteredTxsWithoutDuplicateInputs: IndexedSeq[Transaction] =
+        validatedTxs.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
+        case ((usedInputsIds, acc), tx) =>
+          if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
+            (usedInputsIds ++ tx.inputs.map(input => Algos.encode(input.boxId))) -> (acc :+ tx)
+          } else usedInputsIds -> acc
+      }._2
+      val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
+      val supplyTotal: Amount = supplyAt(height, settings.constants)
+      val txsWithCoinbase: IndexedSeq[Transaction] =
+        coinbaseTransactionScratch(acc.publicImage, timestamp, supplyTotal, feesTotal, height) +: filteredTxsWithoutDuplicateInputs
+      val combinedStateChange: UtxoState.StateChange = combineAll(txsWithCoinbase.map(UtxoState.tx2StateChange).toList)
       val stateRoot: Array[Byte] = state.tree.getOperationsRootHash(
         combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
       )
-      logger.info(s"StartProducingNewCandidate -> -> -> -> ${Algos.encode(stateRoot)}")
-      walletApplicator ! CandidateWithOutMandatoryAccount(validatedTxs, header, difficulty, stateRoot)
-    case msg@NewCandidate(_, _, _, _, _) =>
-      logger.info(s"Got NewCandidate on state applicator.")
-      historyApplicator ! msg
+      nodeViewHolder ! InfoForCandidateIsReady(header, txsWithCoinbase, timestamp, difficulty, stateRoot)
     case msg => logger.info(s"Got $msg in processNewCandidate.")
   }
 

@@ -1,14 +1,12 @@
 package encry.local.miner
 
 import java.util.Date
-
 import akka.actor.Actor
 import encry.EncryApp.miner
 import encry.consensus.{CandidateBlock, ConsensusSchemeReaders}
 import encry.local.miner.Miner.MinedBlock
 import encry.local.miner.Worker.{MineBlock, NextChallenge}
 import java.text.SimpleDateFormat
-
 import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
