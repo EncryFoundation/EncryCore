@@ -35,7 +35,7 @@ object ChainGenerator {
     val genesisBlock: Block = genGenesisBlock(privKey.publicImage, settings.constants.InitialEmissionAmount,
       settings.constants.InitialDifficulty, Height @@ 0)
 
-    val state: UtxoState = utxoFromBoxHolder(BoxHolder(Seq.empty), dir, None, settings, VersionalStorage.LevelDB)
+    val state: UtxoState = utxoFromBoxHolder(BoxHolder(Seq.empty), dir, settings, VersionalStorage.LevelDB)
     val genesisState = state.applyModifier(genesisBlock).right.get
 
     val (forkBlock, forkBoxes) =
@@ -55,7 +55,7 @@ object ChainGenerator {
     (state, newState, chain)
   }
 
-  def utxoFromBoxHolder(bh: BoxHolder, dir: File, nodeViewHolderRef: Option[ActorRef], settings: EncryAppSettings,
+  def utxoFromBoxHolder(bh: BoxHolder, dir: File, settings: EncryAppSettings,
                         storageType: StorageType): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
@@ -85,6 +85,7 @@ object ChainGenerator {
 
     val txs: Seq[Transaction] = Seq(coinbaseTrans)
     val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
+
     val header = Header(
         1.toByte,
         Header.GenesisParentId,

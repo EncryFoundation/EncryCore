@@ -15,7 +15,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.Height
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
@@ -110,7 +110,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
         IndexedSeq(assetBoxForFee, tokenIssuingBox),
         recipientAddress,
         amount,
-        Some(tokenId)
+        Some(ADKey @@ tokenId)
       )
 
       Await.result(dockerNodes().head.sendTransaction(transactionWithAssetToken), waitTime)
