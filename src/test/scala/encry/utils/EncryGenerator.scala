@@ -142,7 +142,7 @@ trait EncryGenerator extends Settings {
       random.nextLong(),
       settings.constants.InitialDifficulty,
       EquihashSolution(Seq(1, 3)),
-      Array.emptyByteArray
+      Random.randomBytes()
     )
   }
 
