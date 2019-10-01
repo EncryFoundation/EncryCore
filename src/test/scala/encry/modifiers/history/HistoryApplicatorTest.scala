@@ -58,14 +58,14 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
     awaitCond(history.getBestBlockHeight == 4, timeout)
 
-    checkBestBlock(history, chain(4))
+    checkBest(history, chain(4))
   }
 
-  def checkBestBlock(history: History, expectBlock: Block) {
-    history.getBestHeaderHeight shouldBe expectBlock.header.height
-    history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(expectBlock.header.id))
-    history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(expectBlock.id))
-    history.getBestBlockHeightDB shouldBe expectBlock.header.height
+  def checkBest(history: History, expectedBlock: Block) {
+    history.getBestHeaderHeight shouldBe expectedBlock.header.height
+    history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(expectedBlock.header.id))
+    history.getBestBlock.map(b => Algos.encode(b.id)) shouldBe Some(Algos.encode(expectedBlock.id))
+    history.getBestBlockHeightDB shouldBe expectedBlock.header.height
   }
 
   val dir: File = FileHelper.getRandomTempDir
@@ -96,7 +96,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
 
-      checkBestBlock(history, chain(blockQty - 1))
+      checkBest(history, chain(blockQty - 1))
     }
 
     "apply remote blocks and check chain sync" in {
@@ -119,7 +119,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
 
-      checkBestBlock(history, chain(blockQty - 1))
+      checkBest(history, chain(blockQty - 1))
     }
 
     "apply remote blocks and check queue for rollback height" in {
@@ -144,7 +144,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == testSettings.levelDB.maxVersions + overQty - 1)
 
-      checkBestBlock(history, chain(testSettings.levelDB.maxVersions + overQty - 1))
+      checkBest(history, chain(testSettings.levelDB.maxVersions + overQty - 1))
     }
 
     "should sync and check history rollback on invalid block " in {
@@ -180,7 +180,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
       expectMsg(timeout, FullBlockChainIsSynced())
       awaitCond(history.getBestBlockHeight == blockQty - 1, timeout)
-      checkBestBlock(history, chain(blockQty - 1))
+      checkBest(history, chain(blockQty - 1))
     }
 
     "sync and rollback headers for invalid payload" in {
@@ -214,7 +214,7 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
       awaitCond(history.getBestBlockHeight == 4, timeout, 500 millis,
         s"history.getBestBlockHeight ${history.getBestBlockHeight} expected 4")
 
-      checkBestBlock(history, chain(4))
+      checkBest(history, chain(4))
     }
 
   }
