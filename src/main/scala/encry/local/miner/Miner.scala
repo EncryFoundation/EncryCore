@@ -131,6 +131,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
       context.become(miningEnabled)
       self ! StartMining
     case FullBlockChainIsSynced() =>
+      logger.info(s"Miner got FullBlockChainIsSynced msg")
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
     case TransactionsForMiner(_) =>

@@ -24,7 +24,7 @@ class BlockSerializerTest extends FunSuite with EncryGenerator with Settings {
       999L,
       settings.constants.InitialDifficulty,
       EquihashSolution(Seq(1, 2, 3)),
-      Array.emptyByteArray
+      Random.randomBytes()
     )
 
     val factory = TestHelper
