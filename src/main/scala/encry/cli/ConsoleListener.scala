@@ -1,13 +1,13 @@
 package encry.cli
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import encry.cli.commands._
+import encry.cli.commands.history.GetLastHeaders
 import encry.settings.EncryAppSettings
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsoleListener(settings: EncryAppSettings) extends Actor {
+class ConsoleListener(settings: EncryAppSettings, dataHolder: ActorRef) extends Actor {
 
   import ConsoleListener._
 
@@ -18,7 +18,7 @@ class ConsoleListener(settings: EncryAppSettings) extends Actor {
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings)
+                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings, dataHolder)
                   .map {
                     case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
@@ -50,7 +50,7 @@ object ConsoleListener {
   ))
 
   private val settingsCmds = Map("settings" -> Map(
-    "addPeer" -> AddPeer,
+    "addPeer"             -> AddPeer,
     "removeFromBlackList" -> RemoveFromBlackList
   ))
 
@@ -63,8 +63,12 @@ object ConsoleListener {
     "privKeys"  -> PrintPrivKeys //Todo delete
   ))
 
-  val cmdDictionary: Map[String, Map[String, Command]] =
-    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds
+  private val historyCmds = Map("history" -> Map(
+    "getLastHeaders"  -> GetLastHeaders
+  ))
 
-  def props(settings: EncryAppSettings): Props = Props(new ConsoleListener(settings))
+  val cmdDictionary: Map[String, Map[String, Command]] =
+    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds ++ ConsoleListener.historyCmds
+
+  def props(settings: EncryAppSettings, dataHolder: ActorRef): Props = Props(new ConsoleListener(settings, dataHolder))
 }

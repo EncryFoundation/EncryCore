@@ -1,12 +1,13 @@
 package encry.cli.commands
 
+import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp._
+import encry.api.http.DataHolderForApi.GetDataFromPresentView
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
-import encry.view.actors.NodeViewHolder.ReceivableMessages._
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
@@ -24,10 +25,10 @@ object Transfer extends Command {
     * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
     * Example "wallet transfer -addr='9fRWpnERVQKzR14qN5EGknx8xk11SU6LoZxcJAc53uAv3HRbL4K' -fee=10000 -amount=2000"
     */
-  override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
+  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (nodeViewHolder ?
-      GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
+    (dataHolder ?
+      GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
         Try {
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s

@@ -1,15 +1,12 @@
 package encry.network
 
+import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.cli.commands.AddPeer.PeerFromCli
-import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.HistoryConsensus._
-import encry.api.http.DataHolderForApi.StartMiner
-import encry.local.miner.Miner
 import encry.local.miner.Miner.{DisableMining, Mining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
@@ -21,7 +18,6 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
-import encry.view.actors.NodeViewHolder.DownloadRequest
 import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
@@ -33,7 +29,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 
@@ -77,6 +72,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
     context.system.eventStream.subscribe(self, classOf[Mining])
+    context.system.eventStream.subscribe(self, classOf[Peer])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -251,6 +247,11 @@ object NodeViewSynchronizer {
     final case class RequestFromLocal(source: ConnectedPeer,
                                       modifierTypeId: ModifierTypeId,
                                       modifierIds: Seq[ModifierId])
+    trait Peer
+
+    final case class PeerFromCli(address: InetSocketAddress) extends Peer
+
+    final case class RemovePeerFromBlackList(address: InetSocketAddress) extends Peer
 
     trait NodeViewHolderEvent
 

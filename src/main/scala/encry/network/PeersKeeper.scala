@@ -5,9 +5,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{UpdatingPeersInfo}
-import encry.cli.commands.AddPeer.PeerFromCli
-import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
+import encry.api.http.DataHolderForApi.UpdatingPeersInfo
 import encry.consensus.HistoryConsensus.HistoryComparisonResult
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}

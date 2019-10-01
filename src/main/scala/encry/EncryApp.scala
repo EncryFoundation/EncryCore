@@ -64,7 +64,7 @@ object EncryApp extends App with StrictLogging {
   }
   if (settings.node.mining) miner ! StartMining
   if (settings.node.useCli) {
-    system.actorOf(ConsoleListener.props(settings), "cliListener")
+    system.actorOf(ConsoleListener.props(settings, dataHolderForApi), "cliListener")
     system.actorSelection("/user/cliListener") ! StartListening
   }
 

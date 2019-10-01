@@ -1,18 +1,22 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
-
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.{miner, nodeViewSynchronizer}
+import encry.EncryApp
+import encry.EncryApp._
 import encry.api.http.DataHolderForApi._
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange}
+import akka.pattern._
+import akka.util.Timeout
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.state.UtxoStateReader
+import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.view.actors.NodeViewHolder.CurrentView
+import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 
@@ -72,6 +76,9 @@ class DataHolderForApi(settings: EncryAppSettings,
         bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus, blockInfo, allP)
       )
 
+    case PeerAdd(peer)                => context.system.eventStream.publish(PeerFromCli(peer))
+    case RemovePeerFromBanList(peer)  => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
+
     case GetConnectedPeers      => sender() ! connectedPeers
     case GetDataFromHistory     => history.foreach(sender() ! _)
     case GetMinerStatus         => sender() ! minerStatus
@@ -83,6 +90,11 @@ class DataHolderForApi(settings: EncryAppSettings,
     case StartMiner             => context.system.eventStream.publish(EnableMining)
                                    context.system.eventStream.publish(StartMining)
     case StopMiner              => context.system.eventStream.publish(DisableMining)
+    case ShutdownNode           => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
+      //
+    case GetDataFromPresentView(f) =>
+      implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
+      (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
 
     case GetAllInfo =>
       sender() ! (
@@ -94,6 +106,7 @@ class DataHolderForApi(settings: EncryAppSettings,
         allPeers
       )
     case _ =>
+
   }
 }
 
@@ -113,9 +126,17 @@ object DataHolderForApi {
 
   final case class BlockAndHeaderInfo(header: Option[Header], block: Option[Block])
 
+  final case class RemovePeerFromBanList(peer: InetSocketAddress)
+
+  final case class PeerAdd(peer: InetSocketAddress)
+
+  final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
+
   case object StartMiner
 
   case object StopMiner
+
+  case object ShutdownNode
 
   case object GetTransactionsNumber
 

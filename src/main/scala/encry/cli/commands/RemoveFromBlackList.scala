@@ -1,7 +1,9 @@
 package encry.cli.commands
 
-import java.net.{InetAddress, InetSocketAddress}
-import encry.EncryApp._
+import java.net.InetSocketAddress
+import scala.concurrent.ExecutionContext.Implicits.global
+import akka.actor.ActorRef
+import encry.api.http.DataHolderForApi.RemovePeerFromBanList
 import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import scala.concurrent.Future
@@ -13,13 +15,11 @@ import scala.concurrent.Future
 
 object RemoveFromBlackList extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
+  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef): Future[Option[Response]] = {
     val host: String = args.requireArg[Ast.Str]("host").s
     val port: Long = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
-    nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
+    dataHolder ! RemovePeerFromBanList(peer)
     Future(Some(Response("Peer removed from black list")))
   }
-
-  final case class RemovePeerFromBlackList(address: InetSocketAddress)
 }
