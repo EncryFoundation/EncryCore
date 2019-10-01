@@ -90,7 +90,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def getK(key: K, node: Node[K, V]): Option[V] = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       getK(key, restoredNode)
     case internalNode: InternalNode[K, V] =>
       if (internalNode.key === key) Some(internalNode.value)
@@ -110,7 +110,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
                      prevOpsInfo: OperationInfo[K, V] = OperationInfo.empty[K, V])
                     (implicit m: Monoid[K], v: Monoid[V]): (Option[Node[K, V]], OperationInfo[K, V]) = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       delete(restoredNode, key)
     case leafNode: LeafNode[K, V] =>
       if (leafNode.key === key) (None, prevOpsInfo.updateDeleted(ByteArrayWrapper(leafNode.hash)))
@@ -162,7 +162,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     val h = implicitly[Order[Node[K, V]]]
     node match {
       case shadowNode: ShadowNode[K, V] =>
-        val restoredNode = shadowNode.restoreFullNode(storage).get
+        val restoredNode = shadowNode.restoreFullNode(storage)
         findTheClosestValue(restoredNode, key)
       case leafNode: LeafNode[K, V] => leafNode.key -> leafNode.value -> EMPTY
       case internalNode: InternalNode[K, V] =>
@@ -196,7 +196,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       getRightPath(restoredNode)
     case leafNode: LeafNode[K, V] => List(leafNode)
     case internalNode: InternalNode[K, V] => internalNode +: internalNode.rightChild.map(getRightPath).getOrElse(List.empty)
@@ -204,7 +204,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def getLeftPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       getLeftPath(restoredNode)
     case leafNode: LeafNode[K, V] => List(leafNode)
     case internalNode: InternalNode[K, V] => internalNode +: internalNode.leftChild.map(getLeftPath).getOrElse(List.empty)
@@ -214,7 +214,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
                      newValue: V,
                      nodeWithOpInfo: NodeWithOpInfo[K, V]): NodeWithOpInfo[K, V] = nodeWithOpInfo.node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       insert(newKey, newValue, NodeWithOpInfo(restoredNode, nodeWithOpInfo.opInfo))
     case _: EmptyNode[K, V] =>
       val newLeaf = LeafNode[K, V](newKey, newValue)
@@ -258,7 +258,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   private def balance(nodeWithOpsInfo: NodeWithOpInfo[K, V]): NodeWithOpInfo[K, V] = {
     nodeWithOpsInfo.node match {
       case shadowNode: ShadowNode[K, V] =>
-        val restoredNode = shadowNode.restoreFullNode(storage).get
+        val restoredNode = shadowNode.restoreFullNode(storage)
         balance(nodeWithOpsInfo.copy(node = restoredNode))
       case internalNode: InternalNode[K, V] =>
         val newAdditionalInfo = (
@@ -286,7 +286,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def rightSubTreeHeight(node: Node[K, V]): Int = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       rightSubTreeHeight(restoredNode)
     case internalNode: InternalNode[K, V] => internalNode.rightChild.map(_.height).getOrElse(-1)
     case _ => -1
@@ -294,7 +294,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def leftSubTreeHeight(node: Node[K, V]): Int = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       leftSubTreeHeight(restoredNode)
     case internalNode: InternalNode[K, V] => internalNode.leftChild.map(_.height).getOrElse(-1)
     case _ => -1
@@ -302,7 +302,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def rightRotation(nodeWithOpInfo: NodeWithOpInfo[K, V]): NodeWithOpInfo[K, V] = nodeWithOpInfo.node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       rightRotation(NodeWithOpInfo(restoredNode, nodeWithOpInfo.opInfo))
     case leafNode: LeafNode[K, V] => nodeWithOpInfo
     case internalNode: InternalNode[K, V] =>
@@ -310,7 +310,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         case LeafNode(key, value) => InternalNode(key, value, 0, 0)
         case internalNode: InternalNode[K, V] => internalNode
         case shadowNode: ShadowNode[K, V] =>
-          shadowNode.restoreFullNode(storage).get match {
+          shadowNode.restoreFullNode(storage) match {
             case LeafNode(key, value) => InternalNode(key, value, 0, 0)
             case internalNode: InternalNode[K, V] => internalNode
           }
@@ -334,7 +334,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def leftRotation(nodeWithOpsInfo: NodeWithOpInfo[K, V]): NodeWithOpInfo[K, V] = nodeWithOpsInfo.node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       leftRotation(NodeWithOpInfo(restoredNode, nodeWithOpsInfo.opInfo))
     case leafNode: LeafNode[K, V] => nodeWithOpsInfo
     case internalNode: InternalNode[K, V] =>
@@ -342,7 +342,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         case LeafNode(key, value) => InternalNode(key, value, 0, 0)
         case internalNode: InternalNode[K, V] => internalNode
         case shadowNode: ShadowNode[K, V] =>
-          shadowNode.restoreFullNode(storage).get match {
+          shadowNode.restoreFullNode(storage) match {
             case LeafNode(key, value) => InternalNode(key, value, 0, 0)
             case internalNode: InternalNode[K, V] => internalNode
           }
@@ -363,7 +363,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   private def rlRotation(nodeWithOpInfo: NodeWithOpInfo[K, V]): NodeWithOpInfo[K, V] = nodeWithOpInfo.node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(storage).get
+      val restoredNode = shadowNode.restoreFullNode(storage)
       rlRotation(NodeWithOpInfo(restoredNode, nodeWithOpInfo.opInfo))
     case leafNode: LeafNode[K, V] => nodeWithOpInfo
     case internalNode: InternalNode[K, V] =>
@@ -376,7 +376,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   private def lrRotation(nodeWithOpsInfo: NodeWithOpInfo[K, V]): NodeWithOpInfo[K, V] =
     nodeWithOpsInfo.node match {
       case shadowNode: ShadowNode[K, V] =>
-        val restoredNode = shadowNode.restoreFullNode(storage).get
+        val restoredNode = shadowNode.restoreFullNode(storage)
         lrRotation(NodeWithOpInfo(restoredNode, nodeWithOpsInfo.opInfo))
       case leafNode: LeafNode[K, V] => nodeWithOpsInfo
       case internalNode: InternalNode[K, V] =>

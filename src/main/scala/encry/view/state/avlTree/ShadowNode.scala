@@ -18,7 +18,7 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](hash: Array[Byte],
   override val key: K = kM.empty
   override val value: V = vM.empty
 
-  def restoreFullNode(storage: VersionalStorage): Try[Node[K, V]] = {
+  def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
     println(s"Trying to restore: ${Algos.encode(hash)}")
     NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey @@ hash).get)
   }
