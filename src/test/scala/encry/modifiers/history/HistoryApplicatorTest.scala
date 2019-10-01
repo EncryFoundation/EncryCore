@@ -202,16 +202,15 @@ class HistoryApplicatorTest extends TestKit(ActorSystem())
 
       headers.foreach(historyApplicator ! ModifierFromRemote(_))
 
-      /* Если раскоментировать то тест падает, getBestHeaderHeight иногда 6 иногда 7, не доходит до 9 */
-//      awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout, 500 millis,
-//        s"history.getBestHeaderHeight ${history.getBestHeaderHeight} expected ${blockQty - 1}")
-//      history.getBestHeaderHeight shouldBe blockQty - 1
-//      history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(chain(blockQty - 1).header.id))
+      awaitCond(history.getBestHeaderHeight == blockQty - 1, timeout, 100 millis,
+        s"history.getBestHeaderHeight ${history.getBestHeaderHeight} expected ${blockQty - 1}")
+      history.getBestHeaderHeight shouldBe blockQty - 1
+      history.getBestHeader.map(h => Algos.encode(h.id)) shouldBe Some(Algos.encode(chain(blockQty - 1).header.id))
 
       payloads.foreach(historyApplicator ! ModifierFromRemote(_))
 
       expectMsg(timeout, FullBlockChainIsSynced())
-      awaitCond(history.getBestBlockHeight == 4, timeout, 500 millis,
+      awaitCond(history.getBestBlockHeight == 4, timeout, 100 millis,
         s"history.getBestBlockHeight ${history.getBestBlockHeight} expected 4")
 
       checkBest(history, chain(4))

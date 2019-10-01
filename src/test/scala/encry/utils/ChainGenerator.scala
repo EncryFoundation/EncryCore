@@ -46,6 +46,7 @@ object ChainGenerator {
     val (chain, _, newState, _) =
       (2 until blockQty).foldLeft(List(genesisBlock, forkBlock), forkBlock, forkState, forkBoxes) {
         case ((blocks, blockL, stateL, boxes), height) =>
+          Thread.sleep(1)//timestamp 1569926861646 less than parent's 1569926861646
           val invalid = genInvalidBlockFrom.exists(height + 1 >= _)
           val (newBlock, newBoxes) = genNextBlockForState(privKey, blockL, settings.constants.InitialEmissionAmount, stateL,  boxes,
             randomAddress, invalid)
