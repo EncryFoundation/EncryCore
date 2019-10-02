@@ -4,7 +4,7 @@ import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
 import encry.it.docker.DockerAfterAll
 import encry.it.util.WaitUtils._
-import encry.it.utils.FutureBlockedRun._
+import encry.it.utils.FutureAwait._
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.duration._
@@ -29,7 +29,7 @@ class TwoOfflinegenTest extends FunSuite with Matchers with DockerAfterAll {
     val node2 = docker
       .startNodeInternal(miningNodeConfig.withFallback(Configs.nodeName("node2")))
 
-    node1.waitForFullHeight(heightSeparation).run
+    node1.waitForFullHeight(heightSeparation).await
 
     val node3 = docker
       .startNodeInternal(
@@ -41,7 +41,7 @@ class TwoOfflinegenTest extends FunSuite with Matchers with DockerAfterAll {
       )
 
     val (bestFullHeaderId1, bestFullHeaderId3) =
-      waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run)
+      waitForEqualsId(node1.bestFullHeaderId.await, node3.bestFullHeaderId.await)
 
     bestFullHeaderId3 shouldEqual bestFullHeaderId1
   }

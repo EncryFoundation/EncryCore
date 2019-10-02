@@ -4,7 +4,7 @@ import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
 import encry.it.docker.DockerAfterAll
 import encry.it.util.WaitUtils._
-import encry.it.utils.FutureBlockedRun._
+import encry.it.utils.FutureAwait._
 import org.scalatest.{FunSuite, Matchers}
 
 import scala.concurrent.duration._
@@ -25,7 +25,7 @@ class ThreeNodesKnowAboutEachOtherTest extends FunSuite with Matchers with Docke
         .withFallback(defaultConf)
       )
 
-    node1.waitForFullHeight(heightSeparation).run
+    node1.waitForFullHeight(heightSeparation).await
 
     val node2 = docker
       .startNodeInternal(Configs.nodeName("node2")
@@ -36,9 +36,9 @@ class ThreeNodesKnowAboutEachOtherTest extends FunSuite with Matchers with Docke
         .withFallback(defaultConf)
       )
 
-    node1.connect(s"${node2.nodeIp}:9001").run
+    node1.connect(s"${node2.nodeIp}:9001").await
 
-    node1.waitForFullHeight(heightSeparation * 2).run
+    node1.waitForFullHeight(heightSeparation * 2).await
 
     val node3 = docker
       .startNodeInternal(Configs.nodeName("node3")
@@ -49,10 +49,10 @@ class ThreeNodesKnowAboutEachOtherTest extends FunSuite with Matchers with Docke
         .withFallback(defaultConf)
       )
 
-    waitForEqualsId(node1.bestFullHeaderId.run, node3.bestFullHeaderId.run)
+    waitForEqualsId(node1.bestFullHeaderId.await, node3.bestFullHeaderId.await)
 
     val (bestFullHeaderId2, bestFullHeaderId3) =
-      waitForEqualsId(node2.bestFullHeaderId.run, node3.bestFullHeaderId.run)
+      waitForEqualsId(node2.bestFullHeaderId.await, node3.bestFullHeaderId.await)
 
     bestFullHeaderId2 shouldEqual bestFullHeaderId3
   }

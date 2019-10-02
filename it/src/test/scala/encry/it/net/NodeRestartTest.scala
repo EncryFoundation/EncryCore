@@ -6,7 +6,7 @@ import encry.it.configs.Configs
 import encry.it.docker.Docker.defaultConf
 import encry.it.docker.DockerAfterAll
 import encry.it.util.WaitUtils._
-import encry.it.utils.FutureBlockedRun._
+import encry.it.utils.FutureAwait._
 import org.encryfoundation.common.utils.Algos
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.utils.Random
@@ -39,17 +39,17 @@ class NodeRestartTest extends AsyncFunSuite with Matchers with DockerAfterAll {
         Some(volumeName, containerMountPath)
       )
 
-    node1.connect(s"${node21.nodeIp}:9001").run
-    node21.connect(s"${node1.nodeIp}:9001").run
+    node1.connect(s"${node21.nodeIp}:9001").await
+    node21.connect(s"${node1.nodeIp}:9001").await
 
-    node1.waitForFullHeight(5).run
+    node1.waitForFullHeight(5).await
 
     node21.shutdown
     Thread.sleep(5000)
     docker.stopNode(node21, 5)
     Thread.sleep(7000)
 
-    node1.waitForFullHeight(10).run
+    node1.waitForFullHeight(10).await
 
     val node22 = docker
       .startNodeInternal(Configs.mining(true)
@@ -62,15 +62,15 @@ class NodeRestartTest extends AsyncFunSuite with Matchers with DockerAfterAll {
         Some(volumeName, containerMountPath)
       )
 
-    node1.waitForFullHeight(15).run
+    node1.waitForFullHeight(15).await
 
-    node1.connect(s"${node22.nodeIp}:9002").run
-    node22.connect(s"${node1.nodeIp}:9001").run
+    node1.connect(s"${node22.nodeIp}:9002").await
+    node22.connect(s"${node1.nodeIp}:9001").await
 
-    node1.waitForFullHeight(20).run
+    node1.waitForFullHeight(20).await
 
     val (bestFullHeaderId1, bestFullHeaderId2) =
-      waitForEqualsId(node1.bestFullHeaderId.run, node22.bestFullHeaderId.run)
+      waitForEqualsId(node1.bestFullHeaderId.await, node22.bestFullHeaderId.await)
 
     bestFullHeaderId2 shouldEqual bestFullHeaderId1
   }
