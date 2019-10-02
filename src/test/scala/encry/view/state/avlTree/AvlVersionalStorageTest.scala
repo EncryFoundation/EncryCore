@@ -11,6 +11,9 @@ import org.scalatest.{Matchers, PropSpec}
 import org.specs2.mutable.Specification
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
+import io.iohk.iodb.ByteArrayWrapper
+
+import scala.collection.immutable.HashMap
 
 class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator {
 
@@ -27,7 +30,9 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     val avlStorage = AvlTree[StorageKey, StorageValue](storage)
 
-    val boxes = (0 to 10000).map{i =>
+    val interval = 500
+
+    val boxes = (0 to interval).map{i =>
       val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
       genAssetBox(addr, i, nonce = i)
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
@@ -44,7 +49,44 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
 
-    boxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
+    boxes.forall{case (key, _) =>
+      //println("test:" + Algos.encode(key))
+      newAvl.contains(key)} shouldBe true
+
+    val newBoxes = (interval to interval*2).map{i =>
+      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
+      genAssetBox(addr, i, nonce = i)
+    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+
+    println("second insert!")
+    val newAvl2 = newAvl.insertAndDeleteMany(
+      StorageVersion @@ Random.randomBytes(),
+      newBoxes.toList,
+      boxes.map{case (key, _) => key}.toList
+    )
+
+    newBoxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
+
+    val anotherNewBoxes = (interval*2 to interval*3).map{i =>
+      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
+      genAssetBox(addr, i, nonce = i)
+    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+    println("third insert!")
+    val newAvl3 = newAvl2.insertAndDeleteMany(
+      StorageVersion @@ Random.randomBytes(),
+      anotherNewBoxes.toList,
+      newBoxes.map{case (key, _) => key}.toList
+    )
+  }
+
+  property("test") {
+    val testHash = HashMap(ByteArrayWrapper(Ints.toByteArray(1)) -> 1,ByteArrayWrapper(Ints.toByteArray(1)) -> 2)
+//    val test1 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 2)
+//    val test2 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 3)
+//    val test3 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 4)
+//    val test4 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 5)
+    val test2Hash = testHash ++ List(ByteArrayWrapper(Ints.toByteArray(1)) -> 3)
+    println(test2Hash)
   }
 
   property("avl test") {
@@ -71,7 +113,9 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     val avlStorage = AvlTree[Int, Int](storage)
 
-    val boxes = List(3 -> 1, 2 -> 1, 1 -> 1)
+    val interval = 10
+
+    val boxes = (0 to interval).map(i => i -> i).toList
     //val boxes = (0 to 100).map(i => i -> i).toList
 
     //println(boxes.map(bx => Algos.encode(bx._1)).mkString("\n "))
@@ -84,16 +128,40 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
       List.empty
     )
 
-    println("------")
+    boxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
 
-    println(newAvl)
+    println(newAvl.rootNode)
 
-    println("right:")
+//    val newBoxes = (interval to interval*2).map(i => i -> i).toList
+//
+//    val newAvl2 = newAvl.insertAndDeleteMany(
+//      StorageVersion @@ Random.randomBytes(),
+//      newBoxes,
+//      boxes.map(_._1)
+//    )
 
-    println(newAvl.rootNode.asInstanceOf[InternalNode[Int, Int]].rightChild.get.asInstanceOf[ShadowNode[Int, Int]].restoreFullNode(storage))
+//    println(newAvl2.rootNode)
 
-    println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
+//    val newBoxe2 = (interval*2 to interval*3).map(i => i -> i).toList
+//
+//    val newAvl3 = newAvl2.insertAndDeleteMany(
+//      StorageVersion @@ Random.randomBytes(),
+//      newBoxe2,
+//      newBoxes.map(_._1)
+//    )
+//
+//    println(newAvl3.rootNode)
 
-    println(Algos.encode(newAvl.rootHash))
+//    println("------")
+//
+//    println(newAvl)
+//
+//    println("right:")
+//
+//    println(newAvl.rootNode.asInstanceOf[InternalNode[Int, Int]].rightChild.get.asInstanceOf[ShadowNode[Int, Int]].restoreFullNode(storage))
+//
+//    println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
+//
+//    println(Algos.encode(newAvl.rootHash))
   }
 }
