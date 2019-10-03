@@ -41,8 +41,9 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     val startTime = System.currentTimeMillis()
 
+    val firstVer = StorageVersion @@ Random.randomBytes()
     val newAvl = avlStorage.insertAndDeleteMany(
-      StorageVersion @@ Random.randomBytes(),
+      firstVer,
       boxes.toList,
       List.empty
     )
@@ -50,7 +51,6 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
     println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
 
     boxes.forall{case (key, _) =>
-      println("test:" + Algos.encode(Algos.hash(Algos.hash(key))))
       newAvl.contains(key)} shouldBe true
 
     val newBoxes = (interval to interval*2).map{i =>
@@ -59,24 +59,28 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
 
     println("second insert!")
+    val secondVer = StorageVersion @@ Random.randomBytes()
     val newAvl2 = newAvl.insertAndDeleteMany(
-      StorageVersion @@ Random.randomBytes(),
+      secondVer,
       newBoxes.toList,
       boxes.map{case (key, _) => key}.toList
     )
 
     newBoxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
 
+    val rollbackAvl = newAvl2.rollbackTo(firstVer).get
+
     val anotherNewBoxes = (interval*2 to interval*3).map{i =>
       val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
       genAssetBox(addr, i, nonce = i)
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
-    println("third insert!")
-    val newAvl3 = newAvl2.insertAndDeleteMany(
+    val newAvl3 = rollbackAvl.insertAndDeleteMany(
       StorageVersion @@ Random.randomBytes(),
       anotherNewBoxes.toList,
-      newBoxes.map{case (key, _) => key}.toList
+      boxes.map{case (key, _) => key}.toList
     )
+
+    println(newAvl3.rootNode)
   }
 
   property("test") {

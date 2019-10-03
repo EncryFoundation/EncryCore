@@ -2,6 +2,7 @@ package encry.view.state.avlTree
 
 import cats.syntax.order._
 import cats.{Monoid, Order}
+import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.avlTree.AvlTree.Direction
@@ -9,9 +10,10 @@ import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
+
 import scala.util.Try
 
-final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable {
+final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging {
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]]{
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -186,7 +188,11 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   //[K: Monoid : Serializer : Hashable : Order, V: Monoid : Serializer]
   def rollbackTo(to: StorageVersion)(implicit kMonoid: Monoid[K], kSer: Serializer[K],
                                      vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] = Try {
+    logger.info(s"Rollback avl to version: ${Algos.encode(to)}")
     storage.rollbackTo(to)
+    logger.info(s"Storage success rollbacked")
+    logger.info(s"rootNodeKey: ${storage.get(AvlTree.rootNodeKey)}")
+    logger.info(s"root node bytes: ${storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get)}")
     val rootNode = NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
     AvlTree[K, V](rootNode, storage)
   }
