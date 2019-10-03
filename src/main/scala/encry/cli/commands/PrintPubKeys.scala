@@ -8,13 +8,16 @@ import encry.settings.EncryAppSettings
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import encry.api.http.DataHolderForApi.GetDataFromPresentView
+import encry.utils.NetworkTimeProvider
 import encry.view.state.UtxoState
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.Future
 
 object PrintPubKeys extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef): Future[Option[Response]] = {
+  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+                       networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
       GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Response]] { view =>

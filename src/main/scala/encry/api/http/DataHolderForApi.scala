@@ -1,10 +1,12 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
+import akka.pattern._
 import encry.api.http.DataHolderForApi._
 import akka.pattern._
 import akka.util.Timeout
@@ -18,10 +20,14 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.actors.NodeViewHolder.CurrentView
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
+import encry.view.wallet.EncryWallet
+import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 
 class DataHolderForApi(settings: EncryAppSettings,
                        ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+
+  implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
@@ -79,11 +85,25 @@ class DataHolderForApi(settings: EncryAppSettings,
     case PeerAdd(peer)                => context.system.eventStream.publish(PeerFromCli(peer))
     case RemovePeerFromBanList(peer)  => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
+    case GetViewPrintAddress                      =>
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+            view.vault.publicKeys.foldLeft("") { (str, k) =>
+              str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"}
+    }).pipeTo(sender)
+
+    case GetViewCreateKey =>
+      (self ?
+          GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
+            if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
+            else view.vault.accountManager.createAccount(None)
+              }).pipeTo(sender)
+
     case GetConnectedPeers      => sender() ! connectedPeers
     case GetDataFromHistory     => history.foreach(sender() ! _)
     case GetMinerStatus         => sender() ! minerStatus
     case GetReaders             => sender() ! Readers(history, state)
     case GetTransactionsNumber  => sender() ! transactionsOnMinerActor
+    case GetTimeProvider        => sender() ! ntp
     case GetBlockInfo           => sender() ! blockInfo
     case GetAllPeers            => sender() ! allPeers
     case GetBannedPeers         => sender() ! blackList
@@ -93,7 +113,6 @@ class DataHolderForApi(settings: EncryAppSettings,
     case ShutdownNode           => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
       //
     case GetDataFromPresentView(f) =>
-      implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
       (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
 
     case GetAllInfo =>
@@ -131,6 +150,12 @@ object DataHolderForApi {
   final case class PeerAdd(peer: InetSocketAddress)
 
   final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
+
+  case object GetViewPrintAddress
+
+  case object GetViewCreateKey
+
+  case object GetTimeProvider
 
   case object StartMiner
 

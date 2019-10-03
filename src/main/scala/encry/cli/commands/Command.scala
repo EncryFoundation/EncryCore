@@ -3,11 +3,13 @@ package encry.cli.commands
 import akka.actor.ActorRef
 import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
+
 import scala.concurrent.Future
 
 trait Command {
 
-  def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef): Future[Option[Response]]
+  def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef, nodeId: Array[Byte], ntp: NetworkTimeProvider): Future[Option[Response]]
 
 }
 

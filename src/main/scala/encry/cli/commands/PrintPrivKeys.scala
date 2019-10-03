@@ -6,16 +6,19 @@ import akka.util.Timeout
 import encry.api.http.DataHolderForApi.GetDataFromPresentView
 import encry.cli.Response
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.Future
 
 //TODO This cmd is unsafe.
 object PrintPrivKeys extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef): Future[Option[Response]] = {
+  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+                       networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
       GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Response]] { view =>

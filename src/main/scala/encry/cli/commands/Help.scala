@@ -3,12 +3,15 @@ package encry.cli.commands
 import akka.actor.ActorRef
 import encry.cli.Response
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object Help extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef): Future[Option[Response]] =
+  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+                       networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] =
     Future(Some(Response(
       """
         |Usage: [GROUP_NAME] [COMMAND] -[ARGUMENT_1]=[VAL_1] -[ARGUMENT_2]=[VAL_2]

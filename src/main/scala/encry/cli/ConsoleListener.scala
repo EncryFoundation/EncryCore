@@ -2,12 +2,19 @@ package encry.cli
 
 import akka.actor.{Actor, ActorRef, Props}
 import encry.cli.commands._
-import encry.cli.commands.history.GetLastHeaders
+import encry.cli.commands.history.{GetCandidate, GetFullBlockById, GetHeaderById, GetLastHeaderIdsAtHeight, GetLastHeaders, GetTxById}
+import encry.cli.commands.info.GetInfo
+import encry.cli.commands.peer.GetAllPeers
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
+
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
 
-class ConsoleListener(settings: EncryAppSettings, dataHolder: ActorRef) extends Actor {
+class ConsoleListener(settings: EncryAppSettings,
+                      dataHolder: ActorRef,
+                      nodeId: Array[Byte],
+                      networkTimeProvider: NetworkTimeProvider) extends Actor {
 
   import ConsoleListener._
 
@@ -18,7 +25,7 @@ class ConsoleListener(settings: EncryAppSettings, dataHolder: ActorRef) extends 
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings, dataHolder)
+                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings, dataHolder, nodeId, networkTimeProvider)
                   .map {
                     case Some(x) => print(x.msg + s"\n$prompt")
                     case None =>
@@ -64,11 +71,28 @@ object ConsoleListener {
   ))
 
   private val historyCmds = Map("history" -> Map(
-    "getLastHeaders"  -> GetLastHeaders
+    "getLastHeaders"     -> GetLastHeaders,
+    "getLastHeaderIds"   -> GetLastHeaderIdsAtHeight,
+    "getHeaderById"      -> GetHeaderById,
+    "getTxById"          -> GetTxById,
+    "getCandidate"       -> GetCandidate,
+    "getFullBlock"       -> GetFullBlockById
+  ))
+
+  private val infoCmds = Map("info" -> Map(
+    "get" -> GetInfo
+  ))
+
+  private val peerCmds = Map("peer" -> Map(
+    "all" -> GetAllPeers
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =
-    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds ++ ConsoleListener.historyCmds
+    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds ++
+      ConsoleListener.historyCmds ++ ConsoleListener.infoCmds ++ ConsoleListener.peerCmds
 
-  def props(settings: EncryAppSettings, dataHolder: ActorRef): Props = Props(new ConsoleListener(settings, dataHolder))
+  def props(settings: EncryAppSettings,
+            dataHolder: ActorRef,
+            nodeId: Array[Byte],
+            timeProvider: NetworkTimeProvider): Props = Props(new ConsoleListener(settings, dataHolder, nodeId, timeProvider))
 }

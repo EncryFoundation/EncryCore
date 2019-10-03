@@ -5,8 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.EncryApp.nodeViewHolder
-import encry.api.http.DataHolderForApi.GetDataFromPresentView
+import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey, GetViewPrintAddress}
 import encry.settings.RESTApiSettings
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
@@ -15,6 +14,7 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.Future
 import scala.util.Random
 
@@ -28,22 +28,13 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
   override val settings: RESTApiSettings = restApiSettings
 
-  private def getWallet: Future[EncryWallet] = (nodeViewHolder ?
+  private def getWallet: Future[EncryWallet] = (dataHolder ?
     GetDataFromCurrentView[History, UtxoState, EncryWallet, EncryWallet](_.vault))
     .mapTo[EncryWallet]
 
-  private def getAddresses: Future[String] = (dataHolder ?
-    GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-      view.vault.publicKeys.foldLeft("") { (str, k) =>
-        str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
-      }
-    }).mapTo[String]
+  private def getAddresses: Future[String] = (dataHolder ? GetViewPrintAddress).mapTo[String]
 
-  private def createKey: Future[PrivateKey25519] = (dataHolder ?
-    GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
-      if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
-      else view.vault.accountManager.createAccount(None)
-    }).mapTo[PrivateKey25519]
+  private def createKey: Future[PrivateKey25519] = (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519]
 
   private def pubKeys: Future[String] = (dataHolder ?
     GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>

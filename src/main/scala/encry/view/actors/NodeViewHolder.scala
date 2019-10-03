@@ -44,7 +44,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-  dataHolder ! UpdatedHistory(nodeView.history)
+  dataHolder ! ChangedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
