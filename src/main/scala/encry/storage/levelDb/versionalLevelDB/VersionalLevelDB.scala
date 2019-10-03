@@ -192,15 +192,17 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         getInaccessiableKeysInVersion(versionToResolve, readOptions)
       deletionsByThisVersion.foreach { key =>
         val elemMap = db.get(userKey(key), readOptions)
-        val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
-          .map(ver => new ByteArrayWrapper(ver))
-        val elemVersions = wrappedVersions.filter(currentVersions.contains)
-        val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
-        toDeleteElemsVersions.foreach(toDelWrapped =>
-          batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
-        )
-        if (elemVersions.isEmpty) batch.delete(userKey(key))
-        else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+        if (elemMap != null) {
+          val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
+            .map(ver => new ByteArrayWrapper(ver))
+          val elemVersions = wrappedVersions.filter(currentVersions.contains)
+          val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
+          toDeleteElemsVersions.foreach(toDelWrapped =>
+            batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
+          )
+          if (elemVersions.isEmpty) batch.delete(userKey(key))
+          else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+        } else logger.info(s"Trying to delete key (${Algos.encode(key)}), which not exist in db")
       }
       val insertionsByThisVersion =
         splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
