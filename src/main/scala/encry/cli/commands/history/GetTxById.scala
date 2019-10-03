@@ -22,9 +22,9 @@ object GetTxById extends Command{
   override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    def getHistory: Future[History] = (dataHolder ? GetDataFromHistory).mapTo[History]
 
-    def getFullBlockByHeaderId(headerId: String): Future[Option[Block]] = getHistory.map { history =>
+    def getFullBlockByHeaderId(headerId: String): Future[Option[Block]] = (dataHolder ?
+      GetDataFromHistory).mapTo[History].map { history =>
       Algos.decode(headerId).toOption
         .flatMap(decoded => history.getHeaderById(ModifierId @@ decoded))
         .flatMap(history.getBlockByHeader)

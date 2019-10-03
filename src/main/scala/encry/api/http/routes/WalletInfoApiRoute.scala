@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey, GetViewPrintAddress}
+import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
 import encry.settings.RESTApiSettings
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
@@ -36,18 +36,9 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
   private def createKey: Future[PrivateKey25519] = (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519]
 
-  private def pubKeys: Future[String] = (dataHolder ?
-    GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-      view.vault.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes) + "\n")
-    }).mapTo[String]
+  private def pubKeys: Future[String] = (dataHolder ? GetViewPrintPubKeys).mapTo[String]
 
-  private def getBalance: Future[String] = (dataHolder ?
-    GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-      val balance: String =
-        view.vault.getBalances.foldLeft("")((str, tokenInfo) =>
-          str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n"))
-      if (balance.length == 0) "0" else balance
-    }).mapTo[String]
+  private def getBalance: Future[String] = (dataHolder ? GetViewGetBalance).mapTo[String]
 
   def infoR: Route = (path("info") & get) {
     getWallet

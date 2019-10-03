@@ -9,16 +9,14 @@ import encry.cli.Response
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import org.encryfoundation.common.crypto.PrivateKey25519
-
 import scala.concurrent.Future
-import scala.util.Try
 
 object CreateKey extends Command {
 
   override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519].foreach(println)
+    (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519]
     Future(None)
   }
 }

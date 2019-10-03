@@ -3,7 +3,7 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetMinerStatus}
+import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetFullHeaderById, GetLastHeaderIdAtHeightHelper, GetLastHeadersHelper, GetMinerStatus}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.view.history.History
@@ -33,13 +33,11 @@ case class HistoryApiRoute(dataHolder: ActorRef,
 
   private def getHistory: Future[History] = (dataHolder ? GetDataFromHistory).mapTo[History]
 
-  private def getHeaderIdsAtHeight(h: Int): Future[Json] = getHistory.map {
-    _.headerIdsAtHeight(h).map(Algos.encode).asJson
-  }
+  private def getHeaderIdsAtHeight(h: Int): Future[Json] = (dataHolder ? GetLastHeaderIdAtHeightHelper(h))
+    .mapTo[Seq[String]].map(_.asJson)
 
-  private def getLastHeaders(n: Int): Future[Json] = getHistory.map {
-    _.lastHeaders(n).headers.map(_.asJson).asJson
-  }
+  private def getLastHeaders(n: Int): Future[Json] =
+    (dataHolder ? GetLastHeadersHelper(n)).mapTo[IndexedSeq[Header]].map(_.asJson)
 
   private def getHeaderIds(offset: Int, limit: Int): Future[Json] =
     getHistory.map {
@@ -57,7 +55,7 @@ case class HistoryApiRoute(dataHolder: ActorRef,
   def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { height => getHeaderIdsAtHeight(height).okJson() }
 
   def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.header.asJson)).okJson()
+    (dataHolder ? GetFullHeaderById(Right(id))).mapTo[Option[Block]].map(_.map(x => x.header.asJson)).okJson()
   }
 
   def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
@@ -69,6 +67,6 @@ case class HistoryApiRoute(dataHolder: ActorRef,
   }
 
   def getFullBlockByHeaderIdR: Route = (modifierId & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.asJson)).okJson()
+    (dataHolder ? GetFullHeaderById(Right(id))).mapTo[Option[Block]].map(_.asJson).okJson()
   }
 }

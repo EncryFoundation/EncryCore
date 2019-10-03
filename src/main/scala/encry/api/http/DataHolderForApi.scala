@@ -10,6 +10,7 @@ import akka.pattern._
 import encry.api.http.DataHolderForApi._
 import akka.pattern._
 import akka.util.Timeout
+import encry.cli.Response
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -23,6 +24,10 @@ import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
+import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings,
                        ntp: NetworkTimeProvider) extends Actor with StrictLogging {
@@ -98,6 +103,50 @@ class DataHolderForApi(settings: EncryAppSettings,
             else view.vault.accountManager.createAccount(None)
               }).pipeTo(sender)
 
+    case GetViewPrintPubKeys =>
+      (self ?
+      GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+        view.vault.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes) + "\n")
+      }).pipeTo(sender)
+
+    case GetViewGetBalance =>
+      (self ?
+      GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+        val balance: String =
+          view.vault.getBalances.foldLeft("")((str, tokenInfo) =>
+            str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n"))
+        if (balance.length == 0) "0" else balance
+      }).pipeTo(sender)
+
+    case GetViewPrintPrivKeys =>
+      (self ?
+      GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+        view.vault.accountManager.accounts.foldLeft("")((str, k) =>
+          str + Algos.encode(k.privKeyBytes) + "\n"
+        )
+      }).pipeTo(sender)
+
+    case GetLastHeadersHelper(i) =>
+      (self ? GetDataFromHistory).mapTo[History].map {
+        _.lastHeaders(i).headers
+      }.pipeTo(sender)
+
+    case GetFullHeaderById(id) =>
+      sender() ! history.flatMap { history =>
+         id match {
+           case Left(value) =>
+             Algos.decode(value).toOption
+               .flatMap(decoded => history.getHeaderById(ModifierId @@ decoded))
+               .flatMap(history.getBlockByHeader)
+           case Right(value) => history.getHeaderById(value).flatMap(history.getBlockByHeader)
+         }
+       }
+
+    case GetLastHeaderIdAtHeightHelper(i) =>
+      (self ? GetDataFromHistory).mapTo[History].map {
+        _.headerIdsAtHeight(i).map(Algos.encode)
+      }.pipeTo(sender)
+
     case GetConnectedPeers      => sender() ! connectedPeers
     case GetDataFromHistory     => history.foreach(sender() ! _)
     case GetMinerStatus         => sender() ! minerStatus
@@ -151,9 +200,21 @@ object DataHolderForApi {
 
   final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
+  final case class GetFullHeaderById(headerId: Either[String, ModifierId])
+
   case object GetViewPrintAddress
 
   case object GetViewCreateKey
+
+  case object GetViewPrintPubKeys
+
+  case object GetViewGetBalance
+
+  case object GetViewPrintPrivKeys
+
+  case class GetLastHeadersHelper(i: Int)
+
+  case class GetLastHeaderIdAtHeightHelper(i: Int)
 
   case object GetTimeProvider
 

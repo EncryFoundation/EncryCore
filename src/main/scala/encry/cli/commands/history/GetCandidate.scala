@@ -19,7 +19,6 @@ object GetCandidate extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef, nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (dataHolder ? GetMinerStatus).mapTo[MinerStatus].map(x => println(x.asJson.toString()))
-    Future(None)
+    (dataHolder ? GetMinerStatus).mapTo[MinerStatus].map(x => Some(Response(x.asJson.toString())))
   }
 }

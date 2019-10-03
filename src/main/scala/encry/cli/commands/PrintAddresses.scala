@@ -15,7 +15,6 @@ object PrintAddresses extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (dataHolder ? GetViewPrintAddress).mapTo[String].foreach(println)
-    Future(None)
+    (dataHolder ? GetViewPrintAddress).mapTo[String].map(s => Some(Response(s)))
   }
 }
