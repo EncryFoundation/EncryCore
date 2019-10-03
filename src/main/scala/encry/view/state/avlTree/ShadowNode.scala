@@ -18,10 +18,21 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](hash: Array[Byte],
   override val key: K = kM.empty
   override val value: V = vM.empty
 
-  def restoreFullNode(storage: VersionalStorage): Try[Node[K, V]] = {
-    println(s"Trying to restore: ${Algos.encode(hash)}")
-    NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey @@ hash).get)
+  def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
+    NodeSerilalizer.fromBytes[K, V](
+      {
+        if (Algos.encode(hash) == "ec905fa4cdcbca936b4e73a1265926f52d4f04d522ff7b319e19621876db7533") {
+          println("here")
+        }
+        if (storage.get(StorageKey @@ hash).isEmpty){
+          println(Algos.encode(hash))
+        }
+        storage.get(StorageKey @@ hash).get
+      }
+    )
   }
+
+  override def toString: String = s"ShadowNode(Hash:${Algos.encode(hash)}, height: ${height}, balance: ${balance})"
 
   override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = NodeWithOpInfo(this, prevOpsInfo)
 }
@@ -30,6 +41,12 @@ object ShadowNode {
 
   def childsToShadowNode[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Node[K, V] = node match {
     case internal: InternalNode[K, V] =>
+      if (internal.leftChild.exists(leftNode => Algos.encode(leftNode.hash) == "ec905fa4cdcbca936b4e73a1265926f52d4f04d522ff7b319e19621876db7533") ||
+        internal.rightChild.exists(rightCild => Algos.encode(rightCild.hash) == "ec905fa4cdcbca936b4e73a1265926f52d4f04d522ff7b319e19621876db7533")
+      ) {
+//        println(s"node: ${node}")
+//        println("-----")
+      }
       internal.copy(
         leftChild = internal.leftChild.map(node => ShadowNode[K, V](hash = node.hash, height = node.height, balance = node.balance)),
         rightChild = internal.rightChild.map(node => ShadowNode[K, V](hash = node.hash, height = node.height, balance = node.balance))

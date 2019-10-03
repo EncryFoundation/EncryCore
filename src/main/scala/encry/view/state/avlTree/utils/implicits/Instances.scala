@@ -36,7 +36,7 @@ object Instances {
   }
 
   implicit def adKeyOrder: Order[StorageKey] = new Order[StorageKey] {
-    override def compare(x: StorageKey, y: StorageKey): Int = Arrays.compareUnsigned(x, y)
+    override def compare(x: StorageKey, y: StorageKey): Int = BigInt(x) compare BigInt(y)
   }
 
   implicit val storVerSer: Serializer[StorageValue] = new Serializer[StorageValue] {

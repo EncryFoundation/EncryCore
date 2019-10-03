@@ -28,17 +28,16 @@ object NodeSerilalizer {
     NodeProtoMsg().withNode(nodeSer)
   }
 
-  def fromProto[K: Serializer : Monoid : Hashable, V: Serializer : Monoid](nodeProto: NodeProtoMsg): Try[Node[K, V]] = Try {
+  def fromProto[K: Serializer : Monoid : Hashable, V: Serializer : Monoid](nodeProto: NodeProtoMsg): Node[K, V] =
     nodeProto.node.get.nodeProto match {
       case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.Leaf(_) => LeafNode.fromProto[K, V](nodeProto.node.get.nodeProto.leaf.get).get
       case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.Internal(_) => InternalNode.fromProto[K, V](nodeProto.node.get.nodeProto.internal.get).get
       case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.Shadow(_) => ShadowNode.fromProto[K, V](nodeProto.node.get.nodeProto.shadow.get).get
       case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.EmptyNode(_) => EmptyNode.fromProto[K, V](nodeProto.node.get.nodeProto.emptyNode.get).get
     }
-  }
 
   def toBytes[K: Serializer : Monoid, V: Serializer : Monoid](node: Node[K, V]): Array[Byte] = toProto(node).toByteArray
 
-  def fromBytes[K: Serializer : Monoid : Hashable, V: Serializer : Monoid](bytes: Array[Byte]): Try[Node[K, V]] =
+  def fromBytes[K: Serializer : Monoid : Hashable, V: Serializer : Monoid](bytes: Array[Byte]): Node[K, V] =
     fromProto(NodeProtoMsg.parseFrom(bytes))
 }

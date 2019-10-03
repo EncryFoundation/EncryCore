@@ -46,7 +46,9 @@ final case class InternalNode[K: Hashable, V](key: K,
         newLeftChildAfterInspect.map(_.hash).getOrElse(Array.emptyByteArray) ++
         newRightChildAfterInspect.map(_.hash).getOrElse(Array.emptyByteArray))
     )
-    NodeWithOpInfo(newNode, rightInfo)
+    val newUpdated =
+      if (newNode.hash sameElements this.hash) rightInfo else rightInfo.update(ByteArrayWrapper(newNode.hash) -> newNode, ByteArrayWrapper(this.hash))
+    NodeWithOpInfo(newNode, newUpdated)
   }
 
   override def toString: String = s"[($key," +
