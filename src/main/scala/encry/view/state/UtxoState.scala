@@ -108,9 +108,12 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => tree.get(StorageKey !@@ input.boxId)
-        .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
-        .map(_.toOption -> input))
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => {
+        val fromStorage = tree.get(StorageKey !@@ input.boxId)
+        logger.info(s"res from storage: ${fromStorage}")
+        fromStorage.map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
+          .map(_.toOption -> input)
+      })
         .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
           (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
