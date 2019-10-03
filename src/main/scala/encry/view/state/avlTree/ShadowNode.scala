@@ -21,12 +21,6 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](hash: Array[Byte],
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
     NodeSerilalizer.fromBytes[K, V](
       {
-        if (Algos.encode(hash) == "ec905fa4cdcbca936b4e73a1265926f52d4f04d522ff7b319e19621876db7533") {
-          println("here")
-        }
-        if (storage.get(StorageKey @@ hash).isEmpty){
-          println(Algos.encode(hash))
-        }
         storage.get(StorageKey @@ hash).get
       }
     )

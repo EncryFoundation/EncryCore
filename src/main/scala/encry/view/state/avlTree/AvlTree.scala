@@ -110,7 +110,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       if (internalNode.key > key) {
         val (newLeftChild, updatedNodesInfo) = internalNode.leftChild.map(node => delete(node, key, prevOpsInfo))
           .getOrElse((Option.empty[Node[K, V]], OperationInfo.empty[K, V]))
-        //if (updatedNodesInfo.containsTest) println("here deleted!")
         val childUpdated = internalNode.updateChilds(newLeftChild = newLeftChild, prevOpsInfo = updatedNodesInfo)
         val newNode = childUpdated.selfInspection
         val balancedRoot = balance(newNode)
