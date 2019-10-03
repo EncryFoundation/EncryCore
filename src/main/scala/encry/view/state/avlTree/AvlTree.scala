@@ -41,7 +41,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     val insertedNodes = newRoot.opInfo.insertedNodes
     val shadowedRoot = ShadowNode.childsToShadowNode(newRoot.node)
     storage.insert(version,
-      toInsert.map{case (key, value) => StorageKey @@ Algos.hash(Algos.hash(kSer.toBytes(key))) -> StorageValue @@ vSer.toBytes(value)} ++
+      toInsert.map{case (key, value) =>
+        StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
+      } ++
         insertedNodes.map{case (key, node) =>
           StorageKey @@ key.data -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList :+
@@ -68,9 +70,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     newRoot.node.hash
   }
 
-  def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] = storage.get(StorageKey !@@ Algos.hash(Algos.hash(kSer.toBytes(k)))).map(vSer.fromBytes)
+  def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] =
+    storage.get(StorageKey !@@ Algos.hash(kSer.toBytes(k).reverse)).map(vSer.fromBytes)
 
-  def contains(k: K)(implicit kSer: Serializer[K]): Boolean = storage.get(StorageKey !@@ Algos.hash(Algos.hash(kSer.toBytes(k)))).isDefined
+  def contains(k: K)(implicit kSer: Serializer[K]): Boolean = {
+    storage.get(StorageKey !@@ Algos.hash(kSer.toBytes(k).reverse)).isDefined
+  }
 
   def getInTree(k: K): Option[V] = getK(k, rootNode)
 

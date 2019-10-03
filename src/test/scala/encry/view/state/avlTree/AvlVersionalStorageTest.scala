@@ -50,7 +50,7 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
     println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
 
     boxes.forall{case (key, _) =>
-      //println("test:" + Algos.encode(key))
+      println("test:" + Algos.encode(Algos.hash(Algos.hash(key))))
       newAvl.contains(key)} shouldBe true
 
     val newBoxes = (interval to interval*2).map{i =>
