@@ -68,7 +68,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     newRoot.node.hash
   }
 
-  def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] = storage.get(StorageKey !@@ Algos.hash(kSer.toBytes(k))).map(vSer.fromBytes)
+  def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] = storage.get(StorageKey !@@ Algos.hash(Algos.hash(kSer.toBytes(k)))).map(vSer.fromBytes)
 
   def contains(k: K)(implicit kSer: Serializer[K]): Boolean = storage.get(StorageKey !@@ Algos.hash(Algos.hash(kSer.toBytes(k)))).isDefined
 
