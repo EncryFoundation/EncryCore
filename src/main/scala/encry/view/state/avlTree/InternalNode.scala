@@ -27,6 +27,7 @@ final case class InternalNode[K: Hashable, V](key: K,
   def updateChilds(newLeftChild: Option[Node[K, V]] = leftChild,
                    newRightChild: Option[Node[K, V]] = rightChild,
                    prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = {
+    val hashK = implicitly[Hashable[K]]
     val (newLeftChildAfterInspect, leftInfo) =
       newLeftChild.map{node =>
         val resOp = node.selfInspection(prevOpsInfo)
@@ -42,7 +43,7 @@ final case class InternalNode[K: Hashable, V](key: K,
       rightChild = newRightChildAfterInspect,
       balance = newLeftChildAfterInspect.map(_.height).getOrElse(-1) - newRightChildAfterInspect.map(_.height).getOrElse(-1),
       height = Math.max(newLeftChildAfterInspect.map(_.height).getOrElse(-1), newRightChildAfterInspect.map(_.height).getOrElse(0)) + 1,
-      hash = Algos.hash(hash ++
+      hash = Algos.hash(hashK.hash(key) ++
         newLeftChildAfterInspect.map(_.hash).getOrElse(Array.emptyByteArray) ++
         newRightChildAfterInspect.map(_.hash).getOrElse(Array.emptyByteArray))
     )
