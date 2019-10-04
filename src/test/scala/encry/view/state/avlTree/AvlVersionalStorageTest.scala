@@ -89,79 +89,79 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
     println(test2Hash)
   }
 
-  property("avl test") {
-
-    import encry.utils.implicits.UTXO._
-    import cats.instances.int._
-
-    implicit val hashInt = new Hashable[Int] {
-      override def hash(value: Int): Array[Byte] = Algos.hash(Ints.toByteArray(value))
-    }
-
-    implicit val serInt = new Serializer[Int] {
-      override def toBytes(elem: Int): Array[Byte] = Ints.toByteArray(elem)
-
-      override def fromBytes(bytes: Array[Byte]): Int = Ints.fromByteArray(bytes)
-    }
-
-    val dir = FileHelper.getRandomTempDir
-
-    val storage = {
-      val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
-      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-    }
-
-    val avlStorage = AvlTree[Int, Int](storage)
-
-    val interval = 10
-
-    val boxes = (0 to interval).map(i => i -> i).toList
-    //val boxes = (0 to 100).map(i => i -> i).toList
-
-    //println(boxes.map(bx => Algos.encode(bx._1)).mkString("\n "))
-
-    val startTime = System.currentTimeMillis()
-
-    val newAvl = avlStorage.insertAndDeleteMany(
-      StorageVersion @@ Random.randomBytes(),
-      boxes,
-      List.empty
-    )
-
-    boxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
-
-    println(newAvl.rootNode)
-
-//    val newBoxes = (interval to interval*2).map(i => i -> i).toList
+//  property("avl test") {
 //
-//    val newAvl2 = newAvl.insertAndDeleteMany(
-//      StorageVersion @@ Random.randomBytes(),
-//      newBoxes,
-//      boxes.map(_._1)
-//    )
-
-//    println(newAvl2.rootNode)
-
-//    val newBoxe2 = (interval*2 to interval*3).map(i => i -> i).toList
+//    import encry.utils.implicits.UTXO._
+//    import cats.instances.int._
 //
-//    val newAvl3 = newAvl2.insertAndDeleteMany(
+////    implicit val hashInt = new Hashable[Int] {
+////      override def hash(value: Int): Array[Byte] = Algos.hash(Ints.toByteArray(value))
+////    }
+////
+////    implicit val serInt = new Serializer[Int] {
+////      override def toBytes(elem: Int): Array[Byte] = Ints.toByteArray(elem)
+////
+////      override def fromBytes(bytes: Array[Byte]): Int = Ints.fromByteArray(bytes)
+////    }
+//
+//    val dir = FileHelper.getRandomTempDir
+//
+//    val storage = {
+//      val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+//      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+//    }
+//
+//    val avlStorage = AvlTree[Int, Int](storage)
+//
+//    val interval = 10
+//
+//    val boxes = (0 to interval).map(i => i -> i).toList
+//    //val boxes = (0 to 100).map(i => i -> i).toList
+//
+//    //println(boxes.map(bx => Algos.encode(bx._1)).mkString("\n "))
+//
+//    val startTime = System.currentTimeMillis()
+//
+//    val newAvl = avlStorage.insertAndDeleteMany(
 //      StorageVersion @@ Random.randomBytes(),
-//      newBoxe2,
-//      newBoxes.map(_._1)
+//      boxes,
+//      List.empty
 //    )
 //
-//    println(newAvl3.rootNode)
-
-//    println("------")
+//    boxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
 //
-//    println(newAvl)
+//    println(newAvl.rootNode)
 //
-//    println("right:")
+////    val newBoxes = (interval to interval*2).map(i => i -> i).toList
+////
+////    val newAvl2 = newAvl.insertAndDeleteMany(
+////      StorageVersion @@ Random.randomBytes(),
+////      newBoxes,
+////      boxes.map(_._1)
+////    )
 //
-//    println(newAvl.rootNode.asInstanceOf[InternalNode[Int, Int]].rightChild.get.asInstanceOf[ShadowNode[Int, Int]].restoreFullNode(storage))
+////    println(newAvl2.rootNode)
 //
-//    println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
+////    val newBoxe2 = (interval*2 to interval*3).map(i => i -> i).toList
+////
+////    val newAvl3 = newAvl2.insertAndDeleteMany(
+////      StorageVersion @@ Random.randomBytes(),
+////      newBoxe2,
+////      newBoxes.map(_._1)
+////    )
+////
+////    println(newAvl3.rootNode)
 //
-//    println(Algos.encode(newAvl.rootHash))
-  }
+////    println("------")
+////
+////    println(newAvl)
+////
+////    println("right:")
+////
+////    println(newAvl.rootNode.asInstanceOf[InternalNode[Int, Int]].rightChild.get.asInstanceOf[ShadowNode[Int, Int]].restoreFullNode(storage))
+////
+////    println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
+////
+////    println(Algos.encode(newAvl.rootHash))
+//  }
 }

@@ -3,6 +3,7 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg
 import cats.syntax.order._
 import cats.{Monoid, Order}
+import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.ChunksCreator.{StateChunk, TmpStateChunk}
@@ -15,7 +16,7 @@ import scorex.utils.Random
 
 import scala.util.Try
 
-final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable {
+final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging { //scalastyle:ignore
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]] {
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -24,6 +25,26 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
   def root: K = rootNode.key
 
   val rootHash: Array[Byte] = rootNode.hash
+
+
+  def fastSyncInsertion(root: Node[K, V], needFirst: Boolean, nodes: List[(K, V)])(implicit kSer: Serializer[K],
+                                             vSer: Serializer[V],
+                                             kM: Monoid[K],
+                                             vM: Monoid[V]): AvlTree[K, V] = {
+    storage.insert(
+      StorageVersion @@ Random.randomBytes(),
+      nodes.map { case (key, value) =>
+        StorageKey @@ Algos.hash(Algos.hash(kSer.toBytes(key))) -> StorageValue @@ vSer.toBytes(value)
+      },
+      List.empty
+    )
+    if (needFirst) {
+      val shadowedRoot = ShadowNode.childsToShadowNode(root)
+      AvlTree(root, storage)
+    } else {
+      this
+    }
+  }
 
   def insertAndDeleteMany(version: StorageVersion,
                           toInsert: List[(K, V)],
@@ -403,20 +424,35 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
   }
 
   def retirnSubtrees(list: List[TmpStateChunk])(implicit serewr: Serializer[K],
-                                             serjfnv: Serializer[V],
-                                             ert: Monoid[K],
-                                             iof: Monoid[V]): List[Node[K, V]] =
-    list.flatMap(_.erList.map(NodeSerilalizer.fromProto[K,V](_)))
+                                                serjfnv: Serializer[V],
+                                                ert: Monoid[K],
+                                                iof: Monoid[V]): List[Node[K, V]] =
+    list.flatMap(_.erList.map(NodeSerilalizer.fromProto[K, V](_)))
 
   def assembleTree(emptyState: AvlTree[K, V], chunks: List[TmpStateChunk])
                   (implicit serewr: Serializer[K],
                    serjfnv: Serializer[V],
                    ert: Monoid[K],
                    iof: Monoid[V]): AvlTree[K, V] = {
-    chunks.foldLeft(emptyState) { case (state, chunk) =>
-      val unserChunk = chunk.erList.map(f => NodeSerilalizer.fromProto[K, V](f)).map(n => n.key -> n.value)
-      state.insertAndDeleteMany(StorageVersion @@ Random.randomBytes(), unserChunk, List.empty)
-    }
+    val root: Node[K, V] = NodeSerilalizer.fromProto[K, V](chunks.last.erList.head)
+    println(s"NEW ROOT ${root}")
+
+    val m = chunks.foldLeft(emptyState, true) { case ((state, tmp), chunk) =>
+      val unserChunk = chunk.erList.map(f => NodeSerilalizer.fromProto[K, V](f))
+      logger.info(s"Insert elems: ${unserChunk.size}. ${unserChunk.mkString(",")}")
+      val ui = unserChunk.map(n => n.key -> n.value)
+      if (tmp) {
+        (state.fastSyncInsertion(root, tmp, ui), false)
+      } else {
+        (state.fastSyncInsertion(root, tmp, ui), false)
+      }
+    }._1
+    val shadowRoot = ShadowNode.childsToShadowNode(root)
+    println(s"\n\n\n=====SATRT ASSEMBLY=====")
+    val k = m.copy(shadowRoot)
+    println(s"${k.rootNode}")
+    println(s"=====END ASSEMBLY=====\n\n\n")
+    k
   }
 
   @scala.annotation.tailrec

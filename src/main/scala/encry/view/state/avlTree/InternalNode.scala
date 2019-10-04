@@ -3,6 +3,7 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
 import cats.Monoid
 import com.google.protobuf.ByteString
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
@@ -51,11 +52,20 @@ final case class InternalNode[K: Hashable, V](key: K,
     NodeWithOpInfo(newNode, newUpdated)
   }
 
-  override def toString: String = s"[($key," +
-    s" $value," +
-    s" height: $height," +
-    s" balance $balance, " +
-    s" hash: ${Algos.encode(hash)}) \n-> LeftChildOf($key):${leftChild.map(_.toString)}, \n-> RightChildOf($key): ${rightChild.map(_.toString)}]"
+  override def toString: String = {
+//    implicit val kTOStr: Hashable[K] = new Hashable[K] {
+//      override def hash(value: K): Array[Byte] = value.asInstanceOf[StorageKey]
+//    }
+//    implicit val vTOStr: Hashable[V] = new Hashable[V] {
+//      override def hash(value: V): Array[Byte] = value.asInstanceOf[StorageValue]
+//    }
+    s"[(${Algos.encode(key.asInstanceOf[StorageKey])}," +
+      s" ${Algos.encode(value.asInstanceOf[StorageValue])}," +
+      s" height: $height," +
+      s" balance $balance, " +
+      s" hash: ${Algos.encode(hash)}) \n-> LeftChildOf(${Algos.encode(key.asInstanceOf[StorageKey])}):${leftChild.map(_.toString)}, " +
+      s"\n-> RightChildOf(${Algos.encode(key.asInstanceOf[StorageKey])}): ${rightChild.map(_.toString)}]"
+  }
 }
 
 object InternalNode {
@@ -64,6 +74,7 @@ object InternalNode {
     val msg = InternalNodeProto()
       .withBalance(node.balance)
       .withHash(ByteString.copyFrom(node.hash))
+      .withHeight(node.height)
       .withKey(ByteString.copyFrom(kSer.toBytes(node.key)))
       .withValue(ByteString.copyFrom(vSer.toBytes(node.value)))
     val withLeftChild = node.leftChild.map { leftChild =>
