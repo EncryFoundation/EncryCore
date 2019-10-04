@@ -32,10 +32,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
                          vM: Monoid[V]): AvlTree[K, V] = {
     val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(rootNode)) {
       case (prevRoot, toDelete) =>
+        logger.info(s"Delete key: ${Algos.encode(vSer.toBytes(toDelete))}")
         deleteKey(toDelete, prevRoot)
     }
     val newRoot = toInsert.foldLeft(rootAfterDelete){
       case (prevRoot, (keyToInsert, valueToInsert)) =>
+        logger.info(s"to insert: ${Algos.encode(kSer.toBytes(keyToInsert))}")
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
@@ -47,10 +49,14 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
       } ++
         insertedNodes.map{case (key, node) =>
+          logger.info(s"insert node: ${Algos.encode(key.data)}")
           StorageKey @@ key.data -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList :+
         (AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash),
-      deletedNodes.map(key => StorageKey @@ key.data)
+      deletedNodes.map(key => {
+        logger.info(s"Delete node: ${Algos.encode(key.data)}")
+        StorageKey @@ key.data
+      })
     )
     AvlTree(shadowedRoot, storage)
   }
