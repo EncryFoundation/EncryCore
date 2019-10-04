@@ -198,7 +198,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     })
       .getOrElse(settings.constants.InitialDifficulty)
 
-    logger.info(s"Before test appl in miner: ${Algos.encode(view.state.tree.rootHash)}")
+    logger.info(s"Before test appl in miner(height for new block: ${height}): ${Algos.encode(view.state.tree.rootHash)}. Root node key: ${Algos.encode(view.state.tree.rootNode.key)}")
 
     val stateRoot = view.state.tree.getOperationsRootHash(
       combinedStateChange.outputsToDb.toList,
