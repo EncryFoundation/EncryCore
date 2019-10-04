@@ -2,6 +2,7 @@ package encry.view.state.avlTree.utils.implicits
 
 import cats.Order
 import cats.kernel.Monoid
+import com.google.common.primitives.Ints
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.avlTree.InternalNode
 import org.bouncycastle.util.Arrays
@@ -15,6 +16,12 @@ object Instances {
 
   implicit val arrayHashable: Hashable[Array[Byte]] = new Hashable[Array[Byte]] {
     override def hash(value: Array[Byte]): Array[Byte] = Algos.hash(value)
+  }
+
+  implicit val serInt: Serializer[Int] = new Serializer[Int] {
+    override def toBytes(elem: Int): Array[Byte] = Ints.toByteArray(elem)
+
+    override def fromBytes(bytes: Array[Byte]): Int = Ints.fromByteArray(bytes)
   }
 
 //  implicit val arrSer: Serializer[Array[Byte]] = new Serializer[Array[Byte]] {
@@ -53,6 +60,10 @@ object Instances {
 
   implicit val storKeyhash: Hashable[StorageKey] = new Hashable[StorageKey] {
     override def hash(value: StorageKey): Array[Byte] = Algos.hash(value)
+  }
+
+  implicit val storInthash: Hashable[Int] = new Hashable[Int] {
+    override def hash(value: Int): Array[Byte] = Algos.hash(Ints.toByteArray(value))
   }
 
   implicit val storKeyMonoid: Monoid[StorageKey] = new Monoid[StorageKey] {

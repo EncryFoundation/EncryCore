@@ -13,11 +13,62 @@ import org.specs2.mutable.Specification
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.ByteArrayWrapper
+import cats.implicits._
+import com.typesafe.scalalogging.StrictLogging
 
+import scala.collection.immutable
 import scala.collection.immutable.HashMap
 
 
-class SubTreeTests extends PropSpec with Matchers with EncryGenerator {
+class SubTreeTests extends PropSpec with Matchers with EncryGenerator with StrictLogging {
+
+  property("qwerty") {
+    val dir = FileHelper.getRandomTempDir
+
+    val storage = {
+      val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+    }
+
+    val avlStorage = AvlTree[Int, Int](storage)
+
+    val dir1 = FileHelper.getRandomTempDir
+
+    val storage1 = {
+      val levelDBInit = LevelDbFactory.factory.open(dir1, new Options)
+      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+    }
+
+    val avlStorage1 = AvlTree[Int, Int](storage1)
+
+    val list: immutable.Seq[Int] = (0 until 4).map(i => i)
+
+    val res1: AvlTree[Int, Int] = list.foldLeft(avlStorage) { case (avl, el) =>
+      logger.info(s"========= START el $el ========")
+      logger.info(s"Inserting: $el.")
+      val k = avl.insertAndDeleteMany(StorageVersion @@ Random.randomBytes(), List(el -> el), List.empty)
+      logger.info(s"After insert $el new root ${k.root}")
+      logger.info(s"RootNode: ${k.rootNode}")
+      logger.info(s"========= FINISH el $el ========\n\n")
+      k
+    }
+
+    val res2: AvlTree[Int, Int] = list.reverse.foldLeft(avlStorage1) { case (avl, el) =>
+      logger.info(s"========= START el $el ========")
+      logger.info(s"Inserting: $el.")
+      val k = avl.insertAndDeleteMany(StorageVersion @@ Random.randomBytes(), List(el -> el), List.empty)
+      logger.info(s"After insert $el new root ${k.root}")
+      logger.info(s"RootNode: ${k.rootNode}")
+      logger.info(s"========= FINISH el $el ========\n")
+      k
+    }
+
+    logger.info(s"Res1 = ${res1.root} --> Res2 = ${res2.root}")
+    logger.info(s"Res1 = ${res1.rootNode}")
+    logger.info(s"Res2 = ${res2.rootNode}")
+    res1.root == res2.root shouldBe true
+
+  }
 
   property("create subtree correctly") {
 
