@@ -1,22 +1,18 @@
 package encry.api.http.routes
 
-import java.net.{InetAddress, InetSocketAddress}
-
+import java.net.InetSocketAddress
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.DataHolderForApi._
 import encry.local.miner.Miner.MinerStatus
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings._
-import encry.utils.{NetworkTime, NetworkTimeProvider}
+import encry.utils.NetworkTimeProvider
 import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.constants.Constants
-
-import scala.concurrent.Future
 
 case class InfoApiRoute(dataHolder: ActorRef,
                         appSettings: EncryAppSettings,
@@ -29,7 +25,6 @@ case class InfoApiRoute(dataHolder: ActorRef,
   override val route: Route = (path("info") & get) {
     (dataHolder ? GetAllInfoHelper)
       .mapTo[Json].okJson()
-
   }
 }
 

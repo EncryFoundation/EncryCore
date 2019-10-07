@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
+import encry.api.http.DataHolderForApi.{GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
 import encry.settings.RESTApiSettings
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
@@ -14,7 +14,6 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.Algos
-
 import scala.concurrent.Future
 import scala.util.Random
 

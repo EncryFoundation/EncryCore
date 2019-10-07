@@ -1,20 +1,17 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
-
-import akka.actor.{Actor, ActorRef, Props}
-import akka.http.scaladsl.server.Route
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
-import akka.pattern._
 import encry.api.http.DataHolderForApi._
 import akka.pattern._
 import akka.util.Timeout
 import encry.api.http.routes.InfoApiRoute
-import encry.cli.Response
+import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
-import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
@@ -28,7 +25,6 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings,
@@ -149,14 +145,21 @@ class DataHolderForApi(settings: EncryAppSettings,
       .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
       .map(_.map(_.toString)).pipeTo(sender)
 
+    case GetConnectedPeersHelper =>
+         (self ? GetConnectedPeers)
+          .mapTo[Seq[ConnectedPeer]]
+          .map(_.map(peer => PeerInfoResponse(
+            peer.socketAddress.toString,
+            Some(peer.handshake.nodeName),
+            Some(peer.direction.toString))
+          )).pipeTo(sender)
+
     case GetLastHeaderIdAtHeightHelper(i) =>
       (self ? GetDataFromHistory).mapTo[History].map {
         _.headerIdsAtHeight(i).map(Algos.encode)
       }.pipeTo(sender)
 
     case GetAllInfoHelper => {
-      println("here")
-//       val appSettings: RESTApiSettings = settings.restApi
 
        val getNodeName: String = settings.network.nodeName
         .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)
@@ -209,10 +212,7 @@ class DataHolderForApi(settings: EncryAppSettings,
                                    context.system.eventStream.publish(StartMining)
     case StopMiner              => context.system.eventStream.publish(DisableMining)
     case ShutdownNode           => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
-      //
-    case GetDataFromPresentView(f) =>
-      (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
-
+    case GetDataFromPresentView(f) => (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
@@ -251,9 +251,17 @@ object DataHolderForApi {//scalastyle:ignore
 
   final case class GetFullHeaderById(headerId: Either[String, ModifierId])
 
+  final case class GetLastHeadersHelper(i: Int)
+
+  final case class GetLastHeaderIdAtHeightHelper(i: Int)
+
+  final case class Readers(h: Option[History], s: Option[UtxoStateReader])
+
   case object GetInfoHelper
 
   case object GetViewPrintAddress
+
+  case object GetConnectedPeersHelper
 
   case object GetViewCreateKey
 
@@ -262,10 +270,6 @@ object DataHolderForApi {//scalastyle:ignore
   case object GetViewGetBalance
 
   case object GetViewPrintPrivKeys
-
-  case class GetLastHeadersHelper(i: Int)
-
-  case class GetLastHeaderIdAtHeightHelper(i: Int)
 
   case object GetTimeProvider
 
@@ -296,8 +300,6 @@ object DataHolderForApi {//scalastyle:ignore
   case object GetBannedPeersHelper
 
   case object GetAllInfo
-
-  final case class Readers(h: Option[History], s: Option[UtxoStateReader])
 
   def props(settings: EncryAppSettings,
             ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))

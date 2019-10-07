@@ -1,21 +1,16 @@
 package encry.api.http.routes
 
-import java.net.{InetAddress, InetSocketAddress}
-
+import java.net.InetSocketAddress
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeers, GetBannedPeersHelper, GetConnectedPeers, PeerAdd, RemovePeerFromBanList}
+import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeersHelper, GetConnectedPeersHelper, PeerAdd, RemovePeerFromBanList}
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.BlackList.{BanReason, BanTime}
 import encry.network.ConnectedPeersCollection.PeerInfo
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
-import io.circe._
-
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
@@ -33,17 +28,11 @@ case class PeersApiRoute(override val settings: RESTApiSettings,
     onSuccess(result)(r => complete(r))
   }
 
-  def connectedPeers: Route = (path("connected") & get) (
-    onSuccess(
-      (dataHolder ? GetConnectedPeers)
-        .mapTo[Seq[ConnectedPeer]]
-        .map(_.map(peer => PeerInfoResponse(
-          peer.socketAddress.toString,
-          Some(peer.handshake.nodeName),
-          Some(peer.direction.toString))
-        )))
-    (r => complete(r))
-  )
+  def connectedPeers: Route = (path("connected") & get) {
+    val res = (dataHolder ? GetConnectedPeersHelper)
+      .mapTo[Seq[PeerInfoResponse]]
+    onSuccess(res)(r => complete(r))
+  }
 
   def bannedList: Route = (path("banned") & get) {
     val result = (dataHolder ? GetBannedPeersHelper).mapTo[Seq[String]].map(_.map(_.toString))

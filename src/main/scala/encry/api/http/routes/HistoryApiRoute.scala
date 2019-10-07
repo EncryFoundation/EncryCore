@@ -11,8 +11,6 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.concurrent.Future
 
 case class HistoryApiRoute(dataHolder: ActorRef,
@@ -44,10 +42,6 @@ case class HistoryApiRoute(dataHolder: ActorRef,
       _.getHeaderIds(limit, offset).map(Algos.encode).asJson
     }
 
-  private def getFullBlockByHeaderId(headerId: ModifierId): Future[Option[Block]] = getHistory.map { history =>
-    history.getHeaderById(headerId).flatMap(history.getBlockByHeader)
-  }
-
   def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) => getHeaderIds(offset, limit).okJson() }
 
   def getLastHeadersR: Route = (pathPrefix("lastHeaders" / IntNumber) & get) { qty => getLastHeaders(qty).okJson() }
@@ -59,7 +53,7 @@ case class HistoryApiRoute(dataHolder: ActorRef,
   }
 
   def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
-    getFullBlockByHeaderId(id).map(_.map(_.payload.txs.asJson)).okJson()
+    (dataHolder ? GetFullHeaderById(Right(id))).mapTo[Option[Block]].map(_.map(_.payload.txs.asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
