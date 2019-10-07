@@ -3,6 +3,7 @@ package encry.api.http
 import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, ActorRef, Props}
+import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
@@ -10,10 +11,11 @@ import akka.pattern._
 import encry.api.http.DataHolderForApi._
 import akka.pattern._
 import akka.util.Timeout
+import encry.api.http.routes.InfoApiRoute
 import encry.cli.Response
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
-import encry.settings.EncryAppSettings
-import encry.utils.NetworkTimeProvider
+import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
 import encry.network.BlackList.{BanReason, BanTime, BanType}
@@ -142,10 +144,57 @@ class DataHolderForApi(settings: EncryAppSettings,
          }
        }
 
+    case GetBannedPeersHelper =>
+      (self ? GetBannedPeers)
+      .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
+      .map(_.map(_.toString)).pipeTo(sender)
+
     case GetLastHeaderIdAtHeightHelper(i) =>
       (self ? GetDataFromHistory).mapTo[History].map {
         _.headerIdsAtHeight(i).map(Algos.encode)
       }.pipeTo(sender)
+
+    case GetAllInfoHelper => {
+      println("here")
+//       val appSettings: RESTApiSettings = settings.restApi
+
+       val getNodeName: String = settings.network.nodeName
+        .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)
+
+       val getStateType: String = "UTXO"
+
+       val storageInfo: String = ""
+
+       val getAddress: Seq[InetSocketAddress] = settings.network.knownPeers
+
+       val getConnectionWithPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(false)
+
+       val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
+
+        val askAllF = (self ? GetAllInfo)
+          .mapTo[(Seq[ConnectedPeer], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
+      (for {
+          (connectedPeers, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
+          currentTime <- ntp.time()
+          launchTime  <- launchTimeFuture
+        } yield InfoApiRoute.makeInfoJson(
+          nodeId,
+          minerInfo,
+          connectedPeers.size,
+          stateReader,
+          getStateType,
+          getNodeName,
+          getAddress,
+          storageInfo,
+          currentTime - launchTime,
+          txsQty,
+          getConnectionWithPeers,
+          blocksInfo.header,
+          blocksInfo.block,
+          settings.constants
+        )).pipeTo(sender())
+      }
+
 
     case GetConnectedPeers      => sender() ! connectedPeers
     case GetDataFromHistory     => history.foreach(sender() ! _)
@@ -178,7 +227,7 @@ class DataHolderForApi(settings: EncryAppSettings,
   }
 }
 
-object DataHolderForApi {
+object DataHolderForApi {//scalastyle:ignore
 
   final case class UpdatingBlackListForApi(blackList: Seq[InetAddress]) extends AnyVal
 
@@ -202,6 +251,8 @@ object DataHolderForApi {
 
   final case class GetFullHeaderById(headerId: Either[String, ModifierId])
 
+  case object GetInfoHelper
+
   case object GetViewPrintAddress
 
   case object GetViewCreateKey
@@ -217,6 +268,10 @@ object DataHolderForApi {
   case class GetLastHeaderIdAtHeightHelper(i: Int)
 
   case object GetTimeProvider
+
+  case object GetAllInfoHelper
+
+  case object GetBannedPeers
 
   case object StartMiner
 
@@ -238,7 +293,7 @@ object DataHolderForApi {
 
   case object GetBlockInfo
 
-  case object GetBannedPeers
+  case object GetBannedPeersHelper
 
   case object GetAllInfo
 

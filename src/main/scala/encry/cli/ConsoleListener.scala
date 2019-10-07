@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import encry.cli.commands._
 import encry.cli.commands.history.{GetCandidate, GetFullBlockById, GetHeaderById, GetLastHeaderIdsAtHeight, GetLastHeaders, GetTxById}
 import encry.cli.commands.info.GetInfo
-import encry.cli.commands.peer.GetAllPeers
+import encry.cli.commands.peer.{GetAllPeers, GetBannedPeers}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 
@@ -84,7 +84,8 @@ object ConsoleListener {
   ))
 
   private val peerCmds = Map("peer" -> Map(
-    "all" -> GetAllPeers
+    "all" -> GetAllPeers,
+    "banned" -> GetBannedPeers
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =

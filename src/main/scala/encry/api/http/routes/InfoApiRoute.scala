@@ -26,43 +26,10 @@ case class InfoApiRoute(dataHolder: ActorRef,
 
   override val settings: RESTApiSettings = appSettings.restApi
 
-  private val getNodeName: String = appSettings.network.nodeName
-    .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
-
-  //todo: remove later
-  private val getStateType: String = "UTXO"
-
-  private val storageInfo: String = ""
-
-  private val getAddress: Seq[InetSocketAddress] = appSettings.network.knownPeers
-
-  private val getConnectionWithPeers: Boolean = appSettings.network.connectOnlyWithKnownPeers.getOrElse(false)
-
-  private val launchTimeFuture: Future[NetworkTime.Time] = timeProvider.time()
-
   override val route: Route = (path("info") & get) {
-    val askAllF = (dataHolder ? GetAllInfo)
-      .mapTo[(Seq[ConnectedPeer], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
-    (for {
-      (connectedPeers, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
-      currentTime <- timeProvider.time()
-      launchTime  <- launchTimeFuture
-    } yield InfoApiRoute.makeInfoJson(
-      nodeId,
-      minerInfo,
-      connectedPeers.size,
-      stateReader,
-      getStateType,
-      getNodeName,
-      getAddress,
-      storageInfo,
-      currentTime - launchTime,
-      txsQty,
-      getConnectionWithPeers,
-      blocksInfo.header,
-      blocksInfo.block,
-      appSettings.constants
-    )).okJson()
+    (dataHolder ? GetAllInfoHelper)
+      .mapTo[Json].okJson()
+
   }
 }
 
