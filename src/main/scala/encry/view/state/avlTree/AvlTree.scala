@@ -1,16 +1,16 @@
 package encry.view.state.avlTree
 
-import NodeMsg.NodeProtoMsg
 import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.state.ChunksCreator.{StateChunk, TmpStateChunk}
+import encry.view.actors.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 
@@ -25,26 +25,6 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
   def root: K = rootNode.key
 
   val rootHash: Array[Byte] = rootNode.hash
-
-
-  def fastSyncInsertion(root: Node[K, V], needFirst: Boolean, nodes: List[(K, V)])(implicit kSer: Serializer[K],
-                                             vSer: Serializer[V],
-                                             kM: Monoid[K],
-                                             vM: Monoid[V]): AvlTree[K, V] = {
-    storage.insert(
-      StorageVersion @@ Random.randomBytes(),
-      nodes.map { case (key, value) =>
-        StorageKey @@ Algos.hash(Algos.hash(kSer.toBytes(key))) -> StorageValue @@ vSer.toBytes(value)
-      },
-      List.empty
-    )
-    if (needFirst) {
-      val shadowedRoot = ShadowNode.childsToShadowNode(root)
-      AvlTree(root, storage)
-    } else {
-      this
-    }
-  }
 
   def insertAndDeleteMany(version: StorageVersion,
                           toInsert: List[(K, V)],
@@ -417,126 +397,97 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
         rightRotation(updatedNode)
     }
 
-  def makeSubtree(list: List[Node[K, V]])(implicit s: Serializer[K], s1: Serializer[V]): TmpStateChunk = {
-    val serList: List[NodeProtoMsg] = list.map(NodeSerilalizer.toProto(_))
-    val stateChunk = TmpStateChunk(serList)
-    stateChunk
-  }
-
-  def retirnSubtrees(list: List[TmpStateChunk])(implicit serewr: Serializer[K],
+  def retirnSubtrees(list: List[SnapshotChunk])(implicit serewr: Serializer[K],
                                                 serjfnv: Serializer[V],
                                                 ert: Monoid[K],
                                                 iof: Monoid[V]): List[Node[K, V]] =
-    list.flatMap(_.erList.map(NodeSerilalizer.fromProto[K, V](_)))
+    list.flatMap(_.nodesList.map(NodeSerilalizer.fromProto[K, V](_)))
 
-  def assembleTree(emptyState: AvlTree[K, V], chunks: List[TmpStateChunk])
-                  (implicit serewr: Serializer[K],
-                   serjfnv: Serializer[V],
-                   ert: Monoid[K],
-                   iof: Monoid[V]): AvlTree[K, V] = {
-    val root: Node[K, V] = NodeSerilalizer.fromProto[K, V](chunks.last.erList.head)
-    println(s"NEW ROOT ${root}")
+  def initializeSnapshotData(bestBlock: Block)(implicit kSerializer: Serializer[K],
+                                               vSerializer: Serializer[V]): (SnapshotManifest, List[SnapshotChunk]) = {
+    val rawSubtrees: List[SnapshotChunk] = createSubtrees(List(rootNode), List.empty)
+    val newManifest: SnapshotManifest =
+      SnapshotManifest(bestBlock.id, rootHash, NodeSerilalizer.toProto(rootNode), rawSubtrees.size)
+    val updS: List[SnapshotChunk] = if (rawSubtrees.nonEmpty) {
+      val firstElem = rawSubtrees.headOption
+      val newRaw: List[SnapshotChunk] = rawSubtrees.drop(1)
+      firstElem.map { ch => ch.copy(nodesList = ch.nodesList.drop(1)) }.fold(newRaw)(_ :: newRaw)
 
-    val m = chunks.foldLeft(emptyState, true) { case ((state, tmp), chunk) =>
-      val unserChunk = chunk.erList.map(f => NodeSerilalizer.fromProto[K, V](f))
-      logger.info(s"Insert elems: ${unserChunk.size}. ${unserChunk.mkString(",")}")
-      val ui = unserChunk.map(n => n.key -> n.value)
-      if (tmp) {
-        (state.fastSyncInsertion(root, tmp, ui), false)
-      } else {
-        (state.fastSyncInsertion(root, tmp, ui), false)
-      }
-    }._1
-    val shadowRoot = ShadowNode.childsToShadowNode(root)
-    println(s"\n\n\n=====SATRT ASSEMBLY=====")
-    val k = m.copy(shadowRoot)
-    println(s"${k.rootNode}")
-    println(s"=====END ASSEMBLY=====\n\n\n")
-    k
+    } else rawSubtrees
+    val subtrees: List[SnapshotChunk] = updS.map(_.copy(manifestId = newManifest.ManifestId))
+    newManifest -> subtrees
+  }
+
+  def assembleTree(initState: AvlTree[K, V], chunks: List[SnapshotChunk])(implicit kSerializer: Serializer[K],
+                                                                          vSerializer: Serializer[V],
+                                                                          kMonoid: Monoid[K],
+                                                                          vMonoid: Monoid[V]): AvlTree[K, V] =
+    chunks.foldLeft(initState) { case (state, chunk) =>
+      state.insertionInFastSyncMod(chunk.nodesList.map(NodeSerilalizer.fromProto[K, V](_)))
+    }
+
+  @scala.annotation.tailrec
+  private def createSubtrees(nodesToProcess: List[Node[K, V]], subtreeChunks: List[SnapshotChunk])
+                            (implicit kSerializer: Serializer[K], vSerializer: Serializer[V]): List[SnapshotChunk] =
+    if (nodesToProcess.nonEmpty) nodesToProcess.head match {
+      case _: EmptyNode[K, V] => List.empty[SnapshotChunk]
+      case s: ShadowNode[K, V] =>
+        val restoredNode: Node[K, V] = s.restoreFullNode(storage)
+        val removedExcess: List[Node[K, V]] = nodesToProcess.drop(1)
+        val newToProcess: List[Node[K, V]] = restoredNode :: removedExcess
+        createSubtrees(newToProcess, subtreeChunks)
+      case i: InternalNode[K, V] =>
+        val leftChild: Option[(List[Node[K, V]], Node[K, V])] = getLeftChild(i)
+        val rightChild: Option[(List[Node[K, V]], Node[K, V])] = getRightChild(i)
+        val (next: List[Node[K, V]], current: List[Node[K, V]]) = (leftChild :: rightChild :: Nil)
+          .foldLeft(List.empty[Node[K, V]], List.empty[Node[K, V]]) {
+            case ((nextNodes, thisNodes), Some((nextChildren, thisNode))) =>
+              (nextChildren ::: nextNodes, thisNode :: thisNodes)
+            case (result, _) => result
+          }
+        val subtree: SnapshotChunk = makeSubtree(i :: current)
+        val updatedNodeToProcess: List[Node[K, V]] = nodesToProcess.drop(1)
+        createSubtrees(updatedNodeToProcess ::: next, subtree :: subtreeChunks)
+      case l: LeafNode[K, V] =>
+        val subtree: SnapshotChunk = makeSubtree(List(l))
+        createSubtrees(nodesToProcess.drop(1), subtree :: subtreeChunks)
+    } else subtreeChunks
+
+  private def insertionInFastSyncMod(nodes: List[Node[K, V]])(implicit kSerializer: Serializer[K],
+                                                              vSerializer: Serializer[V],
+                                                              kMonoid: Monoid[K],
+                                                              vMonoid: Monoid[V]): AvlTree[K, V] = {
+    val nodesToInsert: List[(StorageKey, StorageValue)] = nodes.flatMap { node =>
+      val fullData: (StorageKey, StorageValue) =
+        StorageKey @@ Algos.hash(Algos.hash(kSerializer.toBytes(node.key))) -> StorageValue @@ vSerializer.toBytes(node.value)
+      val shadowData: (StorageKey, StorageValue) =
+        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
+      fullData :: shadowData :: Nil
+    }
+    storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
+    this
   }
 
   @scala.annotation.tailrec
-  def createSubtrees(needToProcess: List[Node[K, V]],
-                     subtreeChunks: List[TmpStateChunk])
-                    (implicit spoj: Serializer[K], sui1: Serializer[V]): List[TmpStateChunk] = {
-    if (needToProcess.nonEmpty) needToProcess.head match {
-      case e: EmptyNode[K, V] => List.empty
-      case s: ShadowNode[K, V] =>
-        val restoredNode: Node[K, V] = s.restoreFullNode(storage)
-        val newTOProcess: List[Node[K, V]] = needToProcess.drop(1)
-        val abc: List[Node[K, V]] = restoredNode :: newTOProcess
-        createSubtrees(abc, subtreeChunks)
-      case i: InternalNode[K, V] if i.rightChild.nonEmpty && i.leftChild.nonEmpty =>
-        val a: (List[Node[K, V]], Node[K, V]) = i.rightChild.get match {
-          case i: InternalNode[K, V] =>
-            List(i.rightChild, i.leftChild).flatten -> i
-          case l: LeafNode[K, V] =>
-            List.empty -> l
-          case s: ShadowNode[K, V] =>
-            val restoredNode: Node[K, V] = s.restoreFullNode(storage)
-            restoredNode match {
-              case i: InternalNode[K, V] =>
-                List(i.rightChild, i.leftChild).flatten -> i
-              case l: LeafNode[K, V] =>
-                List.empty -> l
-            }
-        }
-        val b: (List[Node[K, V]], Node[K, V]) = i.leftChild.get match {
-          case i: InternalNode[K, V] =>
-            List(i.rightChild, i.leftChild).flatten -> i
-          case l: LeafNode[K, V] =>
-            List.empty -> l
-          case s: ShadowNode[K, V] =>
-            val restoredNode: Node[K, V] = s.restoreFullNode(storage)
-            restoredNode match {
-              case i: InternalNode[K, V] =>
-                List(i.rightChild, i.leftChild).flatten -> i
-              case l: LeafNode[K, V] =>
-                List.empty -> l
-            }
-        }
-        val subtree: TmpStateChunk = makeSubtree(i :: a._2 :: b._2 :: Nil)
-        createSubtrees(needToProcess.drop(1) ::: a._1 ::: b._1, subtree :: subtreeChunks)
-      case i: InternalNode[K, V] if i.leftChild.nonEmpty =>
-        val b: (List[Node[K, V]], Node[K, V]) = i.leftChild.get match {
-          case i: InternalNode[K, V] =>
-            List(i.rightChild, i.leftChild).flatten -> i
-          case l: LeafNode[K, V] =>
-            List.empty -> l
-          case s: ShadowNode[K, V] =>
-            val restoredNode: Node[K, V] = s.restoreFullNode(storage)
-            restoredNode match {
-              case i: InternalNode[K, V] =>
-                List(i.rightChild, i.leftChild).flatten -> i
-              case l: LeafNode[K, V] =>
-                List.empty -> l
-            }
-        }
-        val subtree: TmpStateChunk = makeSubtree(i :: b._2 :: Nil)
-        createSubtrees(needToProcess.drop(1) ::: b._1, subtree :: subtreeChunks)
-      case i: InternalNode[K, V] if i.rightChild.nonEmpty =>
-        val b: (List[Node[K, V]], Node[K, V]) = i.rightChild.get match {
-          case i: InternalNode[K, V] =>
-            List(i.rightChild, i.leftChild).flatten -> i
-          case l: LeafNode[K, V] =>
-            List.empty -> l
-          case s: ShadowNode[K, V] =>
-            val restoredNode: Node[K, V] = s.restoreFullNode(storage)
-            restoredNode match {
-              case i: InternalNode[K, V] =>
-                List(i.rightChild, i.leftChild).flatten -> i
-              case l: LeafNode[K, V] =>
-                List.empty -> l
-            }
-        }
-        val subtree: TmpStateChunk = makeSubtree(i :: b._2 :: Nil)
-        createSubtrees(needToProcess.drop(1) ::: b._1, subtree :: subtreeChunks)
-      case l: LeafNode[K, V] =>
-        val subChain = makeSubtree(List(l))
-        createSubtrees(needToProcess.drop(1), subChain :: subtreeChunks)
-    }
-    else subtreeChunks
+  private def handleChild(child: Node[K, V]): (List[Node[K, V]], Node[K, V]) = child match {
+    case s: ShadowNode[K, V] => handleChild(s.restoreFullNode(storage))
+    case i: InternalNode[K, V] => List(i.rightChild, i.leftChild).flatten -> i
+    case l: LeafNode[K, V] => List.empty -> l
   }
+
+  private def getLeftChild(node: InternalNode[K, V]): Option[(List[Node[K, V]], Node[K, V])] = node.leftChild match {
+    case Some(child) => Some(handleChild(child))
+    case n@None => n
+  }
+
+  private def getRightChild(node: InternalNode[K, V]): Option[(List[Node[K, V]], Node[K, V])] = node.rightChild match {
+    case Some(child) => Some(handleChild(child))
+    case n@None => n
+  }
+
+  private def makeSubtree(nodes: List[Node[K, V]])(implicit kSerializer: Serializer[K],
+                                                   vSerializer: Serializer[V]): SnapshotChunk =
+    SnapshotChunk(nodes.map(NodeSerilalizer.toProto(_)))
 
   override def close(): Unit = storage.close()
 
@@ -562,6 +513,13 @@ object AvlTree {
 
     case object EMPTY extends Direction
 
+  }
+
+  def apply[K: Serializer : Monoid : Order : Hashable, V: Serializer : Monoid](manifest: SnapshotManifest,
+                                                                               storage: VersionalStorage): AvlTree[K, V] = {
+    val root: Node[K, V] = NodeSerilalizer.fromProto(manifest.rootNodeBytes)
+    val initTree: AvlTree[K, V] = new AvlTree(root, storage)
+    initTree.insertionInFastSyncMod(List(root))
   }
 
   def apply[K: Monoid : Order : Hashable, V: Monoid](storage: VersionalStorage): AvlTree[K, V] = new AvlTree[K, V](EmptyNode(), storage)
