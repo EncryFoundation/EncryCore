@@ -2,6 +2,7 @@ package encry.view.state.avlTree
 
 import NodeMsg.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
 import cats.Monoid
+import com.google.common.primitives.Ints
 import com.google.protobuf.ByteString
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
@@ -65,6 +66,7 @@ object InternalNode {
     val msg = InternalNodeProto()
       .withBalance(node.balance)
       .withHash(ByteString.copyFrom(node.hash))
+      .withHeight(node.height)
       .withKey(ByteString.copyFrom(kSer.toBytes(node.key)))
       .withValue(ByteString.copyFrom(vSer.toBytes(node.value)))
     val withLeftChild = node.leftChild.map { leftChild =>
