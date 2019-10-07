@@ -11,7 +11,7 @@ import akka.util.Timeout
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object GetAllPeers extends Command{
+object GetAllPeers extends Command {
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

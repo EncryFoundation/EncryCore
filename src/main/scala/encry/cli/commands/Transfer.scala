@@ -5,7 +5,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi.GetDataFromPresentView
-import encry.cli.{Ast, Response}
+import encry.cli.{ Ast, Response }
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -24,36 +24,43 @@ import scala.util.Try
 object Transfer extends Command {
 
   /**
-    * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
-    * Example "wallet transfer -addr='9fRWpnERVQKzR14qN5EGknx8xk11SU6LoZxcJAc53uAv3HRbL4K' -fee=10000 -amount=2000"
-    */
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+   * Command "wallet transfer -addr=<addr[String]> -fee=<fee[Num]> -amount=<amount[Num]>"
+   * Example "wallet transfer -addr='9fRWpnERVQKzR14qN5EGknx8xk11SU6LoZxcJAc53uAv3HRbL4K' -fee=10000 -amount=2000"
+   */
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
       GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
         Try {
           val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
-          val recipient: Address = args.requireArg[Ast.Str]("addr").s
-          val fee: Long = args.requireArg[Ast.Num]("fee").i
-          val amount: Long = args.requireArg[Ast.Num]("amount").i
-          val boxes: IndexedSeq[AssetBox] = view.vault.walletStorage.getAllBoxes().filter(_.isInstanceOf[AssetBox])
-            .map(_.asInstanceOf[AssetBox]).foldLeft(Seq[AssetBox]()) { case (seq, box) =>
-            if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
-          }.toIndexedSeq
-          TransactionFactory.defaultPaymentTransaction(
-            secret,
-            fee,
-            System.currentTimeMillis(),
-            boxes.map(_ -> None),
-            recipient,
-            amount)
+          val recipient: Address      = args.requireArg[Ast.Str]("addr").s
+          val fee: Long               = args.requireArg[Ast.Num]("fee").i
+          val amount: Long            = args.requireArg[Ast.Num]("amount").i
+          val boxes: IndexedSeq[AssetBox] = view.vault.walletStorage
+            .getAllBoxes()
+            .filter(_.isInstanceOf[AssetBox])
+            .map(_.asInstanceOf[AssetBox])
+            .foldLeft(Seq[AssetBox]()) {
+              case (seq, box) =>
+                if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
+            }
+            .toIndexedSeq
+          TransactionFactory.defaultPaymentTransaction(secret,
+                                                       fee,
+                                                       System.currentTimeMillis(),
+                                                       boxes.map(_ -> None),
+                                                       recipient,
+                                                       amount)
         }.toOption
       }).flatMap {
-        case Some(tx: Transaction) =>
-          memoryPool ! NewTransaction(tx)
-          Future.successful(Some(Response(tx.toString)))
-        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
-      }
+      case Some(tx: Transaction) =>
+        memoryPool ! NewTransaction(tx)
+        Future.successful(Some(Response(tx.toString)))
+      case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+    }
   }
 }

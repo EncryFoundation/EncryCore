@@ -2,13 +2,13 @@ package encry.cli.commands.history
 
 import akka.actor.ActorRef
 import akka.util.Timeout
-import encry.cli.{Ast, Response}
+import encry.cli.{ Ast, Response }
 import encry.cli.commands.Command
 import encry.settings.EncryAppSettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.pattern._
-import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetFullHeaderById}
+import encry.api.http.DataHolderForApi.{ GetDataFromHistory, GetFullHeaderById }
 import encry.utils.NetworkTimeProvider
 import encry.view.history.History
 import io.circe.syntax._
@@ -18,14 +18,20 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.concurrent.Future
 
-object GetHeaderById extends Command{
+object GetHeaderById extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
-  implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
+    implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
-  val num = args.requireArg[Ast.Str]("modifier").s
+    val num = args.requireArg[Ast.Str]("modifier").s
 
-    (dataHolder ? GetFullHeaderById(Left(num))).mapTo[Option[Block]].map(x => Some(Response(x.map(_.header).asJson.toString())))}
+    (dataHolder ? GetFullHeaderById(Left(num)))
+      .mapTo[Option[Block]]
+      .map(x => Some(Response(x.map(_.header).asJson.toString())))
+  }
 
 }

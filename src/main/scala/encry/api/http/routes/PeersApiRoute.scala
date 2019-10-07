@@ -1,21 +1,28 @@
 package encry.api.http.routes
 
 import java.net.InetSocketAddress
-import akka.actor.{ActorRef, ActorRefFactory}
+import akka.actor.{ ActorRef, ActorRefFactory }
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeersHelper, GetConnectedPeersHelper, PeerAdd, RemovePeerFromBanList}
+import encry.api.http.DataHolderForApi.{
+  GetAllPeers,
+  GetBannedPeersHelper,
+  GetConnectedPeersHelper,
+  PeerAdd,
+  RemovePeerFromBanList
+}
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
 import scala.concurrent.Future
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
-case class PeersApiRoute(override val settings: RESTApiSettings,
-                         dataHolder: ActorRef)(implicit val context: ActorRefFactory) extends EncryBaseApiRoute {
+case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: ActorRef)(
+  implicit val context: ActorRefFactory
+) extends EncryBaseApiRoute {
 
   override lazy val route: Route = pathPrefix("peers") {
     connectedPeers ~ allPeers ~ bannedList ~ connectPeer
@@ -40,38 +47,36 @@ case class PeersApiRoute(override val settings: RESTApiSettings,
   }
 
   def connectPeer: Route = path("add") {
-    post(entity(as[String]) {
-      str =>
-        complete {
-          Try {
-            val split = str.split(':')
-            (split(0), split(1).toInt)
-          } match {
-            case Success((host, port)) =>
-              dataHolder ! PeerAdd(new InetSocketAddress(host, port))
-              StatusCodes.OK
-            case Failure(_) =>
-              StatusCodes.BadRequest
-          }
+    post(entity(as[String]) { str =>
+      complete {
+        Try {
+          val split = str.split(':')
+          (split(0), split(1).toInt)
+        } match {
+          case Success((host, port)) =>
+            dataHolder ! PeerAdd(new InetSocketAddress(host, port))
+            StatusCodes.OK
+          case Failure(_) =>
+            StatusCodes.BadRequest
         }
+      }
     })
   }
 
   def removeFromBan: Route = path("remove") {
-    post(entity(as[String]) {
-      str =>
-        complete {
-          Try {
-            val split = str.split(':')
-            (split(0), split(1).toInt)
-          } match {
-            case Success((host, port)) =>
-              dataHolder ! RemovePeerFromBanList(new InetSocketAddress(host, port))
-              StatusCodes.OK
-            case Failure(_) =>
-              StatusCodes.BadRequest
-          }
+    post(entity(as[String]) { str =>
+      complete {
+        Try {
+          val split = str.split(':')
+          (split(0), split(1).toInt)
+        } match {
+          case Success((host, port)) =>
+            dataHolder ! RemovePeerFromBanList(new InetSocketAddress(host, port))
+            StatusCodes.OK
+          case Failure(_) =>
+            StatusCodes.BadRequest
         }
+      }
     })
   }
 }

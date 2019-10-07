@@ -11,7 +11,10 @@ import scala.concurrent.Future
 
 object NodeShutdown extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     dataHolder ! ShutdownNode
     Future(None)

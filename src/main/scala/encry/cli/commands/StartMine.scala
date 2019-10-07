@@ -12,7 +12,10 @@ import scala.concurrent.Future
 
 object StartMine extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     dataHolder ! StartMiner
     Future(Some(Response("Mining is started.")))

@@ -3,7 +3,7 @@ package encry.cli.commands.history
 import akka.actor.ActorRef
 import akka.util.Timeout
 import encry.api.http.DataHolderForApi.GetFullHeaderById
-import encry.cli.{Ast, Response}
+import encry.cli.{ Ast, Response }
 import encry.cli.commands.Command
 import encry.settings.EncryAppSettings
 import akka.pattern._
@@ -13,8 +13,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import io.circe.syntax._
 
-object GetFullBlockById extends Command{
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+object GetFullBlockById extends Command {
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
@@ -23,4 +26,3 @@ object GetFullBlockById extends Command{
     (dataHolder ? GetFullHeaderById(Left(num))).mapTo[Option[Block]].map(x => Some(Response(x.asJson.toString())))
   }
 }
-//history getFullBlock -modifier='5a770264e69cb097049d38196d2d0213a69604130e4bb822aaaa931bd8859ea5'

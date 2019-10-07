@@ -1,7 +1,7 @@
 package encry.api.http
 
-import java.net.{InetAddress, InetSocketAddress}
-import akka.actor.{Actor, Props}
+import java.net.{ InetAddress, InetSocketAddress }
+import akka.actor.{ Actor, Props }
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
@@ -10,31 +10,35 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.api.http.routes.InfoApiRoute
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{
+  ChangedHistory,
+  ChangedState,
+  NodeViewChange,
+  PeerFromCli,
+  RemovePeerFromBlackList
+}
 import encry.settings.EncryAppSettings
-import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.state.{UtxoState, UtxoStateReader}
-import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
-import encry.network.BlackList.{BanReason, BanTime, BanType}
+import encry.utils.{ NetworkTime, NetworkTimeProvider }
+import encry.view.state.{ UtxoState, UtxoStateReader }
+import encry.local.miner.Miner.{ DisableMining, EnableMining, MinerStatus, StartMining }
+import encry.network.BlackList.{ BanReason, BanTime, BanType }
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.actors.NodeViewHolder.CurrentView
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.concurrent.Future
 
-class DataHolderForApi(settings: EncryAppSettings,
-                       ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
-  override def preStart(): Unit = {
+  override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-  }
 
   override def receive: Receive = workingCycle()
 
@@ -50,137 +54,157 @@ class DataHolderForApi(settings: EncryAppSettings,
       context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
     case BlockAndHeaderInfo(header, block) =>
-      context.become(workingCycle(
-      blackList,
-      connectedPeers,
-      history,
-      state,
-      transactionsOnMinerActor,
-      minerStatus,
-      BlockAndHeaderInfo(header, block),
-      allPeers))
+      context.become(
+        workingCycle(blackList,
+                     connectedPeers,
+                     history,
+                     state,
+                     transactionsOnMinerActor,
+                     minerStatus,
+                     BlockAndHeaderInfo(header, block),
+                     allPeers)
+      )
 
     case ChangedHistory(reader: History) =>
-      context.become(workingCycle(
-        blackList,
-        connectedPeers,
-        Some(reader),
-        state,
-        transactionsOnMinerActor,
-        minerStatus,
-        blockInfo,
-        allPeers))
+      context.become(
+        workingCycle(blackList,
+                     connectedPeers,
+                     Some(reader),
+                     state,
+                     transactionsOnMinerActor,
+                     minerStatus,
+                     blockInfo,
+                     allPeers)
+      )
 
-    case ChangedState(reader: UtxoStateReader)  =>
-      context.become(workingCycle(
-        blackList, connectedPeers, history, Some(reader), transactionsOnMinerActor, minerStatus, blockInfo, allPeers)
+    case ChangedState(reader: UtxoStateReader) =>
+      context.become(
+        workingCycle(blackList,
+                     connectedPeers,
+                     history,
+                     Some(reader),
+                     transactionsOnMinerActor,
+                     minerStatus,
+                     blockInfo,
+                     allPeers)
       )
 
     case UpdatingMinerStatus(status) =>
-      context.become(workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, status, blockInfo, allPeers)
+      context.become(
+        workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, status, blockInfo, allPeers)
       )
 
     case UpdatingPeersInfo(allP, connectedP, bannedP) =>
-      context.become(workingCycle(
-        bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus, blockInfo, allP)
+      context.become(
+        workingCycle(bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus, blockInfo, allP)
       )
 
-    case PeerAdd(peer)                => context.system.eventStream.publish(PeerFromCli(peer))
-    case RemovePeerFromBanList(peer)  => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
+    case PeerAdd(peer)               => context.system.eventStream.publish(PeerFromCli(peer))
+    case RemovePeerFromBanList(peer) => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
-    case GetViewPrintAddress                      =>
+    case GetViewPrintAddress =>
       (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-            view.vault.publicKeys.foldLeft("") { (str, k) =>
-              str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"}
-    }).pipeTo(sender)
+        view.vault.publicKeys.foldLeft("") { (str, k) =>
+          str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
+        }
+      }).pipeTo(sender)
 
     case GetViewCreateKey =>
-      (self ?
-          GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
-            if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
-            else view.vault.accountManager.createAccount(None)
-              }).pipeTo(sender)
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
+        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
+        else view.vault.accountManager.createAccount(None)
+      }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
-      (self ?
-      GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
         view.vault.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes) + "\n")
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (self ?
-      GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
         val balance: String =
-          view.vault.getBalances.foldLeft("")((str, tokenInfo) =>
-            str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n"))
+          view.vault.getBalances.foldLeft("")(
+            (str, tokenInfo) => str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n")
+          )
         if (balance.length == 0) "0" else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
-      (self ?
-      GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-        view.vault.accountManager.accounts.foldLeft("")((str, k) =>
-          str + Algos.encode(k.privKeyBytes) + "\n"
-        )
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+        view.vault.accountManager.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 
     case GetLastHeadersHelper(i) =>
-      (self ? GetDataFromHistory).mapTo[History].map {
-        _.lastHeaders(i).headers
-      }.pipeTo(sender)
+      (self ? GetDataFromHistory)
+        .mapTo[History]
+        .map {
+          _.lastHeaders(i).headers
+        }
+        .pipeTo(sender)
 
     case GetFullHeaderById(id) =>
       sender() ! history.flatMap { history =>
-         id match {
-           case Left(value) =>
-             Algos.decode(value).toOption
-               .flatMap(decoded => history.getHeaderById(ModifierId @@ decoded))
-               .flatMap(history.getBlockByHeader)
-           case Right(value) => history.getHeaderById(value).flatMap(history.getBlockByHeader)
-         }
-       }
+        id match {
+          case Left(value) =>
+            Algos
+              .decode(value)
+              .toOption
+              .flatMap(decoded => history.getHeaderById(ModifierId @@ decoded))
+              .flatMap(history.getBlockByHeader)
+          case Right(value) => history.getHeaderById(value).flatMap(history.getBlockByHeader)
+        }
+      }
 
     case GetBannedPeersHelper =>
       (self ? GetBannedPeers)
-      .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
-      .map(_.map(_.toString)).pipeTo(sender)
+        .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
+        .map(_.map(_.toString))
+        .pipeTo(sender)
 
     case GetConnectedPeersHelper =>
-         (self ? GetConnectedPeers)
-          .mapTo[Seq[ConnectedPeer]]
-          .map(_.map(peer => PeerInfoResponse(
-            peer.socketAddress.toString,
-            Some(peer.handshake.nodeName),
-            Some(peer.direction.toString))
-          )).pipeTo(sender)
+      (self ? GetConnectedPeers)
+        .mapTo[Seq[ConnectedPeer]]
+        .map(
+          _.map(
+            peer =>
+              PeerInfoResponse(peer.socketAddress.toString,
+                               Some(peer.handshake.nodeName),
+                               Some(peer.direction.toString))
+          )
+        )
+        .pipeTo(sender)
 
     case GetLastHeaderIdAtHeightHelper(i) =>
-      (self ? GetDataFromHistory).mapTo[History].map {
-        _.headerIdsAtHeight(i).map(Algos.encode)
-      }.pipeTo(sender)
+      (self ? GetDataFromHistory)
+        .mapTo[History]
+        .map {
+          _.headerIdsAtHeight(i).map(Algos.encode)
+        }
+        .pipeTo(sender)
 
     case GetAllInfoHelper => {
 
-       val getNodeName: String = settings.network.nodeName
+      val getNodeName: String = settings.network.nodeName
         .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)
 
-       val getStateType: String = "UTXO"
+      val getStateType: String = "UTXO"
 
-       val storageInfo: String = ""
+      val storageInfo: String = ""
 
-       val getAddress: Seq[InetSocketAddress] = settings.network.knownPeers
+      val getAddress: Seq[InetSocketAddress] = settings.network.knownPeers
 
-       val getConnectionWithPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(false)
+      val getConnectionWithPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(false)
 
-       val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
+      val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
 
-        val askAllF = (self ? GetAllInfo)
-          .mapTo[(Seq[ConnectedPeer], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
+      val askAllF = (self ? GetAllInfo)
+        .mapTo[(Seq[ConnectedPeer], MinerStatus, Readers, Int, BlockAndHeaderInfo, Seq[InetSocketAddress])]
       (for {
-          (connectedPeers, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
-          currentTime <- ntp.time()
-          launchTime  <- launchTimeFuture
-        } yield InfoApiRoute.makeInfoJson(
+        (connectedPeers, minerInfo, stateReader, txsQty, blocksInfo, _) <- askAllF
+        currentTime                                                     <- ntp.time()
+        launchTime                                                      <- launchTimeFuture
+      } yield
+        InfoApiRoute.makeInfoJson(
           nodeId,
           minerInfo,
           connectedPeers.size,
@@ -196,22 +220,22 @@ class DataHolderForApi(settings: EncryAppSettings,
           blocksInfo.block,
           settings.constants
         )).pipeTo(sender())
-      }
+    }
 
-
-    case GetConnectedPeers      => sender() ! connectedPeers
-    case GetDataFromHistory     => history.foreach(sender() ! _)
-    case GetMinerStatus         => sender() ! minerStatus
-    case GetReaders             => sender() ! Readers(history, state)
-    case GetTransactionsNumber  => sender() ! transactionsOnMinerActor
-    case GetTimeProvider        => sender() ! ntp
-    case GetBlockInfo           => sender() ! blockInfo
-    case GetAllPeers            => sender() ! allPeers
-    case GetBannedPeers         => sender() ! blackList
-    case StartMiner             => context.system.eventStream.publish(EnableMining)
-                                   context.system.eventStream.publish(StartMining)
-    case StopMiner              => context.system.eventStream.publish(DisableMining)
-    case ShutdownNode           => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
+    case GetConnectedPeers     => sender() ! connectedPeers
+    case GetDataFromHistory    => history.foreach(sender() ! _)
+    case GetMinerStatus        => sender() ! minerStatus
+    case GetReaders            => sender() ! Readers(history, state)
+    case GetTransactionsNumber => sender() ! transactionsOnMinerActor
+    case GetTimeProvider       => sender() ! ntp
+    case GetBlockInfo          => sender() ! blockInfo
+    case GetAllPeers           => sender() ! allPeers
+    case GetBannedPeers        => sender() ! blackList
+    case StartMiner =>
+      context.system.eventStream.publish(EnableMining)
+      context.system.eventStream.publish(StartMining)
+    case StopMiner                 => context.system.eventStream.publish(DisableMining)
+    case ShutdownNode              => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
     case GetDataFromPresentView(f) => (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
@@ -223,11 +247,10 @@ class DataHolderForApi(settings: EncryAppSettings,
         allPeers
       )
     case _ =>
-
   }
 }
 
-object DataHolderForApi {//scalastyle:ignore
+object DataHolderForApi { //scalastyle:ignore
 
   final case class UpdatingBlackListForApi(blackList: Seq[InetAddress]) extends AnyVal
 
@@ -301,6 +324,5 @@ object DataHolderForApi {//scalastyle:ignore
 
   case object GetAllInfo
 
-  def props(settings: EncryAppSettings,
-            ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))
+  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))
 }

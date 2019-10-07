@@ -1,8 +1,8 @@
 package encry.cli.commands.history
 
 import akka.actor.ActorRef
-import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetLastHeadersHelper}
-import encry.cli.{Ast, Response}
+import encry.api.http.DataHolderForApi.{ GetDataFromHistory, GetLastHeadersHelper }
+import encry.cli.{ Ast, Response }
 import encry.cli.commands.Command
 import encry.settings.EncryAppSettings
 import akka.pattern._
@@ -15,10 +15,15 @@ import io.circe.syntax._
 
 object GetLastHeaders extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    val a = args.requireArg[Ast.Num]("count").i
-    (dataHolder ? GetLastHeadersHelper(a.toInt)).mapTo[IndexedSeq[Header]].map(x => Some(Response(x.asJson.toString())))
+    val num: Long                 = args.requireArg[Ast.Num]("count").i
+    (dataHolder ? GetLastHeadersHelper(num.toInt))
+      .mapTo[IndexedSeq[Header]]
+      .map(x => Some(Response(x.asJson.toString())))
   }
 }

@@ -2,7 +2,7 @@ package encry.cli.commands.history
 
 import akka.actor.ActorRef
 import encry.api.http.DataHolderForApi.GetLastHeaderIdAtHeightHelper
-import encry.cli.{Ast, Response}
+import encry.cli.{ Ast, Response }
 import encry.cli.commands.Command
 import encry.settings.EncryAppSettings
 import akka.pattern._
@@ -22,7 +22,9 @@ object GetLastHeaderIdsAtHeight extends Command {
 
     val num = args.requireArg[Ast.Num]("at").i
 
-    (dataHolder ? GetLastHeaderIdAtHeightHelper(num.toInt)).mapTo[Seq[String]].map(s => Some(Response(s.asJson.toString())))
+    (dataHolder ? GetLastHeaderIdAtHeightHelper(num.toInt))
+      .mapTo[Seq[String]]
+      .map(s => Some(Response(s.asJson.toString())))
 
   }
 }

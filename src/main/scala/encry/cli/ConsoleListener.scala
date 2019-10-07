@@ -1,20 +1,28 @@
 package encry.cli
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import encry.cli.commands._
-import encry.cli.commands.history.{GetCandidate, GetFullBlockById, GetHeaderById, GetLastHeaderIdsAtHeight, GetLastHeaders, GetTxById}
+import encry.cli.commands.history.{
+  GetCandidate,
+  GetFullBlockById,
+  GetHeaderById,
+  GetLastHeaderIdsAtHeight,
+  GetLastHeaders,
+  GetTxById
+}
 import encry.cli.commands.info.GetInfo
-import encry.cli.commands.peer.{GetAllPeers, GetBannedPeers, GetConnectedPeers}
+import encry.cli.commands.peer.{ GetAllPeers, GetBannedPeers, GetConnectedPeers }
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 
 class ConsoleListener(settings: EncryAppSettings,
                       dataHolder: ActorRef,
                       nodeId: Array[Byte],
-                      networkTimeProvider: NetworkTimeProvider) extends Actor {
+                      networkTimeProvider: NetworkTimeProvider)
+    extends Actor {
 
   import ConsoleListener._
 
@@ -25,10 +33,15 @@ class ConsoleListener(settings: EncryAppSettings,
           case Success(command) =>
             getCommand(command.category.name, command.ident.name) match {
               case Some(cmd) =>
-                cmd.execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap), settings, dataHolder, nodeId, networkTimeProvider)
+                cmd
+                  .execute(Command.Args(command.params.map(p => p.ident.name -> p.value).toMap),
+                           settings,
+                           dataHolder,
+                           nodeId,
+                           networkTimeProvider)
                   .map {
                     case Some(x) => print(x.msg + s"\n$prompt")
-                    case None =>
+                    case None    =>
                   }
               case None => println("Unknown command. Type 'app help' to see command list.")
             }
@@ -46,48 +59,62 @@ object ConsoleListener {
 
   def getCommand(cat: String, cmd: String): Option[Command] = cmdDictionary.get(cat).flatMap(_.get(cmd))
 
-  private val nodeCmds = Map("node" -> Map(
-    "shutdown"    -> NodeShutdown,
-    "stopMining"  -> StopMine,
-    "startMining" -> StartMine,
-  ))
+  private val nodeCmds = Map(
+    "node" -> Map(
+      "shutdown"    -> NodeShutdown,
+      "stopMining"  -> StopMine,
+      "startMining" -> StartMine,
+    )
+  )
 
-  private val appCmds = Map("app" -> Map(
-    "help" -> Help
-  ))
+  private val appCmds = Map(
+    "app" -> Map(
+      "help" -> Help
+    )
+  )
 
-  private val settingsCmds = Map("settings" -> Map(
-    "addPeer"             -> AddPeer,
-    "removeFromBlackList" -> RemoveFromBlackList
-  ))
+  private val settingsCmds = Map(
+    "settings" -> Map(
+      "addPeer"             -> AddPeer,
+      "removeFromBlackList" -> RemoveFromBlackList
+    )
+  )
 
-  private val walletCmds = Map("wallet" -> Map(
-    "addrs"     -> PrintAddresses,
-    "createKey" -> CreateKey,
-    "pubKeys"   -> PrintPubKeys,
-    "balance"   -> GetBalance,
-    "transfer"  -> Transfer,
-    "privKeys"  -> PrintPrivKeys //Todo delete
-  ))
+  private val walletCmds = Map(
+    "wallet" -> Map(
+      "addrs"     -> PrintAddresses,
+      "createKey" -> CreateKey,
+      "pubKeys"   -> PrintPubKeys,
+      "balance"   -> GetBalance,
+      "transfer"  -> Transfer,
+      "privKeys"  -> PrintPrivKeys //Todo delete
+    )
+  )
 
-  private val historyCmds = Map("history" -> Map(
-    "getLastHeaders"     -> GetLastHeaders,
-    "getLastHeaderIds"   -> GetLastHeaderIdsAtHeight,
-    "getHeaderById"      -> GetHeaderById,
-    "getTxById"          -> GetTxById,
-    "getCandidate"       -> GetCandidate,
-    "getFullBlock"       -> GetFullBlockById
-  ))
+  private val historyCmds = Map(
+    "history" -> Map(
+      "getLastHeaders"   -> GetLastHeaders,
+      "getLastHeaderIds" -> GetLastHeaderIdsAtHeight,
+      "getHeaderById"    -> GetHeaderById,
+      "getTxById"        -> GetTxById,
+      "getCandidate"     -> GetCandidate,
+      "getFullBlock"     -> GetFullBlockById
+    )
+  )
 
-  private val infoCmds = Map("info" -> Map(
-    "get" -> GetInfo
-  ))
+  private val infoCmds = Map(
+    "info" -> Map(
+      "get" -> GetInfo
+    )
+  )
 
-  private val peerCmds = Map("peer" -> Map(
-    "all" -> GetAllPeers,
-    "banned" -> GetBannedPeers,
-    "connected" -> GetConnectedPeers
-  ))
+  private val peerCmds = Map(
+    "peer" -> Map(
+      "all"       -> GetAllPeers,
+      "banned"    -> GetBannedPeers,
+      "connected" -> GetConnectedPeers
+    )
+  )
 
   val cmdDictionary: Map[String, Map[String, Command]] =
     ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds ++
@@ -96,5 +123,6 @@ object ConsoleListener {
   def props(settings: EncryAppSettings,
             dataHolder: ActorRef,
             nodeId: Array[Byte],
-            timeProvider: NetworkTimeProvider): Props = Props(new ConsoleListener(settings, dataHolder, nodeId, timeProvider))
+            timeProvider: NetworkTimeProvider): Props =
+    Props(new ConsoleListener(settings, dataHolder, nodeId, timeProvider))
 }

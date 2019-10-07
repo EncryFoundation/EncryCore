@@ -12,11 +12,15 @@ import encry.utils.NetworkTimeProvider
 import io.circe._
 import scala.concurrent._
 
-object GetInfo extends Command{
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef, nodeId: Array[Byte],
+object GetInfo extends Command {
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (dataHolder ? GetAllInfoHelper).mapTo[Json]
+    (dataHolder ? GetAllInfoHelper)
+      .mapTo[Json]
       .map(x => Some(Response(x.toString())))
   }
 }
