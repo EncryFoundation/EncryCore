@@ -1,20 +1,20 @@
 package encry.view.actors
 
-import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
-import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import akka.actor.{ Actor, ActorRef, ActorSystem, PoisonPill, Props }
+import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.{ModifierAppendedToHistory, ModifierAppendedToState, TransactionsInBlock}
+import encry.stats.StatsSender.{ ModifierAppendedToHistory, ModifierAppendedToState, TransactionsInBlock }
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
-import encry.view.NodeViewErrors.ModifierApplyError.{HistoryApplyError, StateModifierApplyError}
-import encry.view.actors.NodeViewHolder.{DownloadRequest, TransactionsForWallet}
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{LocallyGeneratedBlock, ModifierFromRemote}
+import encry.view.NodeViewErrors.ModifierApplyError.{ HistoryApplyError, StateModifierApplyError }
+import encry.view.actors.NodeViewHolder.{ DownloadRequest, TransactionsForWallet }
+import encry.view.actors.NodeViewHolder.ReceivableMessages.{ LocallyGeneratedBlock, ModifierFromRemote }
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.WalletApplicator.WalletNeedRollbackTo
@@ -22,13 +22,13 @@ import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.immutable.Queue
 import scala.collection.mutable
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 import scala.concurrent.duration._
 
 class HistoryApplicator(nodeViewHolder: ActorRef,
@@ -37,19 +37,20 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
                         settings: EncryAppSettings,
                         influxRef: Option[ActorRef],
                         dataHolder: ActorRef,
-                        networkTimeProvider: NetworkTimeProvider) extends Actor with StrictLogging {
+                        networkTimeProvider: NetworkTimeProvider)
+    extends Actor
+    with StrictLogging {
 
   //todo 1. add history.close in postStop
 
   import context.dispatcher
 
   var modifiersQueue: Queue[(PersistentModifier, ProgressInfo)] = Queue.empty[(PersistentModifier, ProgressInfo)]
-  var currentNumberOfAppliedModifiers: Int = 0
-  var locallyGeneratedModifiers: Queue[PersistentModifier] = Queue.empty[PersistentModifier]
+  var currentNumberOfAppliedModifiers: Int                      = 0
+  var locallyGeneratedModifiers: Queue[PersistentModifier]      = Queue.empty[PersistentModifier]
 
-  override def preStart(): Unit = {
+  override def preStart(): Unit =
     self ! HistoryInitializedSuccessfully
-  }
 
   override def receive: Receive = initializeHistory(restoreHistory)
 
@@ -77,16 +78,20 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
       history.append(modifier) match {
         case Left(ex) =>
           currentNumberOfAppliedModifiers -= 1
-          logger.info(s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.getMessage}." +
-            s" Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
+          logger.info(
+            s"Modifier ${modifier.encodedId} unsuccessfully applied to history with exception ${ex.getMessage}." +
+              s" Current number of applied modifiers is $currentNumberOfAppliedModifiers."
+          )
           context.system.eventStream.publish(
             SyntacticallyFailedModification(modifier, List(HistoryApplyError(ex.getMessage)))
           )
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
           modifiersQueue = modifiersQueue.enqueue(modifier -> progressInfo)
-          logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
-            s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
+          logger.info(
+            s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
+              s"Current number of applied modifiers is $currentNumberOfAppliedModifiers."
+          )
           influxRef.foreach(_ ! ModifierAppendedToHistory(modifier match {
             case _: Header  => true
             case _: Payload => false
@@ -109,10 +114,11 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
 
     case RequestNextModifier =>
       logger.info(s"Got request for the new next modifier from state applicator.")
-      modifiersQueue.dequeueOption.foreach { case ((mod, pi), newQueue) =>
-        logger.info(s"Found new valid for state modifier ${mod.encodedId}. Send it to the state applicator.")
-        sender() ! StartModifiersApplicationOnStateApplicator(pi, IndexedSeq.empty[PersistentModifier])
-        modifiersQueue = newQueue
+      modifiersQueue.dequeueOption.foreach {
+        case ((mod, pi), newQueue) =>
+          logger.info(s"Found new valid for state modifier ${mod.encodedId}. Send it to the state applicator.")
+          sender() ! StartModifiersApplicationOnStateApplicator(pi, IndexedSeq.empty[PersistentModifier])
+          modifiersQueue = newQueue
       }
 
     case LocallyGeneratedBlock(block) =>
@@ -128,7 +134,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
         ref ! ModifierAppendedToState(success = true)
         modifier match {
           case Block(_, payload) if history.isFullChainSynced => ref ! TransactionsInBlock(payload.txs.size)
-          case _ => //do nothing
+          case _                                              => //do nothing
         }
       }
 
@@ -145,11 +151,15 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
         context.system.eventStream.publish(FullBlockChainIsSynced())
       }
       currentNumberOfAppliedModifiers -= 1
-      logger.info(s"Get NotificationAboutSuccessfullyAppliedModifier. Trying to get new one." +
-        s" New currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
-        s" ModCache size is ${ModifiersCache.size}.")
+      logger.info(
+        s"Get NotificationAboutSuccessfullyAppliedModifier. Trying to get new one." +
+          s" New currentNumberOfAppliedModifiers is $currentNumberOfAppliedModifiers." +
+          s" ModCache size is ${ModifiersCache.size}."
+      )
       if (modifiersQueue.nonEmpty) {
-        logger.info(s"modifiersQueue.nonEmpty in NotificationAboutSuccessfullyAppliedModifier. Sent NewModifierNotification")
+        logger.info(
+          s"modifiersQueue.nonEmpty in NotificationAboutSuccessfullyAppliedModifier. Sent NewModifierNotification"
+        )
         sender() ! NotificationAboutNewModifier
       }
       getModifierForApplying(history)
@@ -164,24 +174,29 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
         case (modifier, newQueue) =>
           locallyGeneratedModifiers = newQueue
           currentNumberOfAppliedModifiers += 1
-          logger.debug(s"Found new self mined modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
-            s" Current number of applied modifiers is $currentNumberOfAppliedModifiers." +
-            s" Current number of self mined modifiers is ${locallyGeneratedModifiers.size}.")
+          logger.debug(
+            s"Found new self mined modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
+              s" Current number of applied modifiers is $currentNumberOfAppliedModifiers." +
+              s" Current number of self mined modifiers is ${locallyGeneratedModifiers.size}."
+          )
           self ! ModifierToHistoryAppending(modifier, isLocallyGenerated = true)
-      }
-      else ModifiersCache.popCandidate(history).foreach { modifier =>
-        currentNumberOfAppliedModifiers += 1
-        logger.debug(s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
-          s" Current number of applied modifiers is $currentNumberOfAppliedModifiers." +
-          s" Current modifier's cache size is ${ModifiersCache.size}.")
-        self ! ModifierToHistoryAppending(modifier)
-      }
+      } else
+        ModifiersCache.popCandidate(history).foreach { modifier =>
+          currentNumberOfAppliedModifiers += 1
+          logger.debug(
+            s"Found new modifier ${modifier.encodedId} with type ${modifier.modifierTypeId}." +
+              s" Current number of applied modifiers is $currentNumberOfAppliedModifiers." +
+              s" Current modifier's cache size is ${ModifiersCache.size}."
+          )
+          self ! ModifierToHistoryAppending(modifier)
+        }
     }
 
-  def requestDownloads(pi: ProgressInfo): Unit = pi.toDownload.foreach { case (tid, id) =>
-    if (tid != Transaction.modifierTypeId)
-      logger.debug(s"HistoryApplicator call requestDownloads for modifier ${Algos.encode(id)} of type $tid")
-    context.system.eventStream.publish(DownloadRequest(tid, id))
+  def requestDownloads(pi: ProgressInfo): Unit = pi.toDownload.foreach {
+    case (tid, id) =>
+      if (tid != Transaction.modifierTypeId)
+        logger.debug(s"HistoryApplicator call requestDownloads for modifier ${Algos.encode(id)} of type $tid")
+      context.system.eventStream.publish(DownloadRequest(tid, id))
   }
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
@@ -193,7 +208,9 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
 
 object HistoryApplicator {
 
-  final case class InitialInfoForStateInitialization(history: History, historyAppl: ActorRef, networkTimeProvider: NetworkTimeProvider)
+  final case class InitialInfoForStateInitialization(history: History,
+                                                     historyAppl: ActorRef,
+                                                     networkTimeProvider: NetworkTimeProvider)
 
   case object HistoryInitializedSuccessfully
 
@@ -209,14 +226,13 @@ object HistoryApplicator {
                                                               suffixApplied: IndexedSeq[PersistentModifier])
 
   class HistoryApplicatorPriorityQueue(settings: ActorSystem.Settings, config: Config)
-    extends UnboundedStablePriorityMailbox(
-      PriorityGenerator {
+      extends UnboundedStablePriorityMailbox(PriorityGenerator {
         case NeedToReportAsValid(_) | NeedToReportAsInValid(_) => 0
-        case ModifierToHistoryAppending(_, _) => 1
-        case NotificationAboutSuccessfullyAppliedModifier => 2
-        case RequestNextModifier => 3
-        case PoisonPill => 5
-        case otherwise => 4
+        case ModifierToHistoryAppending(_, _)                  => 1
+        case NotificationAboutSuccessfullyAppliedModifier      => 2
+        case RequestNextModifier                               => 3
+        case PoisonPill                                        => 5
+        case otherwise                                         => 4
       })
 
   def props(nodeViewHolder: ActorRef,
@@ -235,5 +251,6 @@ object HistoryApplicator {
         influxRef,
         dataHolder,
         networkTimeProvider
-      ))
+      )
+    )
 }

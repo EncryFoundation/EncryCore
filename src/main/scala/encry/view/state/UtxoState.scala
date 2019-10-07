@@ -8,12 +8,12 @@ import cats.syntax.traverse._
 import encry.utils.implicits.Validation._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
-import encry.modifiers.state.{Context, EncryPropositionFunctions}
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.modifiers.state.{ Context, EncryPropositionFunctions }
+import encry.settings.{ EncryAppSettings, LevelDBSettings }
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
@@ -24,23 +24,25 @@ import encry.view.state.avlTree.AvlTree
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.modifiers.state.box.{ AssetBox, EncryBaseBox, EncryProposition }
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
+import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, Height }
 import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
-import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
+import org.encryfoundation.common.validation.{ MalformedModifierError, ValidationResult }
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 import scala.util.Try
 
-final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
-                           constants: Constants) extends StrictLogging with UtxoStateReader with AutoCloseable {
+final case class UtxoState(tree: AvlTree[StorageKey, StorageValue], constants: Constants)
+    extends StrictLogging
+    with UtxoStateReader
+    with AutoCloseable {
 
   def applyValidModifier(block: Block): UtxoState = {
     logger.info(s"Block validated successfully. Inserting changes to storage.")
@@ -60,26 +62,39 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
-        logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
+        logger.info(
+          s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}"
+        )
         UtxoState(tree, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
-        logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
-        val lastTxId = block.payload.txs.last.id
+        logger.info(
+          s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}"
+        )
+        val lastTxId          = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-        val validstartTime = System.currentTimeMillis()
-        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
-            totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height,
-            constants.InitialEmissionAmount, constants.EmissionEpochLength, constants.EmissionDecay))
-          else validate(tx, block.header.timestamp, Height @@ block.header.height)
-        }).toList
+        val validstartTime    = System.currentTimeMillis()
+        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs
+          .map(tx => {
+            if (tx.id sameElements lastTxId)
+              validate(
+                tx,
+                block.header.timestamp,
+                Height @@ block.header.height,
+                totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height,
+                                                           constants.InitialEmissionAmount,
+                                                           constants.EmissionEpochLength,
+                                                           constants.EmissionDecay)
+              )
+            else validate(tx, block.header.timestamp, Height @@ block.header.height)
+          })
+          .toList
           .traverse(Validated.fromEither)
           .toEither
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
           txsToApply => {
-            val combineTimeStart = System.currentTimeMillis()
+            val combineTimeStart                           = System.currentTimeMillis()
             val combinedStateChange: UtxoState.StateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
             logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart) / 1000L} s")
             val insertTimestart = System.currentTimeMillis()
@@ -96,38 +111,56 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           }
         )
     }
-    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime) / 1000L} s)")
+    logger.info(
+      s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime) / 1000L} s)"
+    )
     result
   }
 
-  def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
+  def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
     val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
     UtxoState(rollbackedAvl, constants)
   }
 
-  def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
+  def validate(tx: Transaction,
+               blockTimeStamp: Long,
+               blockHeight: Height,
+               allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => {
-        val fromStorage = tree.get(StorageKey !@@ input.boxId)
-        logger.info(s"res from storage: ${fromStorage}")
-        fromStorage.map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
-          .map(_.toOption -> input)
-      })
-        .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
-          (bxOpt, tx.defaultProofOpt) match {
-            // If no `proofs` provided, then `defaultProof` is used.
-            case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) acc :+ bx else acc
-            case (Some(bx), Some(defaultProof)) =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition,
-                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) acc :+ bx else acc
-            case (Some(bx), defaultProofOpt) =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx else acc
-            case _ => acc
-          }
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs
+        .flatMap(input => {
+          val fromStorage = tree.get(StorageKey !@@ input.boxId)
+          logger.info(s"res from storage: ${fromStorage}")
+          fromStorage
+            .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
+            .map(_.toOption -> input)
+        })
+        .foldLeft(IndexedSeq[EncryBaseBox]()) {
+          case (acc, (bxOpt, input)) =>
+            (bxOpt, tx.defaultProofOpt) match {
+              // If no `proofs` provided, then `defaultProof` is used.
+              case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+                if (EncryPropositionFunctions.canUnlock(bx.proposition,
+                                                        Context(tx, bx, stateView),
+                                                        input.contract,
+                                                        defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs)))
+                  acc :+ bx
+                else acc
+              case (Some(bx), Some(defaultProof)) =>
+                if (EncryPropositionFunctions.canUnlock(bx.proposition,
+                                                        Context(tx, bx, stateView),
+                                                        input.contract,
+                                                        Seq(defaultProof))) acc :+ bx
+                else acc
+              case (Some(bx), defaultProofOpt) =>
+                if (EncryPropositionFunctions.canUnlock(bx.proposition,
+                                                        Context(tx, bx, stateView),
+                                                        input.contract,
+                                                        defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) acc :+ bx
+                else acc
+              case _ => acc
+            }
         }
 
       val validBalance: Boolean = {
@@ -139,34 +172,33 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             BalanceCalculator.balanceSheet(tx.newBoxes, constants.IntrinsicTokenId, excludeTokenIssuance = true)
           val intrinsicBalance: Amount = balanceSheet.getOrElse(constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
-          }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
-        creditB.forall { case (tokenId, amount) =>
-          if (tokenId == Algos.encode(constants.IntrinsicTokenId))
-            debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
-          else debitB.getOrElse(tokenId, 0L) >= amount
+        }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
+        creditB.forall {
+          case (tokenId, amount) =>
+            if (tokenId == Algos.encode(constants.IntrinsicTokenId))
+              debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
+            else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
 
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
         Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
-      }
-      else if (bxs.length != tx.inputs.length) {
+      } else if (bxs.length != tx.inputs.length) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Box not found")
         Invalid(Seq(MalformedModifierError(s"Box not found"))).asLeft[Transaction]
-      }
-      else tx.asRight[ValidationResult]
-    } else tx.semanticValidity.errors.headOption
-      .map(err => Invalid(Seq(err)).asLeft[Transaction])
-      .getOrElse(tx.asRight[ValidationResult])
+      } else tx.asRight[ValidationResult]
+    } else
+      tx.semanticValidity.errors.headOption
+        .map(err => Invalid(Seq(err)).asLeft[Transaction])
+        .getOrElse(tx.asRight[ValidationResult])
 
   def close(): Unit = tree.close()
 }
 
 object UtxoState extends StrictLogging {
 
-  final case class StateChange(inputsToDb: Vector[StorageKey],
-                               outputsToDb: Vector[(StorageKey, StorageValue)])
+  final case class StateChange(inputsToDb: Vector[StorageKey], outputsToDb: Vector[(StorageKey, StorageValue)])
 
   private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
 

@@ -196,6 +196,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   def rollbackTo(to: StorageVersion)(implicit kMonoid: Monoid[K], kSer: Serializer[K],
                                      vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] = Try {
     logger.info(s"Rollback avl to version: ${Algos.encode(to)}")
+    logger.info(s"Versions in storage: ${storage.versions.map(Algos.encode).mkString(",")}")
     storage.rollbackTo(to)
     logger.info(s"Storage success rollbacked")
     logger.info(s"rootNodeKey: ${storage.get(AvlTree.rootNodeKey)}")
