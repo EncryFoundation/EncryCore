@@ -1,0 +1,11 @@
+syntax = "proto3";
+import "NodeMsg.proto";
+
+message SnapshotManifestProtoMessage {
+
+    bytes bestBlockId = 1;
+    bytes rootHash = 2;
+    NodeProtoMsg rootNodeBytes = 3;
+    uint64 stateChunksNumber = 4;
+
+}

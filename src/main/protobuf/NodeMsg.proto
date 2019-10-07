@@ -1,5 +1,4 @@
 syntax = "proto3";
-import "scalapb/scalapb.proto";
 
 message NodeProtoMsg {
 
