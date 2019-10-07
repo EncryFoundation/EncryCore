@@ -46,6 +46,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     val shadowedRoot = ShadowNode.childsToShadowNode(newRoot.node)
     storage.insert(version,
       toInsert.map{case (key, value) =>
+        logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
       } ++
         insertedNodes.map{case (key, node) =>
@@ -56,6 +57,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       deletedNodes.map(key => {
         logger.info(s"Delete node: ${Algos.encode(key.data)}")
         StorageKey @@ key.data
+      }) ++ toDelete.map(key => {
+        logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
+        StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
     AvlTree(shadowedRoot, storage)
@@ -199,7 +203,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     logger.info(s"Versions in storage: ${storage.versions.map(Algos.encode).mkString(",")}")
     storage.rollbackTo(to)
     logger.info(s"Storage success rollbacked")
-    logger.info(s"rootNodeKey: ${storage.get(AvlTree.rootNodeKey)}")
+    logger.info(s"rootNodeKey: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
     logger.info(s"root node bytes: ${storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get)}")
     val rootNode = NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
     AvlTree[K, V](rootNode, storage)
