@@ -95,13 +95,22 @@ class StateApplicator(settings: EncryAppSettings,
         case Success(stateToApply) =>
           logger.info(s"Successfully applied to the state. Starting modifiers applying.")
           context.system.eventStream.publish(RollbackSucceed(branchPointOpt))
-          self ! StartModifiersApplying
-          logger.info(progressInfo.toApply.toList.map(mod => mod.encodedId).mkString(","))
-          context.become(modifierApplication(
-            progressInfo.toApply.toList,
-            UpdateInformation(none, none, suffixTrimmed),
-            stateToApply
-          ).orElse(processNewCandidate(state)))
+//          self ! StartModifiersApplying
+//          logger.info(progressInfo.toApply.toList.map(mod => mod.encodedId).mkString(","))
+//          context.become(modifierApplication(
+//            progressInfo.toApply.toList,
+//            UpdateInformation(none, none, suffixTrimmed),
+//            stateToApply
+//          ).orElse(processNewCandidate(state)))
+
+          if (progressInfo.toApply.nonEmpty) {
+            self ! StartModifiersApplying
+            context.become(modifierApplication(
+              progressInfo.toApply.toList,
+              UpdateInformation(none, none, suffixTrimmed),
+              state
+            ).orElse(processNewCandidate(state)))
+          } else historyApplicator ! RequestNextModifier
       }
   }
 
@@ -158,22 +167,10 @@ class StateApplicator(settings: EncryAppSettings,
           toApply.drop(1), updateInformation, block, currentState, block.payload.txs.length
         ).orElse(processNewCandidate(currentState)))
     }
-    case StartModifiersApplying => //todo redundant iterations while updateInformation.failedMod.nonEmpty
-      val newToApply: List[PersistentModifier] = toApply.drop(1)
-      if (newToApply.nonEmpty) {
-        self ! StartModifiersApplying
-        logger.info(s"StartModifiersApplying updateInformation.failedMod.nonEmpty")
-        dataHolder ! ChangedState(currentState)
-        context.become(modifierApplication(newToApply, updateInformation, currentState).orElse(processNewCandidate(currentState)))
-      } else {
-        logger.info(s"StartModifiersApplying w/0 if case to apply is empty")
-        self ! ModifiersApplicationFinished
-        dataHolder ! ChangedState(currentState)
-        context.become(modifiersApplicationCompleted(
-          UpdateInformation(none, none, updateInformation.suffix),
-          currentState
-        ).orElse(processNewCandidate(currentState)))
-      }
+    case StartModifiersApplying =>
+      logger.debug("Switching into modifiersApplicationCompleted due to non empty failed mod")
+      self ! ModifiersApplicationFinished
+      context.become(modifiersApplicationCompleted(updateInformation, currentState))
   }
 
   def modifiersApplicationCompleted(ui: UpdateInformation, currentState: UtxoState): Receive = {
@@ -371,7 +368,7 @@ object StateApplicator {
 
   final case class NeedToReportAsValid(modifier: PersistentModifier) extends AnyVal
 
-  final case class NeedToReportAsInValid(modifier: PersistentModifier) extends AnyVal
+  final case class NeedToReportAsInValid(modifier: Block) extends AnyVal
 
   final case class NewProgressInfoAfterMarkingAsInValid(pi: ProgressInfo) extends AnyVal
 

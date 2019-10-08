@@ -141,9 +141,13 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
       }
 
     case NeedToReportAsInValid(block) =>
-      logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId}.")
-      currentNumberOfAppliedModifiers -= 1
+      logger.info(s"History got message NeedToReportAsInValid for block ${block.encodedId} at height ${block.header.height}.")
+      currentNumberOfAppliedModifiers -= 1 //todo stop node if failed modifier outranges rollback depth
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
+      newProgressInfo.toRemove.foreach(mod => context.system.eventStream.publish(SyntacticallyFailedModification(mod, List.empty[HistoryApplyError])))
+      val blocksToRemove = newProgressInfo.toRemove.map(_.encodedId).toSet
+      modifiersQueue = modifiersQueue.filterNot { case (id, _) => blocksToRemove.contains(id)}
+      logger.info(s"New progress info after invalidating ${block.encodedId} is $newProgressInfo")
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
 
     case NotificationAboutSuccessfullyAppliedModifier =>
