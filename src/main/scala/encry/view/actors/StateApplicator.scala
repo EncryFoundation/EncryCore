@@ -105,6 +105,7 @@ class StateApplicator(settings: EncryAppSettings,
 
           if (progressInfo.toApply.nonEmpty) {
             self ! StartModifiersApplying
+            logger.info(s"TO apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}. Point: ${Algos.encode(progressInfo.branchPoint.map(Algos.encode))}")
             context.become(modifierApplication(
               progressInfo.toApply.toList,
               UpdateInformation(none, none, suffixTrimmed),
