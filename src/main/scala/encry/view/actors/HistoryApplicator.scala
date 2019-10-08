@@ -146,7 +146,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
       val (_, newProgressInfo: ProgressInfo) = history.reportModifierIsInvalid(block)
       newProgressInfo.toRemove.foreach(mod => context.system.eventStream.publish(SyntacticallyFailedModification(mod, List.empty[HistoryApplyError])))
       val blocksToRemove = newProgressInfo.toRemove.map(_.encodedId).toSet
-      modifiersQueue = modifiersQueue.filterNot { case (id, _) => blocksToRemove.contains(id)}
+      modifiersQueue = modifiersQueue.filterNot { case (id, _) => blocksToRemove.contains(id.encodedId)}
       logger.info(s"New progress info after invalidating ${block.encodedId} is $newProgressInfo")
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
 
