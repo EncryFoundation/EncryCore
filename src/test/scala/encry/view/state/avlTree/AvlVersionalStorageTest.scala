@@ -1,6 +1,7 @@
 package encry.view.state.avlTree
 
 import com.google.common.primitives.Ints
+import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper}
@@ -15,7 +16,7 @@ import io.iohk.iodb.ByteArrayWrapper
 
 import scala.collection.immutable.HashMap
 
-class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator {
+class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator with StrictLogging {
 
   property("avst should correct process root hash") {
 
@@ -30,9 +31,19 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
 
     val avlStorage = AvlTree[StorageKey, StorageValue](storage)
 
-    val interval = 500
+    val interval = 1000
 
-    val boxes = (0 to interval).map{i =>
+    val boxes = (0 until interval).map { i =>
+      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
+      genAssetBox(addr, i, nonce = i)
+    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+
+    val newBoxes = (interval until interval * 2).map { i =>
+      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
+      genAssetBox(addr, i, nonce = i)
+    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+
+    val anotherNewBoxes = (interval * 2 until interval * 3).map { i =>
       val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
       genAssetBox(addr, i, nonce = i)
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
@@ -48,43 +59,51 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
       List.empty
     )
 
-    println(s"Time = ${(System.currentTimeMillis() - startTime)/1000L} s")
+    println(s"Time = ${(System.currentTimeMillis() - startTime) / 1000L} s")
 
-    boxes.forall{case (key, _) =>
-      newAvl.contains(key)} shouldBe true
+    boxes.forall {
+      case (key, _) =>
+        val res = newAvl.contains(key)
+        if (res) logger.info(s"Node ${Algos.encode(key)} exist! --")
+        res
+    } shouldBe true
 
-    val newBoxes = (interval to interval*2).map{i =>
-      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
-      genAssetBox(addr, i, nonce = i)
-    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+    logger.info(s"RootNode key before roolback: ${Algos.encode(newAvl.rootHash)}")
 
-    println("second insert!")
+
+    logger.info("second insert!")
     val secondVer = StorageVersion @@ Random.randomBytes()
     val newAvl2 = newAvl.insertAndDeleteMany(
       secondVer,
       newBoxes.toList,
-      boxes.map{case (key, _) => key}.toList
+      boxes.map { case (key, _) => key }.toList
     )
 
-    newBoxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
+    newBoxes.forall { case (key, _) => {
+      val res = newAvl2.contains(key)
+      if (!res) logger.info(s"key ${Algos.encode(key)} doesn't exist!")
+      res
+    } } shouldBe true
 
     val rollbackAvl = newAvl2.rollbackTo(firstVer).get
 
-    val anotherNewBoxes = (interval*2 to interval*3).map{i =>
-      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
-      genAssetBox(addr, i, nonce = i)
-    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     val newAvl3 = rollbackAvl.insertAndDeleteMany(
       StorageVersion @@ Random.randomBytes(),
       anotherNewBoxes.toList,
-      boxes.map{case (key, _) => key}.toList
+      boxes.map { case (key, _) => key }.toList
     )
 
-    println(newAvl3.rootNode)
+    anotherNewBoxes.forall { case (key, _) => newAvl3.contains(key) } shouldBe true
+    boxes.forall {
+      case (key, _) =>
+        val res = !newAvl3.contains(key)
+        if (!res) logger.info(s"Node ${Algos.encode(key)} exist!")
+        res
+    } shouldBe true
   }
 
   property("test") {
-    val testHash = HashMap(ByteArrayWrapper(Ints.toByteArray(1)) -> 1,ByteArrayWrapper(Ints.toByteArray(1)) -> 2)
+    val testHash = HashMap(ByteArrayWrapper(Ints.toByteArray(1)) -> 1, ByteArrayWrapper(Ints.toByteArray(1)) -> 2)
 //    val test1 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 2)
 //    val test2 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 3)
 //    val test3 = testHash + (ByteArrayWrapper(Ints.toByteArray(1)) -> 4)
@@ -132,7 +151,7 @@ class AvlVersionalStorageTest extends PropSpec with Matchers with EncryGenerator
       List.empty
     )
 
-    boxes.forall{case (key, _) => newAvl.contains(key)} shouldBe true
+    boxes.forall { case (key, _) => newAvl.contains(key) } shouldBe true
 
     println(newAvl.rootNode)
 

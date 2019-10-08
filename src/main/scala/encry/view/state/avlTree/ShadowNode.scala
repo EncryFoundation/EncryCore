@@ -13,14 +13,13 @@ import org.encryfoundation.common.utils.Algos
 import scala.util.Try
 
 //represent node, that stored in db, without all fields, except hash, height, balance
-case class ShadowNode[K: Serializer: Hashable, V: Serializer](hash: Array[Byte], height: Int, balance: Int)
+case class ShadowNode[K: Serializer: Hashable, V: Serializer](override val hash: Array[Byte], height: Int, balance: Int)
                                                              (implicit kM: Monoid[K], vM: Monoid[V]) extends Node[K, V] with StrictLogging {
 
   override val key: K = kM.empty
   override val value: V = vM.empty
 
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
-    if (storage.get(StorageKey @@ hash).isEmpty) logger.info(s"Trying to get hash ${Algos.encode(hash)}, but res is null")
     NodeSerilalizer.fromBytes[K, V](
       {
         storage.get(StorageKey @@ hash).get
