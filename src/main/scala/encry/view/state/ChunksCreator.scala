@@ -3,7 +3,7 @@ package encry.view.state
 import NodeMsg.NodeProtoMsg
 import NodeMsg.NodeProtoMsg.NodeTypes
 import akka.util.ByteString
-import encry.view.actors.SnapshotHolder.SnapshotManifest
+import encry.view.fastSync.SnapshotHolder.SnapshotManifest
 import encry.view.state.avlTree.utils.implicits.Serializer
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.state.avlTree.{EmptyNode, InternalNode, LeafNode, ShadowNode}

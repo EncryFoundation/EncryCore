@@ -7,5 +7,6 @@ message SnapshotManifestProtoMessage {
     bytes rootHash = 2;
     NodeProtoMsg rootNodeBytes = 3;
     uint64 stateChunksNumber = 4;
+    uint32 bestBlockHeight = 5;
 
 }

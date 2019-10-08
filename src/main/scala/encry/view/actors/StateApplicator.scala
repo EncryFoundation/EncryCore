@@ -25,10 +25,12 @@ import cats.syntax.option._
 import encry.modifiers.history.HeaderChain
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import encry.view.fastSync.SnapshotHolder.UpdateSnapshot
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.duration._
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
@@ -36,7 +38,8 @@ import scala.util.{Failure, Success, Try}
 class StateApplicator(settings: EncryAppSettings,
                       walletApplicator: ActorRef,
                       dataHolder: ActorRef,
-                      nodeViewHolder: ActorRef) extends Actor with StrictLogging {
+                      nodeViewHolder: ActorRef,
+                      snapshotHolder: ActorRef) extends Actor with StrictLogging {
 
   //todo 1. add supervisor strategy
 
@@ -228,6 +231,10 @@ class StateApplicator(settings: EncryAppSettings,
           context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState))
         } else {
           //all is ok
+          if (block.header.height % settings.snapshotSettings.creationHeight == 0) {
+            logger.info(s"State applicator has sent to snapshot holder UpdateSnapshot message.")
+            snapshotHolder ! UpdateSnapshot(block, updatedState)
+          }
           context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
           historyApplicator ! NeedToReportAsValid(block)
           if (toApply.isEmpty) {
@@ -378,7 +385,8 @@ object StateApplicator {
   def props(setting: EncryAppSettings,
             walletApplicator: ActorRef,
             dataHolder: ActorRef,
-            nodeViewHolder: ActorRef): Props = {
-    Props(new StateApplicator(setting, walletApplicator, dataHolder, nodeViewHolder))
+            nodeViewHolder: ActorRef,
+            snapshotHolder: ActorRef): Props = {
+    Props(new StateApplicator(setting, walletApplicator, dataHolder, nodeViewHolder, snapshotHolder))
   }
 }

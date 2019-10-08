@@ -5,7 +5,8 @@ import cats.{Monoid, Order}
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.actors.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
+import encry.view.fastSync.SnapshotHolder._
+import encry.view.fastSync.SnapshotHolder.SnapshotChunk
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
@@ -13,7 +14,6 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
-
 import scala.util.Try
 
 final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging { //scalastyle:ignore
@@ -54,6 +54,24 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
       deletedNodes.map(key => StorageKey @@ key.data)
     )
     AvlTree(shadowedRoot, storage)
+  }
+
+  private def insertionInFastSyncMod(nodes: List[Node[K, V]], isRoot: Boolean = false)(implicit kSerializer: Serializer[K],
+                                                                                       vSerializer: Serializer[V],
+                                                                                       kMonoid: Monoid[K],
+                                                                                       vMonoid: Monoid[V]): AvlTree[K, V] = {
+    val nodesToInsert: List[(StorageKey, StorageValue)] = nodes.flatMap { node =>
+      val fullData: (StorageKey, StorageValue) =
+        StorageKey @@ Algos.hash(Algos.hash(kSerializer.toBytes(node.key))) -> StorageValue @@ vSerializer.toBytes(node.value)
+      val shadowData: (StorageKey, StorageValue) =
+        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
+      if (isRoot)
+        fullData :: shadowData :: (AvlTree.rootNodeKey -> StorageValue @@ ShadowNode.childsToShadowNode(node).hash) :: Nil
+      else
+        fullData :: shadowData :: Nil
+    }
+    storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
+    this
   }
 
   def getOperationsRootHash(toInsert: List[(K, V)],
@@ -406,13 +424,20 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
   def initializeSnapshotData(bestBlock: Block)(implicit kSerializer: Serializer[K],
                                                vSerializer: Serializer[V]): (SnapshotManifest, List[SnapshotChunk]) = {
     val rawSubtrees: List[SnapshotChunk] = createSubtrees(List(rootNode), List.empty)
-    val newManifest: SnapshotManifest =
-      SnapshotManifest(bestBlock.id, rootHash, NodeSerilalizer.toProto(rootNode), rawSubtrees.size)
+    val newManifest: SnapshotManifest = rootNode match {
+      case i: InternalNode[K, V] =>
+        SnapshotManifest(
+          bestBlock.id, rootHash, NodeSerilalizer.toProto(i), rawSubtrees.size, bestBlock.header.height
+        )
+      case s: ShadowNode[K, V] =>
+        SnapshotManifest(
+          bestBlock.id, rootHash, NodeSerilalizer.toProto(s.restoreFullNode(storage)), rawSubtrees.size, bestBlock.header.height
+        )
+    }
     val updS: List[SnapshotChunk] = if (rawSubtrees.nonEmpty) {
       val firstElem = rawSubtrees.headOption
       val newRaw: List[SnapshotChunk] = rawSubtrees.drop(1)
       firstElem.map { ch => ch.copy(nodesList = ch.nodesList.drop(1)) }.fold(newRaw)(_ :: newRaw)
-
     } else rawSubtrees
     val subtrees: List[SnapshotChunk] = updS.map(_.copy(manifestId = newManifest.ManifestId))
     newManifest -> subtrees
@@ -452,21 +477,6 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
         val subtree: SnapshotChunk = makeSubtree(List(l))
         createSubtrees(nodesToProcess.drop(1), subtree :: subtreeChunks)
     } else subtreeChunks
-
-  private def insertionInFastSyncMod(nodes: List[Node[K, V]])(implicit kSerializer: Serializer[K],
-                                                              vSerializer: Serializer[V],
-                                                              kMonoid: Monoid[K],
-                                                              vMonoid: Monoid[V]): AvlTree[K, V] = {
-    val nodesToInsert: List[(StorageKey, StorageValue)] = nodes.flatMap { node =>
-      val fullData: (StorageKey, StorageValue) =
-        StorageKey @@ Algos.hash(Algos.hash(kSerializer.toBytes(node.key))) -> StorageValue @@ vSerializer.toBytes(node.value)
-      val shadowData: (StorageKey, StorageValue) =
-        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
-      fullData :: shadowData :: Nil
-    }
-    storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-    this
-  }
 
   @scala.annotation.tailrec
   private def handleChild(child: Node[K, V]): (List[Node[K, V]], Node[K, V]) = child match {
@@ -519,7 +529,7 @@ object AvlTree {
                                                                                storage: VersionalStorage): AvlTree[K, V] = {
     val root: Node[K, V] = NodeSerilalizer.fromProto(manifest.rootNodeBytes)
     val initTree: AvlTree[K, V] = new AvlTree(root, storage)
-    initTree.insertionInFastSyncMod(List(root))
+    initTree.insertionInFastSyncMod(List(root), isRoot = true)
   }
 
   def apply[K: Monoid : Order : Hashable, V: Monoid](storage: VersionalStorage): AvlTree[K, V] = new AvlTree[K, V](EmptyNode(), storage)

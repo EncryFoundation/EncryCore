@@ -47,7 +47,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       .withDispatcher("history-applicator-dispatcher"), "historyApplicator")
 
   lazy val stateApplicator: ActorRef = context.system.actorOf(
-    StateApplicator.props(settings, walletApplicator, dataHolder, self)
+    StateApplicator.props(settings, walletApplicator, dataHolder, self, walletApplicator)
       .withDispatcher("state-applicator-dispatcher"), name = "stateApplicator")
 
   override def receive: Receive = awaitingHistory
