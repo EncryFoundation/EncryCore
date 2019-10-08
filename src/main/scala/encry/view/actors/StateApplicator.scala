@@ -234,7 +234,7 @@ class StateApplicator(settings: EncryAppSettings,
 
     case TransactionValidatedFailure(tx, ex) =>
       logger.info(s"Transaction ${tx.encodedId} failed in validation by state.")
-      context.children.foreach(_ ! Kill)
+      context.children.foreach(context.stop)
       context.system.eventStream.publish(SemanticallyFailedModification(block, List(StateModifierApplyError(s"$ex"))))
       historyApplicator ! NeedToReportAsInValid(block)
       context.become(awaitingNewProgressInfo(block, ui, toApply, currentState).orElse(processNewCandidate(currentState)))
