@@ -42,6 +42,7 @@ import encry.view.state.avlTree.utils.implicits.Instances._
 
 import scala.collection._
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSettings) extends Actor with StrictLogging {
 
@@ -169,7 +170,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   }
 
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
-                      bestHeaderOpt: Option[Header]): CandidateBlock = {
+                      bestHeaderOpt: Option[Header]): Try[CandidateBlock] = Try {
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
     val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x, System.currentTimeMillis(), height).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
@@ -232,10 +233,12 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
             if (settings.influxDB.isDefined)
               context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
             logger.info("Going to calculate last block:")
-            val envelope: CandidateEnvelope =
-              CandidateEnvelope
-                .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-            envelope
+            //val envelope: CandidateEnvelope =
+              createCandidate(nodeView, bestHeaderOpt) match {
+                case Success(candidate) => CandidateEnvelope.fromCandidate(candidate)
+                case Failure(ex) => CandidateEnvelope.empty
+              }
+            //envelope
           } else CandidateEnvelope.empty
         candidate
     }
