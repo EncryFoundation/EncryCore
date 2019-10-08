@@ -99,6 +99,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
           logger.info("send")
           Thread.sleep(1000)
           produceCandidate()
+
       }
     case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
@@ -170,7 +171,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   }
 
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
-                      bestHeaderOpt: Option[Header]): Try[CandidateBlock] = Try {
+                      bestHeaderOpt: Option[Header]): CandidateBlock =  {
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
     val txsU: IndexedSeq[Transaction] = transactionsPool.filter(x => view.state.validate(x, System.currentTimeMillis(), height).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
@@ -198,12 +199,13 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     })
       .getOrElse(settings.constants.InitialDifficulty)
 
-    logger.info(s"Before test appl in miner(height for new block: ${height}): ${Algos.encode(view.state.tree.rootHash)}. Root node key: ${Algos.encode(view.state.tree.rootNode.key)}")
-
     val stateRoot = view.state.tree.getOperationsRootHash(
       combinedStateChange.outputsToDb.toList,
-      combinedStateChange.inputsToDb.toList
+      combinedStateChange.inputsToDb.toList,
+      view.state.tree.rootNode
     )
+
+    logger.info(s"Before test appl in miner(height for new block: ${height}): ${Algos.encode(view.state.tree.rootHash)}. Root node key: ${Algos.encode(view.state.tree.rootNode.key)}")
 
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, settings.constants.Version, txs, timestamp, difficulty, stateRoot)
@@ -234,10 +236,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
               context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
             logger.info("Going to calculate last block:")
             //val envelope: CandidateEnvelope =
-              createCandidate(nodeView, bestHeaderOpt) match {
-                case Success(candidate) => CandidateEnvelope.fromCandidate(candidate)
-                case Failure(ex) => CandidateEnvelope.empty
-              }
+            CandidateEnvelope.fromCandidate(createCandidate(nodeView, bestHeaderOpt))
             //envelope
           } else CandidateEnvelope.empty
         candidate

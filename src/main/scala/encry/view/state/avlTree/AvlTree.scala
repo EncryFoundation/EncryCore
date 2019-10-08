@@ -70,10 +70,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   def getOperationsRootHash(
     toInsert: List[(K, V)],
-    toDelete: List[K]
+    toDelete: List[K],
+    toRoot: Node[K, V]
   )(implicit kSer: Serializer[K], vSer: Serializer[V], kM: Monoid[K], vM: Monoid[V]): Array[Byte] = {
-    logger.info(s"Before test appl: ${Algos.encode(rootNode.hash)}")
-    val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(rootNode)) {
+    val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(toRoot)) {
       case (prevRoot, toDelete) =>
         deleteKey(toDelete, prevRoot)
     }
