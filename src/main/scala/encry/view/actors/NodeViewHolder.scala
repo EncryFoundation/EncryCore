@@ -25,11 +25,12 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, ModifierTypeId}
+import encry.EncryApp.miner
+import org.encryfoundation.common.crypto.PrivateKey25519
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
@@ -37,8 +38,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                      settings: EncryAppSettings) extends Actor with StrictLogging with Stash {
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
-
-  var applicationsSuccessful: Boolean = true
 
   val walletApplicator: ActorRef = context.system.actorOf(WalletApplicator.props, "walletApplicator1")
 
@@ -53,19 +52,29 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   override def receive: Receive = awaitingHistory
 
   def awaitingHistory: Receive = {
-    case InitialStateHistoryWallet(history, w, s) =>
+    case InitialStateHistoryWallet(history, wallet, state) =>
       influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-        ref ! HeightStatistics(
-          history.getBestHeaderHeight,
-          history.getBestBlockHeight
-        )
+        ref ! HeightStatistics(history.getBestHeaderHeight, history.getBestBlockHeight)
       })
       unstashAll()
-      context.become(mainBehaviour(history, w, s))
+      context.become(mainBehaviour(history, wallet, state))
     case _ => stash()
   }
 
   def mainBehaviour(history: History, wallet: EncryWallet, state: UtxoState): Receive = {
+
+    case msg@StartAggregatingInfoForCandidateBlock(_) =>
+      logger.info(s"Node view holder have been starting aggregation info for new candidate.")
+      walletApplicator ! msg
+    case msg@InfoForCandidateWithMandatoryAccount(_, _) =>
+      logger.info(s"Node view holder got response from wallet applicator with account. Sent request to History applicator.")
+      historyApplicator ! msg
+    case msg@WrongConditionsForCandidate(_) =>
+      logger.info(s"Node view holder got message: WrongConditionsForCandidate.")
+      miner ! msg
+    case msg@InfoForCandidateIsReady(_, _, _, _, _) =>
+      logger.info(s"Node view holder got message InfoForCandidateIsReady.")
+      miner ! msg
     case StateForNVH(stateNew) => context.become(mainBehaviour(history, wallet, stateNew))
     case msg@ModifierFromRemote(_) => historyApplicator ! msg
     case msg@LocallyGeneratedBlock(_) => historyApplicator ! msg
@@ -119,6 +128,20 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 }
 
 object NodeViewHolder {
+
+  final case class StartAggregatingInfoForCandidateBlock(transactions: IndexedSeq[Transaction]) extends AnyVal
+  final case class InfoForCandidateWithMandatoryAccount(transactions: IndexedSeq[Transaction],
+                                                        account: PrivateKey25519)
+  final case class InfoForCandidateWithDifficultyAndHeaderOfBestBlock(transactions: IndexedSeq[Transaction],
+                                                                      account: PrivateKey25519,
+                                                                      bestHeader: Option[Header],
+                                                                      difficulty: Difficulty)
+  final case class WrongConditionsForCandidate(txs: IndexedSeq[Transaction]) extends AnyVal
+  final case class InfoForCandidateIsReady(header: Option[Header],
+                                           txs: IndexedSeq[Transaction],
+                                           timestamp: Long,
+                                           difficulty: Difficulty,
+                                           stateRoot: Array[Byte])
 
   final case class TransactionsForWallet(toRemove: Seq[PersistentModifier]) extends AnyVal
 

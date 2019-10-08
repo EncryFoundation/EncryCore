@@ -1,16 +1,14 @@
 package encry.view.actors
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef, Kill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.consensus.EncrySupplyController
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.actors.NodeViewHolder.DownloadRequest
+import encry.view.actors.NodeViewHolder.{DownloadRequest, InfoForCandidateIsReady, InfoForCandidateWithDifficultyAndHeaderOfBestBlock}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
@@ -22,14 +20,18 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
+import encry.consensus.SupplyController._
 import encry.modifiers.history.HeaderChain
+import encry.modifiers.mempool.TransactionFactory._
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.actors.WalletApplicator.WalletNeedScanPersistent
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.utils.Algos
-import scala.concurrent.duration._
+import encry.utils.implicits.UTXO._
+import encry.view.state.avlTree.utils.implicits.Instances._
+import EncryApp.timeProvider
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
@@ -59,7 +61,7 @@ class StateApplicator(settings: EncryAppSettings,
       logger.info(s"sender: $sender()")
       sender() ! StateApplicatorStarted(historyUpdated, state, wallet)
       walletApplicator ! NewWalletForWalletApplicator(wallet)
-      context.become(updateState(state, isInProgress = false))
+      context.become(updateState(state, isInProgress = false).orElse(processNewCandidate(state)))
     case nonsense =>
       logger.info(s"Actor had received message $nonsense during state initialized.")
   }
@@ -69,7 +71,7 @@ class StateApplicator(settings: EncryAppSettings,
     case NotificationAboutNewModifier if !isInProgress =>
       logger.info(s"StateApplicator got notification about new modifier and sent request for another one.")
       sender() ! RequestNextModifier
-      context.become(updateState(state, isInProgress = true))
+      context.become(updateState(state, isInProgress = true).orElse(processNewCandidate(state)))
 
     case NotificationAboutNewModifier =>
       logger.info(s"StateApplicator got notification about new modifier but inProgress was $isInProgress.")
@@ -99,9 +101,8 @@ class StateApplicator(settings: EncryAppSettings,
             progressInfo.toApply.toList,
             UpdateInformation(none, none, suffixTrimmed),
             stateToApply
-          ))
+          ).orElse(processNewCandidate(state)))
       }
-    case msg => logger.info(s"Got $msg in updateState")
   }
 
   def modifierApplication(toApply: List[PersistentModifier],
@@ -122,7 +123,7 @@ class StateApplicator(settings: EncryAppSettings,
             newToApply,
             UpdateInformation(none, none, updateInformation.suffix :+ header),
             currentState
-          ))
+          ).orElse(processNewCandidate(currentState)))
         } else {
           logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted." +
             s"Headers height is ${header.height}")
@@ -130,7 +131,7 @@ class StateApplicator(settings: EncryAppSettings,
           context.become(modifiersApplicationCompleted(
             UpdateInformation(none, none, updateInformation.suffix :+ header),
             currentState
-          ))
+          ).orElse(processNewCandidate(currentState)))
         }
       case block: Block =>
         logger.info(s"Start block ${block.encodedId} validation to the state with height ${block.header.height}")
@@ -140,10 +141,7 @@ class StateApplicator(settings: EncryAppSettings,
           case tx if tx.id sameElements lastTxId => context.actorOf(
             TransactionsValidator.props(
               currentState,
-              totalFees + EncrySupplyController.supplyAt(
-                Height @@ block.header.height, settings.constants.InitialEmissionAmount,
-                settings.constants.EmissionEpochLength, settings.constants.EmissionDecay
-              ),
+              totalFees + supplyAt(Height @@ block.header.height, settings.constants),
               block.header.timestamp,
               tx,
               Height @@ block.header.height)
@@ -158,7 +156,7 @@ class StateApplicator(settings: EncryAppSettings,
         }
         context.become(awaitingTransactionsValidation(
           toApply.drop(1), updateInformation, block, currentState, block.payload.txs.length
-        ))
+        ).orElse(processNewCandidate(currentState)))
     }
     case StartModifiersApplying => //todo redundant iterations while updateInformation.failedMod.nonEmpty
       val newToApply: List[PersistentModifier] = toApply.drop(1)
@@ -166,7 +164,7 @@ class StateApplicator(settings: EncryAppSettings,
         self ! StartModifiersApplying
         logger.info(s"StartModifiersApplying updateInformation.failedMod.nonEmpty")
         dataHolder ! ChangedState(currentState)
-        context.become(modifierApplication(newToApply, updateInformation, currentState))
+        context.become(modifierApplication(newToApply, updateInformation, currentState).orElse(processNewCandidate(currentState)))
       } else {
         logger.info(s"StartModifiersApplying w/0 if case to apply is empty")
         self ! ModifiersApplicationFinished
@@ -174,9 +172,8 @@ class StateApplicator(settings: EncryAppSettings,
         context.become(modifiersApplicationCompleted(
           UpdateInformation(none, none, updateInformation.suffix),
           currentState
-        ))
+        ).orElse(processNewCandidate(currentState)))
       }
-    case msg => logger.info(s"Got $msg in modifierApplication")
   }
 
   def modifiersApplicationCompleted(ui: UpdateInformation, currentState: UtxoState): Receive = {
@@ -187,21 +184,15 @@ class StateApplicator(settings: EncryAppSettings,
           s" ${ui.alternativeProgressInfo.get.toApply.isEmpty}")
         dataHolder ! ChangedState(currentState)
         self ! StartModifiersApplicationOnStateApplicator(ui.alternativeProgressInfo.get, ui.suffix)
-        context.become(updateState(currentState, isInProgress = true))
+        context.become(updateState(currentState, isInProgress = true).orElse(processNewCandidate(currentState)))
       case _ =>
         logger.info(s"Send request for the next modifier to the history applicator")
         dataHolder ! ChangedState(currentState)
         historyApplicator ! NotificationAboutSuccessfullyAppliedModifier
         if (ui.suffix.nonEmpty) walletApplicator ! WalletNeedScanPersistent(ui.suffix)
         nodeViewHolder ! StateForNVH(currentState)
-        context.become(updateState(currentState, isInProgress = false))
+        context.become(updateState(currentState, isInProgress = false).orElse(processNewCandidate(currentState)))
     }
-    case msg => logger.info(s"Got $msg in modifiersApplicationCompleted")
-  }
-
-  def awaitingRollbackHistory(state: UtxoState): Receive = {
-    case GetState => sender() ! state
-    case _ =>
   }
 
   def awaitingTransactionsValidation(toApply: Seq[PersistentModifier],
@@ -225,7 +216,7 @@ class StateApplicator(settings: EncryAppSettings,
             block, List(StateModifierApplyError(s"Root hash is incorrect after modifier"))
           ))
 
-          context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState))
+          context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState).orElse(processNewCandidate(updatedState)))
         } else {
           //all is ok
           context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
@@ -233,23 +224,22 @@ class StateApplicator(settings: EncryAppSettings,
           if (toApply.isEmpty) {
             logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
             self ! ModifiersApplicationFinished
-            context.become(modifiersApplicationCompleted(ui, updatedState))
+            context.become(modifiersApplicationCompleted(ui, updatedState).orElse(processNewCandidate(updatedState)))
           } else {
             logger.info(s"awaitingTransactionsValidation finished but infoAboutCurrentFoldIteration._1 is not empty.")
             self ! StartModifiersApplying
-            context.become(modifierApplication(toApply.toList, ui, updatedState))
+            context.become(modifierApplication(toApply.toList, ui, updatedState).orElse(processNewCandidate(updatedState)))
           }
         }
-      } else context.become(awaitingTransactionsValidation(toApply, ui, block, currentState, numberOfTransactions - 1))
+      } else context.become(awaitingTransactionsValidation(toApply, ui, block, currentState, numberOfTransactions - 1)
+        .orElse(processNewCandidate(currentState)))
 
     case TransactionValidatedFailure(tx, ex) =>
       logger.info(s"Transaction ${tx.encodedId} failed in validation by state.")
       context.children.foreach(_ ! Kill)
       context.system.eventStream.publish(SemanticallyFailedModification(block, List(StateModifierApplyError(s"$ex"))))
       historyApplicator ! NeedToReportAsInValid(block)
-      context.become(awaitingNewProgressInfo(block, ui, toApply, currentState))
-
-    case msg => logger.info(s"Got $msg in awaitingTransactionsValidation")
+      context.become(awaitingNewProgressInfo(block, ui, toApply, currentState).orElse(processNewCandidate(currentState)))
   }
 
   def awaitingNewProgressInfo(block: Block,
@@ -264,9 +254,33 @@ class StateApplicator(settings: EncryAppSettings,
           toApply.toList,
           UpdateInformation(block.some, pi.some, ui.suffix),
           currentState
-        )
+        ).orElse(processNewCandidate(currentState))
       )
-    case msg => logger.info(s"Got $msg in awaitingNewProgressInfo")
+  }
+
+  def processNewCandidate(state: UtxoState): Receive = {
+    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) =>
+      logger.info(s"State applicator have been starting processing txs for new candidate.")
+      val timestamp = timeProvider.estimatedTime
+      val height: Height = Height @@ (header.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
+      val validatedTxs: IndexedSeq[Transaction] = txs.filter(state.validate(_, timestamp, height).isRight).distinct
+      val filteredTxsWithoutDuplicateInputs: IndexedSeq[Transaction] =
+        validatedTxs.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
+        case ((usedInputsIds, acc), tx) =>
+          if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
+            (usedInputsIds ++ tx.inputs.map(input => Algos.encode(input.boxId))) -> (acc :+ tx)
+          } else usedInputsIds -> acc
+      }._2
+      val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
+      val supplyTotal: Amount = supplyAt(height, settings.constants)
+      val txsWithCoinbase: IndexedSeq[Transaction] =
+        coinbaseTransactionScratch(acc.publicImage, timestamp, supplyTotal, feesTotal, height) +: filteredTxsWithoutDuplicateInputs
+      val combinedStateChange: UtxoState.StateChange = combineAll(txsWithCoinbase.map(UtxoState.tx2StateChange).toList)
+      val stateRoot: Array[Byte] = state.tree.getOperationsRootHash(
+        combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
+      )
+      nodeViewHolder ! InfoForCandidateIsReady(header, txsWithCoinbase, timestamp, difficulty, stateRoot)
+    case msg => logger.info(s"Got $msg in processNewCandidate.")
   }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier],

@@ -22,7 +22,6 @@ object EquihashPowSchemeReader extends ConsensusSchemeReader[EquihashPowScheme] 
   val schemeName = "equihash"
 
   def read: EquihashPowScheme = {
-    EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version, settings.constants.PreGenesisHeight,
-      settings.constants.MaxTarget)
+    EquihashPowScheme(settings.constants)
   }
 }
