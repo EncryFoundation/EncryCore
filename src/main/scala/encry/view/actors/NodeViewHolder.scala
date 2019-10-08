@@ -94,6 +94,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           }
         }
       )
+
     case GetNodeViewChanges(historyL, stateL, _) =>
       if (historyL) sender() ! ChangedHistory(history)
       if (stateL) sender() ! ChangedState(state)
