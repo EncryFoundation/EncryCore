@@ -10,8 +10,9 @@ import akka.pattern._
 import akka.util.Timeout
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import encry.api.http.DataHolderForApi.GetAllPeers
 
-object GetAllPeers extends Command {
+object GetPeers extends Command {
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,
@@ -20,7 +21,6 @@ object GetAllPeers extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ? GetAllPeers)
       .mapTo[Seq[InetSocketAddress]]
-      .map(_.map(_.toString).foreach(println))
-    Future(None)
+      .map(x => Some(Response(x.toString())))
   }
 }

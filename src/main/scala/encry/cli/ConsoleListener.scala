@@ -11,7 +11,7 @@ import encry.cli.commands.history.{
   GetTxById
 }
 import encry.cli.commands.info.GetInfo
-import encry.cli.commands.peer.{ GetAllPeers, GetBannedPeers, GetConnectedPeers }
+import encry.cli.commands.peer.{ GetPeers, GetBannedPeers, GetConnectedPeers }
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 
@@ -110,7 +110,7 @@ object ConsoleListener {
 
   private val peerCmds = Map(
     "peer" -> Map(
-      "all"       -> GetAllPeers,
+      "all"       -> GetPeers,
       "banned"    -> GetBannedPeers,
       "connected" -> GetConnectedPeers
     )

@@ -1,36 +1,32 @@
 package encry.api.http
 
-import java.net.{ InetAddress, InetSocketAddress }
-import akka.actor.{ Actor, Props }
+import java.net.{InetAddress, InetSocketAddress}
+
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi._
 import akka.pattern._
 import akka.util.Timeout
+import encry.EncryApp
 import encry.api.http.routes.InfoApiRoute
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{
-  ChangedHistory,
-  ChangedState,
-  NodeViewChange,
-  PeerFromCli,
-  RemovePeerFromBlackList
-}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
 import encry.settings.EncryAppSettings
-import encry.utils.{ NetworkTime, NetworkTimeProvider }
-import encry.view.state.{ UtxoState, UtxoStateReader }
-import encry.local.miner.Miner.{ DisableMining, EnableMining, MinerStatus, StartMining }
-import encry.network.BlackList.{ BanReason, BanTime, BanType }
+import encry.utils.{NetworkTime, NetworkTimeProvider}
+import encry.view.state.{UtxoState, UtxoStateReader}
+import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.view.actors.NodeViewHolder.CurrentView
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.history.{ Block, Header }
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {

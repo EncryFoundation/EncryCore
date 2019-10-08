@@ -20,7 +20,6 @@ object GetBannedPeers extends Command {
                        nodeId: Array[Byte],
                        ntp: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (dataHolder ? GetBannedPeersHelper).mapTo[Seq[String]].foreach(println)
-    Future(None)
+    (dataHolder ? GetBannedPeersHelper).mapTo[Seq[String]].map(x => Some(Response(x.toString)))
   }
 }

@@ -85,7 +85,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
-    case msg => println(s"Nvsh got strange message: $msg during history awaiting.")
+    case msg => logger.info(s"Nvsh got strange message: $msg during history awaiting.")
   }
 
   def workingCycle(history: History): Receive = {
@@ -175,11 +175,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! msg
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
-    case msg@StartMining => println("MINER")
-      deliveryManager ! msg
-    case msg@DisableMining =>
-      println("DISABLE")
-      deliveryManager ! msg
+    case msg@StartMining => deliveryManager ! msg
+    case msg@DisableMining => deliveryManager ! msg
     case msg@BanPeer(_, _) => peersKeeper ! msg
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
@@ -247,7 +244,7 @@ object NodeViewSynchronizer {
     final case class RequestFromLocal(source: ConnectedPeer,
                                       modifierTypeId: ModifierTypeId,
                                       modifierIds: Seq[ModifierId])
-    trait Peer
+    sealed trait Peer
 
     final case class PeerFromCli(address: InetSocketAddress) extends Peer
 
