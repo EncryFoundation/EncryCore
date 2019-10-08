@@ -110,6 +110,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
+
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
   def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
