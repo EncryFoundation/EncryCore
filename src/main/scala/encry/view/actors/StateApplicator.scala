@@ -275,7 +275,7 @@ class StateApplicator(settings: EncryAppSettings,
         coinbaseTransactionScratch(acc.publicImage, timestamp, supplyTotal, feesTotal, height) +: filteredTxsWithoutDuplicateInputs
       val combinedStateChange: UtxoState.StateChange = combineAll(txsWithCoinbase.map(UtxoState.tx2StateChange).toList)
       val stateRoot: Array[Byte] = state.tree.getOperationsRootHash(
-        combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
+        combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList,
       )
       nodeViewHolder ! InfoForCandidateIsReady(header, txsWithCoinbase, timestamp, difficulty, stateRoot)
     case msg => logger.info(s"Got $msg in processNewCandidate.")
