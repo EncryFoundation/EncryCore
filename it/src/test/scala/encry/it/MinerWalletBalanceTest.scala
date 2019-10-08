@@ -1,7 +1,7 @@
 package encry.it
 
 import com.typesafe.config.Config
-import encry.consensus.SupplyController
+import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.settings.Settings
@@ -22,7 +22,7 @@ class MinerWalletBalanceTest extends AsyncFunSuite with Matchers with NodesFromD
 
     val heightToCheck = 5
     val supplyAtHeight = (0 to heightToCheck).foldLeft(0: Long) {
-      case (supply, i) => supply + SupplyController.supplyAt(Height @@ i, settings.constants)
+      case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, settings.constants)
     }
 
     val height = dockerNodes().head.waitForHeadersHeight(heightToCheck)

@@ -4,7 +4,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.encryfoundation.common.utils.constants.Constants
 
-object SupplyController {
+object EncrySupplyController {
 
   def supplyAt(height: Height, constants: Constants): Amount = {
     if (height > constants.EmissionEpochLength) (constants.InitialEmissionAmount * Math.pow(

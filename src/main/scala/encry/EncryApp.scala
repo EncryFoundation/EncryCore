@@ -47,7 +47,7 @@ object EncryApp extends App with StrictLogging {
 
   lazy val dataHolderForApi = system.actorOf(DataHolderForApi.props(settings, timeProvider), "dataHolder")
 
-  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef, settings, timeProvider), "miner")
+  lazy val miner: ActorRef = system.actorOf(Miner.props(dataHolderForApi, influxRef, settings), "miner")
   lazy val memoryPool: ActorRef = system.actorOf(MemoryPool.props(settings, timeProvider, miner, influxRef)
     .withDispatcher("mempool-dispatcher"))
   val nodeViewHolder: ActorRef = system.actorOf(NodeViewHolder.props(memoryPool, influxRef, dataHolderForApi, settings)

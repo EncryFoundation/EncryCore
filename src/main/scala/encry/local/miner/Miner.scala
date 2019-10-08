@@ -182,8 +182,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
     val stateHeight = bestHeaderOpt.map(header => Height @@ header.height)
       .getOrElse(TestNetConstants.GenesisHeight)
-    val supplyTotal: Amount = EncrySupplyController.supplyAt(stateHeight, settings.constants.InitialEmissionAmount,
-      settings.constants.EmissionEpochLength, settings.constants.EmissionDecay)
+    val supplyTotal: Amount = EncrySupplyController.supplyAt(height, settings.constants)
     val minerSecret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
     val coinbase: Transaction = TransactionFactory
       .coinbaseTransactionScratch(minerSecret.publicImage, timestamp, supplyTotal, feesTotal, stateHeight)

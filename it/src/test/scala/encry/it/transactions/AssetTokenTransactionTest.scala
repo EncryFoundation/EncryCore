@@ -3,7 +3,7 @@ package encry.it.transactions
 import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.SupplyController
+import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
 import encry.it.util.KeyHelper._
@@ -132,7 +132,7 @@ class AssetTokenTransactionTest extends AsyncFunSuite
           .get
 
         val supplyAtHeight: Long = (0 to thirdHeightToWait).foldLeft(0: Long) {
-          case (supply, i) => supply + SupplyController.supplyAt(Height @@ i, settings.constants)
+          case (supply, i) => supply + EncrySupplyController.supplyAt(Height @@ i, settings.constants)
         }
 
         val ckeckEncryBalanceNew: Boolean = Await.result(dockerNodes().head.balances, waitTime)

@@ -20,7 +20,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import cats.syntax.option._
-import encry.consensus.SupplyController._
+import encry.consensus.EncrySupplyController._
 import encry.modifiers.history.HeaderChain
 import encry.modifiers.mempool.TransactionFactory._
 import encry.utils.NetworkTimeProvider
