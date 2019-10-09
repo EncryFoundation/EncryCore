@@ -111,7 +111,10 @@ class StateApplicator(settings: EncryAppSettings,
               UpdateInformation(none, none, suffixTrimmed),
               stateToApply
             ).orElse(processNewCandidate(state)))
-          } else historyApplicator ! RequestNextModifier
+          } else {
+            historyApplicator ! RequestNextModifier
+            context.become(updateState(stateToApply, isInProgress = false))
+          }
       }
   }
 
