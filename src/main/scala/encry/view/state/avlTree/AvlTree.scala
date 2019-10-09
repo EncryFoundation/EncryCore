@@ -221,13 +221,15 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     Try {
       logger.info(s"Rollback avl to version: ${Algos.encode(to)}")
       logger.info(s"Versions in storage: ${storage.versions.map(Algos.encode).mkString(",")}")
+      logger.info(s"Before rollback node key: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
+      logger.info(s"Before rollback root node: ${rootNode}")
       storage.rollbackTo(to)
       logger.info(s"Storage success rollbacked")
       logger.info(s"rootNodeKey: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
-      logger.info(s"root node bytes: ${storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get)}")
-      val rootNode =
+      val newRootNode =
         NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
-      AvlTree[K, V](rootNode, storage)
+      logger.info(s"root node after rollback: ${newRootNode}")
+      AvlTree[K, V](newRootNode, storage)
     }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
