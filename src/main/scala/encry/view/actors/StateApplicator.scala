@@ -259,7 +259,8 @@ class StateApplicator(settings: EncryAppSettings,
   }
 
   def processNewCandidate(state: UtxoState): Receive = {
-    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) if header.exists(_.stateRoot sameElements state.tree.rootNode.hash) =>
+    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) if
+      header.exists(_.stateRoot sameElements state.tree.rootNode.hash) || (settings.node.offlineGeneration && header.isEmpty) =>
       logger.info(s"State applicator have been starting processing txs for new candidate. " +
         s"State root node: ${state.tree.rootNode}")
       val timestamp = timeProvider.estimatedTime
