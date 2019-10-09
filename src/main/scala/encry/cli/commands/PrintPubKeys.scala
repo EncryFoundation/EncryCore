@@ -5,7 +5,7 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.cli.Response
 import encry.settings.EncryAppSettings
-import encry.api.http.DataHolderForApi.{ GetDataFromPresentView, GetViewPrintPubKeys }
+import encry.api.http.DataHolderForApi.GetViewPrintPubKeys
 import encry.utils.NetworkTimeProvider
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future

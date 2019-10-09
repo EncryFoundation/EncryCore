@@ -3,7 +3,7 @@ package encry.cli.commands
 import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
-import encry.api.http.DataHolderForApi.{ GetDataFromPresentView, GetViewPrintPrivKeys }
+import encry.api.http.DataHolderForApi.GetViewPrintPrivKeys
 import encry.cli.Response
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider

@@ -3,7 +3,7 @@ package encry.cli.commands
 import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
-import encry.api.http.DataHolderForApi.{ GetDataFromPresentView, GetViewGetBalance }
+import encry.api.http.DataHolderForApi.GetViewGetBalance
 import encry.cli.Response
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
