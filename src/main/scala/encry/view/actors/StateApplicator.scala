@@ -1,6 +1,7 @@
 package encry.view.actors
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, Kill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
@@ -8,7 +9,7 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.actors.NodeViewHolder.{DownloadRequest, InfoForCandidateIsReady, InfoForCandidateWithDifficultyAndHeaderOfBestBlock}
+import encry.view.actors.NodeViewHolder.{DownloadRequest, InfoForCandidateIsReady, InfoForCandidateWithDifficultyAndHeaderOfBestBlock, StartAggregatingInfoForCandidateBlock}
 import encry.view.actors.HistoryApplicator._
 import encry.view.actors.StateApplicator._
 import encry.view.actors.TransactionsValidator.{TransactionValidatedFailure, TransactionValidatedSuccessfully}
@@ -32,6 +33,7 @@ import org.encryfoundation.common.utils.Algos
 import encry.utils.implicits.UTXO._
 import encry.view.state.avlTree.utils.implicits.Instances._
 import EncryApp.timeProvider
+
 import scala.collection.IndexedSeq
 import scala.util.{Failure, Success, Try}
 
@@ -280,7 +282,7 @@ class StateApplicator(settings: EncryAppSettings,
           combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
       ) match {
         case Success(stateRoot) => nodeViewHolder ! InfoForCandidateIsReady(header, txsWithCoinbase, timestamp, difficulty, stateRoot)
-        case Failure(_) => self ! InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty)
+        case Failure(_) => nodeViewHolder ! StartAggregatingInfoForCandidateBlock(txs)
       }
     case msg => logger.info(s"Got $msg in processNewCandidate.")
   }
