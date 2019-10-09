@@ -29,6 +29,7 @@ case class InfoApiRoute(dataHolder: ActorRef,
   }
 }
 
+
 object InfoApiRoute {
 
   def makeInfoJson(nodeId: Array[Byte],
