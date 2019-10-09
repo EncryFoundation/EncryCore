@@ -1,19 +1,17 @@
 package encry.api.http.routes
 
-import akka.actor.{ ActorRef, ActorRefFactory }
+import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.api.http.DataHolderForApi.{ GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys }
+import encry.api.http.DataHolderForApi.{GetDataFromWallet, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
 import encry.settings.RESTApiSettings
-import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import encry.view.history.History
-import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.Future
 import scala.util.Random
 
@@ -30,9 +28,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
   override val settings: RESTApiSettings = restApiSettings
 
   private def getWallet: Future[EncryWallet] =
-    (dataHolder ?
-      GetDataFromCurrentView[History, UtxoState, EncryWallet, EncryWallet](_.vault))
-      .mapTo[EncryWallet]
+    (dataHolder ? GetDataFromWallet[EncryWallet](identity)).mapTo[EncryWallet]
 
   private def getAddresses: Future[String] = (dataHolder ? GetViewPrintAddress).mapTo[String]
 
