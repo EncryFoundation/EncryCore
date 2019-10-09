@@ -272,7 +272,7 @@ class StateApplicator(settings: EncryAppSettings,
       val feesTotal: Amount = filteredTxsWithoutDuplicateInputs.map(_.fee).sum
       val supplyTotal: Amount = supplyAt(height, settings.constants)
       val txsWithCoinbase: IndexedSeq[Transaction] =
-        coinbaseTransactionScratch(acc.publicImage, timestamp, supplyTotal, feesTotal, height) +: filteredTxsWithoutDuplicateInputs
+        filteredTxsWithoutDuplicateInputs :+ coinbaseTransactionScratch(acc.publicImage, timestamp, supplyTotal, feesTotal, height)
       val combinedStateChange: UtxoState.StateChange = combineAll(txsWithCoinbase.map(UtxoState.tx2StateChange).toList)
       val stateRoot: Array[Byte] = state.tree.getOperationsRootHash(
         combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList, state.tree.rootNode
