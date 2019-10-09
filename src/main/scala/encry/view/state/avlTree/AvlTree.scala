@@ -417,7 +417,7 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
 
   def initializeSnapshotData(bestBlock: Block)(implicit kSerializer: Serializer[K],
                                                vSerializer: Serializer[V]): (SnapshotManifest, List[SnapshotChunk]) = {
-    val rawSubtrees: List[SnapshotChunk] = createSubtrees(List(rootNode), List.empty)
+    val rawSubtrees: List[SnapshotChunk] = createSubtrees(List(rootNode), List.empty).reverse
     val newManifest: SnapshotManifest = rootNode match {
       case i: InternalNode[K, V] =>
         SnapshotManifest(

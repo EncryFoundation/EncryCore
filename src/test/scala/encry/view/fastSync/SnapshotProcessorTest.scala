@@ -116,7 +116,7 @@ class SnapshotProcessorTest extends WordSpecLike
       val block4 = generateGenesisBlock(
         Height @@ (settings.snapshotSettings.creationHeight + settings.levelDB.maxVersions - 1))
       val block5 = generateGenesisBlock(
-        Height @@ (settings.snapshotSettings.creationHeight + settings.levelDB.maxVersions + 1))
+        Height @@ (settings.snapshotSettings.creationHeight + settings.levelDB.maxVersions))
 
       val processor3 = processor2.processNewBlock(block3)
 

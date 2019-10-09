@@ -1,13 +1,12 @@
 package encry.view.fastSync
 
 import java.io.File
-import SnapshotChunkProto.SnapshotChunkMessage
 import encry.modifiers.InstanceFactory
 import encry.settings.TestNetSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
-import encry.view.fastSync.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
+import encry.view.fastSync.SnapshotHolder.SnapshotChunkSerializer
 import encry.view.state.avlTree.{AvlTree, NodeSerilalizer}
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
@@ -21,98 +20,63 @@ class SubtreesAssemblerTest extends WordSpecLike
   with OneInstancePerTest
   with TestNetSettings {
 
-  "Subtrees" should {
-//    "assembly correctly by small chunks" in {
-//      val firstDir: File = FileHelper.getRandomTempDir
-//      val firstStorage: VLDBWrapper = {
-//        val levelDBInit = LevelDbFactory.factory.open(firstDir, new Options)
-//        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-//      }
-//      val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage)
-//      val interval: Int = 20
-//      val boxes = (0 to interval).map { i =>
-//        val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
-//        genAssetBox(addr, i, nonce = i)
-//      }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
-//
-//      val newAvl: AvlTree[StorageKey, StorageValue] = firstAvl.insertAndDeleteMany(
-//        StorageVersion @@ Random.randomBytes(),
-//        boxes.toList,
-//        List.empty
-//      )
-//      val rootKey = newAvl.rootNode.key
-//      val dummyBlock = generateGenesisBlock(Height @@ 1)
-//      val newInfo: (SnapshotManifest, List[SnapshotChunk]) = newAvl.initializeSnapshotData(dummyBlock)
-//      newInfo._2.nonEmpty shouldBe true
-//      val serChunks: List[SnapshotChunkMessage] = newInfo._2.map(SnapshotHolder.SnapshotChunkSerializer.toProto)
-//      val deserChunks: List[SnapshotChunk] = serChunks.map(SnapshotHolder.SnapshotChunkSerializer.fromProto)
-//        .foldLeft(List.empty[SnapshotChunk]) {
-//          case (list, proto) => proto match {
-//            case Left(value) => list
-//            case Right(value) => value :: list
-//          }
-//        }
-//      val dir2 = FileHelper.getRandomTempDir
-//      val storage2 = {
-//        val levelDBInit = LevelDbFactory.factory.open(dir2, new Options)
-//        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-//      }
-//      val avlStorage2 = AvlTree[StorageKey, StorageValue](newInfo._1, storage2)
-//      avlStorage2.find(rootKey).isDefined shouldBe true
-//      deserChunks.foldLeft(avlStorage2) { case (avl, chunk) =>
-//        val newAvl: AvlTree[StorageKey, StorageValue] = avl.assembleTree(avl, List(chunk))
-//        chunk.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
-//          val cond = newAvl.find(node.key).isDefined
-//          cond shouldBe true
-//          cond
-//        }
-//        newAvl
-//      }
-//    }
-//    "Assembly correct by one big chunk" in {
-//      val firstDir: File = FileHelper.getRandomTempDir
-//      val firstStorage: VLDBWrapper = {
-//        val levelDBInit = LevelDbFactory.factory.open(firstDir, new Options)
-//        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-//      }
-//      val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage)
-//      val interval: Int = 20
-//      val boxes = (0 to interval).map { i =>
-//        val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
-//        genAssetBox(addr, i, nonce = i)
-//      }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
-//
-//      val newAvl: AvlTree[StorageKey, StorageValue] = firstAvl.insertAndDeleteMany(
-//        StorageVersion @@ Random.randomBytes(),
-//        boxes.toList,
-//        List.empty
-//      )
-//      val rootKey = newAvl.rootNode.key
-//      val dummyBlock = generateGenesisBlock(Height @@ 1)
-//      val newInfo: (SnapshotManifest, List[SnapshotChunk]) = newAvl.initializeSnapshotData(dummyBlock)
-//      newInfo._2.nonEmpty shouldBe true
-//      val serChunks: List[SnapshotChunkMessage] = newInfo._2.map(SnapshotHolder.SnapshotChunkSerializer.toProto)
-//      val deserChunks: List[SnapshotChunk] = serChunks.map(SnapshotHolder.SnapshotChunkSerializer.fromProto)
-//        .foldLeft(List.empty[SnapshotChunk]) {
-//          case (list, proto) => proto match {
-//            case Left(value) => list
-//            case Right(value) => value :: list
-//          }
-//        }
-//      val dir2 = FileHelper.getRandomTempDir
-//      val storage2 = {
-//        val levelDBInit = LevelDbFactory.factory.open(dir2, new Options)
-//        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-//      }
-//      val avlStorage2 = AvlTree[StorageKey, StorageValue](newInfo._1, storage2)
-//      avlStorage2.find(rootKey).isDefined shouldBe true
-//      val newAvl1: AvlTree[StorageKey, StorageValue] = avlStorage2.assembleTree(avlStorage2, deserChunks)
-//      deserChunks.map(_.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
-//        val cond = newAvl1.find(node.key).isDefined
-//        cond shouldBe true
-//        cond
-//      })
-//
-//    }
+  "Subtrees assembler" should {
+    "assemble tree correctly" in {
+      val avlTree = createAvl
+      val root = avlTree.rootNode
+      val block = generateGenesisBlock(Height @@ 1)
+      val (manifest, chunks) = avlTree.initializeSnapshotData(block)
+      val serializedChunks = chunks.map(SnapshotChunkSerializer.toProto)
+      val deserializedChunks = serializedChunks.map(SnapshotChunkSerializer.fromProto(_).get)
+
+      val firstDir: File = FileHelper.getRandomTempDir
+      val firstStorage: VLDBWrapper = {
+        val levelDBInit = LevelDbFactory.factory.open(firstDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+      }
+      val avlTree2 = AvlTree[StorageKey, StorageValue](manifest, firstStorage)
+
+      avlTree2.find(root.key).isDefined shouldBe true
+
+      deserializedChunks.foldLeft(avlTree2) { case (avl, chunk) =>
+        val newAvl: AvlTree[StorageKey, StorageValue] = avl.assembleTree(avl, List(chunk))
+        chunk.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
+          newAvl.find(node.key).isDefined
+        } shouldBe true
+        newAvl
+      }
+
+      val firstDir1: File = FileHelper.getRandomTempDir
+      val firstStorage1: VLDBWrapper = {
+        val levelDBInit = LevelDbFactory.factory.open(firstDir1, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+      }
+      val avlTree3 = AvlTree[StorageKey, StorageValue](manifest, firstStorage1)
+      val avlTree4 = avlTree3.assembleTree(avlTree3, deserializedChunks)
+
+      deserializedChunks.foreach(ch =>
+        ch.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
+          avlTree4.find(node.key).isDefined
+        } shouldBe true
+      )
+    }
+  }
+
+  def createAvl: AvlTree[StorageKey, StorageValue] = {
+    val firstDir: File = FileHelper.getRandomTempDir
+    val firstStorage: VLDBWrapper = {
+      val levelDBInit = LevelDbFactory.factory.open(firstDir, new Options)
+      VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+    }
+    val interval: Int = 80
+    val boxes = (0 to interval).map { i =>
+      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
+      genAssetBox(addr, i, nonce = i)
+    }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+
+    val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage)
+    firstAvl.insertAndDeleteMany(
+      StorageVersion @@ Random.randomBytes(), boxes.toList, List.empty
+    )
   }
 }

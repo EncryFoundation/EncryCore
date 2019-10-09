@@ -44,9 +44,10 @@ final case class SnapshotProcessor(actualManifest: Option[(SnapshotManifest, Lis
   }
 
   def processNewBlock(block: Block): SnapshotProcessor = {
+    val condition: Int = (block.header.height - settings.levelDB.maxVersions) % 1000
+    logger.info(s"Condition $condition.")
     val (processor, toDelete) =
-      if (block.header.height > settings.snapshotSettings.creationHeight + settings.levelDB.maxVersions)
-        updateActualSnapshot()
+      if (condition == 0) updateActualSnapshot()
       else this -> List.empty[StorageKey]
     if (toDelete nonEmpty) {
       logger.info(s"New actual manifest has created.")
