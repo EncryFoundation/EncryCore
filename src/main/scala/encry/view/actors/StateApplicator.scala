@@ -258,9 +258,11 @@ class StateApplicator(settings: EncryAppSettings,
 
   def processNewCandidate(state: UtxoState): Receive = {
     case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) =>
-      logger.info(s"State applicator have been starting processing txs for new candidate. State root node: ${state.tree.rootNode}")
+      logger.info(s"State applicator have been starting processing txs for new candidate. " +
+        s"State root node: ${state.tree.rootNode}")
       val timestamp = timeProvider.estimatedTime
       val height: Height = Height @@ (header.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
+      logger.info(s"Prev candidate header: ${header}")
       val validatedTxs: IndexedSeq[Transaction] = txs.filter(state.validate(_, timestamp, height).isRight).distinct
       val filteredTxsWithoutDuplicateInputs: IndexedSeq[Transaction] =
         validatedTxs.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {

@@ -62,8 +62,8 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
   def mainBehaviour(history: History): Receive = {
     case InfoForCandidateWithMandatoryAccount(txs, acc) if (history.isFullChainSynced && history.isBestBlockDefined)
                                                                                       || settings.node.offlineGeneration =>
-      logger.info(s"History applicator got request from node view holder for info for candidate.")
       val header: Option[Header] = history.getHeaderOfBestBlock
+      logger.info(s"History applicator got request from node view holder for info for candidate. Best header: ${header}")
       val difficulty: Difficulty = header map(history.requiredDifficultyAfter(_) match {
         case Left(value)  => logger.info(s"$value"); sys.exit(999)
         case Right(value) => value

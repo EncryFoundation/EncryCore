@@ -39,7 +39,7 @@ class AvlTreeStorageRollbackTest extends PropSpec with Matchers with EncryGenera
 
     val avlStorage = AvlTree[Int, Int](storage)
 
-    val firstBoxes = (0 to 5).map(i => i -> i).toList
+    val firstBoxes = (0 until 500).map(i => i -> i).toList
 
     val firstVersion = StorageVersion @@ Random.randomBytes()
 
@@ -51,13 +51,15 @@ class AvlTreeStorageRollbackTest extends PropSpec with Matchers with EncryGenera
 
     val secondVersion = StorageVersion @@ Random.randomBytes()
 
-    val secondBoxes = (5 to 10).map(i => i -> i).toList
+    val secondBoxes = (500 until 1000).map(i => i -> i).toList
 
     val avl2 = avl1.insertAndDeleteMany(
       secondVersion,
       secondBoxes,
       List.empty
     )
+
+    val rootHash = avl2.rootHash
 
     val avlAfterRollback = avl2.rollbackTo(firstVersion).get
 
@@ -66,6 +68,9 @@ class AvlTreeStorageRollbackTest extends PropSpec with Matchers with EncryGenera
       secondBoxes,
       List.empty
     )
+
+    println(Algos.encode(rootHash))
+    println(Algos.encode(avl3.rootHash))
   }
 
 }
