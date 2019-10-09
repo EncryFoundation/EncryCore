@@ -10,8 +10,10 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import cats.syntax.option._
+
 import scala.annotation.tailrec
 import cats.syntax.either._
+import org.encryfoundation.common.utils.Algos
 
 trait HistoryModifiersProcessors extends HistoryApi {
 
@@ -71,6 +73,8 @@ trait HistoryModifiersProcessors extends HistoryApi {
       .tail
       .headers
       .flatMap(h => if (h == fullBlock.header) fullBlock.some else getBlockByHeader(h))
+    logger.info(s"Processing best chain. prevChain: ${prevChain.headers.map(header => Algos.encode(header.id))}." +
+      s"new chain: ${newChain.headers.map(header => Algos.encode(header.id))}")
     toApply.foreach(addBlockToCacheIfNecessary)
     if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(fullBlock)
     else {

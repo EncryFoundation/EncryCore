@@ -81,7 +81,8 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
       logger.info(s"Modifier ${modifier.encodedId} contains in history or in modifier's cache. It was rejected.")
 
     case ModifierToHistoryAppending(modifier, isLocallyGenerated) =>
-      logger.info(s"Modifier ${modifier.encodedId} application to history has been starting.")
+      logger.info(s"Modifier ${modifier.encodedId} application to history has been " +
+        s"starting. Before appending best header is: ${history.getBestHeader.map(header => Algos.encode(header.id))}")
       history.append(modifier) match {
         case Left(ex) =>
           currentNumberOfAppliedModifiers -= 1
@@ -92,6 +93,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
           )
         case Right(progressInfo) if progressInfo.toApply.nonEmpty =>
           logger.info(s"Modifier ${modifier.encodedId} successfully applied to history.")
+          logger.info(s"Current best header is: ${history.getBestHeader.map(header => Algos.encode(header.id))}")
           modifiersQueue = modifiersQueue.enqueue(modifier -> progressInfo)
           logger.info(s"New element put into queue. Current queue size is ${modifiersQueue.length}." +
             s"Current number of applied modifiers is $currentNumberOfAppliedModifiers.")
