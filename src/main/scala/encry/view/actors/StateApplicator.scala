@@ -212,7 +212,6 @@ class StateApplicator(settings: EncryAppSettings,
           context.system.eventStream.publish(SemanticallyFailedModification(
             block, List(StateModifierApplyError(s"Root hash is incorrect after modifier"))
           ))
-
           context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState).orElse(processNewCandidate(updatedState)))
         } else {
           //all is ok
@@ -256,7 +255,7 @@ class StateApplicator(settings: EncryAppSettings,
 
   def processNewCandidate(state: UtxoState): Receive = {
     case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) =>
-      logger.info(s"State applicator have been starting processing txs for new candidate.")
+      logger.info(s"State applicator have been starting processing txs for new candidate. State root node: ${state.tree.rootNode}")
       val timestamp = timeProvider.estimatedTime
       val height: Height = Height @@ (header.map(_.height).getOrElse(settings.constants.PreGenesisHeight) + 1)
       val validatedTxs: IndexedSeq[Transaction] = txs.filter(state.validate(_, timestamp, height).isRight).distinct
