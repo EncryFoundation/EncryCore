@@ -56,24 +56,6 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
     AvlTree(shadowedRoot, storage)
   }
 
-  private def insertionInFastSyncMod(nodes: List[Node[K, V]], isRoot: Boolean = false)(implicit kSerializer: Serializer[K],
-                                                                                       vSerializer: Serializer[V],
-                                                                                       kMonoid: Monoid[K],
-                                                                                       vMonoid: Monoid[V]): AvlTree[K, V] = {
-    val nodesToInsert: List[(StorageKey, StorageValue)] = nodes.flatMap { node =>
-      val fullData: (StorageKey, StorageValue) =
-        StorageKey @@ Algos.hash(Algos.hash(kSerializer.toBytes(node.key))) -> StorageValue @@ vSerializer.toBytes(node.value)
-      val shadowData: (StorageKey, StorageValue) =
-        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
-      if (isRoot)
-        fullData :: shadowData :: (AvlTree.rootNodeKey -> StorageValue @@ ShadowNode.childsToShadowNode(node).hash) :: Nil
-      else
-        fullData :: shadowData :: Nil
-    }
-    storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-    this
-  }
-
   def getOperationsRootHash(toInsert: List[(K, V)],
                             toDelete: List[K])
                            (implicit kSer: Serializer[K],
@@ -415,11 +397,23 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
         rightRotation(updatedNode)
     }
 
-  def retirnSubtrees(list: List[SnapshotChunk])(implicit serewr: Serializer[K],
-                                                serjfnv: Serializer[V],
-                                                ert: Monoid[K],
-                                                iof: Monoid[V]): List[Node[K, V]] =
-    list.flatMap(_.nodesList.map(NodeSerilalizer.fromProto[K, V](_)))
+  private def insertionInFastSyncMod(nodes: List[Node[K, V]], isRoot: Boolean = false)(implicit kSerializer: Serializer[K],
+                                                                                       vSerializer: Serializer[V],
+                                                                                       kMonoid: Monoid[K],
+                                                                                       vMonoid: Monoid[V]): AvlTree[K, V] = {
+    val nodesToInsert: List[(StorageKey, StorageValue)] = nodes.flatMap { node =>
+      val fullData: (StorageKey, StorageValue) =
+        StorageKey @@ Algos.hash(Algos.hash(kSerializer.toBytes(node.key))) -> StorageValue @@ vSerializer.toBytes(node.value)
+      val shadowData: (StorageKey, StorageValue) =
+        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
+      if (isRoot)
+        fullData :: shadowData :: (AvlTree.rootNodeKey -> StorageValue @@ ShadowNode.childsToShadowNode(node).hash) :: Nil
+      else
+        fullData :: shadowData :: Nil
+    }
+    storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
+    this
+  }
 
   def initializeSnapshotData(bestBlock: Block)(implicit kSerializer: Serializer[K],
                                                vSerializer: Serializer[V]): (SnapshotManifest, List[SnapshotChunk]) = {
