@@ -109,7 +109,7 @@ class StateApplicator(settings: EncryAppSettings,
             context.become(modifierApplication(
               progressInfo.toApply.toList,
               UpdateInformation(none, none, suffixTrimmed),
-              state
+              stateToApply
             ).orElse(processNewCandidate(state)))
           } else historyApplicator ! RequestNextModifier
       }
