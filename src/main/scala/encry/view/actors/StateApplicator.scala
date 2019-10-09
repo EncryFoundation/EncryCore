@@ -259,7 +259,7 @@ class StateApplicator(settings: EncryAppSettings,
   }
 
   def processNewCandidate(state: UtxoState): Receive = {
-    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) =>
+    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, acc, header, difficulty) if header.map(_.stateRoot sameElements state.tree.rootNode.hash) =>
       logger.info(s"State applicator have been starting processing txs for new candidate. " +
         s"State root node: ${state.tree.rootNode}")
       val timestamp = timeProvider.estimatedTime
@@ -284,6 +284,7 @@ class StateApplicator(settings: EncryAppSettings,
         case Success(stateRoot) => nodeViewHolder ! InfoForCandidateIsReady(header, txsWithCoinbase, timestamp, difficulty, stateRoot)
         case Failure(_) => nodeViewHolder ! StartAggregatingInfoForCandidateBlock(txs)
       }
+    case InfoForCandidateWithDifficultyAndHeaderOfBestBlock(txs, _, _, _) => nodeViewHolder ! StartAggregatingInfoForCandidateBlock(txs)
     case msg => logger.info(s"Got $msg in processNewCandidate.")
   }
 
