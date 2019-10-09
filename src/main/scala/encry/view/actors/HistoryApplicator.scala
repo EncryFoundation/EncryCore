@@ -132,6 +132,7 @@ class HistoryApplicator(nodeViewHolder: ActorRef,
     case NeedToReportAsValid(modifier) =>
       logger.info(s"Modifier ${modifier.encodedId} should be marked as valid.")
       history.reportModifierIsValid(modifier)
+      context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
       influxRef.foreach { ref =>
         ref ! ModifierAppendedToState(success = true)
         modifier match {

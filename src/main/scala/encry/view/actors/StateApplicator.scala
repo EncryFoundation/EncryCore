@@ -123,7 +123,6 @@ class StateApplicator(settings: EncryAppSettings,
       case header: Header =>
         logger.info(s"hisAppl: $historyApplicator")
         historyApplicator ! NeedToReportAsValid(header)
-        context.system.eventStream.publish(SemanticallySuccessfulModifier(header))
         val newToApply: List[PersistentModifier] = toApply.drop(1)
         if (newToApply.nonEmpty) {
           logger.info(s"Header ${header.encodedId} with height ${header.height} in receive modifierApplication" +
@@ -217,7 +216,6 @@ class StateApplicator(settings: EncryAppSettings,
           context.become(awaitingNewProgressInfo(block, ui, toApply, updatedState).orElse(processNewCandidate(updatedState)))
         } else {
           //all is ok
-          context.system.eventStream.publish(SemanticallySuccessfulModifier(block))
           historyApplicator ! NeedToReportAsValid(block)
           if (toApply.isEmpty) {
             logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
