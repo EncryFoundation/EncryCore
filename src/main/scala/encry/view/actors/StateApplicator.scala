@@ -137,7 +137,7 @@ class StateApplicator(settings: EncryAppSettings,
         if (toApply.isEmpty) {
           logger.info(s"Finished modifiers application. Become to modifiersApplicationCompleted.")
           self ! ModifiersApplicationFinished
-          context.become(modifiersApplicationCompleted(ui))
+          context.become(modifiersApplicationCompleted(ui.copy(suffix = ui.suffix :+ block)))
         } else {
           logger.info(s"awaitingTransactionsValidation finished but infoAboutCurrentFoldIteration._1 is not empty.")
           self ! StartModifiersApplying

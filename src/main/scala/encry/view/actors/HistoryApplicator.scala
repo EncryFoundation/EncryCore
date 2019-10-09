@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.api.http.DataHolderForApi.GetDataFromWallet
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SyntacticallyFailedModification}
@@ -136,6 +137,8 @@ class HistoryApplicator(history: History,
       modifiersQueue = modifiersQueue.filterNot { case (id, _) => blocksToRemove.contains(id)}
       logger.info(s"New progress info after invalidating ${block.encodedId} is $newProgressInfo")
       sender() ! NewProgressInfoAfterMarkingAsInValid(newProgressInfo)
+
+    case walletRequest: GetDataFromWallet[_] => walletApplicator.forward(walletRequest)
 
     case nonsense => logger.info(s"History applicator actor got from $sender message $nonsense.")
   }

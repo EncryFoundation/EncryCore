@@ -2,6 +2,7 @@ package encry.view.actors
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.api.http.DataHolderForApi.GetDataFromWallet
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.actors.WalletApplicator.{WalletNeedRollbackTo, WalletNeedScanPersistent}
 import encry.view.wallet.EncryWallet
@@ -16,6 +17,8 @@ class WalletApplicator(wallet: EncryWallet, historyApplicator: ActorRef) extends
     case WalletNeedScanPersistent(modifiers) =>
       logger.info(s"Wallet got WalletNeedScanPersistent msg.")
       modifiers.foreach(wallet.scanPersistent)
+    case walletRequest: GetDataFromWallet[_] =>
+      sender() ! walletRequest.f(wallet)
     case nonsense =>
       logger.info(s"WalletApplicator got from $sender message $nonsense.")
   }

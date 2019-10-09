@@ -8,7 +8,7 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.timeProvider
-import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
+import encry.api.http.DataHolderForApi.{BlockAndHeaderInfo, GetDataFromWallet}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -91,6 +91,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         s"\n Requesting ids are: ${ids.map(Algos.encode).mkString(",")}.")
       if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
+    case wallerRequest: GetDataFromWallet[_] => historyApplicator.forward(wallerRequest)
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 

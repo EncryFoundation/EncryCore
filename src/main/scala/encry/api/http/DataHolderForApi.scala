@@ -99,35 +99,35 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case RemovePeerFromBanList(peer) => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-        view.vault.publicKeys.foldLeft("") { (str, k) =>
+      (self ? GetDataFromWallet[String] { wallet =>
+        wallet.publicKeys.foldLeft("") { (str, k) =>
           str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
         }
       }).pipeTo(sender)
 
     case GetViewCreateKey =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
-        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
-        else view.vault.accountManager.createAccount(None)
+      (self ? GetDataFromWallet[PrivateKey25519] { wallet =>
+        if (wallet.accountManager.accounts.isEmpty) wallet.accountManager.mandatoryAccount
+        else wallet.accountManager.createAccount(None)
       }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-        view.vault.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes) + "\n")
+      (self ? GetDataFromWallet[String] { wallet =>
+        wallet.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes) + "\n")
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+      (self ? GetDataFromWallet[String] { wallet =>
         val balance: String =
-          view.vault.getBalances.foldLeft("")(
+          wallet.getBalances.foldLeft("")(
             (str, tokenInfo) => str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n")
           )
         if (balance.length == 0) "0" else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-        view.vault.accountManager.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
+      (self ? GetDataFromWallet[String] { wallet =>
+        wallet.accountManager.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 
     case GetLastHeadersHelper(i) =>
@@ -232,7 +232,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
       context.system.eventStream.publish(StartMining)
     case StopMiner                 => context.system.eventStream.publish(DisableMining)
     case ShutdownNode              => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
-    case GetDataFromPresentView(f) => (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
+    case GetDataFromWallet(f) => (nodeViewHolder ? GetDataFromWallet(f)).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
@@ -266,7 +266,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class PeerAdd(peer: InetSocketAddress)
 
-  final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
+  final case class GetDataFromWallet[A](f: EncryWallet => A)
 
   final case class GetFullHeaderById(headerId: Either[String, ModifierId])
 
