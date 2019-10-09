@@ -71,9 +71,8 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   def getOperationsRootHash(
     toInsert: List[(K, V)],
     toDelete: List[K],
-    toRoot: Node[K, V]
   )(implicit kSer: Serializer[K], vSer: Serializer[V], kM: Monoid[K], vM: Monoid[V]): Array[Byte] = {
-    val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(toRoot)) {
+    val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(rootNode)) {
       case (prevRoot, toDelete) =>
         deleteKey(toDelete, prevRoot)
     }
