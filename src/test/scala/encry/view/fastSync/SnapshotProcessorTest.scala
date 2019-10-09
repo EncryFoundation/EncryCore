@@ -28,38 +28,38 @@ class SnapshotProcessorTest extends WordSpecLike
     "process new snapshot with new unique snapshot correctly" in {
       val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
 
-      val avl1 = createAvl
-      val avl2 = createAvl
-      val avl3 = createAvl
+      val avl1 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
+      val avl2 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
+      val avl3 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
 
       val block1 = generateGenesisBlock(Height @@ 1)
       val block2 = generateGenesisBlock(Height @@ 1)
       val block3 = generateGenesisBlock(Height @@ 1)
 
       val processor1 = snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
-      val (manifest1, keys1) = processor1.bestPotentialManifest.get
-      keys1.forall(processor1.storage.contains) shouldBe true
-      processor1.potentialManifests.exists(_._1.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
+      val manifest1 = processor1.bestPotentialManifest.get
+      manifest1.chunksKeys.map(StorageKey @@ _).forall(processor1.storage.contains) shouldBe true
+      processor1.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
       processor1.actualManifest.isEmpty shouldBe true
 
       val processor2 = processor1.processNewSnapshot(UtxoState(avl2, settings.constants), block2)
-      val (manifest2, keys2) = processor2.bestPotentialManifest.get
-      keys2.forall(processor2.storage.contains) shouldBe true
-      keys1.forall(processor2.storage.contains) shouldBe true
-      processor2.potentialManifests.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
-      processor2.potentialManifests.exists(_._1.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
-      processor2.bestPotentialManifest.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      val manifest2 = processor2.bestPotentialManifest.get
+      manifest2.chunksKeys.map(StorageKey @@ _).forall(processor2.storage.contains) shouldBe true
+      manifest1.chunksKeys.map(StorageKey @@ _).forall(processor2.storage.contains) shouldBe true
+      processor2.potentialManifests.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      processor2.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
+      processor2.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
       processor2.actualManifest.isEmpty shouldBe true
 
       val processor3 = processor2.processNewSnapshot(UtxoState(avl3, settings.constants), block3)
-      val (manifest3, keys3) = processor3.bestPotentialManifest.get
-      keys3.forall(processor3.storage.contains) shouldBe true
-      keys2.forall(processor3.storage.contains) shouldBe true
-      keys1.forall(processor3.storage.contains) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest3.ManifestId)) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
-      processor3.bestPotentialManifest.exists(_._1.ManifestId.sameElements(manifest3.ManifestId)) shouldBe true
+      val manifest3 = processor3.bestPotentialManifest.get
+      manifest3.chunksKeys.map(StorageKey @@ _).forall(processor3.storage.contains) shouldBe true
+      manifest2.chunksKeys.map(StorageKey @@ _).forall(processor3.storage.contains) shouldBe true
+      manifest1.chunksKeys.map(StorageKey @@ _).forall(processor3.storage.contains) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest3.ManifestId)) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
+      processor3.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest3.ManifestId)) shouldBe true
       processor3.actualManifest.isEmpty shouldBe true
 
       avl1.close()
@@ -70,25 +70,25 @@ class SnapshotProcessorTest extends WordSpecLike
     "update best potential snapshot correctly while duplicated comes" in {
       val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
 
-      val avl1 = createAvl
-      val avl2 = createAvl
+      val avl1 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
+      val avl2 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
 
       val block1 = generateGenesisBlock(Height @@ 1)
       val block2 = generateGenesisBlock(Height @@ 1)
 
       val processor1 = snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
-      val (manifest1, _) = processor1.bestPotentialManifest.get
+      val manifest1 = processor1.bestPotentialManifest.get
 
       val processor2 = processor1.processNewSnapshot(UtxoState(avl2, settings.constants), block2)
-      val (manifest2, _) = processor2.bestPotentialManifest.get
+      val manifest2 = processor2.bestPotentialManifest.get
 
       val processor3 = processor2.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
-      val (manifest3, _) = processor3.bestPotentialManifest.get
+      val manifest3 = processor3.bestPotentialManifest.get
 
       manifest1.ManifestId.sameElements(manifest3.ManifestId) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest3.ManifestId)) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest3.ManifestId)) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
 
       processor3.actualManifest.isEmpty shouldBe true
 
@@ -99,17 +99,23 @@ class SnapshotProcessorTest extends WordSpecLike
     "process new best block correctly" in {
       val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
 
-      val avl1 = createAvl
-      val avl2 = createAvl
+      val avl1 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
+
+      val boxes = (200 to 210).map { i =>
+        val addr = "9fQVBThCASmpRtbqtrZk5kFV3W3xkbQoECsnLDuJWvX9fZUfFnn"
+        genAssetBox(addr, scala.util.Random.nextLong(), nonce = scala.util.Random.nextLong())
+      }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+
+      val avl2 = createAvl("9fQVBThCASmpRtbqtrZk5kFV3W3xkbQoECsnLDuJWvX9fZUfFnn", boxes)
 
       val block1 = generateGenesisBlock(Height @@ 1)
       val block2 = generateGenesisBlock(Height @@ 1)
 
       val processor1 = snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
-      val (manifest1, keys1) = processor1.bestPotentialManifest.get
+      val manifest1 = processor1.bestPotentialManifest.get
 
       val processor2 = processor1.processNewSnapshot(UtxoState(avl2, settings.constants), block2)
-      val (manifest2, keys2) = processor2.bestPotentialManifest.get
+      val manifest2 = processor2.bestPotentialManifest.get
 
       val block3 = generateGenesisBlock(
         Height @@ (settings.snapshotSettings.creationHeight + settings.levelDB.maxVersions - 1))
@@ -120,29 +126,29 @@ class SnapshotProcessorTest extends WordSpecLike
 
       val processor3 = processor2.processNewBlock(block3)
 
-      keys2.forall(processor3.storage.contains) shouldBe true
-      keys1.forall(processor3.storage.contains) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
-      processor3.potentialManifests.exists(_._1.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
-      processor3.bestPotentialManifest.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      manifest2.chunksKeys.map(StorageKey @@ _).forall(processor3.storage.contains) shouldBe true
+      manifest1.chunksKeys.map(StorageKey @@ _).forall(processor3.storage.contains) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      processor3.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
+      processor3.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
       processor3.actualManifest.isEmpty shouldBe true
 
       val processor4 = processor3.processNewBlock(block4)
 
-      keys2.forall(processor4.storage.contains) shouldBe true
-      keys1.forall(processor4.storage.contains) shouldBe true
-      processor4.potentialManifests.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
-      processor4.potentialManifests.exists(_._1.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
-      processor4.bestPotentialManifest.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      manifest2.chunksKeys.map(StorageKey @@ _).forall(processor4.storage.contains) shouldBe true
+      manifest1.chunksKeys.map(StorageKey @@ _).forall(processor4.storage.contains) shouldBe true
+      processor4.potentialManifests.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      processor4.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
+      processor4.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
       processor4.actualManifest.isEmpty shouldBe true
 
       val processor5 = processor4.processNewBlock(block5)
 
-      keys2.forall(processor5.storage.contains) shouldBe true
-      keys1.forall(!processor5.storage.contains(_)) shouldBe true
+      processor5.actualManifest.get.chunksKeys.map(StorageKey @@ _).forall(processor5.storage.contains) shouldBe true
+      manifest1.chunksKeys.map(StorageKey @@ _).forall(!processor5.storage.contains(_)) shouldBe true
       processor5.potentialManifests.isEmpty shouldBe true
       processor5.bestPotentialManifest.isEmpty shouldBe true
-      processor5.actualManifest.exists(_._1.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
+      processor5.actualManifest.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
 
       avl1.close()
       avl2.close()
@@ -151,7 +157,7 @@ class SnapshotProcessorTest extends WordSpecLike
     "restore actual chunks correctly" in {
       val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
 
-      val avl1 = createAvl
+      val avl1 = createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia")
 
       val block1 = generateGenesisBlock(Height @@ 1)
 
@@ -181,15 +187,17 @@ class SnapshotProcessorTest extends WordSpecLike
     }
   }
 
-  def createAvl: AvlTree[StorageKey, StorageValue] = {
+  def createAvl(address: String,
+                b: IndexedSeq[(StorageKey, StorageValue)] = IndexedSeq.empty): AvlTree[StorageKey, StorageValue] = {
     val firstDir: File = FileHelper.getRandomTempDir
     val firstStorage: VLDBWrapper = {
       val levelDBInit = LevelDbFactory.factory.open(firstDir, new Options)
       VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
-    val interval: Int = 80
-    val boxes = (0 to interval).map { i =>
-      val addr = "9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia"
+    val interval: Int = 10
+    val boxes: IndexedSeq[(StorageKey, StorageValue)] = if (b.nonEmpty) b else
+      (0 to interval).map { i =>
+      val addr = address
       genAssetBox(addr, i, nonce = i)
     }.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
 

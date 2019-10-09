@@ -1,6 +1,7 @@
 package encry.view.fastSync
 
 import java.io.File
+
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.fastSync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest}
 import encry.view.state.UtxoState
@@ -14,31 +15,32 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.LSMStore
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.iq80.leveldb.{DB, Options}
+
 import scala.language.postfixOps
 
-final case class SnapshotProcessor(actualManifest: Option[(SnapshotManifest, List[StorageKey])],
-                                   potentialManifests: List[(SnapshotManifest, List[StorageKey])],
-                                   bestPotentialManifest: Option[(SnapshotManifest, List[StorageKey])],
+final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
+                                   potentialManifests: List[SnapshotManifest],
+                                   bestPotentialManifest: Option[SnapshotManifest],
                                    settings: EncryAppSettings,
                                    storage: VersionalStorage) extends StrictLogging with AutoCloseable {
 
   def processNewSnapshot(state: UtxoState, block: Block): SnapshotProcessor = {
-    val (processor, toDelete) = potentialManifests find { case (manifest, _) =>
-      (manifest.bestBlockId sameElements block.id) && (manifest.rootHash sameElements state.tree.rootHash)
-    } match {
+    val (processor, toApply) = potentialManifests find (manifest =>
+      (manifest.bestBlockId sameElements block.id) && (manifest.rootHash sameElements state.tree.rootHash))
+    match {
       case Some(elem) => updateBestPotentialSnapshot(elem)
       case None => createNewSnapshot(state, block)
     }
-    if (toDelete nonEmpty) {
+    if (toApply nonEmpty) {
       logger.info(s"New snapshot has created successfully. Insert has started.")
-      storage.insert(StorageVersion @@ Random.randomBytes(), toDelete, List empty)
+      storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List empty)
     } else logger.info(s"New snapshot has not created after processing.")
     logger.info(s"Best potential manifest after processing snapshot info is ${
-      processor.bestPotentialManifest map (e => Algos.encode(e._1.rootHash))
+      processor.bestPotentialManifest map (e => Algos.encode(e.rootHash))
     }. Actual manifest is ${
-      processor.actualManifest map (e => Algos.encode(e._1.rootHash))
+      processor.actualManifest map (e => Algos.encode(e.rootHash))
     }.")
     processor
   }
@@ -51,50 +53,61 @@ final case class SnapshotProcessor(actualManifest: Option[(SnapshotManifest, Lis
       else this -> List.empty[StorageKey]
     if (toDelete nonEmpty) {
       logger.info(s"New actual manifest has created.")
+      logger.info(s"qwertyuio[ ${
+        toDelete.map(ByteArrayWrapper(_)).forall { e =>
+          processor.actualManifest.exists(_.chunksKeys.map(ByteArrayWrapper(_)).contains(e))
+        }
+      }")
       storage.insert(StorageVersion @@ Random.randomBytes(), List.empty, toDelete)
     } else logger.info("Didn't need to update actual snapshot.")
     logger.info(s"Best potential manifest after processing new block is ${
-      processor.bestPotentialManifest map (e => Algos.encode(e._1.rootHash))
+      processor.bestPotentialManifest map (e => Algos.encode(e.rootHash))
     }. Actual manifest is ${
-      processor.actualManifest map (e => Algos.encode(e._1.rootHash))
+      processor.actualManifest map (e => Algos.encode(e.rootHash))
     }.")
     processor
   }
 
   def restoreActualChunks: List[Array[Byte]] = {
     logger.info(s"Restoring actual chunks.")
-    actualManifest.map(_._2).getOrElse(List.empty).flatMap(storage.get)
+    actualManifest.map(_.chunksKeys.map(StorageKey @@ _)).getOrElse(List.empty).flatMap(storage.get)
   }
 
-  private def updateBestPotentialSnapshot(elem: (SnapshotManifest, List[StorageKey])): (SnapshotProcessor, List[(StorageKey, StorageValue)]) =
+  private def updateBestPotentialSnapshot(elem: SnapshotManifest): (SnapshotProcessor, List[(StorageKey, StorageValue)]) =
     this.copy(bestPotentialManifest = elem.some) -> List.empty[(StorageKey, StorageValue)]
 
   private def createNewSnapshot(state: UtxoState, block: Block): (SnapshotProcessor, List[(StorageKey, StorageValue)]) = {
     val (manifest: SnapshotManifest, chunks: List[SnapshotChunk]) = state.tree.initializeSnapshotData(block)
     val snapshotToDB: List[(StorageKey, StorageValue)] = chunks.map { elem =>
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
-      StorageKey @@ Algos.hash(bytes) -> StorageValue @@ bytes
+      StorageKey @@ elem.id -> StorageValue @@ bytes
     }
-    val infoForUpdate: (SnapshotManifest, List[StorageKey]) = manifest -> snapshotToDB.map(_._1)
     this.copy(
-      potentialManifests = infoForUpdate :: potentialManifests,
-      bestPotentialManifest = infoForUpdate.some
+      potentialManifests = manifest :: potentialManifests,
+      bestPotentialManifest = manifest.some
     ) -> snapshotToDB
   }
 
   private def updateActualSnapshot(): (SnapshotProcessor, List[StorageKey]) = {
-    val newActualSnapshot: Option[(SnapshotManifest, List[StorageKey])] = bestPotentialManifest
+
     val manifestsToDelete: List[StorageKey] = potentialManifests.foldLeft(List.empty[StorageKey]) {
-      case (toDelete, (manifest, _)) if newActualSnapshot.exists(_._1.ManifestId sameElements manifest.ManifestId) =>
+      case (toDelete, manifest) if bestPotentialManifest.exists(_.ManifestId sameElements manifest.ManifestId) =>
+        logger.info(s"Same")
         toDelete
-      case (toDelete, (_, keys)) =>
-        toDelete ::: keys
+      case (toDelete, manifest) =>
+        logger.info(s"Different")
+        toDelete ::: manifest.chunksKeys.map(StorageKey @@ _)
     }
+    val newActual = bestPotentialManifest.map(_.chunksKeys).getOrElse(List.empty).map(ByteArrayWrapper(_))
+    val resultToDelete = manifestsToDelete
+      .map(ByteArrayWrapper(_))
+      .filterNot(newActual.contains(_))
+      .map(e => StorageKey @@ e.data)
     this.copy(
-      actualManifest = newActualSnapshot,
+      actualManifest = bestPotentialManifest,
       potentialManifests = List.empty,
       bestPotentialManifest = none
-    ) -> manifestsToDelete
+    ) -> resultToDelete
   }
 
   override def close(): Unit = storage.close()
@@ -117,9 +130,9 @@ object SnapshotProcessor extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
     }
     new SnapshotProcessor(
-      none[(SnapshotManifest, List[StorageKey])],
-      List.empty[(SnapshotManifest, List[StorageKey])],
-      none[(SnapshotManifest, List[StorageKey])],
+      none[SnapshotManifest],
+      List.empty[SnapshotManifest],
+      none[SnapshotManifest],
       settings,
       storage
     )

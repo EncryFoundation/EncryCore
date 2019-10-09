@@ -24,7 +24,6 @@ trait EncryGenerator extends Settings {
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
 
-
   def createPrivKey(seed: Option[String]): PrivateKey25519 = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(

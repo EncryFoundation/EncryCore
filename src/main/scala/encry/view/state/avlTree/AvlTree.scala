@@ -418,21 +418,23 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
   def initializeSnapshotData(bestBlock: Block)(implicit kSerializer: Serializer[K],
                                                vSerializer: Serializer[V]): (SnapshotManifest, List[SnapshotChunk]) = {
     val rawSubtrees: List[SnapshotChunk] = createSubtrees(List(rootNode), List.empty).reverse
-    val newManifest: SnapshotManifest = rootNode match {
-      case i: InternalNode[K, V] =>
-        SnapshotManifest(
-          bestBlock.id, rootHash, NodeSerilalizer.toProto(i), rawSubtrees.size, bestBlock.header.height
-        )
-      case s: ShadowNode[K, V] =>
-        SnapshotManifest(
-          bestBlock.id, rootHash, NodeSerilalizer.toProto(s.restoreFullNode(storage)), rawSubtrees.size, bestBlock.header.height
-        )
-    }
     val updS: List[SnapshotChunk] = if (rawSubtrees.nonEmpty) {
       val firstElem = rawSubtrees.headOption
       val newRaw: List[SnapshotChunk] = rawSubtrees.drop(1)
       firstElem.map { ch => ch.copy(nodesList = ch.nodesList.drop(1)) }.fold(newRaw)(_ :: newRaw)
     } else rawSubtrees
+    val newManifest: SnapshotManifest = rootNode match {
+      case i: InternalNode[K, V] =>
+        SnapshotManifest(
+          bestBlock.id, rootHash, NodeSerilalizer.toProto(i),
+          rawSubtrees.size, bestBlock.header.height, updS.map(_.id)
+        )
+      case s: ShadowNode[K, V] =>
+        SnapshotManifest(
+          bestBlock.id, rootHash, NodeSerilalizer.toProto(s.restoreFullNode(storage)),
+          rawSubtrees.size, bestBlock.header.height, updS.map(_.id)
+        )
+    }
     val subtrees: List[SnapshotChunk] = updS.map(_.copy(manifestId = newManifest.ManifestId))
     newManifest -> subtrees
   }
@@ -441,7 +443,7 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
                                                                           vSerializer: Serializer[V],
                                                                           kMonoid: Monoid[K],
                                                                           vMonoid: Monoid[V]): AvlTree[K, V] =
-    chunks.foldLeft(initState) { case (state, chunk) =>
+    chunks.foldLeft(this) { case (state, chunk) =>
       state.insertionInFastSyncMod(chunk.nodesList.map(NodeSerilalizer.fromProto[K, V](_)))
     }
 
@@ -490,8 +492,7 @@ final case class AvlTree[K: Hashable : Order, V](rootNode: Node[K, V], storage: 
   }
 
   private def makeSubtree(nodes: List[Node[K, V]])(implicit kSerializer: Serializer[K],
-                                                   vSerializer: Serializer[V]): SnapshotChunk =
-    SnapshotChunk(nodes.map(NodeSerilalizer.toProto(_)))
+                                                   vSerializer: Serializer[V]): SnapshotChunk = SnapshotChunk(nodes)
 
   override def close(): Unit = storage.close()
 
