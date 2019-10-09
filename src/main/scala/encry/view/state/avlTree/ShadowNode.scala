@@ -22,7 +22,9 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](override val hash:
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
     NodeSerilalizer.fromBytes[K, V](
       {
-        storage.get(StorageKey @@ hash).get
+        val res = storage.get(StorageKey @@ hash)
+        if (res.isEmpty) logger.info(s"Empty node at key: ${Algos.encode(hash)}")
+        res.get
       }
     )
   }
