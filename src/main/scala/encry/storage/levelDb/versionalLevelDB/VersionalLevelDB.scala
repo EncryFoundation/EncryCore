@@ -50,8 +50,18 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         if (possibleElem != null) {
           Some(VersionalLevelDbValue @@ possibleElem)
         }
-        else None
-      } else None
+        else {
+          logger.info(s"Elem by key: ${elemKey} is empty1." +
+            s"Map: ${Algos.encode(map)}." +
+            s"lastElemVersion: ${Algos.encode(lastElemVersion)}." +
+            s"possibleElem: null")
+          None
+        }
+      } else {
+        logger.info(s"Elem by key: ${elemKey} is empty2." +
+          s"Map: ${if (map != null) Algos.encode(map) else "NULL"}.")
+        None
+      }
       possibleElemInResolved
     } finally readOptions.snapshot().close()
   }
