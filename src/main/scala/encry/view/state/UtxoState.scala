@@ -64,6 +64,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         UtxoState(tree, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
+        logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
+        logger.info(s"Current root node: ${tree.rootNode}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
@@ -93,6 +95,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
             } else {
               logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
+              logger.info(s"After applying root node: ${newTree.rootNode}")
               UtxoState(
                 newTree,
                 constants,
