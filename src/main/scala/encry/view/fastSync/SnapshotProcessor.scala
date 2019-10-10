@@ -1,6 +1,8 @@
 package encry.view.fastSync
 
 import java.io.File
+
+import SnapshotChunkProto.SnapshotChunkMessage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.fastSync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest}
 import encry.view.state.UtxoState
@@ -18,6 +20,7 @@ import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.iq80.leveldb.{DB, Options}
 
 import scala.language.postfixOps
+import scala.util.Try
 
 final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
                                    potentialManifests: List[SnapshotManifest],
@@ -66,6 +69,10 @@ final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
     }.")
     processor
   }
+
+  def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
+    storage.get(StorageKey @@ chunkId)
+      .flatMap(e => Try(SnapshotChunkMessage.parseFrom(e)).toOption)
 
   def restoreActualChunks: List[Array[Byte]] = {
     logger.info(s"Restoring actual chunks.")

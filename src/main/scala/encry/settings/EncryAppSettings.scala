@@ -24,7 +24,8 @@ final case class EncryAppSettings(directory: String,
                                   levelDB: LevelDBSettings,
                                   monitoringSettings: Option[MonitoringSettings],
                                   blackList: BlackListSettings,
-                                  constants: Constants)
+                                  constants: Constants,
+                                  snapshotSettings: SnapshotSettings)
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
@@ -84,6 +85,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
     val blackList          = config.as[BlackListSettings](s"$configPath.blackList")
     val constants          = config.as[Constants](s"$configPath.constantsClass")
+    val snapshotSettings   = config.as[SnapshotSettings](s"$configPath.snapshotSettings")
 
     EncryAppSettings(
       directory,
@@ -98,7 +100,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       levelDb,
       monitoringSettings,
       blackList,
-      constants
+      constants,
+      snapshotSettings
     )
   }
 
@@ -106,6 +109,10 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     EncryApp.forceStopApplication(errorMessage = s"Stop application due to malformed configuration file: $msg")
 }
 
+final case class SnapshotSettings(startWith: Boolean,
+                                  creationHeight: Int,
+                                  responsesInTime: Int,
+                                  requestTimeout: FiniteDuration)
 final case class StorageSettings(history: StorageType, state: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
