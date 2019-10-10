@@ -1,13 +1,15 @@
 package encry.view.state
 
 import java.io.File
-
-import akka.actor.ActorRef
-import com.google.common.primitives.{Ints, Longs}
+import cats.data.Validated
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
+import encry.utils.implicits.Validation._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
-import encry.settings.{EncryAppSettings, LevelDBSettings, Settings}
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -15,16 +17,12 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
-import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import encry.view.state.UtxoState.StateChange
+import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
-import cats.data.Validated
-import cats.Traverse
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.validated._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -34,89 +32,88 @@ import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
-import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
-final case class UtxoState(storage: VersionalStorage,
-                           height: Height,
-                           lastBlockTimestamp: Long)
-  extends StrictLogging with UtxoStateReader with AutoCloseable with Settings {
+final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
+                           constants: Constants) extends StrictLogging with UtxoStateReader with AutoCloseable {
+
+  def applyValidModifier(block: Block): UtxoState = {
+    logger.info(s"Block validated successfully. Inserting changes to storage.")
+    val combinedStateChange: StateChange = combineAll(block.payload.txs.toList.map(UtxoState.tx2StateChange))
+    val newTree = tree.insertAndDeleteMany(
+      StorageVersion !@@ block.id,
+      combinedStateChange.outputsToDb.toList,
+      combinedStateChange.inputsToDb.toList
+    )
+    UtxoState(
+      newTree,
+      constants,
+    )
+  }
 
   def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(
-          storage,
-          height,
-          header.timestamp
-        ).asRight[List[ModifierApplyError]]
+        UtxoState(tree, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validate(tx, totalFees + EncrySupplyController.supplyAt(height,
-            settings.constants.InitialEmissionAmount, settings.constants.EmissionEpochLength,
-            settings.constants.EmissionDecay))
-          else validate(tx)
+          if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
+            totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
+          else validate(tx, block.header.timestamp, Height @@ block.header.height)
         }).toList
           .traverse(Validated.fromEither)
           .toEither
-        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime)/1000L} s")
+        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
           err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
           txsToApply => {
             val combineTimeStart = System.currentTimeMillis()
-            val combinedStateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
-            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart)/1000L} s")
+            val combinedStateChange: UtxoState.StateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
+            logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart) / 1000L} s")
             val insertTimestart = System.currentTimeMillis()
-            storage.insert(
+            val newTree = tree.insertAndDeleteMany(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
               combinedStateChange.inputsToDb.toList
             )
-            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart)/1000L} s")
-            UtxoState(
-              storage,
-              Height @@ block.header.height,
-              block.header.timestamp
-            ).asRight[List[ModifierApplyError]]
+            if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
+              List(StateModifierApplyError(s"Incorrect state root after block (${block.header.encodedId}) applying. " +
+                s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
+                s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
+            } else {
+              logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
+              UtxoState(
+                newTree,
+                constants,
+              ).asRight[List[ModifierApplyError]]
+            }
           }
         )
     }
-    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime)/1000L} s)")
+    logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime) / 1000L} s)")
     result
   }
 
-  def rollbackTo(version: VersionTag): Try[UtxoState] = Try {
-    storage.versions.find(_ sameElements version) match {
-      case Some(_) =>
-        logger.info(s"Rollback to version ${Algos.encode(version)}")
-        storage.rollbackTo(StorageVersion !@@ version)
-        val stateHeight: Int = storage.get(StorageKey @@ UtxoState.bestHeightKey.untag(Digest32))
-          .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.GenesisHeight)
-        UtxoState(
-          storage,
-          Height @@ stateHeight,
-          lastBlockTimestamp
-        )
-      case None => throw new Exception(s"Impossible to rollback to version ${Algos.encode(version)}")
-    }
+  def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
+    val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
+    UtxoState(rollbackedAvl, constants)
   }
 
-  def validate(tx: Transaction, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
+  def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
-      val stateView: EncryStateView = EncryStateView(height, lastBlockTimestamp, ADDigest @@ Array.emptyByteArray)
-      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => storage.get(StorageKey !@@ input.boxId)
+      val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)
+      val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => tree.get(StorageKey !@@ input.boxId)
         .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input))
         .foldLeft(IndexedSeq[EncryBaseBox]()) { case (acc, (bxOpt, input)) =>
@@ -136,17 +133,17 @@ final case class UtxoState(storage: VersionalStorage,
         }
 
       val validBalance: Boolean = {
-        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs, settings.constants.IntrinsicTokenId).map {
+        val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs, constants.IntrinsicTokenId).map {
           case (key, value) => Algos.encode(key) -> value
         }
         val creditB: Map[String, Amount] = {
           val balanceSheet: Map[TokenId, Amount] =
-            BalanceCalculator.balanceSheet(tx.newBoxes, settings.constants.IntrinsicTokenId, excludeTokenIssuance = true)
-          val intrinsicBalance: Amount = balanceSheet.getOrElse(TestNetConstants.IntrinsicTokenId, 0L)
-          balanceSheet.updated(TestNetConstants.IntrinsicTokenId, intrinsicBalance + tx.fee)
+            BalanceCalculator.balanceSheet(tx.newBoxes, constants.IntrinsicTokenId, excludeTokenIssuance = true)
+          val intrinsicBalance: Amount = balanceSheet.getOrElse(constants.IntrinsicTokenId, 0L)
+          balanceSheet.updated(constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
           }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }
         creditB.forall { case (tokenId, amount) =>
-          if (tokenId == Algos.encode(TestNetConstants.IntrinsicTokenId))
+          if (tokenId == Algos.encode(constants.IntrinsicTokenId))
             debitB.getOrElse(tokenId, 0L) + allowedOutputDelta >= amount
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
@@ -165,7 +162,7 @@ final case class UtxoState(storage: VersionalStorage,
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
 
-  def close(): Unit = storage.close()
+  def close(): Unit = tree.close()
 }
 
 object UtxoState extends StrictLogging {
@@ -188,54 +185,38 @@ object UtxoState extends StrictLogging {
 
   def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
 
-  def create(stateDir: File,
-             nodeViewHolderRef: Option[ActorRef],
-             settings: EncryAppSettings,
-             statsSenderRef: Option[ActorRef]): UtxoState = {
+  def create(stateDir: File, settings: EncryAppSettings): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
     }
-    val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
-      .map(d => Ints.fromByteArray(d)).getOrElse(TestNetConstants.PreGenesisHeight)
-    val lastBlockTimestamp: Amount = versionalStorage.get(StorageKey @@ lastBlockTimeKey.untag(Digest32))
-      .map(d => Longs.fromByteArray(d)).getOrElse(0L)
-    new UtxoState(
-      versionalStorage,
-      Height @@ stateHeight,
-      lastBlockTimestamp,
+    logger.info(s"State created.")
+    UtxoState(
+      AvlTree[StorageKey, StorageValue](versionalStorage),
+      settings.constants
     )
   }
 
-  def genesis(stateDir: File,
-              nodeViewHolderRef: Option[ActorRef],
-              settings: EncryAppSettings,
-              statsSenderRef: Option[ActorRef]): UtxoState = {
+  def genesis(stateDir: File, settings: EncryAppSettings): UtxoState = {
     //check kind of storage
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
-
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-
-    new UtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
-    )
+    UtxoState(AvlTree[StorageKey, StorageValue](storage), settings.constants)
   }
 }

@@ -66,7 +66,8 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         2,
         scala.util.Random.nextLong(),
         testNetSettings.constants.InitialDifficulty,
-        EquihashSolution(Seq(1, 3))
+        EquihashSolution(Seq(1, 3)),
+        Random.randomBytes()
       )
       val header_second: Header = Header(
         1.toByte,
@@ -76,7 +77,8 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         1,
         scala.util.Random.nextLong(),
         testNetSettings.constants.InitialDifficulty,
-        EquihashSolution(Seq(1, 3))
+        EquihashSolution(Seq(1, 3)),
+        Random.randomBytes()
       )
 
       history.append(header_first)

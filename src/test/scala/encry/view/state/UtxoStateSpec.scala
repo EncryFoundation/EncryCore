@@ -45,25 +45,25 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 //    )
 //  }
 
-  def utxoFromBoxHolder(bh: BoxHolder,
-                        dir: File,
-                        nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings): UtxoState = {
-    val storage = settings.storage.state match {
-      case VersionalStorage.IODB =>
-        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-    }
-
-    storage.insert(
-      StorageVersion @@ Array.fill(32)(0: Byte),
-      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
-    )
-
-    new UtxoState(storage, Height @@ 0, 0L)
-  }
+//  def utxoFromBoxHolder(bh: BoxHolder,
+//                        dir: File,
+//                        nodeViewHolderRef: Option[ActorRef],
+//                        settings: EncryAppSettings): UtxoState = {
+//    val storage = settings.storage.state match {
+//      case VersionalStorage.IODB =>
+//        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
+//      case VersionalStorage.LevelDB =>
+//        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+//        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+//    }
+//
+//    storage.insert(
+//      StorageVersion @@ Array.fill(32)(0: Byte),
+//      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
+//    )
+//
+//    new UtxoState(storage, Height @@ 0, 0L)
+//  }
 
 
 //  property("Proofs for transaction") {

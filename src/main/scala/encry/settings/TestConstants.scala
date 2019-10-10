@@ -21,6 +21,8 @@ case object TestConstants extends Constants {
 
   val StateByteCost: Int = 26
 
+  val stateRootSize: Int = 32
+
   val MaxDataLength: Int = 1000
 
   val AfterGenesisStateDigestHex: String = "39bc0df81fec1ee7b3804eb42084883ce4925aec8393df39806f00e129ade9f101"

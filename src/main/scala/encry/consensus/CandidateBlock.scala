@@ -11,7 +11,8 @@ case class CandidateBlock(parentOpt: Option[Header],
                           version: Byte,
                           transactions: Seq[Transaction],
                           timestamp: Long,
-                          difficulty: Difficulty) {
+                          difficulty: Difficulty,
+                          stateRoot: Array[Byte]) {
 
   override def toString: String = s"<CandidateBlock timestamp=$timestamp txQty=${transactions.size} " +
     s"parentId=${parentOpt.map(_.encodedId).getOrElse("None")}>"

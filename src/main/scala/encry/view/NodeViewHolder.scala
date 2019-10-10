@@ -293,7 +293,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     val stateDir: File = UtxoState.getStateDir(settings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: UtxoState = UtxoState.genesis(stateDir, Some(self), settings, influxRef)
+    val state: UtxoState = UtxoState.genesis(stateDir, settings)
     val history: History = History.readOrGenerate(settings, timeProvider)
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
     NodeView(history, state, wallet)
@@ -306,7 +306,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val history: History = History.readOrGenerate(settings, timeProvider)
       val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
       val state: UtxoState = restoreConsistentState(
-        UtxoState.create(stateDir, Some(self), settings, influxRef), history
+        UtxoState.create(stateDir, settings), history
       )
       Some(NodeView(history, state, wallet))
     } catch {
@@ -324,7 +324,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     dir.listFiles.foreach(_.delete())
     val stateDir: File = UtxoState.getStateDir(settings)
     stateDir.mkdirs()
-    UtxoState.create(stateDir, Some(self), settings, influxRef)
+    UtxoState.create(stateDir, settings)
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: History): UtxoState =
@@ -353,7 +353,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             case None => throw new Exception(s"Failed to get full block for header $h")
           }
         }
-        toApply.foldLeft(startState) { (s, m) => s.applyModifier(m).right.get }
+        toApply.foldLeft(startState) { (s, m) => s.applyValidModifier(m) }
     }
 
   override def close(): Unit = {
