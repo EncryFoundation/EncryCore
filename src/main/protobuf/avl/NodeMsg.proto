@@ -1,0 +1,42 @@
+syntax = "proto3";
+import "scalapb/scalapb.proto";
+
+message NodeProtoMsg {
+
+    message NodeTypes {
+
+        message LeafNodeProto {
+            bytes key = 1;
+            bytes value = 2;
+        }
+
+        message InternalNodeProto {
+            bytes key = 1;
+            bytes value = 2;
+            int32 height = 3;
+            int32 balance = 4;
+            ShadowNodeProto leftChild = 5;
+            ShadowNodeProto rightChild = 6;
+            bytes hash = 7;
+        }
+
+        message ShadowNodeProto {
+            bytes hash = 1;
+            int32 height = 2;
+            int32 balance = 3;
+        }
+
+        message EmptyNodeProto {
+            bool emptyNode = 1;
+        }
+
+        oneof nodeProto {
+            LeafNodeProto leaf = 1;
+            InternalNodeProto internal = 2;
+            ShadowNodeProto shadow = 3;
+            EmptyNodeProto emptyNode = 4;
+        }
+    }
+
+    NodeTypes node = 1;
+}
