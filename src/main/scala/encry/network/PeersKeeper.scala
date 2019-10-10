@@ -228,7 +228,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
     case RemovePeerFromBlackList(peer) => blackList = blackList.remove(peer.getAddress)
 
-    case FullBlockChainIsSynced() =>
+    case FullBlockChainIsSynced =>
       logger.info(s"Peers keeper got message: FullBlockChainIsSynced")
       context.become(workingBehaviour(isBlockChainSynced = true))
 

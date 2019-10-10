@@ -191,7 +191,7 @@ object Utils extends Settings with StrictLogging {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(storage, settings.constants)
+    new UtxoState(storage, Height @@ 0, 0)
   }
 
   def getRandomTempDir: File = {

@@ -14,7 +14,7 @@ trait UtxoStateReader {
 
   implicit val hf: Algos.HF = Algos.hash
 
-  var height: Height
+  val height: Height
 
   protected val storage: VersionalStorage
 

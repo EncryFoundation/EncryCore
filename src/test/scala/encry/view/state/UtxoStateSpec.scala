@@ -11,7 +11,7 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.modifiers.history.{Block, Payload}
+import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.iq80.leveldb.Options
 import org.scalatest.{Matchers, PropSpec}
@@ -62,7 +62,7 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(storage, settings.constants)
+    new UtxoState(storage, Height @@ 0, 0L)
   }
 
 
