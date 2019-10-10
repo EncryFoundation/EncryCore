@@ -1,12 +1,14 @@
 package encry.view.fastSync
 
+import java.net.InetSocketAddress
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.google.common.primitives.{Ints, Longs}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
@@ -16,16 +18,30 @@ import encry.view.state.UtxoState
 import encry.view.state.avlTree.utils.implicits.Serializer
 import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.network.BasicMessagesRepo
+import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.util.Try
 
-class SnapshotHolder(settings: EncryAppSettings) extends Actor with StrictLogging {
+class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef) extends Actor with StrictLogging {
+
+  import context.dispatcher
 
   var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
 
-  // networkController ! RegisterMessagesHandler(smth, self)
+  override def preStart(): Unit = {
+    logger.info(s"SnapshotHolder has started.")
+    networkController ! RegisterMessagesHandler(Seq(
+      RequestManifest.NetworkMessageTypeID -> "RequestManifest",
+      ResponseManifestMessage.NetworkMessageTypeID -> "ResponseManifestMessage",
+      RequestChunkMessage.NetworkMessageTypeID -> "RequestChunkMessage",
+      ResponseChunkMessage.NetworkMessageTypeID -> "ResponseChunkMessage",
+      ManifestHasChanged.NetworkMessageTypeID -> "ManifestHasChanged"
+    ), self)
+  }
+
+  var communicationWithPeer: Option[(InetSocketAddress, Cancellable)] = None
 
   override def receive: Receive = {
     case UpdateSnapshot(block, state) =>
@@ -38,21 +54,87 @@ class SnapshotHolder(settings: EncryAppSettings) extends Actor with StrictLoggin
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
       snapshotProcessor = newProcessor
 
-    case RequestActualManifest(remote) =>
-      logger.info(s"${remote.socketAddress} has asked actual manifest.")
-      remote.handlerRef ! ResponseManifest(snapshotProcessor.actualManifest)
-
-    case RequestSnapshot(remote) =>
-      logger.info(s"${remote.socketAddress} has asked actual chunks.")
-      snapshotProcessor.restoreActualChunks.foreach(bytes => remote.handlerRef ! ResponseSnapshotChunk(bytes))
-
     case SemanticallySuccessfulModifier(_) => //do nothing
     case nonsense => logger.info(s"Snapshot holder got strange message $nonsense.")
+  }
+
+  def fastSyncMod(toRequest: List[Array[Byte]],
+                  manifestId: Array[Byte],
+                  inAwait: List[Array[Byte]],
+                  responseTimeout: Option[Cancellable]): Receive = {
+    case AskNextChunks if inAwait.isEmpty =>
+
+    case AskNextChunks =>
+      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! AskNextChunks)
+    case DataFromPeer(message, remote) =>
+      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
+      message match {
+        case ResponseManifestMessage(byteString) =>
+          SnapshotManifestSerializer.fromProto(byteString).fold(e => {
+            logger.info(s"Tried to parse manifest from ${remote.socketAddress}, but gor exception ${e.getMessage}.")
+            //todo ban node
+          }, manifest => {
+            logger.info(s"Got manifest from ${remote.socketAddress}. Starting fast sync downloading.")
+            context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! AskNextChunks)
+            context.become(fastSyncMod(manifest.chunksKeys, manifest.ManifestId, List.empty, None))
+          })
+        case ResponseChunkMessage(chunk) =>
+        case ManifestHasChanged(requestedManifestId, newManifestId) =>
+        case _ =>
+      }
+
+    case nonsense => logger.info(s"Snapshot holder got strange message $nonsense while fast sync mod.")
+  }
+
+  def workMod(connections: List[(InetSocketAddress, Cancellable)]): Receive = {
+    case DataFromPeer(message, remote) if communicationWithPeer.exists(_._1 == remote.socketAddress) =>
+      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
+      message match {
+        case BasicMessagesRepo.RequestManifest =>
+          logger.info(s"Remote ${remote.socketAddress} requested actual manifest.")
+          snapshotProcessor.actualManifest.foreach { m =>
+            logger.info(s"Sent to remote ${remote.socketAddress} actual manifest.")
+            remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
+          }
+        case RequestChunkMessage(chunkId, manifestId) =>
+          logger.info(s"Got request chunk message from ${remote.socketAddress} with manifest if ${Algos.encode(manifestId)}." +
+            s" Actual manifest id is ${snapshotProcessor.actualManifest.map(e => Algos.encode(e.ManifestId))}.")
+
+          if (
+            snapshotProcessor.actualManifest.exists(_.ManifestId.sameElements(manifestId)) &&
+              snapshotProcessor.actualManifest.exists(_.chunksKeys.exists(_.sameElements(chunkId)))
+          ) {
+            logger.info(s"Request for chunk from ${remote.socketAddress} is valid.")
+            snapshotProcessor.getChunkById(chunkId).foreach { ch =>
+              logger.info(s"Sent response with chunk ${Algos.encode(chunkId)} and manifest ${Algos.encode(manifestId)}.")
+              communicationWithPeer = Some(
+                remote.socketAddress ->
+                  context.system.scheduler.scheduleOnce(settings.snapshotSettings.requestTimeout)(self ! TimeoutHasExpired)
+              )
+              remote.handlerRef ! ResponseChunkMessage(ch)
+            }
+          } else {
+            //todo if 2nd condition false - ban node
+            logger.info(s"Got request for chunk from old manifest.")
+            snapshotProcessor.actualManifest.foreach { m =>
+              logger.info(s"Sent to ${remote.socketAddress} new manifest.")
+              ManifestHasChanged(manifestId, SnapshotManifestSerializer.toProto(m))
+            }
+          }
+      }
+    case TimeoutHasExpired =>
+      communicationWithPeer = None
+    //todo ban peer
+
+    case DataFromPeer(message, remote) => //do nothing
   }
 
 }
 
 object SnapshotHolder {
+
+  final case object TimeoutHasExpired
+  final case object AskNextChunks
 
   final case class SnapshotManifest(bestBlockId: ModifierId,
                                     rootHash: Array[Byte],
@@ -140,5 +222,9 @@ object SnapshotHolder {
   final case class RequestSnapshot(remote: ConnectedPeer) extends AnyVal
 
   final case class ResponseSnapshotChunk(bytes: Array[Byte]) extends AnyVal
+
+  def props(settings: EncryAppSettings, networkController: ActorRef): Props = Props(
+    new SnapshotHolder(settings, networkController)
+  )
 
 }

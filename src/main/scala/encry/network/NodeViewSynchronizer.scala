@@ -34,6 +34,7 @@ import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.fastSync.SnapshotHolder
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -46,6 +47,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
+
+  val snapshotHolder: ActorRef = context.system.actorOf(SnapshotHolder.props(settings, networkController))
 
   networkController ! RegisterMessagesHandler(Seq(
     InvNetworkMessage.NetworkMessageTypeID -> "InvNetworkMessage",
