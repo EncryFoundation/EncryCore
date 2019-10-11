@@ -1,10 +1,11 @@
 package encry.view.state.avlTree
 
+import com.typesafe.scalalogging.StrictLogging
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
 case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty[ByteArrayWrapper, Node[K, V]],
-                               deletedNodes: Set[ByteArrayWrapper] = Set.empty[ByteArrayWrapper]) {
+                               deletedNodes: Set[ByteArrayWrapper] = Set.empty[ByteArrayWrapper]) extends StrictLogging {
 
   def resolve: (Map[ByteArrayWrapper, Node[K, V]], List[ByteArrayWrapper]) = {
     val toDelete = deletedNodes.diff(insertedNodes.keys.toSet)
@@ -14,6 +15,7 @@ case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] 
 
   def update(newInserted: List[(ByteArrayWrapper, Node[K, V])] = List.empty[(ByteArrayWrapper, Node[K, V])],
              newDeleted: List[ByteArrayWrapper] = List.empty[ByteArrayWrapper]): OperationInfo[K, V] = {
+    logger.info(s"del1: ${newDeleted.map(elem => Algos.encode(elem.data))}")
 //    val toInsert = insertedNodes ++ newInserted
 //    val toDelete = deletedNodes.diff(toInsert.keys.toList)
 //    this.copy(
@@ -28,6 +30,7 @@ case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] 
 
   def update(newInserted: (ByteArrayWrapper, Node[K, V]),
              newDeleted: ByteArrayWrapper): OperationInfo[K, V] = {
+    logger.info(s"del2: ${Algos.encode(newDeleted.data)}")
 //    val toDelete = newDeleted +: deletedNodes
 //    val toInsert = (insertedNodes + newInserted) -- deletedNodes
 //    this.copy(
@@ -40,9 +43,11 @@ case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] 
     )
   }
 
-  def updateDeleted(newDeleted: ByteArrayWrapper): OperationInfo[K, V] =
+  def updateDeleted(newDeleted: ByteArrayWrapper): OperationInfo[K, V] = {
+    logger.info(s"del3: ${Algos.encode(newDeleted.data)}")
 //    this.copy(insertedNodes - newDeleted, newDeleted +: deletedNodes)
     this.copy(insertedNodes = insertedNodes - newDeleted, deletedNodes = deletedNodes + newDeleted)
+  }
 
   def updateInserted(newInserted: (ByteArrayWrapper, Node[K, V])): OperationInfo[K, V] = {
 //    val toInsert = insertedNodes + newInserted
