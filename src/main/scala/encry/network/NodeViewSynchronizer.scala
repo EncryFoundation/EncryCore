@@ -49,7 +49,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
 
-  val snapshotHolder: ActorRef = context.system.actorOf(SnapshotHolder.props(settings, networkController))
+  val snapshotHolder: ActorRef = context.system.actorOf(SnapshotHolder.props(settings, networkController, nodeViewHolderRef))
 
   networkController ! RegisterMessagesHandler(Seq(
     InvNetworkMessage.NetworkMessageTypeID -> "InvNetworkMessage",
