@@ -42,7 +42,7 @@ case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] 
 
   def updateDeleted(newDeleted: ByteArrayWrapper): OperationInfo[K, V] =
 //    this.copy(insertedNodes - newDeleted, newDeleted +: deletedNodes)
-    this.copy(deletedNodes = deletedNodes + newDeleted)
+    this.copy(insertedNodes = insertedNodes - newDeleted, deletedNodes = deletedNodes + newDeleted)
 
   def updateInserted(newInserted: (ByteArrayWrapper, Node[K, V])): OperationInfo[K, V] = {
 //    val toInsert = insertedNodes + newInserted

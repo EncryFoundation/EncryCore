@@ -77,10 +77,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       case (prevRoot, toDelete) =>
         deleteKey(toDelete, prevRoot)
     }
+    logger.info(s"After deleting rootNode: ${rootAfterDelete}")
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         insert(keyToInsert, valueToInsert, prevRoot)
     }
+    logger.info(s"new root should be: ${newRoot}")
     newRoot.node.hash
   }
 
