@@ -46,7 +46,7 @@ final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
   }
 
   def processNewBlock(block: Block): SnapshotProcessor = {
-    val condition: Int = (block.header.height - settings.levelDB.maxVersions) % 1000
+    val condition: Int = (block.header.height - settings.levelDB.maxVersions) % 200
     logger.info(s"Condition $condition.")
     val (processor, toDelete) =
       if (condition == 0) updateActualSnapshot()
