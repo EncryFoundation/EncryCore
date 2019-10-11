@@ -10,6 +10,8 @@ case class BlockDownloadProcessor(nodeSettings: NodeSettings, constants: Constan
 
   private[history] var minimalBlockHeightVar: Int = Int.MaxValue
 
+  def updateMinimalBlockHeightVar(height: Int): Unit = minimalBlockHeightVar = height
+
   /** Start height to download full blocks.
     * Int.MaxValue when headers chain is not synchronized with the network and no full blocks download needed */
   def minimalBlockHeight: Int = minimalBlockHeightVar

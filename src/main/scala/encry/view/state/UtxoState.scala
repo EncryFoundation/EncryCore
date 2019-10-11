@@ -2,6 +2,8 @@ package encry.view.state
 
 import java.io.File
 
+import NodeMsg.NodeProtoMsg
+
 import cats.data.Validated
 import cats.instances.list._
 import cats.syntax.either._
@@ -21,8 +23,9 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
+import encry.view.fastSync.SnapshotHolder.SnapshotChunk
 import encry.view.state.UtxoState.StateChange
-import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.{AvlTree, Node, NodeSerilalizer}
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -173,6 +176,9 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     } else tx.semanticValidity.errors.headOption
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
+
+  def applyNodesFastSync(chunks: List[NodeProtoMsg]): UtxoState =
+    this.copy(tree = tree.assembleTree(chunks.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_))))
 
   def close(): Unit = tree.close()
 }
