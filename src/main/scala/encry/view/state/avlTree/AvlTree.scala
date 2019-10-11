@@ -147,6 +147,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         val balancedRoot = balance(newNode)
         (Some(balancedRoot.node), balancedRoot.opInfo)
       } else {
+        logger.info(s"theClosestValue for node ${internalNode}")
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
         val hash            = implicitly[Hashable[K]]
         val newNode = theClosestValue match {
