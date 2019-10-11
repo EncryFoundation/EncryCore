@@ -188,10 +188,13 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
   }
 
   def commonMessages: Receive = {
-    case UpdateSnapshot(block, state) =>
+    case UpdateSnapshot(block, state) if block.header.height != settings.constants.GenesisHeight =>
       logger.info(s"Snapshot holder got update snapshot message. Potential snapshot processing has started.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewSnapshot(state, block)
       snapshotProcessor = newProcessor
+
+    case UpdateSnapshot(block, state) =>
+      logger.info(s"Got update state for genesis block and tree.")
 
     case SemanticallySuccessfulModifier(block: Block) =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
