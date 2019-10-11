@@ -66,6 +66,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     } finally readOptions.snapshot().close()
   }
 
+  val b = 1: Byte
+  val c = b + 10
+
   /**
     * Insert new version to db.
     *

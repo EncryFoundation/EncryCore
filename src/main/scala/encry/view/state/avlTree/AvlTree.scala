@@ -32,12 +32,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
                          vM: Monoid[V]): AvlTree[K, V] = {
     val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(rootNode)) {
       case (prevRoot, toDeleteKey) =>
-        logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(toDeleteKey))}")
+        //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(toDeleteKey))}")
         deleteKey(toDeleteKey, prevRoot)
     }
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
-        logger.info(s"to insert: ${Algos.encode(kSer.toBytes(keyToInsert))}")
+        //logger.info(s"to insert: ${Algos.encode(kSer.toBytes(keyToInsert))}")
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
@@ -48,20 +48,20 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       version,
       toInsert.map {
         case (key, value) =>
-          logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
+          //logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
           StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
       } ++
         insertedNodes.map {
           case (key, node) =>
-            logger.info(s"insert node: ${Algos.encode(key.data)}")
+            //logger.info(s"insert node: ${Algos.encode(key.data)}")
             StorageKey @@ key.data -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList :+
         (AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash),
       deletedNodes.map(key => {
-        logger.info(s"Delete node: ${Algos.encode(key.data)}")
+        //logger.info(s"Delete node: ${Algos.encode(key.data)}")
         StorageKey @@ key.data
       }) ++ toDelete.map(key => {
-        logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
+        //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
