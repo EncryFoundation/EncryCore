@@ -116,6 +116,7 @@ object SnapshotProcessor extends StrictLogging {
   def getDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {
+    snapshotsDir.mkdirs()
     val storage: VersionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init snapshots holder with iodb storage")
