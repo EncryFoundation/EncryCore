@@ -230,7 +230,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case StartMiner =>
       context.system.eventStream.publish(EnableMining)
       context.system.eventStream.publish(StartMining)
-    case StopMiner                 => context.system.eventStream.publish(DisableMining)
+    case StopMiner                 =>
+      println("DISABLE")
+      context.system.eventStream.publish(DisableMining)
     case ShutdownNode              => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
     case GetDataFromWallet(f) => (nodeViewHolder ? GetDataFromWallet(f)).pipeTo(sender)
     case GetAllInfo =>

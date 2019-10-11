@@ -37,7 +37,14 @@ object EncryApp extends App with StrictLogging {
 
   lazy val settings: EncryAppSettings = EncryAppSettings.read(args.headOption)
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
-
+//
+//  val fileName = "/Users/liorliviev/IdeaProjects/EncryCore/src/main/scala/encry/api/http/routes/argon/index.html"
+//
+// val b =  for (line <- Source.fromFile(fileName).getLines) {
+//    println(line)
+//  }
+//
+//  b
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
   val nodeId: Array[Byte] = Algos.hash(settings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + settings.network.bindAddress.getPort)).take(5)
@@ -81,6 +88,7 @@ object EncryApp extends App with StrictLogging {
 
     val apiRoutes: Seq[ApiRoute] = Seq(
       HuiRoute(settings.restApi, dataHolderForApi),
+      ArgonRoute(settings.restApi),
       PeersApiRoute(settings.restApi, dataHolderForApi),
       InfoApiRoute(dataHolderForApi, settings, nodeId, timeProvider),
       HistoryApiRoute(dataHolderForApi, settings, nodeId),
