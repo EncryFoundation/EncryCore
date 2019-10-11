@@ -35,7 +35,7 @@ import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.SnapshotHolder
-import encry.view.fastSync.SnapshotHolder.FastSyncDone
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, UpdateSnapshot}
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -186,6 +186,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
     case msg@SendToNetwork(_, _) => peersKeeper ! msg
+    case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
     case msg@FastSyncDone =>
       nodeViewHolderRef ! msg
       deliveryManager ! msg

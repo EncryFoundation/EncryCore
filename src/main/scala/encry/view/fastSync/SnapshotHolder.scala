@@ -42,6 +42,7 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
 
   override def preStart(): Unit = {
     logger.info(s"SnapshotHolder has started.")
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     networkController ! RegisterMessagesHandler(
       Seq(
         RequestManifest.NetworkMessageTypeID         -> "RequestManifest",
