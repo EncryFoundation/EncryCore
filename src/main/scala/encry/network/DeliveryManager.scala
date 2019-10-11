@@ -26,6 +26,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.fastSync.SnapshotHolder.FastSyncDone
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -71,6 +72,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
   var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings.network)
 
   var canProcessTransactions: Boolean = true
+
+  var canProcessPayloads: Boolean = !settings.snapshotSettings.startWith
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
@@ -120,7 +123,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case _ =>
       }
 
-    case CheckPayloadsToDownload =>
+    case CheckPayloadsToDownload if canProcessPayloads =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
@@ -135,6 +138,19 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val nextCheckModsScheduler =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
       context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsScheduler))
+
+    case CheckPayloadsToDownload =>
+      logger.info(s"Got CheckPayloadsToDownload while snapshotSettings.startWith is ${settings.snapshotSettings.startWith}.")
+      context.become(basicMessageHandler(
+        history,
+        isBlockChainSynced,
+        settings.node.mining,
+        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
+      ))
+
+    case FastSyncDone =>
+      logger.info(s"Delivery manager got FastSyncDone message.")
+      canProcessPayloads = true
 
     case SemanticallySuccessfulModifier(mod) =>
       logger.info(s"Got SemanticallySuccessfulModifier with id: ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} on dm")

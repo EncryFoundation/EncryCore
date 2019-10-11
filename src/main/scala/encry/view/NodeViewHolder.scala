@@ -2,6 +2,7 @@ package encry.view
 
 import java.io.File
 
+import NodeMsg.NodeProtoMsg
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -19,7 +20,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fastSync.SnapshotHolder
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, NewChunkToApply}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -47,6 +48,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  var canDownloadPayloads: Boolean = !settings.snapshotSettings.startWith
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
@@ -105,7 +107,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
 
-    case CompareViews(peer, modifierTypeId, modifierIds) =>
+    case CompareViews(peer, modifierTypeId, modifierIds)
+        if (modifierTypeId == Payload.modifierTypeId && canDownloadPayloads) || modifierTypeId != Payload.modifierTypeId =>
       logger.debug(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
@@ -119,6 +122,22 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
+
+    case CompareViews(peer, modifierTypeId, modifierIds) =>
+
+    case FastSyncDoneAt(height, id) =>
+      canDownloadPayloads = true
+      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(height)
+      nodeView.history.getHeaderById(ModifierId @@ id).foreach { h =>
+      logger.info(s"Update best block fast sync mod")
+        updateNodeView(updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)))
+      }
+      nodeViewSynchronizer ! FastSyncDone
+
+    case NewChunkToApply(list: List[NodeProtoMsg]) =>
+      val newState = nodeView.state.applyNodesFastSync(list)
+      updateNodeView(updatedState = Some(newState))
+      logger.info(s"NVH Updated state")
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }

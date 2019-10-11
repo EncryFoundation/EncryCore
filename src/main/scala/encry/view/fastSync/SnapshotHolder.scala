@@ -1,22 +1,28 @@
 package encry.view.fastSync
 
-import java.net.InetSocketAddress
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
-import com.google.common.primitives.{Ints, Longs}
+import akka.actor.{ Actor, ActorRef, Cancellable, Props }
+import com.google.common.primitives.{ Ints, Longs }
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.Broadcast
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PeersKeeper.SendToNetwork
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import encry.view.fastSync.SnapshotHolder._
+import encry.view.fastSync.SnapshotDownloadController.{
+  ProcessManifestHasChangedMessage,
+  ProcessRequestedChunkResult,
+  ProcessRequestedManifestResult
+}
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.utils.implicits.Serializer
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
+import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo
 import org.encryfoundation.common.network.BasicMessagesRepo._
@@ -24,26 +30,163 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.util.Try
 
-class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef) extends Actor with StrictLogging {
+class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, nodeViewHolder: ActorRef)
+    extends Actor
+    with StrictLogging {
 
   import context.dispatcher
 
-  var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
+  var snapshotProcessor: SnapshotProcessor                   = SnapshotProcessor.initialize(settings)
+  var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
+  var givingChunksProcessor: GivingChunksProcessor           = GivingChunksProcessor.empty
 
   override def preStart(): Unit = {
     logger.info(s"SnapshotHolder has started.")
-    networkController ! RegisterMessagesHandler(Seq(
-      RequestManifest.NetworkMessageTypeID -> "RequestManifest",
-      ResponseManifestMessage.NetworkMessageTypeID -> "ResponseManifestMessage",
-      RequestChunkMessage.NetworkMessageTypeID -> "RequestChunkMessage",
-      ResponseChunkMessage.NetworkMessageTypeID -> "ResponseChunkMessage",
-      ManifestHasChanged.NetworkMessageTypeID -> "ManifestHasChanged"
-    ), self)
+    networkController ! RegisterMessagesHandler(
+      Seq(
+        RequestManifest.NetworkMessageTypeID         -> "RequestManifest",
+        ResponseManifestMessage.NetworkMessageTypeID -> "ResponseManifestMessage",
+        RequestChunkMessage.NetworkMessageTypeID     -> "RequestChunkMessage",
+        ResponseChunkMessage.NetworkMessageTypeID    -> "ResponseChunkMessage",
+        ManifestHasChanged.NetworkMessageTypeID      -> "ManifestHasChanged"
+      ),
+      self
+    )
   }
 
-  var communicationWithPeer: Option[(InetSocketAddress, Cancellable)] = None
+  override def receive: Receive =
+    if (settings.snapshotSettings.startWith) fastSyncMod
+    else workMod(None).orElse(commonMessages)
 
-  override def receive: Receive = {
+  def fastSyncMod: Receive = {
+    case RequestNextChunks
+        if snapshotDownloadController.toRequest.nonEmpty || snapshotDownloadController.inAwait.nonEmpty =>
+      logger.info(s"Got RequestNextChunks message.")
+      val (controller, toDownload) = snapshotDownloadController.chunksIdsToDownload
+      if (toDownload.nonEmpty) toDownload.foreach(b => controller.cp.foreach(_.handlerRef ! b))
+      snapshotDownloadController = controller
+      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! RequestNextChunks)
+
+    case RequestNextChunks if snapshotDownloadController.currentManifest.nonEmpty =>
+      nodeViewHolder ! FastSyncDoneAt(
+        snapshotProcessor.actualManifest.map(_.bestBlockHeight).getOrElse(-1),
+        snapshotProcessor.actualManifest.map(_.bestBlockId).getOrElse(Array.emptyByteArray)
+      )
+
+    case DataFromPeer(message, remote) =>
+      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
+      message match {
+        case ResponseManifestMessage(manifest) =>
+          snapshotDownloadController.processRequestedManifest(manifest, remote) match {
+            case ProcessRequestedManifestResult(_, true, false) =>
+              logger.info(s"Ban illegal peer ${remote.socketAddress}!")
+            //todo ban remote
+            case ProcessRequestedManifestResult(controller, false, true) =>
+              logger.info(s"Start processing chunks for manifest ${controller.currentManifest
+                .map(e => Algos.encode(e.ManifestId))} from ${remote.socketAddress}.")
+              snapshotDownloadController = controller
+              self ! RequestNextChunks
+            case ProcessRequestedManifestResult(_, false, false) =>
+              logger.info(s"Got new manifest from ${remote.socketAddress} but has been already processing other one.")
+          }
+        case ResponseChunkMessage(chunk) =>
+          snapshotDownloadController.processRequestedChunk(chunk, remote) match {
+            case ProcessRequestedChunkResult(_, true, _) =>
+              logger.info(s"Got corrupted chunk from ${remote.socketAddress}.")
+            //todo ban node
+            case ProcessRequestedChunkResult(controller, false, list: List[NodeProtoMsg]) if list.nonEmpty =>
+              logger.info(s"Got correct chunk from ${remote.socketAddress}.")
+              snapshotDownloadController = controller
+              nodeViewHolder ! NewChunkToApply(list)
+            case ProcessRequestedChunkResult(_, false, _) =>
+              logger.info(s"Got chunk from peer which not correspond to expected.")
+          }
+        case ManifestHasChanged(requestedManifestId, newManifestId: SnapshotManifestProtoMessage) =>
+          snapshotDownloadController.processManifestHasChangedMessage(newManifestId, requestedManifestId, remote) match {
+            case ProcessManifestHasChangedMessage(_, true) =>
+            //todo ban peer
+            case ProcessManifestHasChangedMessage(controller, false) =>
+              snapshotDownloadController = controller
+          }
+        case _ =>
+      }
+
+    case HeaderChainIsSynced => //todo probably should process only 1 time
+      logger.info(s"Broadcast request for new manifest")
+      context.parent ! SendToNetwork(RequestManifest, Broadcast)
+    case RequestNextChunks =>
+    case nonsense          => logger.info(s"Snapshot holder got strange message $nonsense while fast sync mod.")
+  }
+
+  def workMod(timeout: Option[Cancellable]): Receive = {
+    case DataFromPeer(message, remote)
+        if givingChunksProcessor.peer.isEmpty || givingChunksProcessor.peer.exists(
+          _.socketAddress == remote.socketAddress
+        ) =>
+      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
+      message match {
+        case BasicMessagesRepo.RequestManifest =>
+          logger.info(s"Remote ${remote.socketAddress} requested actual manifest.")
+          snapshotProcessor.actualManifest.foreach { m =>
+            logger.info(s"Sent to remote ${remote.socketAddress} actual manifest.")
+            remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
+          }
+          givingChunksProcessor = givingChunksProcessor
+            .copy(Some(remote),
+                  snapshotProcessor.actualManifest,
+                  snapshotProcessor.actualManifest.map(_.chunksKeys).getOrElse(List.empty))
+        case RequestChunkMessage(chunkId, manifestId) =>
+          timeout.foreach(_.cancel())
+          logger.info(
+            s"Got request chunk message from ${remote.socketAddress} with manifest if ${Algos.encode(manifestId)}." +
+              s" Actual manifest id is ${snapshotProcessor.actualManifest.map(e => Algos.encode(e.ManifestId))}."
+          )
+          if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress) && snapshotProcessor.actualManifest
+                .exists(_.ManifestId.sameElements(manifestId)) && snapshotProcessor.actualManifest
+                .exists(_.chunksKeys.exists(_.sameElements(chunkId)))) {
+            logger.info(s"Request for chunk from ${remote.socketAddress} is valid.")
+            snapshotProcessor.getChunkById(chunkId).foreach { ch =>
+              logger
+                .info(s"Sent response with chunk ${Algos.encode(chunkId)} and manifest ${Algos.encode(manifestId)}.")
+              givingChunksProcessor = givingChunksProcessor.updateLastsIds(ch.id.toByteArray, remote)
+              remote.handlerRef ! ResponseChunkMessage(ch)
+            }
+            context.become(
+              workMod(
+                Some(
+                  context.system.scheduler
+                    .scheduleOnce(settings.snapshotSettings.requestTimeout)(self ! TimeoutHasExpired)
+                )
+              )
+            )
+          } else if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress)) {
+            //todo if 2nd condition false - ban node
+            logger.info(s"Got request for chunk from old manifest.")
+            snapshotProcessor.actualManifest.foreach { m =>
+              logger.info(s"Sent to ${remote.socketAddress} new manifest.")
+              ManifestHasChanged(manifestId, SnapshotManifestSerializer.toProto(m))
+            }
+            givingChunksProcessor = givingChunksProcessor.copy(
+              Some(remote),
+              snapshotProcessor.actualManifest,
+              snapshotProcessor.actualManifest.map(_.chunksKeys).getOrElse(List.empty)
+            )
+            context.become(
+              workMod(
+                Some(
+                  context.system.scheduler
+                    .scheduleOnce(settings.snapshotSettings.requestTimeout)(self ! TimeoutHasExpired)
+                )
+              )
+            )
+          } else { /*???*/ }
+        case _ =>
+      }
+
+    case TimeoutHasExpired => givingChunksProcessor = GivingChunksProcessor.empty
+  }
+
+  def commonMessages: Receive = {
     case UpdateSnapshot(block, state) =>
       logger.info(s"Snapshot holder got update snapshot message. Potential snapshot processing has started.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewSnapshot(state, block)
@@ -55,86 +198,19 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef) ex
       snapshotProcessor = newProcessor
 
     case SemanticallySuccessfulModifier(_) => //do nothing
-    case nonsense => logger.info(s"Snapshot holder got strange message $nonsense.")
+    case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
   }
-
-  def fastSyncMod(toRequest: List[Array[Byte]],
-                  manifestId: Array[Byte],
-                  inAwait: List[Array[Byte]],
-                  responseTimeout: Option[Cancellable]): Receive = {
-    case AskNextChunks if inAwait.isEmpty =>
-
-    case AskNextChunks =>
-      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! AskNextChunks)
-    case DataFromPeer(message, remote) =>
-      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
-      message match {
-        case ResponseManifestMessage(byteString) =>
-          SnapshotManifestSerializer.fromProto(byteString).fold(e => {
-            logger.info(s"Tried to parse manifest from ${remote.socketAddress}, but gor exception ${e.getMessage}.")
-            //todo ban node
-          }, manifest => {
-            logger.info(s"Got manifest from ${remote.socketAddress}. Starting fast sync downloading.")
-            context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! AskNextChunks)
-            context.become(fastSyncMod(manifest.chunksKeys, manifest.ManifestId, List.empty, None))
-          })
-        case ResponseChunkMessage(chunk) =>
-        case ManifestHasChanged(requestedManifestId, newManifestId) =>
-        case _ =>
-      }
-
-    case nonsense => logger.info(s"Snapshot holder got strange message $nonsense while fast sync mod.")
-  }
-
-  def workMod(connections: List[(InetSocketAddress, Cancellable)]): Receive = {
-    case DataFromPeer(message, remote) if communicationWithPeer.exists(_._1 == remote.socketAddress) =>
-      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
-      message match {
-        case BasicMessagesRepo.RequestManifest =>
-          logger.info(s"Remote ${remote.socketAddress} requested actual manifest.")
-          snapshotProcessor.actualManifest.foreach { m =>
-            logger.info(s"Sent to remote ${remote.socketAddress} actual manifest.")
-            remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
-          }
-        case RequestChunkMessage(chunkId, manifestId) =>
-          logger.info(s"Got request chunk message from ${remote.socketAddress} with manifest if ${Algos.encode(manifestId)}." +
-            s" Actual manifest id is ${snapshotProcessor.actualManifest.map(e => Algos.encode(e.ManifestId))}.")
-
-          if (
-            snapshotProcessor.actualManifest.exists(_.ManifestId.sameElements(manifestId)) &&
-              snapshotProcessor.actualManifest.exists(_.chunksKeys.exists(_.sameElements(chunkId)))
-          ) {
-            logger.info(s"Request for chunk from ${remote.socketAddress} is valid.")
-            snapshotProcessor.getChunkById(chunkId).foreach { ch =>
-              logger.info(s"Sent response with chunk ${Algos.encode(chunkId)} and manifest ${Algos.encode(manifestId)}.")
-              communicationWithPeer = Some(
-                remote.socketAddress ->
-                  context.system.scheduler.scheduleOnce(settings.snapshotSettings.requestTimeout)(self ! TimeoutHasExpired)
-              )
-              remote.handlerRef ! ResponseChunkMessage(ch)
-            }
-          } else {
-            //todo if 2nd condition false - ban node
-            logger.info(s"Got request for chunk from old manifest.")
-            snapshotProcessor.actualManifest.foreach { m =>
-              logger.info(s"Sent to ${remote.socketAddress} new manifest.")
-              ManifestHasChanged(manifestId, SnapshotManifestSerializer.toProto(m))
-            }
-          }
-      }
-    case TimeoutHasExpired =>
-      communicationWithPeer = None
-    //todo ban peer
-
-    case DataFromPeer(message, remote) => //do nothing
-  }
-
 }
 
 object SnapshotHolder {
 
   final case object TimeoutHasExpired
-  final case object AskNextChunks
+
+  final case object RequestNextChunks
+
+  final case object HeaderChainIsSynced
+
+  final case class NewChunkToApply(list: List[NodeProtoMsg]) extends AnyVal
 
   final case class SnapshotManifest(bestBlockId: ModifierId,
                                     rootHash: Array[Byte],
@@ -150,14 +226,14 @@ object SnapshotHolder {
 
   object SnapshotManifestSerializer {
 
-    def toProto(manifest: SnapshotManifest): SnapshotManifestProtoMessage = SnapshotManifestProtoMessage()
-      .withBestBlockId(ByteString.copyFrom(manifest.bestBlockId))
-      .withRootHash(ByteString.copyFrom(manifest.rootHash))
-      .withRootNodeBytes(manifest.rootNodeBytes)
-      .withStateChunksNumber(manifest.stateChunksNumber)
-      .withBestBlockHeight(manifest.bestBlockHeight)
-      .withChunksIds(manifest.chunksKeys.map(ByteString.copyFrom))
-
+    def toProto(manifest: SnapshotManifest): SnapshotManifestProtoMessage =
+      SnapshotManifestProtoMessage()
+        .withBestBlockId(ByteString.copyFrom(manifest.bestBlockId))
+        .withRootHash(ByteString.copyFrom(manifest.rootHash))
+        .withRootNodeBytes(manifest.rootNodeBytes)
+        .withStateChunksNumber(manifest.stateChunksNumber)
+        .withBestBlockHeight(manifest.bestBlockHeight)
+        .withChunksIds(manifest.chunksKeys.map(ByteString.copyFrom))
 
     def fromProto(manifest: SnapshotManifestProtoMessage): Try[SnapshotManifest] = Try(
       SnapshotManifest(
@@ -171,10 +247,7 @@ object SnapshotHolder {
     )
   }
 
-
-  final case class SnapshotChunk(nodesList: List[NodeProtoMsg],
-                                 manifestId: Array[Byte],
-                                 id: Array[Byte])
+  final case class SnapshotChunk(nodesList: List[NodeProtoMsg], manifestId: Array[Byte], id: Array[Byte])
 
   object SnapshotChunk {
     def apply[K: Serializer, V: Serializer](list: List[Node[K, V]]): SnapshotChunk = {
@@ -200,10 +273,11 @@ object SnapshotHolder {
 
     import encry.view.state.avlTree.utils.implicits.Instances._
 
-    def toProto(chunk: SnapshotChunk): SnapshotChunkMessage = SnapshotChunkMessage()
-      .withChunks(chunk.nodesList)
-      .withManifestId(ByteString.copyFrom(chunk.manifestId))
-      .withId(ByteString.copyFrom(chunk.id))
+    def toProto(chunk: SnapshotChunk): SnapshotChunkMessage =
+      SnapshotChunkMessage()
+        .withChunks(chunk.nodesList)
+        .withManifestId(ByteString.copyFrom(chunk.manifestId))
+        .withId(ByteString.copyFrom(chunk.id))
 
     def fromProto(chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
       SnapshotChunk(
@@ -223,8 +297,12 @@ object SnapshotHolder {
 
   final case class ResponseSnapshotChunk(bytes: Array[Byte]) extends AnyVal
 
-  def props(settings: EncryAppSettings, networkController: ActorRef): Props = Props(
-    new SnapshotHolder(settings, networkController)
+  final case class FastSyncDoneAt(height: Int, headerId: Array[Byte])
+
+  final case object FastSyncDone
+
+  def props(settings: EncryAppSettings, networkController: ActorRef, nodeViewHolderRef: ActorRef): Props = Props(
+    new SnapshotHolder(settings, networkController, nodeViewHolderRef)
   )
 
 }

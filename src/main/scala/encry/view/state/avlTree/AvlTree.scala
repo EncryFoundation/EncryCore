@@ -525,13 +525,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
     newManifest -> subtrees
   }
 
-  def assembleTree(initState: AvlTree[K, V], chunks: List[SnapshotChunk])(implicit kSerializer: Serializer[K],
-                                                                          vSerializer: Serializer[V],
-                                                                          kMonoid: Monoid[K],
-                                                                          vMonoid: Monoid[V]): AvlTree[K, V] =
-    chunks.foldLeft(this) { case (state, chunk) =>
-      state.insertionInFastSyncMod(chunk.nodesList.map(NodeSerilalizer.fromProto[K, V](_)))
-    }
+  def assembleTree(chunks: List[Node[K, V]])(implicit kSerializer: Serializer[K],
+                                                vSerializer: Serializer[V],
+                                                kMonoid: Monoid[K],
+                                                vMonoid: Monoid[V]): AvlTree[K, V] = insertionInFastSyncMod(chunks)
 
   @scala.annotation.tailrec
   private def createSubtrees(nodesToProcess: List[Node[K, V]], subtreeChunks: List[SnapshotChunk])

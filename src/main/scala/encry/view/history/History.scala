@@ -134,6 +134,15 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
     }
   }
 
+  def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
+    logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
+    historyStorage.insert(
+      StorageVersion @@ validityKey(headerId).untag(StorageKey),
+      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+    )
+    this
+  }
+
   override def close(): Unit = historyStorage.close()
 
   def closeStorage(): Unit = historyStorage.close()

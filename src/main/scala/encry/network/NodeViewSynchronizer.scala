@@ -35,6 +35,7 @@ import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.SnapshotHolder
+import encry.view.fastSync.SnapshotHolder.FastSyncDone
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -184,6 +185,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
+    case msg@SendToNetwork(_, _) => peersKeeper ! msg
+    case msg@FastSyncDone =>
+      nodeViewHolderRef ! msg
+      deliveryManager ! msg
     case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
@@ -254,7 +259,7 @@ object NodeViewSynchronizer {
 
     case class ChangedHistory(reader: History) extends NodeViewChange
 
-    case class UpdatedHistory(history: History)
+    final case class UpdatedHistory(history: History) extends AnyVal
 
     case class ChangedState(reader: UtxoState) extends NodeViewChange
 
