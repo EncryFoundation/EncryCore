@@ -3,31 +3,29 @@ package encry.view.fastSync
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{ Actor, ActorRef, Cancellable, Props }
-import com.google.common.primitives.{ Ints, Longs }
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import com.google.common.primitives.{Ints, Longs}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.SendToNetwork
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.fastSync.SnapshotHolder._
-import encry.view.fastSync.SnapshotDownloadController.{
-  ProcessManifestHasChangedMessage,
-  ProcessRequestedChunkResult,
-  ProcessRequestedManifestResult
-}
+import encry.view.fastSync.SnapshotDownloadController.{ProcessManifestHasChangedMessage, ProcessRequestedChunkResult, ProcessRequestedManifestResult}
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.utils.implicits.Serializer
-import encry.view.state.avlTree.{ Node, NodeSerilalizer }
+import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -44,6 +42,8 @@ class SnapshotHolder(settings: EncryAppSettings,
   var givingChunksProcessor: GivingChunksProcessor           = GivingChunksProcessor.empty
 
   var processedTmp = false
+
+  var processNewSnapshot = false
 
   override def preStart(): Unit = {
     logger.info(s"SnapshotHolder has started.")
@@ -210,15 +210,19 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def commonMessages: Receive = {
-    case UpdateSnapshot(block, state) if block.header.height != settings.constants.GenesisHeight =>
+    case UpdateSnapshot(block, state) if block.header.height != settings.constants.GenesisHeight && processNewSnapshot =>
       logger.info(s"Snapshot holder got update snapshot message. Potential snapshot processing has started.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewSnapshot(state, block)
       snapshotProcessor = newProcessor
 
     case UpdateSnapshot(_, _) =>
-      logger.info(s"Got update state for genesis block and tree.")
+      logger.info(s"Got update state for genesis block and tree. Or processNewSnapshot $processNewSnapshot.")
 
-    case SemanticallySuccessfulModifier(block: Block) =>
+    case FullBlockChainIsSynced =>
+      logger.info(s"Snapshot holder got FullBlockChainIsSynced")
+      processNewSnapshot = true
+
+    case SemanticallySuccessfulModifier(block: Block) if processNewSnapshot =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
       snapshotProcessor = newProcessor

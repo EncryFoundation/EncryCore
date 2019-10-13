@@ -207,6 +207,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
       peersKeeper ! FullBlockChainIsSynced
+      if (!settings.snapshotSettings.startWith) snapshotHolder ! FullBlockChainIsSynced
     case StopTransactionsValidation =>
       deliveryManager ! StopTransactionsValidation
       canProcessTransactions = false
