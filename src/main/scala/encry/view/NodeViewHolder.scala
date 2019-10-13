@@ -20,7 +20,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, NewChunkToApply, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, NewChunkToApply, UpdateSnapshot}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -257,6 +257,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            if (newHistory.isHeadersChainSyncedVar) {
+              logger.info(s"Send to nvsh HeaderChainIsSynced")
+              nodeViewSynchronizer ! HeaderChainIsSynced
+            }
             if (newHistory.getBestBlock.exists(l => l.header.height % 200 == 0))
               newHistory.getBestBlock.foreach(b => nodeViewSynchronizer ! UpdateSnapshot(b, newState))
             influxRef.foreach { ref =>

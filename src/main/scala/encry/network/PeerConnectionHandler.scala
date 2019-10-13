@@ -140,7 +140,7 @@ class PeerConnectionHandler(connection: ActorRef,
       logger.debug("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
       connection ! ResumeReading
 
-    case message => logger.debug(s"Peer connection handler for $remote Got something strange: $message")
+    case message => logger.info(s"Peer connection handler for $remote Got something strange: $message")
   }
 
   def workingCycleWriting: Receive =

@@ -502,12 +502,16 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
   }
 
   def initializeSnapshotData(bestBlock: Block)(implicit kSerializer: Serializer[K],
-                                               vSerializer: Serializer[V]): (SnapshotManifest, List[SnapshotChunk]) = {
+                                               vSerializer: Serializer[V],
+                                               kMonoid: Monoid[K],
+                                               vMonoid: Monoid[V]): (SnapshotManifest, List[SnapshotChunk]) = {
     val rawSubtrees: List[SnapshotChunk] = createSubtrees(List(rootNode), List.empty).reverse
     val updS: List[SnapshotChunk] = if (rawSubtrees.nonEmpty) {
       val firstElem = rawSubtrees.headOption
       val newRaw: List[SnapshotChunk] = rawSubtrees.drop(1)
-      firstElem.map { ch => ch.copy(nodesList = ch.nodesList.drop(1)) }.fold(newRaw)(_ :: newRaw)
+      firstElem.map { ch =>
+        SnapshotChunk(ch.nodesList.drop(1).map(NodeSerilalizer.fromProto[K, V](_)), ch.manifestId)
+      }.fold(newRaw)(_ :: newRaw)
     } else rawSubtrees
     val newManifest: SnapshotManifest = rootNode match {
       case i: InternalNode[K, V] =>

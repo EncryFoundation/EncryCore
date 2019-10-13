@@ -30,7 +30,10 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.util.Try
 
-class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, nodeViewHolder: ActorRef)
+class SnapshotHolder(settings: EncryAppSettings,
+                     networkController: ActorRef,
+                     nodeViewHolder: ActorRef,
+                     nodeViewSyncronizer: ActorRef)
     extends Actor
     with StrictLogging {
 
@@ -39,6 +42,8 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
   var snapshotProcessor: SnapshotProcessor                   = SnapshotProcessor.initialize(settings)
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var givingChunksProcessor: GivingChunksProcessor           = GivingChunksProcessor.empty
+
+  var processedTmp = false
 
   override def preStart(): Unit = {
     logger.info(s"SnapshotHolder has started.")
@@ -64,7 +69,14 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
         if snapshotDownloadController.toRequest.nonEmpty || snapshotDownloadController.inAwait.nonEmpty =>
       logger.info(s"Got RequestNextChunks message.")
       val (controller, toDownload) = snapshotDownloadController.chunksIdsToDownload
-      if (toDownload.nonEmpty) toDownload.foreach(b => controller.cp.foreach(_.handlerRef ! b))
+      logger.info(s"Chunk lasts: all size ${controller.toRequest.size}. inAwait: ${controller.inAwait.size}")
+      if (toDownload.nonEmpty) toDownload.foreach { b =>
+        logger.info(s"toDownload.nonEmpty -> true")
+        controller.cp.foreach { l =>
+          logger.info(s"controller.cp -> nonEmpty: true")
+          l.handlerRef ! b
+        }
+      }
       snapshotDownloadController = controller
       context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! RequestNextChunks)
 
@@ -91,6 +103,7 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
               logger.info(s"Got new manifest from ${remote.socketAddress} but has been already processing other one.")
           }
         case ResponseChunkMessage(chunk) =>
+
           snapshotDownloadController.processRequestedChunk(chunk, remote) match {
             case ProcessRequestedChunkResult(_, true, _) =>
               logger.info(s"Got corrupted chunk from ${remote.socketAddress}.")
@@ -112,11 +125,14 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
         case _ =>
       }
 
-    case HeaderChainIsSynced => //todo probably should process only 1 time
+    case HeaderChainIsSynced if !processedTmp => //todo probably should process only 1 time
+      processedTmp = true
       logger.info(s"Broadcast request for new manifest")
-      context.parent ! SendToNetwork(RequestManifest, Broadcast)
-    case RequestNextChunks =>
-    case nonsense          => logger.info(s"Snapshot holder got strange message $nonsense while fast sync mod.")
+      nodeViewSyncronizer ! SendToNetwork(RequestManifest, Broadcast)
+    case HeaderChainIsSynced               =>
+    case SemanticallySuccessfulModifier(_) =>
+    case RequestNextChunks                 =>
+    case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense while fast sync mod.")
   }
 
   def workMod(timeout: Option[Cancellable]): Receive = {
@@ -150,7 +166,9 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
               logger
                 .info(s"Sent response with chunk ${Algos.encode(chunkId)} and manifest ${Algos.encode(manifestId)}.")
               givingChunksProcessor = givingChunksProcessor.updateLastsIds(ch.id.toByteArray, remote)
-              remote.handlerRef ! ResponseChunkMessage(ch)
+              val a = ResponseChunkMessage(ch)
+              logger.info(s"ResponseChunkMessage for chunk ${Algos.encode(chunkId)} is ${Algos.encode(a.chunk.id.toByteArray)}")
+              remote.handlerRef ! a
             }
             context.become(
               workMod(
@@ -193,7 +211,7 @@ class SnapshotHolder(settings: EncryAppSettings, networkController: ActorRef, no
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewSnapshot(state, block)
       snapshotProcessor = newProcessor
 
-    case UpdateSnapshot(block, state) =>
+    case UpdateSnapshot(_, _) =>
       logger.info(s"Got update state for genesis block and tree.")
 
     case SemanticallySuccessfulModifier(block: Block) =>
@@ -253,7 +271,7 @@ object SnapshotHolder {
 
   final case class SnapshotChunk(nodesList: List[NodeProtoMsg], manifestId: Array[Byte], id: Array[Byte])
 
-  object SnapshotChunk {
+  object SnapshotChunk extends StrictLogging  {
     def apply[K: Serializer, V: Serializer](list: List[Node[K, V]]): SnapshotChunk = {
       val chunkId: Array[Byte] = Algos.hash(list.flatMap(_.hash).toArray)
       new SnapshotChunk(
@@ -265,6 +283,7 @@ object SnapshotHolder {
 
     def apply[K: Serializer, V: Serializer](list: List[Node[K, V]], manifestId: Array[Byte]): SnapshotChunk = {
       val chunkId: Array[Byte] = Algos.hash(list.flatMap(_.hash).toArray)
+      logger.info(s"Create snapshotChunk with id ${Algos.encode(chunkId)}")
       new SnapshotChunk(
         list.map(NodeSerilalizer.toProto(_)),
         manifestId,
@@ -273,7 +292,7 @@ object SnapshotHolder {
     }
   }
 
-  object SnapshotChunkSerializer {
+  object SnapshotChunkSerializer extends StrictLogging {
 
     import encry.view.state.avlTree.utils.implicits.Instances._
 
@@ -283,12 +302,14 @@ object SnapshotHolder {
         .withManifestId(ByteString.copyFrom(chunk.manifestId))
         .withId(ByteString.copyFrom(chunk.id))
 
-    def fromProto(chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
-      SnapshotChunk(
+    def fromProto(chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try {
+      val a = SnapshotChunk(
         chunk.chunks.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).toList,
         chunk.manifestId.toByteArray
       )
-    )
+      logger.info(s"From proto for chunk ${Algos.encode(chunk.id.toByteArray)} created SnapshotChunk with id ${Algos.encode(a.id)}")
+      a
+    }
   }
 
   final case class UpdateSnapshot(bestBlock: Block, state: UtxoState)
@@ -305,8 +326,11 @@ object SnapshotHolder {
 
   final case object FastSyncDone
 
-  def props(settings: EncryAppSettings, networkController: ActorRef, nodeViewHolderRef: ActorRef): Props = Props(
-    new SnapshotHolder(settings, networkController, nodeViewHolderRef)
+  def props(settings: EncryAppSettings,
+            networkController: ActorRef,
+            nodeViewHolderRef: ActorRef,
+            nodeViewSyncronizer: ActorRef): Props = Props(
+    new SnapshotHolder(settings, networkController, nodeViewHolderRef, nodeViewSyncronizer)
   )
 
 }

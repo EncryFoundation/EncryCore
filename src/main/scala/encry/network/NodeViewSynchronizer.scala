@@ -35,7 +35,7 @@ import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.SnapshotHolder
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, UpdateSnapshot}
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -49,7 +49,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
 
-  val snapshotHolder: ActorRef = context.system.actorOf(SnapshotHolder.props(settings, networkController, nodeViewHolderRef)
+  val snapshotHolder: ActorRef = context.system.actorOf(SnapshotHolder.props(settings, networkController, nodeViewHolderRef, self)
   .withDispatcher("snapshot-holder-dispatcher"), "snapshotHolder")
 
   networkController ! RegisterMessagesHandler(Seq(
@@ -187,6 +187,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
     case msg@SendToNetwork(_, _) => peersKeeper ! msg
+    case msg@HeaderChainIsSynced => snapshotHolder ! msg
     case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
     case msg@FastSyncDone =>
       nodeViewHolderRef ! msg
