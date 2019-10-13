@@ -29,7 +29,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
-  private var isHeadersChainSyncedVar: Boolean = false
+  var isHeadersChainSyncedVar: Boolean = false
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))

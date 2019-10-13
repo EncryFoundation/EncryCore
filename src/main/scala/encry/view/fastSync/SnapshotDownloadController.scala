@@ -5,16 +5,13 @@ import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import encry.view.fastSync.SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
+import encry.view.fastSync.SnapshotHolder.{SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
 import cats.syntax.option._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
-import encry.view.fastSync.SnapshotDownloadController.{
-  ProcessManifestHasChangedMessage,
-  ProcessRequestedChunkResult,
-  ProcessRequestedManifestResult
-}
-import org.encryfoundation.common.network.BasicMessagesRepo.{ RequestChunkMessage, RequestChunkMessageSerializer }
+import encry.view.fastSync.SnapshotDownloadController.{ProcessManifestHasChangedMessage, ProcessRequestedChunkResult, ProcessRequestedManifestResult}
+import org.encryfoundation.common.network.BasicMessagesRepo.{NetworkMessage, RequestChunkMessage, RequestChunkMessageSerializer}
+import org.encryfoundation.common.utils.Algos
 
 final case class SnapshotDownloadController(currentManifest: Option[SnapshotManifest],
                                             toRequest: List[Array[Byte]],
@@ -61,6 +58,10 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
             ProcessRequestedChunkResult(this.copy(cp = remote.some), isForBan = true, List.empty)
           },
           chunk => {
+            logger.info(s"inAwait -> ${inAwait.map(Algos.encode)}")
+            logger.info(s"chunk -> ${Algos.encode(chunk.id)}")
+            logger.info(s"1st cond: ${currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId))}")
+            logger.info(s"2nd cond: ${inAwait.exists(_.sameElements(chunk.id))}")
             if (currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId)) &&
                 inAwait.exists(_.sameElements(chunk.id))) {
               val newController = this.copy(inAwait = inAwait.filterNot(_.sameElements(chunk.id)), cp = remote.some)
@@ -69,17 +70,21 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
               ProcessRequestedChunkResult(this.copy(cp = remote.some), isForBan = false, List.empty) //todo probably forBan = true
           }
         )
-    else ProcessRequestedChunkResult(this, isForBan = false, List.empty)
+    else {
+      logger.info(s"processRequestedChunk --->>> ELSE for ${remote.socketAddress}")
+      ProcessRequestedChunkResult(this, isForBan = false, List.empty)
+    }
 
-  def chunksIdsToDownload: (SnapshotDownloadController, List[GeneralizedNetworkProtoMessage.InnerMessage]) =
+  def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) =
     if (inAwait.isEmpty) {
       val newToRequest: List[Array[Byte]]     = toRequest.take(settings.snapshotSettings.chunksNumberPerRequest)
+      logger.info(s"newToRequest -> ${newToRequest.map(Algos.encode).mkString(",")}")
       val updatedToRequest: List[Array[Byte]] = toRequest.drop(settings.snapshotSettings.chunksNumberPerRequest)
-      val serializedToDownload = newToRequest.map(
-        e =>
-          RequestChunkMessageSerializer
-            .toProto(RequestChunkMessage(e, currentManifest.map(_.ManifestId).getOrElse(Array.emptyByteArray)))
+      //logger.info(s"updatedToRequest -> ${updatedToRequest.map(Algos.encode).mkString(",")}")
+      val serializedToDownload: List[RequestChunkMessage] = newToRequest.map(
+        e => RequestChunkMessage(e, currentManifest.map(_.ManifestId).getOrElse(Array.emptyByteArray))
       )
+      logger.info(s"serializedToDownload -> ${serializedToDownload.map(f => Algos.encode(f.chunkId)).mkString(",")}")
       this.copy(toRequest = updatedToRequest, inAwait = newToRequest) -> serializedToDownload
     } else this -> List.empty
 
