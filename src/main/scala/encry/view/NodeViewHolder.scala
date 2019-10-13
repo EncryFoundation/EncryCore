@@ -125,7 +125,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
-    case CompareViews(peer, modifierTypeId, modifierIds) =>
+    case CompareViews(_, _, _) =>
 
     case ManifestToNvh(m) =>
       logger.info(s"NVH got ManifestToNvh with ${m}")
