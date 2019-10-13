@@ -245,7 +245,7 @@ object SnapshotHolder {
                                     chunksKeys: List[Array[Byte]]) {
     val ManifestId: Array[Byte] = Algos.hash(
       Longs.toByteArray(stateChunksNumber) ++ bestBlockId ++ rootHash ++
-        rootNodeBytes.toByteArray ++ Ints.toByteArray(bestBlockHeight) ++ chunksKeys.flatten.toArray[Byte]
+        rootNodeBytes.toByteArray ++ Ints.toByteArray(bestBlockHeight)
     )
   }
 
@@ -285,7 +285,7 @@ object SnapshotHolder {
     }
 
     def apply[K: Serializer, V: Serializer](list: List[Node[K, V]], manifestId: Array[Byte]): SnapshotChunk = {
-      val chunkId: Array[Byte] = Algos.hash(list.flatMap(_.hash).toArray)
+      val chunkId: Array[Byte] = Algos.hash(list.flatMap(_.hash).toArray ++ manifestId)
       logger.info(s"Create snapshotChunk with id ${Algos.encode(chunkId)}")
       new SnapshotChunk(
         list.map(NodeSerilalizer.toProto(_)),
