@@ -30,7 +30,9 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
   def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
-      case header: Header   => (this, processHeader(header))
+      case header: Header   =>
+        logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
+        (this, processHeader(header))
       case payload: Payload => (this, processPayload(payload))
     })
   }

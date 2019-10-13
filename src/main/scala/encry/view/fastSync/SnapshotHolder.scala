@@ -82,8 +82,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case RequestNextChunks if snapshotDownloadController.currentManifest.nonEmpty =>
       nodeViewHolder ! FastSyncDoneAt(
-        snapshotProcessor.actualManifest.map(_.bestBlockHeight).getOrElse(-1),
-        snapshotProcessor.actualManifest.map(_.bestBlockId).getOrElse(Array.emptyByteArray)
+        snapshotDownloadController.currentManifest.map(_.bestBlockHeight).getOrElse(-1),
+        snapshotDownloadController.currentManifest.map(_.bestBlockId).getOrElse(Array.emptyByteArray)
       )
 
     case DataFromPeer(message, remote) =>
@@ -98,6 +98,7 @@ class SnapshotHolder(settings: EncryAppSettings,
               logger.info(s"Start processing chunks for manifest ${controller.currentManifest
                 .map(e => Algos.encode(e.ManifestId))} from ${remote.socketAddress}.")
               snapshotDownloadController = controller
+              nodeViewHolder ! ManifestToNvh(snapshotDownloadController.currentManifest)
               self ! RequestNextChunks
             case ProcessRequestedManifestResult(_, false, false) =>
               logger.info(s"Got new manifest from ${remote.socketAddress} but has been already processing other one.")
@@ -229,6 +230,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 
 object SnapshotHolder {
 
+  final case class ManifestToNvh(m: Option[SnapshotManifest])
+
   final case object TimeoutHasExpired
 
   final case object RequestNextChunks
@@ -247,6 +250,9 @@ object SnapshotHolder {
       Longs.toByteArray(stateChunksNumber) ++ bestBlockId ++ rootHash ++
         rootNodeBytes.toByteArray ++ Ints.toByteArray(bestBlockHeight)
     )
+
+    override def toString: String = s"bestBlockId ${Algos.encode(bestBlockId)}, rootHash ${Algos.encode(rootHash)}, " +
+      s"stateChunksNumber $stateChunksNumber, bestBlockHeight $bestBlockHeight."
   }
 
   object SnapshotManifestSerializer {

@@ -16,14 +16,16 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, NewChunkToApply, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestToNvh, NewChunkToApply, UpdateSnapshot}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
+import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -125,9 +127,20 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
     case CompareViews(peer, modifierTypeId, modifierIds) =>
 
+    case ManifestToNvh(m) =>
+      logger.info(s"NVH got ManifestToNvh with ${m}")
+      m.foreach { manifest =>
+      logger.info(s"Manifest non empty")
+        import encry.view.state.avlTree.utils.implicits.Instances._
+        val newAvl = AvlTree[StorageKey, StorageValue](manifest, nodeView.state.tree.storage)
+        val newState = nodeView.state.copy(tree = newAvl)
+        updateNodeView(updatedState = Some(newState))
+      }
+
     case FastSyncDoneAt(height, id) =>
       canDownloadPayloads = true
-      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(height)
+      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(height + 1)
+      logger.info(s"||||||||||||||||||||${nodeView.history.getHeaderById(ModifierId @@ id)}||||||||||||||||||||")
       nodeView.history.getHeaderById(ModifierId @@ id).foreach { h =>
       logger.info(s"Update best block fast sync mod")
         updateNodeView(updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)))
@@ -187,7 +200,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                           progressInfo: ProgressInfo,
                           suffixApplied: IndexedSeq[PersistentModifier]):
   (History, UtxoState, Seq[PersistentModifier]) = {
-    logger.debug(s"\nStarting updating state in updateState function!")
+    logger.info(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
       case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
@@ -219,6 +232,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
+              logger.info(s"Application to state faild cause ${e}")
               val (newHis: History, newProgressInfo: ProgressInfo) =
                 history.reportModifierIsInvalid(modToApply)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
@@ -244,7 +258,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
-          logger.debug(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+          logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
           logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
           influxRef.foreach { ref =>
             ref ! EndOfApplyingModifier(pmod.id)
@@ -254,7 +268,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             ref ! ModifierAppendedToHistory(isHeader, success = true)
           }
-          logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+          logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
           if (progressInfo.toApply.nonEmpty) {
             logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
             val startPoint: Long = System.currentTimeMillis()
@@ -295,7 +309,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           } else {
             if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-            logger.debug(s"\nProgress info is empty")
+            logger.info(s"\nProgress info is empty")
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
           }
         case Left(e) =>

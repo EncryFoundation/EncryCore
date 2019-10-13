@@ -87,7 +87,10 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           .toEither
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
-          err => err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState],
+          err => {
+            logger.info(s"Failed to state cause ${err.message}")
+            err.errors.map(modError => StateModifierApplyError(modError.message)).toList.asLeft[UtxoState]
+          },
           txsToApply => {
             val combineTimeStart = System.currentTimeMillis()
             val combinedStateChange: UtxoState.StateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
@@ -100,6 +103,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               Height @@ block.header.height
             )
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
+              logger.info(s"Invalid state root!")
               List(StateModifierApplyError(s"Incorrect state root after block (${block.header.encodedId}) applying. " +
                 s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
@@ -228,7 +232,7 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
-    storage.insert(
+    if (!settings.snapshotSettings.startWith) storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
