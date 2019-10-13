@@ -525,8 +525,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
           rawSubtrees.size, bestBlock.header.height, updS.map(_.id)
         )
     }
-    val subtrees: List[SnapshotChunk] = updS.map(_.copy(manifestId = newManifest.ManifestId))
-    newManifest -> subtrees
+    val ki = updS.map(t => SnapshotChunk(t.nodesList.map(NodeSerilalizer.fromProto[K, V](_)), newManifest.ManifestId))
+    val m123 = newManifest.copy(chunksKeys = ki.map(_.id))
+    //val subtrees: List[SnapshotChunk] = ki.map(_.copy(manifestId = m123.ManifestId))
+    m123 -> ki
   }
 
   def assembleTree(chunks: List[Node[K, V]])(implicit kSerializer: Serializer[K],
