@@ -62,7 +62,13 @@ final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
   }
 
   def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
-    storage.get(StorageKey @@ chunkId).flatMap(e => Try(SnapshotChunkMessage.parseFrom(e)).toOption)
+    storage.get(StorageKey @@ chunkId).flatMap { e =>
+      val a                             = Try(SnapshotChunkMessage.parseFrom(e)).toOption
+      val b: Option[Try[SnapshotChunk]] = a.map(f => SnapshotChunkSerializer.fromProto(f))
+      logger.info(s"getChunkById for chunk ${Algos.encode(chunkId)} get from db ${b
+        .map(_.map(l => s" manifestId -> ${Algos.encode(l.manifestId)}, id -> ${Algos.encode(l.id)}"))}")
+      a
+    }
 
   @deprecated def restoreActualChunks: List[Array[Byte]] = {
     logger.info(s"Restoring actual chunks.")

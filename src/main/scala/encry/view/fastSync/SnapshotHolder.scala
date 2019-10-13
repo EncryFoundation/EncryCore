@@ -103,11 +103,13 @@ class SnapshotHolder(settings: EncryAppSettings,
               logger.info(s"Got new manifest from ${remote.socketAddress} but has been already processing other one.")
           }
         case ResponseChunkMessage(chunk) =>
-
+          logger.info(s"Got DataFromPeer -> ResponseChunkMessage -> with chunk ${Algos.encode(chunk.id.toByteArray)} and manifestId ->" +
+            s" ${Algos.encode(chunk.manifestId.toByteArray)}")
           snapshotDownloadController.processRequestedChunk(chunk, remote) match {
             case ProcessRequestedChunkResult(_, true, _) =>
               logger.info(s"Got corrupted chunk from ${remote.socketAddress}.")
             //todo ban node
+
             case ProcessRequestedChunkResult(controller, false, list: List[NodeProtoMsg]) if list.nonEmpty =>
               logger.info(s"Got correct chunk from ${remote.socketAddress}.")
               snapshotDownloadController = controller
@@ -167,7 +169,8 @@ class SnapshotHolder(settings: EncryAppSettings,
                 .info(s"Sent response with chunk ${Algos.encode(chunkId)} and manifest ${Algos.encode(manifestId)}.")
               givingChunksProcessor = givingChunksProcessor.updateLastsIds(ch.id.toByteArray, remote)
               val a = ResponseChunkMessage(ch)
-              logger.info(s"ResponseChunkMessage for chunk ${Algos.encode(chunkId)} is ${Algos.encode(a.chunk.id.toByteArray)}")
+              logger.info(s"ResponseChunkMessage for chunk ${Algos.encode(chunkId)} is ${Algos.encode(a.chunk.id.toByteArray)}" +
+                s" with manifestId ${Algos.encode(a.chunk.manifestId.toByteArray)}")
               remote.handlerRef ! a
             }
             context.become(
@@ -308,6 +311,8 @@ object SnapshotHolder {
         chunk.manifestId.toByteArray
       )
       logger.info(s"From proto for chunk ${Algos.encode(chunk.id.toByteArray)} created SnapshotChunk with id ${Algos.encode(a.id)}")
+      logger.info(s"From proto for chunk ${Algos.encode(chunk.id.toByteArray)} with manifest id ${Algos.encode(chunk.manifestId.toByteArray)}" +
+        s" created SnapshotChunk with manifest id ${Algos.encode(a.manifestId)}")
       a
     }
   }
