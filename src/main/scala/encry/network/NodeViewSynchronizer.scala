@@ -143,7 +143,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
               .collect { case (id, mod) if mod.isDefined => id -> mod.get }
               .toMap
             logger.info(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
-            logger.debug(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
+            logger.info(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
             modifiers
           }
 

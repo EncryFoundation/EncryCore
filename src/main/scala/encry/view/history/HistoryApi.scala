@@ -101,8 +101,14 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     .getOrElse(Seq.empty[ModifierId])
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
-    .get(ByteArrayWrapper(id)).map(h => HeaderProtoSerializer.toProto(h).toByteArray)
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(b => BlockProtoSerializer.toProto(b).toByteArray))
+    .get(ByteArrayWrapper(id)).map(h => {
+    logger.info(s"get header from cache. Res is: ${h}")
+    HeaderProtoSerializer.toProto(h).toByteArray
+  })
+    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(b => {
+      logger.info(s"get block from cache. Res is: ${b}")
+      BlockProtoSerializer.toProto(b).toByteArray
+    }))
     .orElse(modifierBytesByIdDB(id))
 
   def lastHeaders(count: Int): HeaderChain = getBestHeader
