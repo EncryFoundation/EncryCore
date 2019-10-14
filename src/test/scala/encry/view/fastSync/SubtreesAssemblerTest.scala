@@ -3,31 +3,33 @@ package encry.view.fastSync
 import java.io.File
 import encry.modifiers.InstanceFactory
 import encry.settings.TestNetSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.utils.FileHelper
 import encry.view.fastSync.SnapshotHolder.SnapshotChunkSerializer
-import encry.view.state.avlTree.{AvlTree, NodeSerilalizer}
+import encry.view.state.avlTree.{ AvlTree, Node, NodeSerilalizer }
 import org.iq80.leveldb.Options
-import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
+import org.scalatest.{ Matchers, OneInstancePerTest, WordSpecLike }
 import encry.view.state.avlTree.utils.implicits.Instances._
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import scorex.utils.Random
 
-class SubtreesAssemblerTest extends WordSpecLike
-  with Matchers
-  with InstanceFactory
-  with OneInstancePerTest
-  with TestNetSettings {
+class SubtreesAssemblerTest
+    extends WordSpecLike
+    with Matchers
+    with InstanceFactory
+    with OneInstancePerTest
+    with TestNetSettings {
 
   "Subtrees assembler" should {
     "assemble tree correctly" in {
-      val avlTree = createAvl
-      val root = avlTree.rootNode
-      val block = generateGenesisBlock(Height @@ 1)
-      val (manifest, chunks) = avlTree.initializeSnapshotData(block)
-      val serializedChunks = chunks.map(SnapshotChunkSerializer.toProto)
-      val deserializedChunks = serializedChunks.map(SnapshotChunkSerializer.fromProto(_).get)
+      val avlTree: AvlTree[StorageKey, StorageValue] = createAvl
+      val root: Node[StorageKey, StorageValue]       = avlTree.rootNode
+      val block: Block                               = generateGenesisBlock(Height @@ 1)
+      val (manifest, chunks)                         = avlTree.initializeSnapshotData(block)
+      val serializedChunks                           = chunks.map(SnapshotChunkSerializer.toProto)
+      val deserializedChunks                         = serializedChunks.map(SnapshotChunkSerializer.fromProto(_).get)
 
       val firstDir: File = FileHelper.getRandomTempDir
       val firstStorage: VLDBWrapper = {
@@ -38,13 +40,15 @@ class SubtreesAssemblerTest extends WordSpecLike
 
       avlTree2.find(root.key).isDefined shouldBe true
 
-//      deserializedChunks.foldLeft(avlTree2) { case (avl, chunk) =>
-//        val newAvl: AvlTree[StorageKey, StorageValue] = avl.assembleTree(avl, List(chunk))
-//        chunk.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
-//          newAvl.find(node.key).isDefined
-//        } shouldBe true
-//        newAvl
-//      }
+      deserializedChunks.foldLeft(avlTree2) {
+        case (avl, chunk) =>
+          val newAvl: AvlTree[StorageKey, StorageValue] =
+            avl.assembleTree(chunk.nodesList.map(l => NodeSerilalizer.fromProto[StorageKey, StorageValue](l)))
+          chunk.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
+            newAvl.find(node.key).isDefined
+          } shouldBe true
+          newAvl
+      }
 
       val firstDir1: File = FileHelper.getRandomTempDir
       val firstStorage1: VLDBWrapper = {
@@ -52,13 +56,16 @@ class SubtreesAssemblerTest extends WordSpecLike
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
       }
       val avlTree3 = AvlTree[StorageKey, StorageValue](manifest, firstStorage1)
-      //val avlTree4 = avlTree3.assembleTree(avlTree3, deserializedChunks)
+      val avlTree4 = avlTree3.assembleTree(
+        deserializedChunks.flatMap(_.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)))
+      )
 
-//      deserializedChunks.foreach(ch =>
-//        ch.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
-//          avlTree4.find(node.key).isDefined
-//        } shouldBe true
-//      )
+      deserializedChunks.foreach(
+        ch =>
+          ch.nodesList.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).forall { node =>
+            avlTree4.find(node.key).isDefined
+          } shouldBe true
+      )
     }
   }
 
@@ -76,7 +83,9 @@ class SubtreesAssemblerTest extends WordSpecLike
 
     val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage)
     firstAvl.insertAndDeleteMany(
-      StorageVersion @@ Random.randomBytes(), boxes.toList, List.empty
+      StorageVersion @@ Random.randomBytes(),
+      boxes.toList,
+      List.empty
     )
   }
 }

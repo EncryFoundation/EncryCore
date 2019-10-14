@@ -1,16 +1,19 @@
 package encry.view.fastSync
 
-import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import encry.view.fastSync.SnapshotHolder.{SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.view.fastSync.SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
 import cats.syntax.option._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
-import encry.view.fastSync.SnapshotDownloadController.{ProcessManifestHasChangedMessage, ProcessRequestedChunkResult, ProcessRequestedManifestResult}
-import org.encryfoundation.common.network.BasicMessagesRepo.{NetworkMessage, RequestChunkMessage, RequestChunkMessageSerializer}
+import encry.view.fastSync.SnapshotDownloadController.{
+  ProcessManifestHasChangedMessage,
+  ProcessRequestedChunkResult,
+  ProcessRequestedManifestResult
+}
+import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 import org.encryfoundation.common.utils.Algos
 
 final case class SnapshotDownloadController(currentManifest: Option[SnapshotManifest],
@@ -78,7 +81,7 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
 
   def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) =
     if (inAwait.isEmpty) {
-      val newToRequest: List[Array[Byte]]     = toRequest.take(settings.snapshotSettings.chunksNumberPerRequest)
+      val newToRequest: List[Array[Byte]] = toRequest.take(settings.snapshotSettings.chunksNumberPerRequest)
       logger.info(s"newToRequest -> ${newToRequest.map(Algos.encode).mkString(",")}")
       val updatedToRequest: List[Array[Byte]] = toRequest.drop(settings.snapshotSettings.chunksNumberPerRequest)
       //logger.info(s"updatedToRequest -> ${updatedToRequest.map(Algos.encode).mkString(",")}")
