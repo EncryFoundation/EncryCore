@@ -1,5 +1,6 @@
 package encry.network
 
+import HeaderProto.HeaderProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
@@ -36,6 +37,8 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.SnapshotHolder
 import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, UpdateSnapshot}
+
+import scala.util.Try
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -133,11 +136,17 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             memoryPoolRef ! RequestModifiersForTransactions(remote, unrequestedModifiers)
           case Payload.modifierTypeId =>
             getModsForRemote(unrequestedModifiers).foreach(_.foreach {
-              case (id, bytes) => remote.handlerRef ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
+              case (id, bytes) =>
+                remote.handlerRef ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
             })
-          case tId => getModsForRemote(unrequestedModifiers).foreach(modifiers =>
+          case tId => getModsForRemote(unrequestedModifiers).foreach { modifiers =>
+            modifiers.foreach(k =>
+              logger.info(s"Response to ${remote.socketAddress} header ${
+                Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(k._2)))
+              }")
+            )
             remote.handlerRef ! ModifiersNetworkMessage(tId -> modifiers)
-          )
+          }
         }
 
         def getModsForRemote(ids: Seq[ModifierId]): Option[Map[ModifierId, Array[Byte]]] = Option(history)

@@ -278,7 +278,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               logger.info(s"Send to nvsh HeaderChainIsSynced")
               nodeViewSynchronizer ! HeaderChainIsSynced
             }
-            if (newHistory.getBestBlock.exists(l => l.header.height % 200 == 0))
+            if (newHistory.getBestBlock.exists(l => l.header.height % 50 == 0))
               newHistory.getBestBlock.foreach(b => nodeViewSynchronizer ! UpdateSnapshot(b, newState))
             influxRef.foreach { ref =>
               logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
