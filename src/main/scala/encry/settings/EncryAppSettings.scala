@@ -114,7 +114,7 @@ final case class SnapshotSettings(startWith: Boolean,
                                   responsesInTime: Int,
                                   requestTimeout: FiniteDuration,
                                   chunksNumberPerRequest: Int)
-final case class StorageSettings(history: StorageType, state: StorageType)
+final case class StorageSettings(history: StorageType, state: StorageType, snapshotHolder: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
 final case class BlackListSettings(banTime: FiniteDuration, cleanupTime: FiniteDuration)

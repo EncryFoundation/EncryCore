@@ -195,7 +195,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
-    case msg@SendToNetwork(_, _) => peersKeeper ! msg
+    case msg@SendToNetwork(_, _) =>
+      logger.info(s"NVSH got SendToNetwork")
+      peersKeeper ! msg
     case msg@HeaderChainIsSynced => snapshotHolder ! msg
     case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
     case msg@FastSyncDone =>

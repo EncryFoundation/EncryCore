@@ -196,7 +196,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case SendToNetwork(message, strategy) =>
       val peers: Seq[ConnectedPeer] = connectedPeers.collect(getAllPeers, getConnectedPeers)
       strategy.choose(peers).foreach { peer =>
-        logger.debug(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
+        logger.info(s"Sending message: ${message.messageName} to: ${peer.socketAddress}.")
         peer.handlerRef ! message
       }
 
