@@ -1,15 +1,18 @@
 package encry.view.state.avlTree
 
 import cats.syntax.order._
-import cats.{ Monoid, Order }
+import cats.{Monoid, Order}
+import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree.Direction
-import encry.view.state.avlTree.AvlTree.Directions.{ EMPTY, LEFT, RIGHT }
-import encry.view.state.avlTree.utils.implicits.{ Hashable, Serializer }
+import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
 
 import scala.util.Try
 
@@ -25,7 +28,8 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
 
   def insertAndDeleteMany(version: StorageVersion,
                           toInsert: List[(K, V)],
-                          toDelete: List[K])
+                          toDelete: List[K],
+                          stateHeight: Height = Height @@ 0)
                          (implicit kSer: Serializer[K],
                          vSer: Serializer[V],
                          kM: Monoid[K],
@@ -55,8 +59,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
           case (key, node) =>
             //logger.info(s"insert node: ${Algos.encode(key.data)}")
             StorageKey @@ key.data -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
-        }.toList :+
-        (AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash),
+        }.toList ++
+        List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
+          UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
       deletedNodes.map(key => {
         //logger.info(s"Delete node: ${Algos.encode(key.data)}")
         StorageKey @@ key.data

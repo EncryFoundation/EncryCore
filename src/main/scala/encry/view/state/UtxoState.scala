@@ -1,10 +1,12 @@
 package encry.view.state
 
 import java.io.File
+
 import cats.data.Validated
 import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.traverse._
+import com.google.common.primitives.Ints
 import encry.utils.implicits.Validation._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
@@ -22,7 +24,7 @@ import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.state.UtxoState.StateChange
 import encry.view.state.avlTree.AvlTree
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.LSMStore
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -37,9 +39,11 @@ import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
+
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
+                           height: Height,
                            constants: Constants) extends StrictLogging with UtxoStateReader with AutoCloseable {
 
   def applyValidModifier(block: Block): UtxoState = {
@@ -48,10 +52,12 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     val newTree = tree.insertAndDeleteMany(
       StorageVersion !@@ block.id,
       combinedStateChange.outputsToDb.toList,
-      combinedStateChange.inputsToDb.toList
+      combinedStateChange.inputsToDb.toList,
+      Height @@ block.header.height
     )
     UtxoState(
       newTree,
+      Height @@ block.header.height,
       constants,
     )
   }
@@ -61,7 +67,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(tree, constants).asRight[List[ModifierApplyError]]
+        UtxoState(tree, height, constants).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
@@ -87,7 +93,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             val newTree = tree.insertAndDeleteMany(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
-              combinedStateChange.inputsToDb.toList
+              combinedStateChange.inputsToDb.toList,
+              Height @@ block.header.height
             )
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
               List(StateModifierApplyError(s"Incorrect state root after block (${block.header.encodedId}) applying. " +
@@ -98,6 +105,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               logger.info(s"After applying root node: ${newTree.rootNode}")
               UtxoState(
                 newTree,
+                Height @@ block.header.height,
                 constants,
               ).asRight[List[ModifierApplyError]]
             }
@@ -110,7 +118,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
     val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
-    UtxoState(rollbackedAvl, constants)
+    val height: Height = Height !@@ Ints.fromByteArray(tree.storage.get(UtxoState.bestHeightKey).get)
+    UtxoState(rollbackedAvl, height, constants)
   }
 
   def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
@@ -173,11 +182,7 @@ object UtxoState extends StrictLogging {
   final case class StateChange(inputsToDb: Vector[StorageKey],
                                outputsToDb: Vector[(StorageKey, StorageValue)])
 
-  private val bestVersionKey: Digest32 = Algos.hash("best_state_version")
-
-  private val bestHeightKey: Digest32 = Algos.hash("state_height")
-
-  private val lastBlockTimeKey: Digest32 = Algos.hash("last_block_timestamp")
+  val bestHeightKey: StorageKey = StorageKey !@@ Algos.hash("state_height")
 
   def tx2StateChange(tx: Transaction): StateChange = StateChange(
     tx.inputs.map(input => StorageKey !@@ input.boxId).toVector,
@@ -201,6 +206,7 @@ object UtxoState extends StrictLogging {
     logger.info(s"State created.")
     UtxoState(
       AvlTree[StorageKey, StorageValue](versionalStorage),
+      Height @@ 0,
       settings.constants
     )
   }
@@ -220,6 +226,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )
-    UtxoState(AvlTree[StorageKey, StorageValue](storage), settings.constants)
+    UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants)
   }
 }

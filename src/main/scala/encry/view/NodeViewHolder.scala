@@ -49,7 +49,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-    ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
+    logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.state.height}")
+    ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
   override def preStart(): Unit = logger.info(s"Node view holder started.")
@@ -233,6 +234,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            influxRef.foreach { ref =>
+              logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
+              ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)
+            }
             if (settings.influxDB.isDefined)
               context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
             influxRef.foreach { ref =>

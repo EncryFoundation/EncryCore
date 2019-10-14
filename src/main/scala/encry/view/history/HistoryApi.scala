@@ -303,8 +303,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     }
 
   def addBlockToCacheIfNecessary(b: Block): Unit =
-    if (b.header.height >= getBestBlockHeight - settings.constants.MaxRollbackDepth) {
-      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
+    if (!blocksCache.contains(ByteArrayWrapper(b.id)) && (b.header.height >= getBestBlockHeight - settings.constants.MaxRollbackDepth)) {
+      logger.debug(s"Should add ${Algos.encode(b.id)} to block cache")
       val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
       blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
       blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)

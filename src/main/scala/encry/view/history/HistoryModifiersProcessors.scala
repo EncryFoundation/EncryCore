@@ -28,10 +28,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
-    .flatMap(block =>
-      if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) none
-      else processBlock(block).some
-    )
+    .flatMap(block => processBlock(block).some)
     .getOrElse(putToHistory(payload))
 
   private def processBlock(blockToProcess: Block): ProgressInfo = {
