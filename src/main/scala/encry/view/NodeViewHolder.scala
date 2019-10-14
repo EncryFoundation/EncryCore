@@ -271,6 +271,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
             if (newHistory.isHeadersChainSyncedVar) {
               logger.info(s"Send to nvsh HeaderChainIsSynced")
               nodeViewSynchronizer ! HeaderChainIsSynced

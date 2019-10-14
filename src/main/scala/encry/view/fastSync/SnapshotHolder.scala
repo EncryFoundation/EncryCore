@@ -233,7 +233,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
       snapshotProcessor = newProcessor
-
+    case HeaderChainIsSynced => //do nothing
     case SemanticallySuccessfulModifier(_) => //do nothing
     case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
   }
