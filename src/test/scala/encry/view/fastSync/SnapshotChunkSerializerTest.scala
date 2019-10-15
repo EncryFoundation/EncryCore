@@ -52,7 +52,7 @@ class SnapshotChunkSerializerTest
       StorageVersion @@ Random.randomBytes(),
       boxes.toList,
       List.empty
-    )._1
+    )
   }
 
   def tmpDir: File = FileHelper.getRandomTempDir
