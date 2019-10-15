@@ -24,6 +24,7 @@ import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
@@ -112,17 +113,20 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
       }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
-      (self ? GetDataFromWallet[String] { wallet =>
-        wallet.publicKeys.foldLeft("")((str, k) => str + Algos.encode(k.pubKeyBytes) + "\n")
+      (self ? GetDataFromWallet[List[String]] { wallet =>
+        wallet.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (self ? GetDataFromWallet[String] { wallet =>
-        val balance: String =
-          wallet.getBalances.foldLeft("")(
-            (str, tokenInfo) => str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n")
-          )
-        if (balance.length == 0) "0" else balance
+      (self ? GetDataFromWallet[Map[String, Amount]] { wallet =>
+       val balance: Map[String, Amount] = wallet.getBalances.toMap
+//        println(balance +" 123124")
+       if (balance.isEmpty) Map.empty[String, Amount] else balance
+//        if (balance.isEmpty) Seq(Map.empty) else Seq(c)
+//          wallet.getBalances.foldLeft("")(
+//            (str, tokenInfo) => str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n")
+//          )
+//        if (balance.length == 0) "0" else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
@@ -228,12 +232,15 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
     case StartMiner =>
+      println("Able")
       context.system.eventStream.publish(EnableMining)
       context.system.eventStream.publish(StartMining)
     case StopMiner                 =>
       println("DISABLE")
       context.system.eventStream.publish(DisableMining)
-    case ShutdownNode              => EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
+    case ShutdownNode              =>
+      println("stopped")
+      EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
     case GetDataFromWallet(f) => (nodeViewHolder ? GetDataFromWallet(f)).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
@@ -277,6 +284,8 @@ object DataHolderForApi { //scalastyle:ignore
   final case class GetLastHeaderIdAtHeightHelper(i: Int)
 
   final case class Readers(h: Option[History], s: Option[UtxoStateReader])
+
+  case object GetViewSendTx
 
   case object GetInfoHelper
 

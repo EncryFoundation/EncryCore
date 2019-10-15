@@ -17,9 +17,10 @@ case class CompositeHttpService(system: ActorSystem,
   val redirectToSwagger: Route = redirect("/swagger", StatusCodes.PermanentRedirect)
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  val compositeRoute: Route = routes.map(_.route).reduce(_ ~ _) ~
-    path("swagger") { getFromResource("swagger-ui/index.html") } ~
-    getFromResourceDirectory("swagger-ui") ~
-    //swaggerRoute.routes ~
-    redirectToSwagger
+  val compositeRoute: Route = routes.map(_.route).reduce(_ ~ _)
+//  ~
+//    path("swagger") { getFromResource("swagger-ui/index.html") } ~
+//    getFromResourceDirectory("swagger-ui") ~
+//    //swaggerRoute.routes ~
+//    redirectToSwagger
 }

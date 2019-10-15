@@ -5,72 +5,42 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetMinerStatus, StartMiner, StopMiner}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
 import encry.local.miner.Miner.MinerStatus
 import scalatags.Text.all.{div, span, td, _}
 import encry.settings.{NodeSettings, RESTApiSettings}
-import io.circe.Decoder.Result
 import io.circe.Json
 import scalatags.{Text, generic}
 import io.circe.parser
 import io.circe.generic.auto._
-import scalatags.text.Builder
-
-import scala.concurrent.duration._
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.utils.Algos
 import scala.concurrent.{Await, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-case class InfoApi(name: String,
-                   stateType: String,
-                   difficulty: String,
-                   bestFullHeaderId: String,
-                   bestHeaderId: String,
-                   peersCount: Int,
-                   unconfirmedCount: Int,
-                   previousFullHeaderId: String,
-                   fullHeight: Int,
-                   headersHeight: Int,
-                   stateVersion: String,
-                   uptime: Int,
-                   storage: String,
-                   isConnectedWithKnownPeers: Boolean,
-                   isMining: Boolean,
-                   knownPeers: Seq[String]
-                  )
 
-case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
 
-  def statusF = (dataHolder ? GetMinerStatus).mapTo[MinerStatus]
+  def walletF: Future[Map[String, Amount]] = (dataHolder ? GetViewGetBalance).mapTo[Map[String, Amount]]
 
-  def stop(): Unit = dataHolder ! StopMiner
+  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
-  implicit def ev: generic.AttrValue[Builder, Unit] = (t: Builder, a: Attr, v: Unit) => v
+  def info: Future[(Map[String, Amount], List[String])] = for {
+    wallet <- walletF
+    pubKeys <- pubKeysF
+  } yield (wallet, pubKeys)
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def currentInfoF = for {
-    info <- infoHelper
-    status <- statusF
-  } yield (info, status)
 
-  //  def currentInfo: Json = Await.result(currentInfoF, 5000.millis)
-  //
-  //  val decoding = parser.decode[InfoApi](currentInfo.toString())
+  def walletScript(balances: Map[String, Amount], pubKeysList: List[String]): Text.TypedTag[String] = {
+    val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
 
-  //  val sadasd = decoding match {
-  //    case Right(value) => value
-  //    case Left(er) => println(er)
-  //  }
-
-  //  def getAllInfonef(json: Future[Json]): Unit = json.onComplete(_.get)
-
-
-  def woqdl(json: Json, minerStatus: MinerStatus): Text.TypedTag[String] = {
-    val nodeInfo = parser.decode[InfoApi](json.toString())
+    val EttTokenId: String = Algos.encode(IntrinsicTokenId)
     html(
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
@@ -78,7 +48,8 @@ case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
         meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
         meta(name := "author", content := "Creative Tim"),
         script(
-          raw("""function shutdown(){
+          raw(
+            """function shutdown(){
     var input1 = document.getElementById("input1");
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/shutdown");
@@ -87,7 +58,8 @@ case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   }""")
         ),
         script(
-          raw("""function start(){
+          raw(
+            """function start(){
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/startMining");
 //    request.setRequestHeader('content-type', 'application/json');
@@ -97,7 +69,8 @@ case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   }""")
         ),
         script(
-          raw("""function stop(){
+          raw(
+            """function stop(){
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/stopMining");
 //    request.setRequestHeader('content-type', 'application/json');
@@ -341,172 +314,75 @@ case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
           div(cls := "header bg-gradient-primary pb-8 pt-5 pt-md-8",
             div(cls := "container-fluid",
               div(cls := "header-body"),
-              div(cls:="row",
+              div(cls := "row",
 
-   if(minerStatus.isMining) {
-              Seq(
-                div(cls := "col-lg-3 col-md-6",
-                  button(tpe := "button",  cls := "btn-icon-clipboard", onclick:="stop();", id:="myButtonn", data("clipboard-text") := "button-play", title := "", data("original-title") := "Stop Mining",
-                    div(
-                      i(cls := "ni ni-button-pause"),
-                      span("Stop Mining")
-                    )
-                  )
-                ),
-//                script(tpe := "text/javascript",
-//                  raw("""document.getElementById("myButton").onclick = function () {
-//        document.getElementById("myButton").disabled = true;
-//    };""")
-//                )
               )
-   } else {
-     Seq(
-       div(cls := "col-lg-3 col-md-6",
-         button(tpe := "button", cls := "btn-icon-clipboard", onclick:="start();", id:="myButton", data("clipboard-text") := "button-play", title := "", data("original-title") := "Start Mining",
-           div(
-             i(cls := "ni ni-button-play"),
-             span("Start Mining")
-           )
-         )
-       ),
-//       script(tpe := "text/javascript",
-//         raw(
-//           """document.getElementById("myButton").onclick = function () {
-//        location.href = "/node/startMining";
-//    };""")
-//       )
-     )
-   },
-     Seq(
-     div(cls := "col-lg-3 col-md-6",
-       button(tpe := "button", cls := "btn-icon-clipboard", onclick:="shutdown()", id:="aaa", data("clipboard-text") := "button-play", title := "", data("original-title") := "Node Shutdown",
-         div(
-           i(cls := "ni ni-button-power"),
-           span("Node Shudown")
-         )
-       )
-     ),
-//     script(tpe := "text/javascript",
-//       raw(
-//         """document.getElementById("aaa").onclick = function () {
-//        location.href = "/node/shutdown";
-//    };""")
-//     )
-   )
-    )
             )
           ),
           // Page content
           div(cls := "container-fluid mt--7",
-            div(cls := "row",
-              div(cls := "col",
+            div(cls := "row mt-5",
+              div(cls := "col-xl-12 mb-5 mb-xl-0",
                 div(cls := "card shadow",
                   div(cls := "card-header border-0",
                     div(cls := "row align-items-center",
                       div(cls := "col",
-                        h3(cls := "mb-0", "Node Info")
+                        h3(cls := "mb-0", "Tokens")
                       )
                     )
                   ),
                   div(cls := "table-responsive",
                     // Projects table
-                    table(cls := "table align-items-center table-flush", id :="myTable",
+                    table(cls := "table align-items-center table-flush",
                       thead(cls := "thead-light",
                         tr(
-                          th(attr("scope") := "row", "Name"),
-                          td(attr("scope") := "row", nodeInfo.right.get.name)
-                        ),
-                        tr(th(attr("scope") := "row", "State Type"),
-                          td(attr("scope") := "row", nodeInfo.right.get.stateType)
-                        ),
-                        tr(th(attr("scope") := "row", "Difficulty"),
-                          td(attr("scope") := "row", nodeInfo.right.get.difficulty)
-                        ),
-                        tr(th(attr("scope") := "row", "Best Full Header Id"),
-                          td(attr("scope") := "row", nodeInfo.right.get.bestFullHeaderId)
-                        ),
-                        tr(th(attr("scope") := "row", "bestHeaderId"),
-                          td(attr("scope") := "row", nodeInfo.right.get.bestHeaderId)
-                        ),
-                        tr(th(attr("scope") := "row", "peersCount"),
-                          td(attr("scope") := "row", nodeInfo.right.get.peersCount)
-                        ),
-                        tr(th(attr("scope") := "row", "unconfirmedCount"),
-                          td(attr("scope") := "row", nodeInfo.right.get.unconfirmedCount)
-                        ),
-                        tr(th(attr("scope") := "row", "previousFullHeaderId"),
-                          td(attr("scope") := "row", nodeInfo.right.get.previousFullHeaderId)
+                          th(attr("scope") := "row", "TokenId"),
+                          th(attr("scope") := "row", "Balance")
                         )
-                        ,
-                        tr(th(attr("scope") := "row", "fullHeight"),
-                          td(attr("scope") := "row", nodeInfo.right.get.fullHeight)
-                        ),
-                        tr(th(attr("scope") := "row", "headersHeight"),
-                          td(attr("scope") := "row", nodeInfo.right.get.headersHeight)
-                        ),
-                        tr(th(attr("scope") := "row", "stateVersion"),
-                          td(attr("scope") := "row", nodeInfo.right.get.stateVersion)
-                        ),
-                        tr(th(attr("scope") := "row", "uptime"),
-                          td(attr("scope") := "row", nodeInfo.right.get.uptime)
-                        ),
-                        tr(th(attr("scope") := "row", "storage"),
-                          td(attr("scope") := "row", nodeInfo.right.get.storage)
-                        ),
-                        tr(th(attr("scope") := "row", "isConnectedWithKnownPeers"),
-                          td(attr("scope") := "row", nodeInfo.right.get.isConnectedWithKnownPeers.toString())
-                        ),
-                        tr(th(attr("scope") := "row", "isMining"),
-                          td(attr("scope") := "row", nodeInfo.right.get.isMining.toString())
-                        ),
-                        tr(th(attr("scope") := "row", "knownPeers"),
-                          td(attr("scope") := "row", nodeInfo.right.get.knownPeers)
-                        )
-                        //                        th(attr("scope") := "row", "Unique users"),
-                        //                        th(attr("scope") := "row", "Bounce rate"))
+                      ),
+                      tbody(
+
+                        (for (b <- balances) yield {
+                          val tknStr = b._1 match {
+                            case encry if b._1 == EttTokenId => "ETT"
+                            case _ => b._1
+                          }
+                          tr(
+                            th(tknStr
+                            ),
+                            th(b._2
+                            )
+                          )
+                        }).toSeq: _*
                       )
-                      //                    tbody(
-                      //                      tr(
-                      //                        th(attr("scope") := "col", "/argon/"),
-                      //                        td(currentInfo.findAllByKey("name").head.toString()),
-                      //                        td("340"),
-                      //                        td(
-                      //                          i(cls := "fas fa-arrow-up text-success mr-3"), "46,53%"
-                      //                        )
-                      //                      ),
-                      //                      tr(
-                      //                        th(attr("scope") := "col", "/argon/index.html"),
-                      //                        td("3,985"),
-                      //                        td("319"),
-                      //                        td(
-                      //                          i(cls := "fas fa-arrow-down text-warning mr-3"), "46,53%"
-                      //                        )
-                      //                      )
-                      ////                      tr(
-                      ////                        th(attr("scope") := "col", "/argon/charts.html"),
-                      ////                        td("3,513"),
-                      ////                        td("294"),
-                      ////                        td(
-                      ////                          i(cls := "fas fa-arrow-down text-warning mr-3"), "36,49%"
-                      ////                        )
-                      ////                      ),
-                      ////                      tr(
-                      ////                        th(attr("scope") := "col", "/argon/tables.html"),
-                      ////                        td("2,050"),
-                      ////                        td("147"),
-                      ////                        td(
-                      ////                          i(cls := "fas fa-arrow-up text-success mr-3"), "50,87%"
-                      ////                        )
-                      ////                      ),
-                      ////                      tr(
-                      ////                        th(attr("scope") := "col", "/argon/profile.html"),
-                      ////                        td("1,795"),
-                      ////                        td("190"),
-                      ////                        td(
-                      ////                          i(cls := "fas fa-arrow-down text-danger mr-3"), "46,53%"
-                      ////                        )
-                      ////                      )
-                      //                    )
+                    )
+                  )
+                )
+              ),
+              div(cls := "col-xl-12",
+                div(cls := "card shadow",
+                  div(cls := "card-header border-0",
+                    div(cls := "row align-items-center",
+                      div(cls := "col",
+                        h3(cls := "mb-0", "Publick keys")
+                      )
+                    )
+                  ),
+                  div(cls := "table-responsive",
+                    // Projects table
+                    table(cls := "table align-items-center table-flush",
+                      thead(cls := "thead-light",
+                        tr(
+                          th(attr("scope") := "col", "Key")
+                        )
+                      ),
+                      tbody(
+                        for (p <- pubKeysList) yield {
+                          tr(
+                            th(attr("scope") := "row", p)
+                          )
+                        }
+                      )
                     )
                   )
                 )
@@ -558,17 +434,11 @@ case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     )
   }
 
-//  override def route: Route = (path("web") & get) {
-//    //    complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl.render))
-//    onComplete(currentInfoF) {
-//      case Success(value) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl(value._1, value._2).render))
-//    }
-//  }
-
-  override def route: Route = (path("web") & get) {
-    //    complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl.render))
-    onComplete(currentInfoF) {
-      case Success(value) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl(value._1, value._2).render))
+  override def route: Route = (path("wallet") & get) {
+    //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
+    onComplete(info) {
+      case Success(bbb) =>
+        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(bbb._1, bbb._2).render))
     }
   }
 

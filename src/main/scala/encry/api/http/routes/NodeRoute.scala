@@ -12,16 +12,22 @@ case class NodeRoute(dataHolder: ActorRef, appSettings: EncryAppSettings)(implic
   override val settings: RESTApiSettings = appSettings.restApi
 
   override def route: Route = pathPrefix("node") {
-    nodeStartMiningR ~ nodeStopMiningR
+    nodeStartMiningR ~ nodeStopMiningR ~ nodeShutdownR
   }
 
-  def nodeStartMiningR: Route = (path("startMining") & post) {
+  def nodeStartMiningR: Route = (path("startMining") & get) {
     dataHolder ! StartMiner
     withCors(complete(StatusCodes.OK))
   }
 
-  def nodeStopMiningR: Route = (path("stopMining") & post) {
+  def nodeStopMiningR: Route = (path("stopMining") & get) {
     dataHolder ! StopMiner
     withCors(complete(StatusCodes.OK))
   }
+
+  def nodeShutdownR: Route = (path("shutdown") & get) {
+    dataHolder ! ShutdownNode
+    withCors(complete(StatusCodes.OK))
+  }
+
 }
