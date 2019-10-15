@@ -8,9 +8,8 @@ object HeaderUtils extends StrictLogging {
 
   val TransactionsRootSize: Int = 32
 
-  def syntacticallyValidity(header: Header, modifierIdSize: Int): ValidationResult = {
-    logger.info(header.toString())
-    val res = ModifierValidator.accumulateErrors
+  def syntacticallyValidity(header: Header, modifierIdSize: Int): ValidationResult =
+    ModifierValidator.accumulateErrors
       .demand(header.modifierTypeId == Header.modifierTypeId,
         s"Modifier's type id should be ${Header.modifierTypeId}")
       .demand(header.id.size == modifierIdSize,
@@ -20,7 +19,4 @@ object HeaderUtils extends StrictLogging {
       .demand(header.transactionsRoot.size == TransactionsRootSize,
         s"TransactionsRoot's size should be $TransactionsRootSize bytes")
       .result
-    logger.info(s"res: ${res}")
-    res
-  }
 }

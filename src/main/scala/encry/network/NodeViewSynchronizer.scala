@@ -140,10 +140,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             val modifiers: Map[ModifierId, Array[Byte]] = unrequestedModifiers
               .view
               .map(id => id -> historyStorage.modifierBytesById(id))
-              .collect { case (id, mod) if mod.isDefined => id -> mod.get }
+              .collect { case (id, mod) if mod.isDefined => id -> mod.get}
               .toMap
-            logger.info(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
-            logger.info(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
+            logger.debug(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
             modifiers
           }
 

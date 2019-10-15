@@ -124,6 +124,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def computeApplications(): Unit = {
     val mods = ModifiersCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
+      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
       mods.foreach(mod => pmodModify(mod))
       computeApplications()
     }
@@ -230,7 +231,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           }
           logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
           if (progressInfo.toApply.nonEmpty) {
-            logger.debug(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
+            logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())

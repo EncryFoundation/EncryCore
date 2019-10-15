@@ -28,7 +28,10 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
-    .flatMap(block => processBlock(block).some)
+    .flatMap{block =>
+      logger.info(s"proc block ${block.header.encodedId}!")
+      processBlock(block).some
+    }
     .getOrElse(putToHistory(payload))
 
   private def processBlock(blockToProcess: Block): ProgressInfo = {

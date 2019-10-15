@@ -429,7 +429,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         val cP = shuffle.last._1
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         if (modifierTypeId != Transaction.modifierTypeId)
-          logger.info(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
+          logger.debug(s"requestModifies for peer ${cP.socketAddress} for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
         requestModifies(history, cP, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
       } else logger.info(s"BlockChain is not synced. There is no nodes, which we can connect with.")
     }
@@ -457,8 +457,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               peer: ConnectedPeer,
               isBlockChainSynced: Boolean): Unit =
     if (isExpecting(mId, mTid, peer)) {
-      if (mTid != Transaction.modifierTypeId)
+      if (mTid != Transaction.modifierTypeId) {
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
+      }
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
