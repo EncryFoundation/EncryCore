@@ -86,6 +86,6 @@ class SubtreesAssemblerTest
       StorageVersion @@ Random.randomBytes(),
       boxes.toList,
       List.empty
-    )._1
+    )
   }
 }

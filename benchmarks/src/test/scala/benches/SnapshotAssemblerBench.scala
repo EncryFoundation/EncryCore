@@ -77,7 +77,7 @@ object SnapshotAssemblerBench {
       val avlNew = (from to to).foldLeft(firstAvl) { case (avl, i) =>
         val bx = Utils.genAssetBox(address, i, nonce = i)
         val b = (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)
-        avl.insertAndDeleteMany(StorageVersion @@ Random.randomBytes(), List(b), List.empty)._1
+        avl.insertAndDeleteMany(StorageVersion @@ Random.randomBytes(), List(b), List.empty)
       }
       avlNew
     }

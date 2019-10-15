@@ -39,7 +39,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
                          (implicit kSer: Serializer[K],
                          vSer: Serializer[V],
                          kM: Monoid[K],
-                         vM: Monoid[V]): (AvlTree[K, V], (Map[ByteArrayWrapper, Node[K, V]], List[ByteArrayWrapper])) = {
+                         vM: Monoid[V]): AvlTree[K, V] = {
     val rootAfterDelete = toDelete.foldLeft(NodeWithOpInfo(rootNode)) {
       case (prevRoot, toDeleteKey) =>
         //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(toDeleteKey))}")
@@ -77,7 +77,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       })
     )
     //println(newRoot.node)
-    AvlTree(shadowedRoot, storage) -> (insertedNodes, deletedNodes)
+    AvlTree(shadowedRoot, storage)
   }
 
   def getOperationsRootHash(
