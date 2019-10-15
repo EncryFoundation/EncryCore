@@ -4,7 +4,6 @@ import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import akka.actor.{ Actor, ActorRef, Cancellable, Props }
-import com.google.common.primitives.{ Ints, Longs }
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
@@ -39,7 +38,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   import context.dispatcher
 
-  var snapshotProcessor: SnapshotProcessor                   = SnapshotProcessor.initialize(settings)
+  var snapshotProcessor: Option[SnapshotProcessor]                   = None
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var givingChunksProcessor: GivingChunksProcessor           = GivingChunksProcessor.empty
 
@@ -151,25 +150,25 @@ class SnapshotHolder(settings: EncryAppSettings,
       message match {
         case BasicMessagesRepo.RequestManifest =>
           logger.info(s"Remote ${remote.socketAddress} requested actual manifest.")
-          snapshotProcessor.actualManifest.foreach { m =>
+          snapshotProcessor.foreach(_.actualManifest.foreach { m =>
             logger.info(s"Sent to remote ${remote.socketAddress} actual manifest.")
             remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
-          }
+          })
           givingChunksProcessor = givingChunksProcessor
             .copy(Some(remote),
-                  snapshotProcessor.actualManifest,
-                  snapshotProcessor.actualManifest.map(_.chunksKeys).getOrElse(List.empty))
+                  snapshotProcessor.get.actualManifest,
+                  snapshotProcessor.get.actualManifest.map(_.chunksKeys).getOrElse(List.empty))
         case RequestChunkMessage(chunkId, manifestId) =>
           timeout.foreach(_.cancel())
           logger.info(
             s"Got request chunk message from ${remote.socketAddress} with manifest if ${Algos.encode(manifestId)}." +
-              s" Actual manifest id is ${snapshotProcessor.actualManifest.map(e => Algos.encode(e.ManifestId))}."
+              s" Actual manifest id is ${snapshotProcessor.get.actualManifest.map(e => Algos.encode(e.ManifestId))}."
           )
-          if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress) && snapshotProcessor.actualManifest
-                .exists(_.ManifestId.sameElements(manifestId)) && snapshotProcessor.actualManifest
+          if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress) && snapshotProcessor.get.actualManifest
+                .exists(_.ManifestId.sameElements(manifestId)) && snapshotProcessor.get.actualManifest
                 .exists(_.chunksKeys.exists(_.sameElements(chunkId)))) {
             logger.info(s"Request for chunk from ${remote.socketAddress} is valid.")
-            snapshotProcessor.getChunkById(chunkId).foreach { ch =>
+            snapshotProcessor.get.getChunkById(chunkId).foreach { ch =>
               logger
                 .info(s"Sent response with chunk ${Algos.encode(chunkId)} and manifest ${Algos.encode(manifestId)}.")
               givingChunksProcessor = givingChunksProcessor.updateLastsIds(ch.id.toByteArray, remote)
@@ -191,14 +190,14 @@ class SnapshotHolder(settings: EncryAppSettings,
           } else if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress)) {
             //todo if 2nd condition false - ban node
             logger.info(s"Got request for chunk from old manifest.")
-            snapshotProcessor.actualManifest.foreach { m =>
+            snapshotProcessor.get.actualManifest.foreach { m =>
               logger.info(s"Sent to ${remote.socketAddress} new manifest.")
               ManifestHasChanged(manifestId, SnapshotManifestSerializer.toProto(m))
             }
             givingChunksProcessor = givingChunksProcessor.copy(
               Some(remote),
-              snapshotProcessor.actualManifest,
-              snapshotProcessor.actualManifest.map(_.chunksKeys).getOrElse(List.empty)
+              snapshotProcessor.get.actualManifest,
+              snapshotProcessor.get.actualManifest.map(_.chunksKeys).getOrElse(List.empty)
             )
             context.become(
               workMod(
@@ -216,11 +215,12 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def commonMessages: Receive = {
+    case sp: SnapshotProcessor => snapshotProcessor = Some(sp)
     case UpdateSnapshot(block, state)
         if block.header.height != settings.constants.GenesisHeight && processNewSnapshot =>
-      logger.info(s"Snapshot holder got update snapshot message. Potential snapshot processing has started.")
-      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewSnapshot(state, block)
-      snapshotProcessor = newProcessor
+//      logger.info(s"Snapshot holder got update snapshot message. Potential snapshot processing has started.")
+//      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewSnapshot(state, block)
+//      snapshotProcessor = newProcessor
 
     case UpdateSnapshot(_, _) =>
       logger.info(s"Got update state for genesis block and tree. Or processNewSnapshot $processNewSnapshot.")
@@ -230,9 +230,9 @@ class SnapshotHolder(settings: EncryAppSettings,
       processNewSnapshot = true
 
     case SemanticallySuccessfulModifier(block: Block) if processNewSnapshot =>
-      logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
-      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
-      snapshotProcessor = newProcessor
+//      logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
+//      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
+//      snapshotProcessor = newProcessor
     case HeaderChainIsSynced => //do nothing
     case SemanticallySuccessfulModifier(_) => //do nothing
     case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
@@ -263,10 +263,7 @@ object SnapshotHolder {
                                     stateChunksNumber: Long,
                                     bestBlockHeight: Int,
                                     chunksKeys: List[Array[Byte]]) {
-    val ManifestId: Array[Byte] = Algos.hash(
-      Longs.toByteArray(stateChunksNumber) ++ bestBlockId ++ rootHash ++
-        rootNodeBytes.toByteArray ++ Ints.toByteArray(bestBlockHeight)
-    )
+    val ManifestId: Array[Byte] = Algos.hash(rootHash ++ bestBlockId)
 
     override def toString: String =
       s"bestBlockId ${Algos.encode(bestBlockId)}, rootHash ${Algos.encode(rootHash)}, " +
@@ -298,27 +295,6 @@ object SnapshotHolder {
 
   final case class SnapshotChunk(nodesList: List[NodeProtoMsg], manifestId: Array[Byte], id: Array[Byte])
 
-  object SnapshotChunk extends StrictLogging {
-    def apply[K: Serializer, V: Serializer](list: List[Node[K, V]]): SnapshotChunk = {
-      val chunkId: Array[Byte] = Algos.hash(list.flatMap(_.hash).toArray)
-      new SnapshotChunk(
-        list.map(NodeSerilalizer.toProto(_)),
-        Array.emptyByteArray,
-        chunkId
-      )
-    }
-
-    def apply[K: Serializer, V: Serializer](list: List[Node[K, V]], manifestId: Array[Byte]): SnapshotChunk = {
-      val chunkId: Array[Byte] = Algos.hash(list.flatMap(_.hash).toArray ++ manifestId)
-      logger.info(s"Create snapshotChunk with id ${Algos.encode(chunkId)}")
-      new SnapshotChunk(
-        list.map(NodeSerilalizer.toProto(_)),
-        manifestId,
-        chunkId
-      )
-    }
-  }
-
   object SnapshotChunkSerializer extends StrictLogging {
 
     import encry.view.state.avlTree.utils.implicits.Instances._
@@ -331,8 +307,9 @@ object SnapshotHolder {
 
     def fromProto(chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
       SnapshotChunk(
-        chunk.chunks.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_)).toList,
-        chunk.manifestId.toByteArray
+        chunk.chunks.toList,
+        chunk.manifestId.toByteArray,
+        chunk.id.toByteArray
       )
     )
   }
