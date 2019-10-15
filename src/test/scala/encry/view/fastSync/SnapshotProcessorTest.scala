@@ -45,8 +45,8 @@ class SnapshotProcessorTest
         manifest1.bestBlockHeight == block1.header.height shouldBe true
         manifest1.chunksKeys.map(ByteArrayWrapper(_)).distinct.size == manifest1.chunksKeys.size shouldBe true
 
-        processor1.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
-        processor1.potentialManifests.size == 1 shouldBe true
+        processor1.potentialManifestsIds.exists(_.sameElements(manifest1.ManifestId)) shouldBe true
+        processor1.potentialManifestsIds.size == 1 shouldBe true
 
         manifest1.chunksKeys.forall { chunkId =>
           processor1.storage.get(StorageKey @@ chunkId).isDefined
@@ -69,9 +69,9 @@ class SnapshotProcessorTest
         processor2.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe false
         processor2.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
 
-        processor2.potentialManifests.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
-        processor2.potentialManifests.exists(_.ManifestId.sameElements(manifest2.ManifestId)) shouldBe true
-        processor2.potentialManifests.size == 2 shouldBe true
+        processor2.potentialManifestsIds.exists(_.sameElements(manifest1.ManifestId)) shouldBe true
+        processor2.potentialManifestsIds.exists(_.sameElements(manifest2.ManifestId)) shouldBe true
+        processor2.potentialManifestsIds.size == 2 shouldBe true
 
         manifest2.chunksKeys.forall { chunkId =>
           processor2.storage.get(StorageKey @@ chunkId).isDefined
@@ -107,7 +107,7 @@ class SnapshotProcessorTest
         manifest3.ManifestId.sameElements(manifest1.ManifestId) shouldBe true
         manifest3.ManifestId.sameElements(manifest2.ManifestId) shouldBe false
 
-        processor3.potentialManifests.size == 2 shouldBe true
+        processor3.potentialManifestsIds.size == 2 shouldBe true
       }
       "create a new snapshot with the same block but different root hash" in {
         val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
@@ -164,8 +164,9 @@ class SnapshotProcessorTest
           processor5.getChunkById(key).isDefined
         } shouldBe true
 
-        manifest1.chunksKeys.forall { key =>
-          processor5.getChunkById(key).isEmpty
+        manifest1.chunksKeys.filterNot(l => processor5.actualManifest.get.chunksKeys.exists(_.sameElements(l))).forall {
+          key =>
+            processor5.getChunkById(key).isEmpty
         } shouldBe true
       }
     }
@@ -197,11 +198,13 @@ class SnapshotProcessorTest
       .map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
 
     val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage)
-    firstAvl.insertAndDeleteMany(
-      StorageVersion @@ Random.randomBytes(),
-      boxes.toList,
-      List.empty
-    )
+    firstAvl
+      .insertAndDeleteMany(
+        StorageVersion @@ Random.randomBytes(),
+        boxes.toList,
+        List.empty
+      )
+      ._1
   }
 
   def tmpDir: File = FileHelper.getRandomTempDir

@@ -1,71 +1,73 @@
 package encry.view.fastSync
 
 import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
-import encry.view.fastSync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest }
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.view.fastSync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
-import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.state.avlTree.{InternalNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
-import org.iq80.leveldb.{ DB, Options }
+import org.iq80.leveldb.{DB, Options}
+import scorex.crypto.hash.Digest32
+
 import scala.language.postfixOps
 import scala.util.Try
 
-final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
-                                   potentialManifests: List[SnapshotManifest],
-                                   bestPotentialManifest: Option[SnapshotManifest],
-                                   settings: EncryAppSettings,
-                                   storage: VersionalStorage)
+final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
+    with SnapshotProcessorStorageAPI
     with AutoCloseable {
 
   def processNewSnapshot(state: UtxoState, block: Block): SnapshotProcessor = {
-    val (processor, toApply) = potentialManifests.find(
-      manifest => (manifest.bestBlockId sameElements block.id) && (manifest.rootHash sameElements state.tree.rootHash)
-    ) match {
+    val potentialManifestId: Digest32 = Algos.hash(state.tree.rootHash ++ block.id)
+    val manifestIds: Seq[Array[Byte]] = potentialManifestsIds
+    val toApply = manifestIds
+      .find(_.sameElements(potentialManifestId))
+      .flatMap(bytes => manifestById(StorageKey @@ bytes)) match {
       case Some(elem) => updateBestPotentialSnapshot(elem)
-      case None       => createNewSnapshot(state, block)
+      case None       => createNewSnapshot(state, block, manifestIds: Seq[Array[Byte]])
     }
     if (toApply.nonEmpty) {
       logger.info(s"A new snapshot was created successfully. Insertion was started.")
       storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List empty)
     } else logger.info(s"The new snapshot was not created after processing.")
     logger.info(
-      s"Best potential manifest after processing snapshot info is ${processor.bestPotentialManifest map (
+      s"Best potential manifest after processing snapshot info is ${this.bestPotentialManifest map (
         e => Algos.encode(e.rootHash)
-      )}. Actual manifest is ${processor.actualManifest map (e => Algos.encode(e.rootHash))}. " +
+      )}. Actual manifest is ${this.actualManifest map (e => Algos.encode(e.rootHash))}. " +
         s"Blocks height ${block.header.height}, id ${block.encodedId}."
     )
-    processor
+    this
   }
 
   def processNewBlock(block: Block): SnapshotProcessor = {
     val condition: Int = (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.creationHeight
-    val (processor, toDelete) =
+    val (toDelete, toInsertNew) =
       if (condition == 0) updateActualSnapshot()
-      else this -> List.empty[StorageKey]
-    if (toDelete nonEmpty) {
+      else List.empty -> List.empty
+    if (toDelete.nonEmpty || toInsertNew.nonEmpty) {
       logger.info(
         s"Actual manifest was updated. Removed all unnecessary chunks|manifests. Block height ${block.header.height}, id ${block.encodedId}."
       )
-      storage.insert(StorageVersion @@ Random.randomBytes(), List.empty, toDelete)
+      storage.insert(StorageVersion @@ Random.randomBytes(), toInsertNew, toDelete.map(StorageKey @@ _))
     } else
       logger.info(s"Didn't need to update actual manifest. Block height ${block.header.height}, id ${block.encodedId}.")
     logger.info(
-      s"Best potential manifest after processing new block is ${processor.bestPotentialManifest map (
+      s"Best potential manifest after processing new block is ${this.bestPotentialManifest map (
         e => Algos.encode(e.rootHash)
-      )}. Actual manifest is ${processor.actualManifest map (e => Algos.encode(e.rootHash))}.Block height ${block.header.height}, id ${block.encodedId}."
+      )}. Actual manifest is ${this.actualManifest map (e => Algos.encode(e.rootHash))}.Block height ${block.header.height}, id ${block.encodedId}."
     )
-    processor
+    this
   }
 
   def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
@@ -73,33 +75,72 @@ final case class SnapshotProcessor(actualManifest: Option[SnapshotManifest],
 
   private def updateBestPotentialSnapshot(
     elem: SnapshotManifest
-  ): (SnapshotProcessor, List[(StorageKey, StorageValue)]) =
-    this.copy(bestPotentialManifest = elem.some) -> List.empty[(StorageKey, StorageValue)]
+  ): List[(StorageKey, StorageValue)] = {
+    val updatedManifest = BestPotentialManifestKey -> StorageValue @@ SnapshotManifestSerializer
+      .toProto(elem)
+      .toByteArray
+    List(updatedManifest)
+  }
 
-  private def createNewSnapshot(state: UtxoState,
-                                block: Block): (SnapshotProcessor, List[(StorageKey, StorageValue)]) = {
-    val (manifest: SnapshotManifest, chunks: List[SnapshotChunk]) = state.tree.initializeSnapshotData(block)
+  private def createNewSnapshot(
+    state: UtxoState,
+    block: Block,
+    manifestIds: Seq[Array[Byte]]
+  ): List[(StorageKey, StorageValue)] = {
+    val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] = state.tree.createSubtrees
+    val newChunks: List[SnapshotChunk] = rawSubtrees.map { l =>
+      val chunkId: Array[Byte] = l.headOption.map(_.value).getOrElse(Array.emptyByteArray)
+      SnapshotChunk(l.map(NodeSerilalizer.toProto[StorageKey, StorageValue](_)),
+                    Algos.hash(state.tree.rootHash ++ block.id),
+                    chunkId)
+    }
+    val manifest: SnapshotManifest = state.tree.rootNode match {
+      case i: InternalNode[StorageKey, StorageValue] => SnapshotManifest(
+        block.id, state.tree.rootHash, NodeSerilalizer.toProto(i),
+        rawSubtrees.size, block.header.height, newChunks.map(_.id))
+      case s: ShadowNode[StorageKey, StorageValue] => SnapshotManifest(
+        block.id, state.tree.rootHash, NodeSerilalizer.toProto(s.restoreFullNode(storage)),
+        rawSubtrees.size, block.header.height, newChunks.map(_.id))
+    }
+    val updatedSubtrees: Option[SnapshotChunk] = newChunks.headOption.map(node =>
+      node.copy(node.nodesList.drop(1))
+    )
+    val subtreesWithOutFirst: List[SnapshotChunk] = newChunks.drop(1)
+    val chunks: List[SnapshotChunk] = updatedSubtrees.fold(subtreesWithOutFirst)(_ :: subtreesWithOutFirst)
+
     val snapshotToDB: List[(StorageKey, StorageValue)] = chunks.map { elem =>
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
       StorageKey @@ elem.id -> StorageValue @@ bytes
     }
-    this.copy(
-      potentialManifests = manifest :: potentialManifests,
-      bestPotentialManifest = manifest.some
-    ) -> snapshotToDB
+    val serializedManifest: StorageValue = StorageValue @@ SnapshotManifestSerializer.toProto(manifest).toByteArray
+    val manifestToDB: (StorageKey, StorageValue) =
+      StorageKey @@ manifest.ManifestId -> StorageValue @@ serializedManifest
+    val newBestPotentialManifest: (StorageKey, StorageValue) =
+      BestPotentialManifestKey -> (StorageValue @@ SnapshotManifestSerializer.toProto(manifest).toByteArray)
+    val updateList: (StorageKey, StorageValue) =
+      PotentialManifestsIdsKey -> StorageValue @@ (manifest.ManifestId :: manifestIds.toList).flatten.toArray
+    newBestPotentialManifest :: manifestToDB :: updateList :: snapshotToDB
   }
 
-  private def updateActualSnapshot(): (SnapshotProcessor, List[StorageKey]) = {
-    val manifestsToDelete: List[StorageKey] = potentialManifests.foldLeft(List.empty[StorageKey]) {
-      case (toDelete, manifest) if bestPotentialManifest.exists(_.ManifestId sameElements manifest.ManifestId) =>
-        toDelete
-      case (toDelete, manifest) => toDelete ::: manifest.chunksKeys.map(StorageKey @@ _)
+  private def updateActualSnapshot(): (List[Array[Byte]], List[(StorageKey, StorageValue)]) = {
+    val bestPotMan: Option[SnapshotManifest] = bestPotentialManifest
+    val newActualChunks: List[Array[Byte]]   = bestPotMan.map(_.chunksKeys).getOrElse(List.empty)
+    val toDeleteManifests: Seq[SnapshotManifest] =
+      actualManifest.fold(allPotentialManifests)(_ +: allPotentialManifests)
+    val chunkKeysToDeleteKeys: List[Array[Byte]] = toDeleteManifests
+      .flatMap(_.chunksKeys)
+      .toList
+      .filterNot(l => newActualChunks.exists(_.sameElements(l)))
+    val manifestsToDeleteKeys: List[StorageKey] = toDeleteManifests.foldLeft(List.empty[StorageKey]) {
+      case (toDelete, manifest) if bestPotMan.exists(_.ManifestId.sameElements(manifest.ManifestId)) => toDelete
+      case (toDelete, manifest)                                                                      => (StorageKey @@ manifest.ManifestId) :: toDelete
     }
-    this.copy(
-      actualManifest = bestPotentialManifest,
-      potentialManifests = List.empty,
-      bestPotentialManifest = none
-    ) -> manifestsToDelete
+    val removeBestPotential = BestPotentialManifestKey
+    val insertNewActual = ActualManifestKey -> StorageValue @@ bestPotMan
+      .map(k => SnapshotManifestSerializer.toProto(k).toByteArray)
+      .getOrElse(Array.emptyByteArray)
+
+    (removeBestPotential :: chunkKeysToDeleteKeys ::: manifestsToDeleteKeys) -> List(insertNewActual)
   }
 
   override def close(): Unit = storage.close()
@@ -122,12 +163,6 @@ object SnapshotProcessor extends StrictLogging {
         val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
     }
-    new SnapshotProcessor(
-      none[SnapshotManifest],
-      List.empty[SnapshotManifest],
-      none[SnapshotManifest],
-      settings,
-      storage
-    )
+    new SnapshotProcessor(settings, storage)
   }
 }

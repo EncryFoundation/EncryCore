@@ -35,7 +35,7 @@ import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
-import encry.view.fastSync.SnapshotHolder
+import encry.view.fastSync.{SnapshotHolder, SnapshotProcessor}
 import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, UpdateSnapshot}
 
 import scala.util.Try
@@ -210,6 +210,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case RequestedModifiersForRemote(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
+    case snapshotProcessor: SnapshotProcessor => snapshotHolder ! snapshotProcessor
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
