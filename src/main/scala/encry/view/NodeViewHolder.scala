@@ -289,7 +289,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
 
-            if (!settings.snapshotSettings.startWith) {
+            if (!settings.snapshotSettings.startWith && nodeView.history.isFullChainSynced) {
               val startTime = System.currentTimeMillis()
               logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
 

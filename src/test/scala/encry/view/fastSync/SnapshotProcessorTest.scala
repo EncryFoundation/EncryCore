@@ -28,7 +28,8 @@ class SnapshotProcessorTest
   "SnapshotProcessor" should {
     "processNewSnapshot function" should {
       "save new unique snapshot correctly" in {
-        val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
+        val settingsNew = settings.copy(snapshotSettings = settings.snapshotSettings.copy(creationHeight = 50))
+        val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settingsNew, tmpDir)
         val avl1: AvlTree[StorageKey, StorageValue] =
           createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 0, 20)
         val avl2: AvlTree[StorageKey, StorageValue] =
@@ -37,7 +38,7 @@ class SnapshotProcessorTest
         val block2: Block = generateGenesisBlock(Height @@ 1)
 
         val processor1: SnapshotProcessor =
-          snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
+          snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
         val manifest1: SnapshotHolder.SnapshotManifest = processor1.bestPotentialManifest.get
 
         manifest1.rootHash.sameElements(avl1.rootHash) shouldBe true
@@ -60,8 +61,9 @@ class SnapshotProcessorTest
             nodes.forall(node => avl1.contains(node.key))
           } shouldBe true
 
-        val processor2: SnapshotProcessor = processor1.processNewSnapshot(UtxoState(avl2, settings.constants), block2)
-        val manifest2                     = processor2.bestPotentialManifest.get
+        val processor2: SnapshotProcessor =
+          processor1.processNewSnapshot(UtxoState(avl2, Height @@ 0, settings.constants), block2)
+        val manifest2 = processor2.bestPotentialManifest.get
 
         manifest1.ManifestId.sameElements(manifest2.ManifestId) shouldBe false
         manifest1.rootHash.sameElements(manifest2.rootHash) shouldBe false
@@ -97,12 +99,14 @@ class SnapshotProcessorTest
         val block2: Block = generateGenesisBlock(Height @@ 1)
 
         val processor1: SnapshotProcessor =
-          snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
+          snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
         val manifest1: SnapshotHolder.SnapshotManifest = processor1.bestPotentialManifest.get
-        val processor2: SnapshotProcessor              = processor1.processNewSnapshot(UtxoState(avl2, settings.constants), block2)
-        val manifest2                                  = processor2.bestPotentialManifest.get
-        val processor3: SnapshotProcessor              = processor2.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
-        val manifest3                                  = processor3.bestPotentialManifest.get
+        val processor2: SnapshotProcessor =
+          processor1.processNewSnapshot(UtxoState(avl2, Height @@ 0, settings.constants), block2)
+        val manifest2 = processor2.bestPotentialManifest.get
+        val processor3: SnapshotProcessor =
+          processor2.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
+        val manifest3 = processor3.bestPotentialManifest.get
 
         manifest3.ManifestId.sameElements(manifest1.ManifestId) shouldBe true
         manifest3.ManifestId.sameElements(manifest2.ManifestId) shouldBe false
@@ -118,28 +122,30 @@ class SnapshotProcessorTest
         val block1: Block = generateGenesisBlock(Height @@ 1)
 
         val processor1: SnapshotProcessor =
-          snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
+          snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
         val manifest1: SnapshotHolder.SnapshotManifest = processor1.bestPotentialManifest.get
-        val processor2: SnapshotProcessor              = processor1.processNewSnapshot(UtxoState(avl2, settings.constants), block1)
-        val manifest2                                  = processor2.bestPotentialManifest.get
+        val processor2: SnapshotProcessor =
+          processor1.processNewSnapshot(UtxoState(avl2, Height @@ 0, settings.constants), block1)
+        val manifest2 = processor2.bestPotentialManifest.get
 
         manifest1.ManifestId.sameElements(manifest2.ManifestId) shouldBe false
       }
     }
     "processNewBlock function" should {
       "skip unnecessary block|process necessary block correctly|remove outdated chunks" in {
-        val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
+        val settingsNew = settings.copy(snapshotSettings = settings.snapshotSettings.copy(creationHeight = 50))
+        val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settingsNew, tmpDir)
         val avl1: AvlTree[StorageKey, StorageValue] =
           createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 0, 20)
         val avl2: AvlTree[StorageKey, StorageValue] =
           createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 5, 25)
         val block1: Block = generateGenesisBlock(Height @@ 1)
-        val block2: Block = generateGenesisBlock(Height @@ settings.snapshotSettings.creationHeight)
+        val block2: Block = generateGenesisBlock(Height @@ settingsNew.snapshotSettings.creationHeight)
         val block3: Block =
-          generateGenesisBlock(Height @@ (settings.snapshotSettings.creationHeight + settings.levelDB.maxVersions))
+          generateGenesisBlock(Height @@ (settingsNew.snapshotSettings.creationHeight + settings.levelDB.maxVersions))
 
         val processor1: SnapshotProcessor =
-          snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
+          snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
         val manifest1: SnapshotHolder.SnapshotManifest = processor1.bestPotentialManifest.get
 
         val processor2 = processor1.processNewBlock(block1)
@@ -147,8 +153,9 @@ class SnapshotProcessorTest
         processor2.actualManifest.isDefined shouldBe false
         processor2.bestPotentialManifest.exists(_.ManifestId.sameElements(manifest1.ManifestId)) shouldBe true
 
-        val processor3: SnapshotProcessor = processor2.processNewSnapshot(UtxoState(avl2, settings.constants), block2)
-        val manifest3                     = processor3.bestPotentialManifest.get
+        val processor3: SnapshotProcessor =
+          processor2.processNewSnapshot(UtxoState(avl2, Height @@ 0, settings.constants), block2)
+        val manifest3 = processor3.bestPotentialManifest.get
 
         val processor4 = processor3.processNewBlock(block2)
         processor4.bestPotentialManifest.nonEmpty shouldBe true
@@ -177,7 +184,7 @@ class SnapshotProcessorTest
           createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 0, 20)
         val block1: Block = generateGenesisBlock(Height @@ 1)
         val processor1: SnapshotProcessor =
-          snapshotProcessor.processNewSnapshot(UtxoState(avl1, settings.constants), block1)
+          snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
         val randomKeys = (0 to 20).map(_ => StorageKey @@ Random.randomBytes()).toList
 
         processor1.bestPotentialManifest.get.chunksKeys.forall(l => processor1.getChunkById(l).isDefined) shouldBe true
