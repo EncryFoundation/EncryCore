@@ -96,7 +96,9 @@ object TransactionFactory extends StrictLogging {
                                 amount: Long,
                                 tokenIdOpt: Option[ADKey] = None): Transaction = {
     val howMuchCanTransfer: Long = useOutputs.map(_._1.amount).sum - fee
+    println(howMuchCanTransfer)
     val howMuchWillTransfer: Long = howMuchCanTransfer - Math.abs(Random.nextLong % howMuchCanTransfer)
+    println(howMuchWillTransfer)
     val change: Long = howMuchCanTransfer - howMuchWillTransfer
     val directives: IndexedSeq[TransferDirective] =
       IndexedSeq(TransferDirective(recipient, howMuchWillTransfer, tokenIdOpt))

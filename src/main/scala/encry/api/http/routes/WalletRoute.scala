@@ -385,6 +385,43 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                       )
                     )
                   )
+                ),
+                  div(cls := "card-body px-lg-5 py-lg-5",
+                  form(role := "form", action:="/wallet/transfer",
+                    div(cls := "form-group",
+                      div(cls := "input-group input-group-alternative mb-3",
+                        div(cls := "input-group-prepend",
+                          span(cls := "input-group-text",
+                            i(cls := "ni ni-hat-3")
+                          )
+                        ),
+                        input(cls := "form-control", name:="addr",  placeholder := "Address", tpe := "text")
+                      )
+                    ),
+                    div(cls := "form-group",
+                      div(cls := "input-group input-group-alternative mb-3",
+                        div(cls := "input-group-prepend",
+                          span(cls := "input-group-text",
+                            i(cls := "ni ni-email-83")
+                          )
+                        ),
+                        input(cls := "form-control",name:="fee", placeholder := "Fee", tpe := "text")
+                      )
+                    ),
+                    div(cls := "form-group",
+                      div(cls := "input-group input-group-alternative",
+                        div(cls := "input-group-prepend",
+                          span(cls := "input-group-text",
+                            i(cls := "ni ni-lock-circle-open")
+                          )
+                        ),
+                        input(cls := "form-control",name:="amount", placeholder := "Amount", tpe := "text")
+                      )
+                    ),
+                    div(cls := "text-center",
+                      button(tpe := "submit", cls := "btn btn-primary mt-4", "Send Money")
+                    )
+                  )
                 )
               )
             ),
