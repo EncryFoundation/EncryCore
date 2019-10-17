@@ -90,7 +90,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
       if (isInHistory || isInCache)
-        logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else ModifiersCache.put(key(mod.id), mod, nodeView.history)
       computeApplications()
@@ -200,7 +200,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
@@ -295,7 +295,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               val startTime = System.currentTimeMillis()
               logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
 
-              if (newHistory.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
+              if (
+                newHistory.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
                 && l.header.height != settings.constants.GenesisHeight)) {
                 newHistory.getBestBlock.foreach { b =>
                   val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(newState, b)
