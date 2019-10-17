@@ -3,21 +3,26 @@ package encry.view.fastSync
 import java.io.File
 
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.fastSync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import encry.view.fastSync.SnapshotHolder.{
+  SnapshotChunk,
+  SnapshotChunkSerializer,
+  SnapshotManifest,
+  SnapshotManifestSerializer
+}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.{ EncryAppSettings, LevelDBSettings }
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.view.state.avlTree.{InternalNode, Node, NodeSerilalizer, ShadowNode}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.view.state.avlTree.{ InternalNode, Node, NodeSerilalizer, ShadowNode }
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import org.iq80.leveldb.{DB, Options}
+import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
 
 import scala.language.postfixOps
@@ -131,13 +136,15 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   private def updateActualSnapshot(): (List[Array[Byte]], List[(StorageKey, StorageValue)]) = {
     val bestPotMan: Option[SnapshotManifest] = bestPotentialManifest
-    val newActualChunks: Set[ByteArrayWrapper]    = bestPotMan.map(_.chunksKeys).getOrElse(List.empty).map(ByteArrayWrapper(_)).toSet
+    val newActualChunks: Set[ByteArrayWrapper] =
+      bestPotMan.map(_.chunksKeys).getOrElse(List.empty).map(ByteArrayWrapper(_)).toSet
 
     val toDeleteManifests: Set[SnapshotManifest] =
       actualManifest.fold(allPotentialManifests.toSet)(l => (l +: allPotentialManifests).toSet)
 
     val chunkKeysToDeleteKeys1: Set[ByteArrayWrapper] = toDeleteManifests
-      .flatMap(_.chunksKeys).map(ByteArrayWrapper(_))
+      .flatMap(_.chunksKeys)
+      .map(ByteArrayWrapper(_))
 
     val chunkKeysToDeleteKeys: Set[Array[Byte]] = chunkKeysToDeleteKeys1.diff(newActualChunks).map(_.data)
 
