@@ -38,12 +38,6 @@ object ShadowNode {
 
   def childsToShadowNode[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Node[K, V] = node match {
     case internal: InternalNode[K, V] =>
-      if (internal.leftChild.exists(leftNode => Algos.encode(leftNode.hash) == "ec905fa4cdcbca936b4e73a1265926f52d4f04d522ff7b319e19621876db7533") ||
-        internal.rightChild.exists(rightCild => Algos.encode(rightCild.hash) == "ec905fa4cdcbca936b4e73a1265926f52d4f04d522ff7b319e19621876db7533")
-      ) {
-//        println(s"node: ${node}")
-//        println("-----")
-      }
       internal.copy(
         leftChild = internal.leftChild.map(node => ShadowNode[K, V](hash = node.hash, height = node.height, balance = node.balance)),
         rightChild = internal.rightChild.map(node => ShadowNode[K, V](hash = node.hash, height = node.height, balance = node.balance))

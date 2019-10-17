@@ -7,10 +7,10 @@ import org.encryfoundation.common.utils.Algos
 case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty[ByteArrayWrapper, Node[K, V]],
                                deletedNodes: Set[ByteArrayWrapper] = Set.empty[ByteArrayWrapper]) extends StrictLogging {
 
-  def resolve: (Map[ByteArrayWrapper, Node[K, V]], List[ByteArrayWrapper]) = {
+  def resolve: (Array[(ByteArrayWrapper, Node[K, V])], List[ByteArrayWrapper]) = {
     val toDelete = deletedNodes.diff(insertedNodes.keys.toSet)
     val toInsert = insertedNodes.filterKeys(key => !toDelete.contains(key))
-    toInsert -> toDelete.toList
+    toInsert.toArray -> toDelete.toList
   }
 
   def update(newInserted: List[(ByteArrayWrapper, Node[K, V])] = List.empty[(ByteArrayWrapper, Node[K, V])],

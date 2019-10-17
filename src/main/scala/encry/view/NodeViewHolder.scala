@@ -191,6 +191,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
+              influxRef.foreach(ref =>
+                ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
+              )
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>

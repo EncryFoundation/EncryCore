@@ -210,7 +210,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           logger.info(s"NULL at key: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
         }
         val elemFlag = elemInfo.head
-        val elemMap = elemInfo.drop(1)
+        val elemMap = util.Arrays.copyOfRange(elemInfo, 1, elemInfo.length + 1)
+        //val elemMap = elemInfo.drop(1)
         if (elemMap.length > settings.versionKeySize) {
           val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
           elemVersions.dropWhile(_ != wrappedVer).drop(1).foreach {

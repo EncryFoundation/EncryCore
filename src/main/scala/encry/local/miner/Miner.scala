@@ -61,7 +61,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
       influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
-      logger.info(s"data holder: ${dataHolder}")
+      logger.info(s"data holder: ${dataHolder}. Context: ${context}")
       dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
     }
