@@ -139,7 +139,7 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
   def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
     logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
     historyStorage.insert(
-      StorageVersion @@ validityKey(headerId).untag(StorageKey),
+      StorageVersion @@ validityKey(payloadId).untag(StorageKey),
       (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
     )
     this
