@@ -91,7 +91,9 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
           logger.info("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
-    case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
+    case TransactionsForMiner(txs) =>
+      logger.info(s"")
+      transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       killAllWorkers()

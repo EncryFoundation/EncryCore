@@ -27,8 +27,8 @@ import scala.util.{Random, Try}
 case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSettings)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute
-    with FailFastCirceSupport
-    with StrictLogging {
+  with FailFastCirceSupport
+  with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
     infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ aaa
@@ -39,13 +39,17 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
   private def getWallet: Future[EncryWallet] =
     (dataHolder ? GetDataFromWallet[EncryWallet](identity)).mapTo[EncryWallet]
 
-  private def getAddresses: Future[String] = (dataHolder ? GetViewPrintAddress).mapTo[String]
+  private def getAddresses: Future[String] = (dataHolder ? GetViewPrintAddress)
+    .mapTo[String]
 
-  private def createKey: Future[PrivateKey25519] = (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519]
+  private def createKey: Future[PrivateKey25519] = (dataHolder ? GetViewCreateKey)
+    .mapTo[PrivateKey25519]
 
-  private def pubKeys: Future[String] = (dataHolder ? GetViewPrintPubKeys).mapTo[String]
+  private def pubKeys: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys)
+    .mapTo[List[String]]
 
-  private def getBalance: Future[String] = (dataHolder ? GetViewGetBalance).mapTo[String]
+  private def getBalance: Future[String] = (dataHolder ? GetViewGetBalance)
+    .mapTo[String]
 
   def infoR: Route = (path("info") & get) {
     getWallet.map { w =>
@@ -60,15 +64,12 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
     getAddresses.map(_.asJson).okJson()
   }
 
-  def aaa = (path("transfer") & get ) {
-    parameters('addr, 'fee.as[Int], 'amount.as[Int]) { (addr, fee, amount) =>
+  def aaa = (path("transfer") & get) {
+    parameters('addr, 'fee.as[Int], 'amount.as[Long]) { (addr, fee, amount) =>
       (dataHolder ?
         GetDataFromWallet[Option[Transaction]] { wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
-//            val recipient: Address      = args.requireArg[Ast.Str]("addr").s
-//            val fee: Long               = args.requireArg[Ast.Num]("fee").i
-//            val amount: Long            = args.requireArg[Ast.Num]("amount").i
             val boxes: IndexedSeq[AssetBox] = wallet.walletStorage
               .getAllBoxes()
               .filter(_.isInstanceOf[AssetBox])
@@ -87,7 +88,9 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
+          println(tx)
           memoryPool ! NewTransaction(tx)
+          println("aaaa")
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

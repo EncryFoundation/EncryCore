@@ -328,6 +328,56 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     div(cls := "row align-items-center",
                       div(cls := "col",
                         h3(cls := "mb-0", "Tokens")
+                      ),
+                      div(cls := "col-md-4",
+                        button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form", "Transfer"),
+                        div(cls := "modal fade", id := "modal-form", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
+                          div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",
+                            div(cls := "modal-content",
+                              div(cls := "modal-body p-0",
+                                div(cls := "card bg-secondary shadow border-0",
+                                  div(cls := "card-body px-lg-5 py-lg-5",
+                                    form(role := "form", action:="/wallet/transfer",
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-hat-3")
+                                            )
+                                          ),
+                                          input(cls := "form-control", name:="addr",  placeholder := "Address", tpe := "text")
+                                        )
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-email-83")
+                                            )
+                                          ),
+                                          input(cls := "form-control",name:="fee", placeholder := "Fee", tpe := "text")
+                                        )
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-lock-circle-open")
+                                            )
+                                          ),
+                                          input(cls := "form-control",name:="amount", placeholder := "Amount", tpe := "text")
+                                        )
+                                      ),
+                                      div(cls := "text-center",
+                                        button(tpe := "submit", cls := "btn btn-primary mt-4", "Send Money")
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        )
                       )
                     )
                   ),
@@ -358,8 +408,11 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     )
                   )
                 )
+              )
               ),
-              div(cls := "col-xl-12",
+
+              div(cls := "row mt-5",
+              div(cls := "col-xl-12 mb-5 mb-xl-0",
                 div(cls := "card shadow",
                   div(cls := "card-header border-0",
                     div(cls := "row align-items-center",
@@ -385,46 +438,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                       )
                     )
                   )
-                ),
-                  div(cls := "card-body px-lg-5 py-lg-5",
-                  form(role := "form", action:="/wallet/transfer",
-                    div(cls := "form-group",
-                      div(cls := "input-group input-group-alternative mb-3",
-                        div(cls := "input-group-prepend",
-                          span(cls := "input-group-text",
-                            i(cls := "ni ni-hat-3")
-                          )
-                        ),
-                        input(cls := "form-control", name:="addr",  placeholder := "Address", tpe := "text")
-                      )
-                    ),
-                    div(cls := "form-group",
-                      div(cls := "input-group input-group-alternative mb-3",
-                        div(cls := "input-group-prepend",
-                          span(cls := "input-group-text",
-                            i(cls := "ni ni-email-83")
-                          )
-                        ),
-                        input(cls := "form-control",name:="fee", placeholder := "Fee", tpe := "text")
-                      )
-                    ),
-                    div(cls := "form-group",
-                      div(cls := "input-group input-group-alternative",
-                        div(cls := "input-group-prepend",
-                          span(cls := "input-group-text",
-                            i(cls := "ni ni-lock-circle-open")
-                          )
-                        ),
-                        input(cls := "form-control",name:="amount", placeholder := "Amount", tpe := "text")
-                      )
-                    ),
-                    div(cls := "text-center",
-                      button(tpe := "submit", cls := "btn btn-primary mt-4", "Send Money")
-                    )
-                  )
                 )
               )
-            ),
+              )
+            ,
             // Footer
             footer(cls := "footer",
               div(cls := "row align-items-center justify-content-xl-between",
