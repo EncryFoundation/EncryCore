@@ -66,6 +66,8 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
             logger.info(s"chunk manifest -> ${Algos.encode(chunk.manifestId)}")
             logger.info(s"1st cond: ${currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId))}")
             logger.info(s"2nd cond: ${inAwait.exists(_.sameElements(chunk.id))}")
+            logger.info(s"currentManifestId -> ${currentManifest.map(l => Algos.encode(l.ManifestId))}")
+            logger.info(s"chunk.manifestId -> ${Algos.encode(chunk.manifestId)}")
             if (currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId)) &&
                 inAwait.exists(_.sameElements(chunk.id))) {
               val newController = this.copy(inAwait = inAwait.filterNot(_.sameElements(chunk.id)), cp = remote.some)
