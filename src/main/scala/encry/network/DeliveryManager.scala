@@ -199,7 +199,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
 
-    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) if canProcessPayloads =>
+    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) if
+    (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
       if (modifierTypeId != Transaction.modifierTypeId)
         logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
