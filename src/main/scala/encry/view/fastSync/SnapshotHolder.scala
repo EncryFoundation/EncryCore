@@ -38,7 +38,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   import context.dispatcher
 
-  var snapshotProcessor: Option[SnapshotProcessor]                   = None
+  var snapshotProcessor: Option[SnapshotProcessor]           = None
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var givingChunksProcessor: GivingChunksProcessor           = GivingChunksProcessor.empty
 
@@ -149,23 +149,23 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
       message match {
         case BasicMessagesRepo.RequestManifest =>
+          val actualManifestVal = snapshotProcessor.flatMap(_.actualManifest)
           logger.info(s"Remote ${remote.socketAddress} requested actual manifest.")
-          snapshotProcessor.foreach(_.actualManifest.foreach { m =>
+          actualManifestVal.foreach { m =>
             logger.info(s"Sent to remote ${remote.socketAddress} actual manifest.")
             remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
-          })
+          }
           givingChunksProcessor = givingChunksProcessor
-            .copy(Some(remote),
-                  snapshotProcessor.get.actualManifest,
-                  snapshotProcessor.get.actualManifest.map(_.chunksKeys).getOrElse(List.empty))
+            .copy(Some(remote), actualManifestVal, actualManifestVal.map(_.chunksKeys).getOrElse(List.empty))
         case RequestChunkMessage(chunkId, manifestId) =>
+          val actualManifestVal = snapshotProcessor.flatMap(_.actualManifest)
           timeout.foreach(_.cancel())
           logger.info(
             s"Got request chunk message from ${remote.socketAddress} with manifest if ${Algos.encode(manifestId)}." +
-              s" Actual manifest id is ${snapshotProcessor.get.actualManifest.map(e => Algos.encode(e.ManifestId))}."
+              s" Actual manifest id is ${actualManifestVal.map(e => Algos.encode(e.ManifestId))}."
           )
-          if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress) && snapshotProcessor.get.actualManifest
-                .exists(_.ManifestId.sameElements(manifestId)) && snapshotProcessor.get.actualManifest
+          if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress) && actualManifestVal
+                .exists(_.ManifestId.sameElements(manifestId)) && actualManifestVal
                 .exists(_.chunksKeys.exists(_.sameElements(chunkId)))) {
             logger.info(s"Request for chunk from ${remote.socketAddress} is valid.")
             snapshotProcessor.get.getChunkById(chunkId).foreach { ch =>
@@ -190,14 +190,14 @@ class SnapshotHolder(settings: EncryAppSettings,
           } else if (givingChunksProcessor.peer.exists(_.socketAddress == remote.socketAddress)) {
             //todo if 2nd condition false - ban node
             logger.info(s"Got request for chunk from old manifest.")
-            snapshotProcessor.get.actualManifest.foreach { m =>
+            actualManifestVal.foreach { m =>
               logger.info(s"Sent to ${remote.socketAddress} new manifest.")
               ManifestHasChanged(manifestId, SnapshotManifestSerializer.toProto(m))
             }
             givingChunksProcessor = givingChunksProcessor.copy(
               Some(remote),
-              snapshotProcessor.get.actualManifest,
-              snapshotProcessor.get.actualManifest.map(_.chunksKeys).getOrElse(List.empty)
+              actualManifestVal,
+              actualManifestVal.map(_.chunksKeys).getOrElse(List.empty)
             )
             context.become(
               workMod(
@@ -233,7 +233,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 //      logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
 //      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
 //      snapshotProcessor = newProcessor
-    case HeaderChainIsSynced => //do nothing
+    case HeaderChainIsSynced               => //do nothing
     case SemanticallySuccessfulModifier(_) => //do nothing
     case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
   }
