@@ -36,7 +36,7 @@ import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.{SnapshotHolder, SnapshotProcessor}
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, SnapshotProcessorMessage, UpdateSnapshot}
 
 import scala.util.Try
 
@@ -93,6 +93,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
+//    case msg@SnapshotProcessorMessage(_) =>
+//      println(s"NVSH processor")
+//      snapshotHolder ! msg
     case msg => logger.info(s"Nvsh got strange message: $msg during history awaiting.")
   }
 
@@ -198,7 +201,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@SendToNetwork(_, _) =>
       logger.info(s"NVSH got SendToNetwork")
       peersKeeper ! msg
-    case msg@HeaderChainIsSynced => snapshotHolder ! msg
+    case msg@HeaderChainIsSynced =>
+      snapshotHolder ! msg
     case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
     case msg@FastSyncDone =>
       //nodeViewHolderRef ! msg
@@ -210,7 +214,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case RequestedModifiersForRemote(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
-    case snapshotProcessor: SnapshotProcessor => snapshotHolder ! snapshotProcessor
+    case msg@SnapshotProcessorMessage(_) =>
+      println(s"NVSH processor")
+      snapshotHolder ! msg
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
