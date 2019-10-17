@@ -126,14 +126,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case CheckPayloadsToDownload if canProcessPayloads =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
-      logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
-      logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
+      logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
+      logger.info(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
           currentQueue.map(elem => ModifierId @@ elem.toArray)
         ).filterNot(modId => currentQueue.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId)))
-      logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
+      logger.info(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
       if (newIds.nonEmpty) requestDownload(Payload.modifierTypeId, newIds, history, isBlockChainSynced, isMining)
       val nextCheckModsScheduler =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
@@ -202,11 +202,12 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case DownloadRequest(modifierTypeId, modifiersId, previousModifier) if
     (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
       if (modifierTypeId != Transaction.modifierTypeId)
-        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
+        logger.info(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
     case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
+      logger.info(s"DownloadRequest but canProcessPayloads = $canProcessPayloads")
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
@@ -340,7 +341,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       } match {
         case Some((_, (cP, _, _))) =>
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
-          logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
+          logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
           priorityCalculator = priorityCalculator.incrementRequest(peer.socketAddress)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress, peerRequests.updated(
