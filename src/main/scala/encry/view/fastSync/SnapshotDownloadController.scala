@@ -68,8 +68,12 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
             logger.info(s"2nd cond: ${inAwait.exists(_.sameElements(chunk.id))}")
             logger.info(s"currentManifestId -> ${currentManifest.map(l => Algos.encode(l.ManifestId))}")
             logger.info(s"chunk.manifestId -> ${Algos.encode(chunk.manifestId)}")
+            logger.info(s"currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId)) -> " +
+              s"${currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId))}")
+            logger.info(s"inAwait.exists(_.sameElements(chunk.id)) -> ${inAwait.exists(_.sameElements(chunk.id))}")
             if (currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId)) &&
                 inAwait.exists(_.sameElements(chunk.id))) {
+              logger.info(s"chunk.nodesList -> ${chunk.nodesList.size}")
               val newController = this.copy(inAwait = inAwait.filterNot(_.sameElements(chunk.id)), cp = remote.some)
               ProcessRequestedChunkResult(newController, isForBan = false, chunk.nodesList)
             } else
