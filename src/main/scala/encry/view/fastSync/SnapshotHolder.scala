@@ -28,6 +28,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.util.Try
+import scala.concurrent.duration._
 
 class SnapshotHolder(settings: EncryAppSettings,
                      networkController: ActorRef,
@@ -83,7 +84,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         }
       }
       snapshotDownloadController = controller
-      context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! RequestNextChunks)
+      context.system.scheduler.scheduleOnce(30.seconds)(self ! RequestNextChunks)
 
     case RequestNextChunks if snapshotDownloadController.currentManifest.nonEmpty =>
       nodeViewHolder ! FastSyncDoneAt(
