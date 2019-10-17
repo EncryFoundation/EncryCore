@@ -21,7 +21,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestToNvh, NewChunkToApply, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestToNvh, NewChunkToApply, SnapshotProcessorMessage, UpdateSnapshot}
 import encry.view.fastSync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
@@ -51,11 +51,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  nodeViewSynchronizer ! ChangedHistory(nodeView.history)
   var canDownloadPayloads: Boolean = !settings.snapshotSettings.startWith
 
   var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
 
-  nodeViewSynchronizer ! snapshotProcessor
+  nodeViewSynchronizer ! SnapshotProcessorMessage(snapshotProcessor)
+  println(s"NVH to NSSH procc")
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
@@ -119,7 +121,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
     case CompareViews(peer, modifierTypeId, modifierIds)
         if (modifierTypeId == Payload.modifierTypeId && canDownloadPayloads) || modifierTypeId != Payload.modifierTypeId =>
-      logger.debug(s"Start processing CompareViews message on NVH.")
+      logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds

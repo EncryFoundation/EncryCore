@@ -46,6 +46,10 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   var processNewSnapshot = false
 
+  override def postStop(): Unit = {
+    logger.info(s"\n\n SNAPSHOT ACTOR ERROR \n\n")
+  }
+
   override def preStart(): Unit = {
     logger.info(s"SnapshotHolder has started.")
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
@@ -135,7 +139,8 @@ class SnapshotHolder(settings: EncryAppSettings,
       processedTmp = true
       logger.info(s"Broadcast request for new manifest")
       nodeViewSyncronizer ! SendToNetwork(RequestManifest, Broadcast)
-    case HeaderChainIsSynced               =>
+    case HeaderChainIsSynced =>
+      println(s"HeaderChainIsSynced -> processedTmp -> ${!processedTmp}")
     case SemanticallySuccessfulModifier(_) =>
     case RequestNextChunks                 =>
     case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense while fast sync mod.")
@@ -150,6 +155,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       message match {
         case BasicMessagesRepo.RequestManifest =>
           val actualManifestVal = snapshotProcessor.flatMap(_.actualManifest)
+          logger.info(s"actualManifestVal -> ${actualManifestVal}")
           logger.info(s"Remote ${remote.socketAddress} requested actual manifest.")
           actualManifestVal.foreach { m =>
             logger.info(s"Sent to remote ${remote.socketAddress} actual manifest.")
@@ -215,7 +221,9 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def commonMessages: Receive = {
-    case sp: SnapshotProcessor => snapshotProcessor = Some(sp)
+    case SnapshotProcessorMessage(sp) =>
+      println(s"commonMessages -> SnapshotProcessor")
+      snapshotProcessor = Some(sp)
     case UpdateSnapshot(block, state)
         if block.header.height != settings.constants.GenesisHeight && processNewSnapshot =>
 //      logger.info(s"Snapshot holder got update snapshot message. Potential snapshot processing has started.")
@@ -240,6 +248,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 }
 
 object SnapshotHolder {
+
+  final case class SnapshotProcessorMessage(sp: SnapshotProcessor)
 
   final case class ManifestToNvh(m: Option[SnapshotManifest]) extends AnyVal
 
