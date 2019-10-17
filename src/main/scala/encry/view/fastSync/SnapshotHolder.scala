@@ -115,15 +115,15 @@ class SnapshotHolder(settings: EncryAppSettings,
           )
           snapshotDownloadController.processRequestedChunk(chunk, remote) match {
             case ProcessRequestedChunkResult(_, true, _) =>
-              logger.info(s"Got corrupted chunk from ${remote.socketAddress}.")
+              logger.info(s"Got corrupted chunk ${Algos.encode(chunk.id.toByteArray)} from ${remote.socketAddress}.")
             //todo ban node
 
             case ProcessRequestedChunkResult(controller, false, list: List[NodeProtoMsg]) if list.nonEmpty =>
-              logger.info(s"Got correct chunk from ${remote.socketAddress}.")
+              logger.info(s"Got correct chunk ${Algos.encode(chunk.id.toByteArray)} from ${remote.socketAddress}.")
               snapshotDownloadController = controller
               nodeViewHolder ! NewChunkToApply(list)
             case ProcessRequestedChunkResult(_, false, _) =>
-              logger.info(s"Got chunk from peer which not correspond to expected.")
+              logger.info(s"Got chunk ${Algos.encode(chunk.id.toByteArray)} from peer which not correspond to expected.")
           }
         case ManifestHasChanged(requestedManifestId, newManifestId: SnapshotManifestProtoMessage) =>
           snapshotDownloadController.processManifestHasChangedMessage(newManifestId, requestedManifestId, remote) match {
