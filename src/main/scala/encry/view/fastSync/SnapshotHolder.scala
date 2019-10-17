@@ -118,7 +118,7 @@ class SnapshotHolder(settings: EncryAppSettings,
               logger.info(s"Got corrupted chunk ${Algos.encode(chunk.id.toByteArray)} from ${remote.socketAddress}.")
             //todo ban node
 
-            case ProcessRequestedChunkResult(controller, false, list: List[NodeProtoMsg]) if list.nonEmpty =>
+            case ProcessRequestedChunkResult(controller, false, list: List[NodeProtoMsg]) => //todo bug with emptyChunk
               logger.info(s"Got correct chunk ${Algos.encode(chunk.id.toByteArray)} from ${remote.socketAddress}.")
               snapshotDownloadController = controller
               nodeViewHolder ! NewChunkToApply(list)
