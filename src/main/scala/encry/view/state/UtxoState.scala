@@ -204,9 +204,11 @@ object UtxoState extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
     }
     logger.info(s"State created.")
+    val avlTree = AvlTree.restore[StorageKey, StorageValue](versionalStorage).get
+    val height: StorageValue = avlTree.storage.get(UtxoState.bestHeightKey).get
     UtxoState(
-      AvlTree[StorageKey, StorageValue](versionalStorage),
-      Height @@ 0,
+      avlTree,
+      Height @@ Ints.fromByteArray(height),
       settings.constants
     )
   }
