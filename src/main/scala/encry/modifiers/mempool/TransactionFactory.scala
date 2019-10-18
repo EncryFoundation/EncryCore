@@ -72,7 +72,7 @@ object TransactionFactory extends StrictLogging {
 
     val change: Long = amount
 
-    logger.info(s"Change: $change")
+    println(change)
 
     if (change < 0) {
       logger.info(s"Transaction impossible: required amount is bigger than available. Change is: $change.")
@@ -99,7 +99,7 @@ object TransactionFactory extends StrictLogging {
                                 tokenIdOpt: Option[ADKey] = None): Transaction = {
     val howMuchCanTransfer: Long = useOutputs.map(_._1.amount).sum - fee
     println(howMuchCanTransfer)
-    val howMuchWillTransfer: Long = howMuchCanTransfer - amount
+    val howMuchWillTransfer: Long = amount
     println(howMuchWillTransfer)
     val change: Long = howMuchCanTransfer - howMuchWillTransfer
     val directives: IndexedSeq[TransferDirective] =

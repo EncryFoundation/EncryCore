@@ -38,9 +38,12 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 
 
   def walletScript(balances: Map[String, Amount], pubKeysList: List[String]): Text.TypedTag[String] = {
+
     val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
 
     val EttTokenId: String = Algos.encode(IntrinsicTokenId)
+
+    val aaa = balances.values.head.toString
     html(
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
@@ -48,36 +51,37 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
         meta(name := "author", content := "Creative Tim"),
         script(
-          raw(
-            """function shutdown(){
-    var input1 = document.getElementById("input1");
-    var request = new XMLHttpRequest();
-    request.open('GET', "http://localhost:9051/node/shutdown");
-//    request.setRequestHeader('content-type', 'application/json');
-    request.send();
-  }""")
+          raw("""function validateForm() {
+  var x = document.forms["myForm"]["addr"].value;
+  var y = document.forms["myForm"]["fee"].value;
+  var z = document.forms["myForm"]["amount"].value;
+  if (x == "") {
+    alert("Address must be filled out");
+    return false;
+  }
+  if (y == "") {
+     alert("Fee must be filled out");
+     return false;
+   }
+ if (z == "") {
+    alert("Amount must be filled out");
+    return false;
+  }
+}""")
         ),
         script(
-          raw(
-            """function start(){
-    var request = new XMLHttpRequest();
-    request.open('GET', "http://localhost:9051/node/startMining");
-//    request.setRequestHeader('content-type', 'application/json');
-    request.send();
-    setTimeout(location.reload.bind(location), 5000);
-    window.alert("Start mining... \n Reloading page in 5s.");
-  }""")
-        ),
-        script(
-          raw(
-            """function stop(){
-    var request = new XMLHttpRequest();
-    request.open('GET', "http://localhost:9051/node/stopMining");
-//    request.setRequestHeader('content-type', 'application/json');
-    request.send();
-    setTimeout(location.reload.bind(location), 5000);
-    window.alert("Stop mining... \n Reloading page in 5s.");
-  }""")
+          raw("""function wallet(){
+                 var a = document.forms["myForm"]["addr"].value;
+                 var b = document.forms["myForm"]["fee"].value;
+                 var x = document.forms["myForm"]["amount"].value;
+                    var request = new XMLHttpRequest();
+
+                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x);
+                    //request.setRequestHeader('content-type', 'application/json');
+
+                    request.send();
+ }
+                  }""")
         ),
 
         tag("title")(
@@ -337,17 +341,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                               div(cls := "modal-body p-0",
                                 div(cls := "card bg-secondary shadow border-0",
                                   div(cls := "card-body px-lg-5 py-lg-5",
-                                    form(role := "form", action:="/wallet/transfer",
-                                      div(cls := "form-group",
-                                        div(cls := "input-group input-group-alternative mb-3",
-                                          div(cls := "input-group-prepend",
-                                            span(cls := "input-group-text",
-                                              i(cls := "ni ni-hat-3")
-                                            )
-                                          ),
-                                          input(cls := "form-control", name:="addr",  placeholder := "Address", tpe := "text")
-                                        )
-                                      ),
+                                    form(role := "form", onsubmit:="return validateForm()", id:="myForm",
+
                                       div(cls := "form-group",
                                         div(cls := "input-group input-group-alternative mb-3",
                                           div(cls := "input-group-prepend",
@@ -355,21 +350,95 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-email-83")
                                             )
                                           ),
-                                          input(cls := "form-control",name:="fee", placeholder := "Fee", tpe := "text")
+                                          input(cls := "form-control", id:="babo", name:="addr",  placeholder := "Address", tpe := "text")
                                         )
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-money-coins")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                            script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bibo"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                            )
+                                            )
+
                                       ),
                                       div(cls := "form-group",
                                         div(cls := "input-group input-group-alternative",
                                           div(cls := "input-group-prepend",
                                             span(cls := "input-group-text",
-                                              i(cls := "ni ni-lock-circle-open")
+                                              i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control",name:="amount", placeholder := "Amount", tpe := "text")
+                                          input(cls := "form-control", id:="bobo", name:="amount", placeholder := "Amount"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bobo"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          ),
                                         )
                                       ),
+                                      div(cls := "form-group",
+                                            select(cls:="form-control",
+
+//                                              (for (b <- balances) yield {
+                                              for (coinIds <- balances.keys.toList) yield {
+                                                option(value := coinIds, if(coinIds == EttTokenId) "ETT ❤️\u200D" else coinIds)
+
+                                              }
+
+//                                              }
+
+                                          )
+
+
+                                      ),
                                       div(cls := "text-center",
-                                        button(tpe := "submit", cls := "btn btn-primary mt-4", "Send Money")
+                                        button(tpe := "button", onclick:="wallet()", cls := "btn btn-primary mt-4", "Send Money")
                                       )
                                     )
                                   )
@@ -383,7 +452,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   ),
                   div(cls := "table-responsive",
                     // Projects table
-                    table(cls := "table align-items-center table-flush",
+                    table(cls := "table align-items-center table-flush", id:="myTable",
                       thead(cls := "thead-light",
                         tr(
                           th(attr("scope") := "row", "TokenId"),
