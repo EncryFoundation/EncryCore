@@ -9,7 +9,7 @@ final case class GivingChunksProcessor(peer: Option[ConnectedPeer],
                                        lastsIds: List[Array[Byte]]) {
 
   def updateLastsIds(forRemove: Array[Byte], cp: ConnectedPeer): GivingChunksProcessor =
-      this.copy(peer = cp.some, lastsIds = lastsIds.filterNot(_.sameElements(forRemove)))
+    this.copy(peer = cp.some, lastsIds = lastsIds.filterNot(_.sameElements(forRemove)))
 }
 
 object GivingChunksProcessor {
