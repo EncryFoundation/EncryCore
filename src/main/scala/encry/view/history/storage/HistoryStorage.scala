@@ -25,7 +25,9 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     case _: VLDBWrapper           => store.get(StorageKey @@ id.untag(ModifierId))
   })
     .flatMap(res => HistoryModifiersProtoSerializer.fromProto(res) match {
-      case Success(b) => b.some
+      case Success(b) =>
+        logger.info(s"From storage: ${b}")
+        b.some
       case Failure(e) => logger.warn(s"Failed to parse block from db: $e"); none
     })
 
