@@ -135,7 +135,7 @@ object ModifiersCache extends StrictLogging {
     else history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
       case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
-          logger.info(s"Found new payload ${Algos.encode(header.payloadId)}")
+
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isHeadersChainSynced => List.empty[Key]
         case _ => List.empty[Key]

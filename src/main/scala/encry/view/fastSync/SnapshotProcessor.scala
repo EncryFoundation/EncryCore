@@ -175,20 +175,18 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   }
 
   private def updateChunksManifestId(manifest: Option[SnapshotManifest]): Unit =
-    manifest.foreach(
-      newManifest =>
-        newManifest.chunksKeys.foreach(
-          chunkId =>
-            getChunkById(chunkId).collect {
-              case chunk if !chunk.manifestId.toByteArray.sameElements(newManifest.ManifestId) =>
-                chunk.copy(manifestId = ByteString.copyFrom(newManifest.ManifestId))
-            }.foreach { chunk =>
-              storage.insert(StorageVersion @@ Random.randomBytes(),
-                             List(StorageKey @@ chunk.id.toByteArray -> StorageValue @@ chunk.toByteArray),
-                             List.empty)
-          }
-      )
-    )
+    manifest.foreach { newManifest =>
+      newManifest.chunksKeys.foreach { chunkId =>
+        getChunkById(chunkId).collect {
+          case chunk if !chunk.manifestId.toByteArray.sameElements(newManifest.ManifestId) =>
+            chunk.copy(manifestId = ByteString.copyFrom(newManifest.ManifestId))
+        }.foreach { chunk =>
+          storage.insert(StorageVersion @@ Random.randomBytes(),
+                         List(StorageKey @@ chunk.id.toByteArray -> StorageValue @@ chunk.toByteArray),
+                         List.empty)
+        }
+      }
+    }
 
   override def close(): Unit = storage.close()
 }
