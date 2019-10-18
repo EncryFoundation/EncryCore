@@ -41,6 +41,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
 
   def insertObjects(objectsToInsert: Seq[PersistentModifier]): Unit = store match {
     case iodb: IODBHistoryWrapper =>
+      logger.info(s"Inserting: $objectsToInsert")
       iodb.objectStore.update(
         Random.nextLong(),
         Seq.empty,
@@ -48,6 +49,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
           ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj)))
       )
     case _: VLDBWrapper =>
+      logger.info(s"Inserting: $objectsToInsert")
       insert(
         StorageVersion @@ objectsToInsert.head.id.untag(ModifierId),
         objectsToInsert.map(obj =>
@@ -60,12 +62,14 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
                  objectsToInsert: Seq[PersistentModifier]): Unit = store match {
     case _: IODBHistoryWrapper =>
+      logger.info(s"Inserting2: $objectsToInsert")
       insertObjects(objectsToInsert)
       insert(
         StorageVersion @@ version,
         indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
       )
     case _: VLDBWrapper =>
+      logger.info(s"Inserting2: $objectsToInsert")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>
