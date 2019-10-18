@@ -48,6 +48,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
    // val deletedNodes  = newRoot.opInfo.deletedNodes
     val (insertedNodes, deletedNodes) = newRoot.opInfo.resolve
     val shadowedRoot  = ShadowNode.childsToShadowNode(newRoot.node)
+    val startInsertTime = System.currentTimeMillis()
     storage.insert(
       version,
       toInsert.map {
@@ -70,6 +71,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
+    logger.info(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
     //println(newRoot.node)
     AvlTree(shadowedRoot, storage)
   }
