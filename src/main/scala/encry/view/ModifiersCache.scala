@@ -93,7 +93,7 @@ object ModifiersCache extends StrictLogging {
         case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
-          logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
+          logger.info(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
@@ -135,14 +135,15 @@ object ModifiersCache extends StrictLogging {
     else history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
       case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
+          logger.info(s"Found new payload ${Algos.encode(header.payloadId)}")
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isHeadersChainSynced => List.empty[Key]
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>
-        logger.debug(s"No payloads for current history")
+        logger.info(s"No payloads for current history")
         exhaustiveSearch
-      case None => logger.debug(s"No payloads for current history")
+      case None => logger.info(s"No payloads for current history")
         List.empty[Key]
     }
   }

@@ -137,7 +137,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
     case CompareViews(_, _, _) =>
 
-    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isHeadersChainSyncedVar =>
+    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
       snapshotProcessor = newProcessor
@@ -245,7 +245,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               influxRef.foreach(ref =>
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
-              context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
               logger.info(s"Application to state faild cause ${e}")
@@ -295,8 +294,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               val startTime = System.currentTimeMillis()
               logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
 
-              if (
-                newHistory.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
+              if (newHistory.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
                 && l.header.height != settings.constants.GenesisHeight)) {
                 newHistory.getBestBlock.foreach { b =>
                   val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(newState, b)
