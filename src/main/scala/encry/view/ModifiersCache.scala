@@ -86,14 +86,14 @@ object ModifiersCache extends StrictLogging {
         case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           new mutable.WrappedArray.ofByte(header.payloadId)
       }
-    }.toList
+      }.toList
 
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
       v match {
         case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
-          logger.info(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
+          logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
           isApplicableMod
       }
     }).collect { case Some(v) => v._1 }
@@ -135,15 +135,14 @@ object ModifiersCache extends StrictLogging {
     else history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
       case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
-
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isHeadersChainSynced => List.empty[Key]
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>
-        logger.info(s"No payloads for current history")
+        logger.debug(s"No payloads for current history")
         exhaustiveSearch
-      case None => logger.info(s"No payloads for current history")
+      case None => logger.debug(s"No payloads for current history")
         List.empty[Key]
     }
   }

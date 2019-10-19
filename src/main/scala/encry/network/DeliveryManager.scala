@@ -127,7 +127,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
-      logger.info(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
+      logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
+      logger.info(s"receivedModifiers: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,

@@ -245,6 +245,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               influxRef.foreach(ref =>
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
+              context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
               logger.info(s"Application to state faild cause ${e}")
