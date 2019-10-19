@@ -68,6 +68,10 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       .orElse(getHeaderByIdDB(id))
   )
 
+  def getBestHeaderAtHeight(h: Int): Option[Header] = headersCacheIndexes.get(h)
+    .flatMap(_.headOption).flatMap(id => headersCache.get(ByteArrayWrapper(id)))
+    .orElse(getBestHeaderAtHeightDB(h))
+
   def getBlockByPayload(payload: Payload): Option[Block] = headersCache
     .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
     .orElse(blocksCache.get(ByteArrayWrapper(payload.headerId)))

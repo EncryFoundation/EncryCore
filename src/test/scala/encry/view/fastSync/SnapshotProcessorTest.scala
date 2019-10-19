@@ -574,7 +574,6 @@ class SnapshotProcessorTest
         boxes.toList,
         List.empty
       )
-
   }
 
   def tmpDir: File = FileHelper.getRandomTempDir

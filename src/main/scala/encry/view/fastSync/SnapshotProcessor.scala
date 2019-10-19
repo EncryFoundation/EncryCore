@@ -43,14 +43,13 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       case None       => createNewSnapshot(state, block, manifestIds: Seq[Array[Byte]])
     }
     if (toApply.nonEmpty) {
-      logger.info(s"A new snapshot was created successfully. Insertion was started.")
+      logger.info(s"A new snapshot created successfully. Insertion started.")
       storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List empty)
-    } else logger.info(s"The new snapshot was not created after processing.")
+    } else logger.info(s"The new snapshot didn't create after processing.")
     logger.info(
-      s"Best potential manifest after processing snapshot info is ${this.bestPotentialManifest map (
-        e => Algos.encode(e.rootHash)
-      )}. Actual manifest is ${this.actualManifest map (e => Algos.encode(e.rootHash))}. " +
-        s"Blocks height ${block.header.height}, id ${block.encodedId}."
+      s"Best potential manifest after processing snapshot info is ${bestPotentialManifest
+        .map(e => Algos.encode(e.rootHash))}. Actual manifest is ${actualManifest.map(e => Algos.encode(e.rootHash))}. " +
+        s"Blocks height is ${block.header.height}, id is ${block.encodedId}."
     )
     this
   }
@@ -63,16 +62,20 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       else List.empty -> List.empty
     if (toDelete.nonEmpty || toInsertNew.nonEmpty) {
       logger.info(
-        s"Actual manifest was updated. Removed all unnecessary chunks|manifests. Block height ${block.header.height}, id ${block.encodedId}."
+        s"Actual manifest updated. Removed all unnecessary chunks|manifests." +
+          s" Block height is ${block.header.height}, id ${block.encodedId}."
       )
       storage.insert(StorageVersion @@ Random.randomBytes(), toInsertNew, toDelete.map(StorageKey @@ _))
       updateChunksManifestId(actualManifest)
     } else
-      logger.info(s"Didn't need to update actual manifest. Block height ${block.header.height}, id ${block.encodedId}.")
+      logger.info(
+        s"Didn't need to update actual manifest. Block height is ${block.header.height}, id is ${block.encodedId}."
+      )
     logger.info(
-      s"Best potential manifest after processing new block is ${this.bestPotentialManifest map (
+      s"Best potential manifest after processing new block is ${bestPotentialManifest.map(
         e => Algos.encode(e.rootHash)
-      )}. Actual manifest is ${this.actualManifest map (e => Algos.encode(e.rootHash))}.Block height ${block.header.height}, id ${block.encodedId}."
+      )}. Actual manifest is ${actualManifest
+        .map(e => Algos.encode(e.rootHash))}. Block height is ${block.header.height}, id is ${block.encodedId}."
     )
     this
   }

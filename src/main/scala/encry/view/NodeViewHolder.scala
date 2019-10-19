@@ -21,7 +21,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestToNvh, NewChunkToApply, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestToNodeViewHolder, NewChunkToApply, SnapshotProcessorMessage, UpdateSnapshot}
 import encry.view.fastSync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
@@ -143,7 +143,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       snapshotProcessor = newProcessor
 
     case SemanticallySuccessfulModifier(_) =>
-    case ManifestToNvh(m) =>
+    case ManifestToNodeViewHolder(m) =>
       logger.info(s"NVH got ManifestToNvh with ${m}")
       m.foreach { manifest =>
       logger.info(s"Manifest non empty")
