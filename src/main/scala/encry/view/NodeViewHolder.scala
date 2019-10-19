@@ -293,7 +293,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (!settings.snapshotSettings.startWith && nodeView.history.isFullChainSynced) {
               val startTime = System.currentTimeMillis()
               logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
-
               if (newHistory.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
                 && l.header.height != settings.constants.GenesisHeight)) {
                 newHistory.getBestBlock.foreach { b =>
