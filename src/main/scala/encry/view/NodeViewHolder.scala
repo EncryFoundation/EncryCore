@@ -33,7 +33,7 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId, ModifierTypeId}
 
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
@@ -63,7 +63,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-    logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.state.height}")
+    logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.history.getBestBlockHeight} | " +
+      s"${nodeView.state.height}")
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
@@ -153,20 +154,23 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         updateNodeView(updatedState = Some(newState))
       }
 
-    case FastSyncDoneAt(height, id) =>
+    case FastSyncDoneAt(heightAt, id) =>
       canDownloadPayloads = true
-      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(height + 1)
+      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(heightAt + 1)
       logger.info(s"||||||||||||||||||||${nodeView.history.getHeaderById(ModifierId @@ id)}||||||||||||||||||||")
       nodeView.history.getHeaderById(ModifierId @@ id).foreach { h =>
-      logger.info(s"Update best block fast sync mod")
-        updateNodeView(updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)))
+      logger.info(s"Update best block fast sync mod. Updated state height.")
+        updateNodeView(
+          updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)),
+          updatedState = Some(nodeView.state.copy(height = Height @@ heightAt))
+        )
       }
       nodeViewSynchronizer ! FastSyncDone
 
     case NewChunkToApply(list: List[NodeProtoMsg]) =>
       val newState = nodeView.state.applyNodesFastSync(list)
       updateNodeView(updatedState = Some(newState))
-      logger.info(s"NVH Updated state")
+      logger.debug(s"NVH Updated state")
 
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }

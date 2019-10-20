@@ -95,7 +95,9 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
       ProcessRequestedChunkResult(this, isForBan = false, List.empty)
     }
 
-  def processNextRequestChunksMessage(): ProcessNextRequestChunksMessageResult =
+  def processNextRequestChunksMessage(): ProcessNextRequestChunksMessageResult = {
+    logger.info(s"processNextRequestChunksMessage. needToBeRequested.size ${needToBeRequested.size}. " +
+      s"awaitingResponse.size ${awaitingResponse.size}.")
     if (needToBeRequested.nonEmpty && awaitingResponse.isEmpty) {
       val (processor, toDownload) = chunksIdsToDownload
       ProcessNextRequestChunksMessageResult(processor, isSyncDone = false, toDownload)
@@ -103,6 +105,7 @@ final case class SnapshotDownloadController(currentManifest: Option[SnapshotMani
       ProcessNextRequestChunksMessageResult(this, isSyncDone = true, List.empty)
     else
       ProcessNextRequestChunksMessageResult(this, isSyncDone = false, List.empty)
+  }
 
   private def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
     val newToRequest: Set[ByteArrayWrapper] = needToBeRequested

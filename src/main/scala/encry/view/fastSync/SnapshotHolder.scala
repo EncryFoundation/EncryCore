@@ -75,7 +75,7 @@ class SnapshotHolder(settings: EncryAppSettings,
             }
           }
           snapshotDownloadController = controller
-          context.system.scheduler.scheduleOnce(5.seconds)(self ! RequestNextChunks)
+          context.system.scheduler.scheduleOnce(1.seconds)(self ! RequestNextChunks)
         case ProcessNextRequestChunksMessageResult(_, true, _) =>
           nodeViewHolder ! FastSyncDoneAt(
             snapshotDownloadController.currentManifest.map(_.bestBlockHeight).getOrElse(-1),

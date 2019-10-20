@@ -11,6 +11,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
+import encry.EncryApp.settings
 
 object ModifiersCache extends StrictLogging {
 
@@ -136,7 +137,9 @@ object ModifiersCache extends StrictLogging {
       case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
-        case _ if history.isHeadersChainSynced => List.empty[Key]
+        case _ if history.isHeadersChainSynced =>
+          if (settings.snapshotSettings.startWith) exhaustiveSearch
+          else List.empty[Key]
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>
