@@ -246,6 +246,19 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
+              if (!settings.snapshotSettings.startWith && newHis.isFullChainSynced) {
+                val startTime = System.currentTimeMillis()
+                logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
+                if (newHis.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
+                  && l.header.height != settings.constants.GenesisHeight)) {
+                  newHis.getBestBlock.foreach { b =>
+                    val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
+                    snapshotProcessor = newProcess
+                  }
+                }
+                logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
+                logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
+              }
               influxRef.foreach(ref =>
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
@@ -294,20 +307,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-
-            if (!settings.snapshotSettings.startWith && nodeView.history.isFullChainSynced) {
-              val startTime = System.currentTimeMillis()
-              logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
-              if (newHistory.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
-                && l.header.height != settings.constants.GenesisHeight)) {
-                newHistory.getBestBlock.foreach { b =>
-                  val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(newState, b)
-                  snapshotProcessor = newProcess
-                }
-              }
-              logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
-              logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
-            }
             influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
             if (newHistory.isHeadersChainSyncedVar) {
               logger.info(s"Send to nvsh HeaderChainIsSynced")
