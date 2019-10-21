@@ -65,6 +65,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def insert(newElem: LevelDbDiff): Unit = {
     assert(newElem.version.length == settings.versionKeySize,
       s"Version length is incorrect! Should be: ${settings.versionKeySize}, but get: ${newElem.version.length}")
+    assert(newElem.elemsToInsert.forall(_._1.length == settings.keySize),
+      s"Key length is incorrect! Should be: ${settings.versionKeySize}")
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
@@ -80,7 +82,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
       newElem.elemsToInsert.foreach {
         case (elemKey, elemValue) =>
-
           /**
             * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
             * First check contain db this elem or not. if no: insert elem, and insert init access map
