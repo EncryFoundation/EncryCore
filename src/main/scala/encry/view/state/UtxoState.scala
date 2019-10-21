@@ -3,7 +3,6 @@ package encry.view.state
 import java.io.File
 
 import NodeMsg.NodeProtoMsg
-
 import cats.data.Validated
 import cats.instances.list._
 import cats.syntax.either._
@@ -43,6 +42,7 @@ import org.encryfoundation.common.validation.{MalformedModifierError, Validation
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
 
+import scala.collection.immutable
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
@@ -183,6 +183,12 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
 
   def applyNodesFastSync(chunks: List[NodeProtoMsg]): UtxoState =
     this.copy(tree = tree.assembleTree(chunks.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_))))
+
+  def validateTreeAfterFastSync(): Boolean = {
+    val validationResult: Boolean = tree.selfInspectionAfterFastSync
+    logger.info(s"After tree validation result is $validationResult.")
+    validationResult
+  }
 
   def close(): Unit = tree.close()
 }

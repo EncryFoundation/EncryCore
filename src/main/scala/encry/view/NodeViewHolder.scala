@@ -14,9 +14,12 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.stats.StatsSender._
+import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
@@ -28,12 +31,14 @@ import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
+import io.iohk.iodb.LSMStore
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId, ModifierTypeId}
+import org.iq80.leveldb.Options
 
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
@@ -55,6 +60,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var canDownloadPayloads: Boolean = !settings.snapshotSettings.startWith
 
   var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
+  val snapshotProcessorCreationCondition: Boolean = settings.snapshotSettings.creationHeight <= settings.levelDB.maxVersions
 
   nodeViewSynchronizer ! SnapshotProcessorMessage(snapshotProcessor)
   println(s"NVH to NSSH procc")
@@ -149,12 +155,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       m.foreach { manifest =>
       logger.info(s"Manifest non empty")
         import encry.view.state.avlTree.utils.implicits.Instances._
-        val newAvl = AvlTree[StorageKey, StorageValue](manifest, nodeView.state.tree.storage)
+        val newAvl = AvlTree[StorageKey, StorageValue](manifest, createStateStorageFastSync)
         val newState = nodeView.state.copy(tree = newAvl)
         updateNodeView(updatedState = Some(newState))
       }
 
-    case FastSyncDoneAt(heightAt, id) =>
+    case FastSyncDoneAt(heightAt, id) if nodeView.state.validateTreeAfterFastSync() =>
       canDownloadPayloads = true
       nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(heightAt + 1)
       logger.info(s"||||||||||||||||||||${nodeView.history.getHeaderById(ModifierId @@ id)}||||||||||||||||||||")
@@ -166,6 +172,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         )
       }
       nodeViewSynchronizer ! FastSyncDone
+
+    case FastSyncDoneAt(_, _) =>
+      EncryApp.forceStopApplication(999, "Tree after fast sync is incorrect")
 
     case NewChunkToApply(list: List[NodeProtoMsg]) =>
       val newState = nodeView.state.applyNodesFastSync(list)
@@ -249,8 +258,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               if (!settings.snapshotSettings.startWith && newHis.isFullChainSynced) {
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
-                if (newHis.getBestBlock.exists(l => l.header.height % settings.snapshotSettings.creationHeight == 0
-                  && l.header.height != settings.constants.GenesisHeight)) {
+                if (snapshotProcessorCreationCondition && newHis.getBestBlock.exists(l =>
+                  l.header.height % settings.snapshotSettings.creationHeight == 0
+                    && l.header.height != settings.constants.GenesisHeight)) {
                   newHis.getBestBlock.foreach { b =>
                     val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
                     snapshotProcessor = newProcess
@@ -439,6 +449,24 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         toApply.foldLeft(startState) { (s, m) => s.applyValidModifier(m) }
     }
+
+  def createStateStorageFastSync: VersionalStorage = {
+    val dir: File = UtxoState.getStateDir(settings)
+    dir.mkdirs()
+    dir.listFiles.foreach(_.delete())
+    val stateDir: File = UtxoState.getStateDir(settings)
+    stateDir.mkdirs()
+    val versionalStorage: VersionalStorage = settings.storage.state match {
+      case VersionalStorage.IODB =>
+        logger.info("Init state with iodb storage")
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init state with levelDB storage")
+        val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
+    }
+    versionalStorage
+  }
 
   override def close(): Unit = {
     nodeView.history.close()

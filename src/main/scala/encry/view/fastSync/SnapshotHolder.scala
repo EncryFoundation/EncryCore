@@ -43,6 +43,7 @@ class SnapshotHolder(settings: EncryAppSettings,
   var givingChunksProcessor: GivingChunksProcessor           = GivingChunksProcessor.empty
 
   override def preStart(): Unit = {
+    if (settings.snapshotSettings.creationHeight <= settings.levelDB.maxVersions) context.stop(self)
     logger.info(s"SnapshotHolder has started.")
     networkController ! RegisterMessagesHandler(
       Seq(
@@ -106,7 +107,6 @@ class SnapshotHolder(settings: EncryAppSettings,
             case ProcessRequestedChunkResult(controller, false, _) => snapshotDownloadController = controller
           }
         case ManifestHasChanged(requestedManifestId, newManifest: SnapshotManifestProtoMessage) =>
-          //todo re-init state tree on nvh
           snapshotDownloadController.processManifest(newManifest,
                                                      remote,
                                                      history,
