@@ -191,7 +191,7 @@ object UtxoState extends StrictLogging {
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, settings.levelDB.keySize))
     }
     val stateHeight: Int = versionalStorage.get(StorageKey @@ bestHeightKey.untag(Digest32))
       .map(d => Ints.fromByteArray(d)).getOrElse(settings.constants.PreGenesisHeight)
