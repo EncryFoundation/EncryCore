@@ -1,14 +1,17 @@
 package encry.modifiers.state
 
-import encry.modifiers.InstanceFactory
-import org.encryfoundation.common.modifiers.state.box.AssetBoxSerializer
+import encry.utils.Keys
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, AssetBoxSerializer, EncryProposition}
 import org.scalatest.FunSuite
 
-class AssetBoxSerializerTest extends FunSuite with InstanceFactory {
+class AssetBoxSerializerTest extends FunSuite with Keys {
+
+  lazy val assetBoxI: AssetBox = AssetBox(EncryProposition.pubKeyLocked(publicKey.pubKeyBytes), 999L, 100000L)
+  lazy val openAssetBoxI: AssetBox = AssetBox(EncryProposition.open, 999L, 100000L)
 
   test("toBytes & parseBytes") {
 
-    val bx = AssetBoxI
+    val bx = assetBoxI
 
     val bxSerialized = bx.bytes
 
@@ -21,7 +24,7 @@ class AssetBoxSerializerTest extends FunSuite with InstanceFactory {
 
   test("toBytes & parseBytes (OpenProposition)") {
 
-    val bx = OpenAssetBoxI
+    val bx = openAssetBoxI
 
     val bxSerialized = bx.bytes
 

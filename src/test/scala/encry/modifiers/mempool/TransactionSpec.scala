@@ -1,16 +1,15 @@
 package encry.modifiers.mempool
 
-import encry.modifiers.InstanceFactory
+import encry.utils.Utils.randomAddress
+import encry.utils.TestEntityGenerator._
 import encry.utils.TestHelper
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.scalatest.{Matchers, PropSpec}
 
-class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
+class TransactionSpec extends PropSpec with Matchers {
 
   private val txValid = paymentTransactionValid
-
-  private val txInvalid = paymentTransactionInvalid
 
   property("semanticValidity of valid tx") {
 
@@ -22,7 +21,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
     val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(TestHelper.genAssetBox(publicKey.address.address))
 
-      TransactionFactory.defaultPaymentTransactionScratch(secret, 100, timestamp, useBoxes ++ useBoxes ++ useBoxes,
+      TransactionFactory.defaultPaymentTransactionScratch(privKey, 100, System.currentTimeMillis(), useBoxes ++ useBoxes ++ useBoxes,
         randomAddress, TestHelper.Props.txAmount)
     }
 
@@ -34,7 +33,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
     val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq(TestHelper.genAssetBox(publicKey.address.address))
 
-      TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
+      TransactionFactory.defaultPaymentTransactionScratch(privKey, -100, System.currentTimeMillis(), useBoxes,
         randomAddress, TestHelper.Props.txAmount)
     }
 
@@ -46,7 +45,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
     val tx: Transaction = {
       val useBoxes: IndexedSeq[AssetBox] = IndexedSeq.empty
 
-      TransactionFactory.defaultPaymentTransactionScratch(secret, -100, timestamp, useBoxes,
+      TransactionFactory.defaultPaymentTransactionScratch(privKey, -100, System.currentTimeMillis(), useBoxes,
         randomAddress, TestHelper.Props.txAmount)
     }
 
@@ -59,7 +58,7 @@ class TransactionSpec extends PropSpec with Matchers with InstanceFactory {
       val useBoxes: IndexedSeq[AssetBox] = (0 to Short.MaxValue + 10)
         .foldLeft(IndexedSeq.empty[AssetBox]) { case (acc, _) => acc :+ TestHelper.genAssetBox(publicKey.address.address) }
 
-      TransactionFactory.defaultPaymentTransactionScratch(secret, 100, timestamp, useBoxes,
+      TransactionFactory.defaultPaymentTransactionScratch(privKey, 100, System.currentTimeMillis(), useBoxes,
         randomAddress, TestHelper.Props.txAmount)
     }
 

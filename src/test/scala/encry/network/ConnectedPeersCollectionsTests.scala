@@ -5,17 +5,16 @@ import java.net.InetSocketAddress
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import encry.consensus.HistoryConsensus.{Fork, Older, Unknown, Younger}
-import encry.modifiers.InstanceFactory
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus._
 import encry.settings.TestNetSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
+import encry.utils.Utils.protocolToBytes
 
 class ConnectedPeersCollectionsTests extends WordSpecLike
   with Matchers
-  with InstanceFactory
   with OneInstancePerTest
   with TestNetSettings {
 

@@ -3,8 +3,8 @@ package benches
 import java.util.concurrent.TimeUnit
 
 import benches.SerializedMonetaryTxBenchmark.SerializedMonetaryBenchState
-import benches.Utils._
-import encryBenchmark.{BenchSettings, Settings}
+import encry.utils.TestEntityGenerator
+import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionSerializer}
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.openjdk.jmh.annotations._
@@ -53,9 +53,9 @@ object SerializedMonetaryTxBenchmark extends BenchSettings {
 
     @Setup
     def createStateForBenchmark(): Unit = {
-      initialBoxes = generateInitialBoxes(benchSettings.serializedMonetaryBenchSettings.totalBoxesNumber)
+      initialBoxes = TestEntityGenerator.generateInitialBoxes(benchSettings.serializedMonetaryBenchSettings.totalBoxesNumber)
       initialTransactions =
-        generatePaymentTransactions(
+        TestEntityGenerator.generatePaymentTransactions(
           initialBoxes,
           benchSettings.serializedMonetaryBenchSettings.numberOfInputs,
           benchSettings.serializedMonetaryBenchSettings.numberOfOutputs

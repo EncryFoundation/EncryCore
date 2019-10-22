@@ -1,18 +1,21 @@
 package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp
-import encry.modifiers.InstanceFactory
-import encry.settings.{EncryAppSettings, LevelDBSettings, Settings}
+import encry.settings.{LevelDBSettings, Settings}
 import encry.utils.TestHelper.Props
-import encry.utils.{EncryGenerator, FileHelper}
+import encry.utils.FileHelper
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{Matchers, PropSpec}
+import encry.utils.TestEntityGenerator._
+import encry.utils.Utils.randomAddress
 
-class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging with Settings {
+class WalletSpec extends PropSpec
+  with Matchers
+  with Settings
+  with StrictLogging {
 
   val dummyLevelDBSettings = LevelDBSettings(5)
 

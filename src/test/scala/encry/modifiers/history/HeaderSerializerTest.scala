@@ -1,10 +1,10 @@
 package encry.modifiers.history
 
-import encry.utils.EncryGenerator
 import org.encryfoundation.common.modifiers.history.HeaderSerializer
 import org.scalatest.{Matchers, PropSpec}
+import encry.utils.TestEntityGenerator.genHeader
 
-class HeaderSerializerTest extends PropSpec with Matchers with EncryGenerator{
+class HeaderSerializerTest extends PropSpec with Matchers {
 
   property("testToBytes & testParseBytes") {
 

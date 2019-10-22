@@ -1,12 +1,12 @@
 package encry.modifiers.history
 
-import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 import scorex.crypto.hash.Blake2b256
+import encry.utils.TestEntityGenerator.genHeader
 
-class HeaderSpec extends PropSpec with Matchers with EncryGenerator{
+class HeaderSpec extends PropSpec with Matchers {
 
-  property("Different headers should have different hash"){
+  property("Different headers should have different hash") {
 
     val header = genHeader
 

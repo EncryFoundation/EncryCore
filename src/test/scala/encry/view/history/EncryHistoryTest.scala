@@ -1,10 +1,8 @@
 package encry.view.history
 
-import encry.modifiers.InstanceFactory
-import encry.utils.EncryGenerator
 import org.scalatest.{Matchers, PropSpec}
 
-class EncryHistoryTest extends PropSpec with Matchers with InstanceFactory with EncryGenerator {
+class EncryHistoryTest extends PropSpec with Matchers {
 
   property("PreGenesis height test check.") {
 

@@ -4,21 +4,24 @@ import java.net.InetSocketAddress
 
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
-import encry.EncryApp
-import encry.modifiers.InstanceFactory
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings. Settings
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.{BasicMessagesRepo, SyncInfo}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import org.scalatest.{Matchers, PropSpec}
+import encry.utils.HistoryGenerator.dummyHistory
+import encry.utils.Utils.protocolToBytes
+import encry.utils.TestEntityGenerator._
 
 import scala.util.Try
 
-class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with InstanceFactory with Settings {
+class BasicNetworkMessagesProtoTest extends PropSpec
+  with Matchers
+  with Settings {
 
-  val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
+  val testedBlocks: Vector[Block] = (0 until 10).foldLeft(dummyHistory(settings), Vector.empty[Block]) {
     case ((prevHistory, blocks), _) =>
       val block: Block = generateNextBlock(prevHistory)
       prevHistory.append(block.header)

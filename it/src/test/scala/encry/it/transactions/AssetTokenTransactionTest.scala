@@ -1,34 +1,36 @@
 package encry.it.transactions
 
-import TransactionGenerator.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.it.configs.Configs
 import encry.it.docker.NodesFromDocker
-import encry.it.util.KeyHelper._
+import encry.modifiers.mempool.TransactionFactory
 import encry.settings.Settings
-import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
+import encry.utils.Keys
+import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
-import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.Height
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{AsyncFunSuite, Matchers}
 import scorex.crypto.signatures.Curve25519
-import scorex.utils.Random
+import scorex.utils.{Random => ScorexRandom}
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
+import scala.util.Random
 
 class AssetTokenTransactionTest extends AsyncFunSuite
   with Matchers
   with ScalaFutures
   with StrictLogging
   with NodesFromDocker
+  with Keys
   with Settings {
 
   override protected def nodeConfigs: Seq[Config] = Seq(Configs.mining(true)
@@ -41,25 +43,22 @@ class AssetTokenTransactionTest extends AsyncFunSuite
     val firstHeightToWait: Int = 5
     val secondHeightToWait: Int = 8
     val thirdHeightToWait: Int = 11
-    val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
-    val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
     val waitTime: FiniteDuration = 30.minutes
-    val amount: Int = scala.util.Random.nextInt(2000)
-    val fee: Int = scala.util.Random.nextInt(500)
-    val createdTokensAmount: Int = scala.util.Random.nextInt(2000)
-    val tokenAmount: Int = scala.util.Random.nextInt(500)
-    val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(Random.randomBytes())._2).address.address
+    val amount: Int = Random.nextInt(2000)
+    val fee: Int = Random.nextInt(500)
+    val createdTokensAmount: Int = Random.nextInt(2000)
+    val tokenAmount: Int = Random.nextInt(500)
+    val recipientAddress: Address = PublicKey25519(Curve25519.createKeyPair(ScorexRandom.randomBytes())._2).address.address
 
     Await.result(dockerNodes().head.waitForHeadersHeight(firstHeightToWait), waitTime)
 
     val getBoxes: Seq[EncryBaseBox] = Await.result(dockerNodes().head.outputs, waitTime)
     val oneBox: AssetBox = getBoxes.collect { case ab: AssetBox => ab }.head
-    val transaction: Transaction = CreateTransaction.assetIssuingTransactionScratch(
+    val transaction: Transaction = TransactionFactory.assetIssuingTransactionScratch(
       privKey,
       fee,
-      timestamp = System.currentTimeMillis(),
-      useOutputs = IndexedSeq(oneBox).map(_ -> None),
-      contract = PubKeyLockedContract(privKey.publicImage.pubKeyBytes).contract,
+      System.currentTimeMillis(),
+      IndexedSeq(oneBox),
       createdTokensAmount
     )
 
@@ -104,14 +103,14 @@ class AssetTokenTransactionTest extends AsyncFunSuite
         case tb: TokenIssuingBox if tb.amount >= tokenAmount => tb
       }.head
 
-      val transactionWithAssetToken: Transaction = CreateTransaction.defaultPaymentTransaction(
+      val transactionWithAssetToken: Transaction = TransactionFactory.defaultPaymentTransactionScratch(
         privKey,
         fee,
         System.currentTimeMillis(),
-        IndexedSeq(assetBoxForFee, tokenIssuingBox).map(_ -> None),
+        IndexedSeq(assetBoxForFee, tokenIssuingBox),
         recipientAddress,
         amount,
-        Map(tokenId -> tokenAmount)
+        Some(ADKey @@ tokenId)
       )
 
       Await.result(dockerNodes().head.sendTransaction(transactionWithAssetToken), waitTime)

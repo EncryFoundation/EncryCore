@@ -3,7 +3,7 @@ package benches
 import java.util.concurrent.TimeUnit
 
 import benches.SerializedDataTxBenchmark.SerializedDataBenchState
-import benches.Utils._
+import encry.utils.TestEntityGenerator
 import encryBenchmark.{BenchSettings, Settings}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionSerializer}
 import org.encryfoundation.common.modifiers.state.box.AssetBox
@@ -53,8 +53,8 @@ object SerializedDataTxBenchmark extends BenchSettings {
 
     @Setup
     def createStateForBenchmark(): Unit = {
-      initialBoxes = generateInitialBoxes(benchSettings.serializedDataBenchSettings.totalBoxesNumber)
-      initialTransactions = generateDataTransactions(
+      initialBoxes = TestEntityGenerator.generateInitialBoxes(benchSettings.serializedDataBenchSettings.totalBoxesNumber)
+      initialTransactions = TestEntityGenerator.generateDataTransactions(
         initialBoxes,
         benchSettings.serializedDataBenchSettings.numberOfInputs,
         benchSettings.serializedDataBenchSettings.numberOfOutputs,

@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import encry.modifiers.InstanceFactory
 import encry.network.BlackList.BanReason._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
@@ -12,12 +11,12 @@ import encry.network.PeersKeeper.BanPeer
 import encry.settings.TestNetSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+import encry.utils.Utils.protocolToBytes
 import scala.concurrent.duration._
 
 class BlackListTests extends WordSpecLike
   with Matchers
   with BeforeAndAfterAll
-  with InstanceFactory
   with OneInstancePerTest
   with TestNetSettings {
 
@@ -26,11 +25,11 @@ class BlackListTests extends WordSpecLike
   override def afterAll(): Unit = system.terminate()
 
   val knowPeersSettings = testNetSettings.copy(
-    network = settings.network.copy(
+    network = testNetSettings.network.copy(
       knownPeers = Seq(new InetSocketAddress("172.16.11.11", 9001)),
       connectOnlyWithKnownPeers = Some(true)
     ),
-    blackList = settings.blackList.copy(
+    blackList = testNetSettings.blackList.copy(
       banTime = 2 seconds,
       cleanupTime = 3 seconds
     ))

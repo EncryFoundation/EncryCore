@@ -1,10 +1,10 @@
 package encry.modifiers.mempool
 
-import encry.modifiers.InstanceFactory
 import org.encryfoundation.common.modifiers.mempool.transaction.TransactionSerializer
 import org.scalatest.FunSuite
+import encry.utils.TestEntityGenerator.{paymentTransactionDynamic, coinbaseTransaction}
 
-class TransactionSerializerTest extends FunSuite with InstanceFactory {
+class TransactionSerializerTest extends FunSuite {
 
   test("toBytes & parseBytes (Transfer)") {
 
@@ -21,7 +21,7 @@ class TransactionSerializerTest extends FunSuite with InstanceFactory {
 
   test("toBytes & parseBytes (Coinbase)") {
 
-    val tx = coinbaseTransaction
+    val tx = coinbaseTransaction(0)
 
     val txSerialized = tx.bytes
 

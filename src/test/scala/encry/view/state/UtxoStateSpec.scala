@@ -9,7 +9,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.{EncryGenerator, FileHelper, TestHelper}
+import encry.utils.{TestEntityGenerator, FileHelper, TestHelper}
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.utils.constants.TestNetConstants
@@ -18,7 +18,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.ExecutionContextExecutor
 
-class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
+class UtxoStateSpec extends PropSpec with Matchers {
 
 //  def utxoFromBoxHolder(bh: BoxHolder,
 //                        dir: File,
@@ -44,27 +44,6 @@ class UtxoStateSpec extends PropSpec with Matchers with EncryGenerator {
 //      None
 //    )
 //  }
-
-  def utxoFromBoxHolder(bh: BoxHolder,
-                        dir: File,
-                        nodeViewHolderRef: Option[ActorRef],
-                        settings: EncryAppSettings): UtxoState = {
-    val storage = settings.storage.state match {
-      case VersionalStorage.IODB =>
-        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
-    }
-
-    storage.insert(
-      StorageVersion @@ Array.fill(32)(0: Byte),
-      bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
-    )
-
-    new UtxoState(storage, settings.constants)
-  }
-
 
 //  property("Proofs for transaction") {
 //
