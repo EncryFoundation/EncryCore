@@ -1,5 +1,6 @@
 package encry.view.state.avlTree
 
+import NodeMsg.NodeProtoMsg
 import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
@@ -608,13 +609,14 @@ object AvlTree {
   def apply[K: Monoid: Order: Hashable : Serializer, V: Monoid : Serializer](storage: VersionalStorage): AvlTree[K, V] =
     new AvlTree[K, V](EmptyNode(), storage)
 
-  def apply[K: Serializer : Monoid : Order : Hashable, V: Serializer : Monoid](manifest: SnapshotManifest,
+  def apply[K: Serializer : Monoid : Order : Hashable, V: Serializer : Monoid](blockHeight: Int,
+                                                                               rootNode: NodeProtoMsg,
                                                                                storage: VersionalStorage): AvlTree[K, V] = {
-    val root: Node[K, V] = NodeSerilalizer.fromProto(manifest.rootNodeBytes)
+    val root: Node[K, V] = NodeSerilalizer.fromProto(rootNode)
     val initTree: AvlTree[K, V] = new AvlTree(root, storage)
     storage.insert(
       StorageVersion @@ Random.randomBytes(),
-      List(UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(manifest.bestBlockHeight))
+      List(UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(blockHeight))
     )
     initTree.insertionInFastSyncMod(List(root), isRoot = true)
   }

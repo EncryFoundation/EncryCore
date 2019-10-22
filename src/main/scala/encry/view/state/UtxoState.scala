@@ -238,7 +238,7 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
-    if (!settings.snapshotSettings.startWith) storage.insert(
+    if (!settings.snapshotSettings.enableFastSynchronization) storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )

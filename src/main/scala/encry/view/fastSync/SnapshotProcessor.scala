@@ -3,7 +3,6 @@ package encry.view.fastSync
 import java.io.File
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import com.google.protobuf.ByteString
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.fastSync.SnapshotHolder.{
   SnapshotChunk,
@@ -48,14 +47,15 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     } else logger.info(s"The new snapshot didn't create after processing.")
     logger.info(
       s"Best potential manifest after processing snapshot info is ${bestPotentialManifest
-        .map(e => Algos.encode(e.rootHash))}. Actual manifest is ${actualManifest.map(e => Algos.encode(e.rootHash))}. " +
+        .map(e => Algos.encode(e.manifestId))}. Actual manifest is ${actualManifest.map(e => Algos.encode(e.manifestId))}. " +
         s"Blocks height is ${block.header.height}, id is ${block.encodedId}."
     )
     this
   }
 
   def processNewBlock(block: Block): SnapshotProcessor = {
-    val condition: Int = (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.creationHeight
+    val condition
+      : Int = (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
     logger.info(s"condition = $condition")
     val (toDelete, toInsertNew) =
       if (condition == 0) updateActualSnapshot()
@@ -66,16 +66,16 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
           s" Block height is ${block.header.height}, id ${block.encodedId}."
       )
       storage.insert(StorageVersion @@ Random.randomBytes(), toInsertNew, toDelete.map(StorageKey @@ _))
-      updateChunksManifestId(actualManifest)
+      //updateChunksManifestId(actualManifest)
     } else
       logger.info(
         s"Didn't need to update actual manifest. Block height is ${block.header.height}, id is ${block.encodedId}."
       )
     logger.info(
       s"Best potential manifest after processing new block is ${bestPotentialManifest.map(
-        e => Algos.encode(e.rootHash)
+        e => Algos.encode(e.manifestId)
       )}. Actual manifest is ${actualManifest
-        .map(e => Algos.encode(e.rootHash))}. Block height is ${block.header.height}, id is ${block.encodedId}."
+        .map(e => Algos.encode(e.manifestId))}. Block height is ${block.header.height}, id is ${block.encodedId}."
     )
     this
   }
@@ -86,7 +86,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   private def updateBestPotentialSnapshot(
     elem: SnapshotManifest
   ): List[(StorageKey, StorageValue)] =
-    if (!bestPotentialManifest.exists(_.ManifestId.sameElements(elem.ManifestId))) {
+    if (!bestPotentialManifest.exists(_.manifestId.sameElements(elem.manifestId))) {
       val updatedManifest = BestPotentialManifestKey -> StorageValue @@ SnapshotManifestSerializer
         .toProto(elem)
         .toByteArray
@@ -101,24 +101,14 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] = state.tree.createSubtrees
     val newChunks: List[SnapshotChunk] = rawSubtrees.map { l =>
       val chunkId: Array[Byte] = l.headOption.map(_.hash).getOrElse(Array.emptyByteArray)
-      SnapshotChunk(l.map(NodeSerilalizer.toProto[StorageKey, StorageValue](_)),
-                    Algos.hash(state.tree.rootHash ++ block.id),
-                    chunkId)
+      SnapshotChunk(l.map(NodeSerilalizer.toProto[StorageKey, StorageValue](_)), chunkId)
     }
     val manifest: SnapshotManifest = state.tree.rootNode match {
       case i: InternalNode[StorageKey, StorageValue] =>
-        SnapshotManifest(block.id,
-                         state.tree.rootHash,
-                         NodeSerilalizer.toProto(i),
-                         rawSubtrees.size,
-                         block.header.height,
-                         newChunks.map(_.id))
+        SnapshotManifest(Algos.hash(state.tree.rootHash ++ block.id), NodeSerilalizer.toProto(i), newChunks.map(_.id))
       case s: ShadowNode[StorageKey, StorageValue] =>
-        SnapshotManifest(block.id,
-                         state.tree.rootHash,
+        SnapshotManifest(Algos.hash(state.tree.rootHash ++ block.id),
                          NodeSerilalizer.toProto(s.restoreFullNode(storage)),
-                         rawSubtrees.size,
-                         block.header.height,
                          newChunks.map(_.id))
     }
     val updatedSubtrees: Option[SnapshotChunk]    = newChunks.headOption.map(node => node.copy(node.nodesList.drop(1)))
@@ -131,10 +121,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     }
     val serializedManifest: StorageValue = StorageValue @@ SnapshotManifestSerializer.toProto(manifest).toByteArray
     val manifestToDB: (StorageKey, StorageValue) =
-      StorageKey @@ manifest.ManifestId -> StorageValue @@ serializedManifest
+      StorageKey @@ manifest.manifestId -> StorageValue @@ serializedManifest
     val newBestPotentialManifest: (StorageKey, StorageValue) = BestPotentialManifestKey -> serializedManifest
     val updateList: (StorageKey, StorageValue) =
-      PotentialManifestsIdsKey -> StorageValue @@ (manifest.ManifestId :: manifestIds.toList).flatten.toArray
+      PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
     newBestPotentialManifest :: manifestToDB :: updateList :: snapshotToDB
   }
 
@@ -150,11 +140,11 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     //manifests ids to remove excluding new actual without current actual
     val potentialManifestsExcludingBestPotential: Seq[Array[Byte]] = bestPotentialManifestOpt
       .fold(potentialManifestsIds)(
-        elem => potentialManifestsIds.filterNot(_.sameElements(elem.ManifestId))
+        elem => potentialManifestsIds.filterNot(_.sameElements(elem.manifestId))
       )
     //manifests ids to remove including actual
     val toDeleteManifests: Seq[Array[Byte]] = actualManifestOpt
-      .fold(potentialManifestsExcludingBestPotential)(potentialManifestsExcludingBestPotential :+ _.ManifestId)
+      .fold(potentialManifestsExcludingBestPotential)(potentialManifestsExcludingBestPotential :+ _.manifestId)
     //chunks ids connected with new actual manifest
     val newActualChunks: Set[ByteArrayWrapper] = bestPotentialManifestOpt
       .map(_.chunksKeys)
@@ -176,20 +166,6 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       updateNewActualManifest
     )
   }
-
-  private def updateChunksManifestId(manifest: Option[SnapshotManifest]): Unit =
-    manifest.foreach { newManifest =>
-      newManifest.chunksKeys.foreach { chunkId =>
-        getChunkById(chunkId).collect {
-          case chunk if !chunk.manifestId.toByteArray.sameElements(newManifest.ManifestId) =>
-            chunk.copy(manifestId = ByteString.copyFrom(newManifest.ManifestId))
-        }.foreach { chunk =>
-          storage.insert(StorageVersion @@ Random.randomBytes(),
-                         List(StorageKey @@ chunk.id.toByteArray -> StorageValue @@ chunk.toByteArray),
-                         List.empty)
-        }
-      }
-    }
 
   override def close(): Unit = storage.close()
 }

@@ -4,138 +4,147 @@ import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import encry.view.fastSync.SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
-import cats.syntax.option._
+import encry.view.fastSync.SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
-import encry.view.fastSync.SnapshotDownloadController.{
-  ProcessNextRequestChunksMessageResult,
-  ProcessRequestedChunkResult,
-  ProcessRequestedManifestResult
-}
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 import org.encryfoundation.common.utils.Algos
+import cats.syntax.either._
+import cats.syntax.option._
 
-final case class SnapshotDownloadController(currentManifest: Option[SnapshotManifest],
-                                            needToBeRequested: List[Array[Byte]],
-                                            awaitingResponse: Set[ByteArrayWrapper],
+final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
+                                            notYetRequested: List[Array[Byte]],
+                                            requestedChunks: Set[ByteArrayWrapper],
                                             settings: EncryAppSettings,
-                                            cp: Option[ConnectedPeer])
+                                            cp: Option[ConnectedPeer],
+                                            requiredManifestHeight: Int)
     extends StrictLogging {
 
-  def processManifest(manifestProto: SnapshotManifestProtoMessage,
-                      remote: ConnectedPeer,
-                      history: History,
-                      manifestHasChangedMessage: Boolean = false,
-                      previousManifestId: Array[Byte] = Array.emptyByteArray): ProcessRequestedManifestResult = {
-    val comparisonStateRootResult: Boolean = history
-      .getBestHeaderAtHeight(manifestProto.bestBlockHeight)
-      .exists(_.stateRoot.sameElements(manifestProto.rootHash.toByteArray))
-    if ((currentManifest.isEmpty || (manifestHasChangedMessage && currentManifest.exists(
-          _.ManifestId.sameElements(previousManifestId)
-        ))) && comparisonStateRootResult && (cp.isEmpty || cp.exists(
-          _.socketAddress == remote.socketAddress
-        )))
-      SnapshotManifestSerializer
-        .fromProto(manifestProto)
-        .fold(
-          ex => {
-            logger.info(s"Manifest from the network is corrupted cause ${ex.getMessage}. Ban remote $remote.")
-            ProcessRequestedManifestResult(this, isForBan = true, startRequestChunks = false)
-          },
-          manifest => {
-            logger.info(s"A new snapshot serialized successfully. Number of chunks is ${manifest.chunksKeys.size}.")
-            ProcessRequestedManifestResult(
-              SnapshotDownloadController(manifest.some,
-                                         manifest.chunksKeys,
-                                         Set.empty[ByteArrayWrapper],
-                                         settings,
-                                         remote.some),
-              isForBan = false,
-              startRequestChunks = true
-            )
-          }
-        )
-    else if (!comparisonStateRootResult) {
-      logger.info(s"Manifest from ${remote.socketAddress} contains corrupted root hash. Ban it.")
-      ProcessRequestedManifestResult(this, isForBan = true, startRequestChunks = false)
-    } else ProcessRequestedManifestResult(this, isForBan = false, startRequestChunks = false)
+  def processManifest(
+    manifestProto: SnapshotManifestProtoMessage,
+    remote: ConnectedPeer,
+    history: History
+  ): Either[Throwable, (SnapshotDownloadController, Option[NodeProtoMsg])] = {
+    logger.info(s"Got new manifest from ${remote.socketAddress}.")
+    val isManifestValid: Boolean = checkManifestValidity(manifestProto.manifestId.toByteArray, history)
+    if (isManifestValid && cp.isEmpty) {
+      Either.fromTry(SnapshotManifestSerializer.fromProto(manifestProto)) match {
+        case Left(error) =>
+          logger.info(s"Manifest was parsed with error ${error.getCause}. Ban peer!")
+          error.asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
+        case Right(manifest) =>
+          logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} was parsed successfully.")
+          (SnapshotDownloadController(
+            requiredManifestId,
+            manifest.chunksKeys,
+            Set.empty[ByteArrayWrapper],
+            settings,
+            remote.some,
+            requiredManifestHeight
+          ) -> manifest.rootNodeBytes.some).asRight[Throwable]
+      }
+    } else if (!isManifestValid) {
+      logger.info(s"Got invalid manifest with id ${Algos.encode(manifestProto.manifestId.toByteArray)}. Ban peer!")
+      new Exception(s"Got invalid manifest with id ${Algos.encode(manifestProto.manifestId.toByteArray)}")
+        .asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
+    } else {
+      logger.info(s"Got manifest message, but we already have another one. Skip this one.")
+      (this -> none).asRight[Throwable]
+    }
   }
 
-  def processRequestedChunk(chunkMessage: SnapshotChunkMessage, remote: ConnectedPeer): ProcessRequestedChunkResult =
+  def processRequestedChunk(
+    chunkMessage: SnapshotChunkMessage,
+    remote: ConnectedPeer
+  ): Either[Throwable, (SnapshotDownloadController, List[NodeProtoMsg])] = {
+    logger.info(s"Got new chunk from ${remote.socketAddress}.")
     if (cp.exists(_.socketAddress == remote.socketAddress))
-      SnapshotChunkSerializer
-        .fromProto(chunkMessage)
-        .fold(
-          e => {
-            logger.info(s"Chunks from ${remote.socketAddress} is corrupted cause ${e.getCause}.")
-            ProcessRequestedChunkResult(this.copy(cp = remote.some), isForBan = true, List.empty)
-          },
-          chunk => {
-            val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
-            val firstCondition: Boolean   = currentManifest.exists(_.ManifestId.sameElements(chunk.manifestId))
-            if (firstCondition && awaitingResponse.contains(chunkId)) {
-              logger.info(s"Got correct chunk ${Algos.encode(chunk.id)} from ${remote.socketAddress}.")
-              val newController: SnapshotDownloadController =
-                this.copy(awaitingResponse = awaitingResponse - chunkId, cp = remote.some)
-              ProcessRequestedChunkResult(newController, isForBan = false, chunk.nodesList)
-            } else if (!firstCondition) {
-              logger.info(s"Got chunk from ${remote.socketAddress} with incorrect manifest id. Ban it.")
-              ProcessRequestedChunkResult(this, isForBan = true, List.empty)
-            } else {
-              logger.info(s"Got chunk which not in awaitingResponse collection. Do nothing.")
-              ProcessRequestedChunkResult(this.copy(cp = remote.some), isForBan = false, List.empty)
-            }
+      Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
+        case Left(error) =>
+          logger.info(s"Chunk was parsed with error ${error.getCause}. Ban peer!")
+          error.asLeft[(SnapshotDownloadController, List[NodeProtoMsg])]
+        case Right(chunk) =>
+          val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
+          if (requestedChunks.contains(chunkId)) {
+            logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
+            (this.copy(requestedChunks = requestedChunks - chunkId, cp = remote.some) -> chunk.nodesList)
+              .asRight[Throwable]
+          } else {
+            logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+            new Exception(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+              .asLeft[(SnapshotDownloadController, List[NodeProtoMsg])]
           }
-        )
-    else {
+      } else {
       logger.info(s"Got chunk from unknown peer ${remote.socketAddress}.")
-      ProcessRequestedChunkResult(this, isForBan = false, List.empty)
+      (this -> List.empty[NodeProtoMsg]).asRight[Throwable]
     }
+  }
 
-  def processNextRequestChunksMessage(): ProcessNextRequestChunksMessageResult = {
-    logger.info(s"processNextRequestChunksMessage. needToBeRequested.size ${needToBeRequested.size}. " +
-      s"awaitingResponse.size ${awaitingResponse.size}.")
-    if (needToBeRequested.nonEmpty && awaitingResponse.isEmpty) {
-      val (processor, toDownload) = chunksIdsToDownload
-      ProcessNextRequestChunksMessageResult(processor, isSyncDone = false, toDownload)
-    } else if (needToBeRequested.isEmpty && awaitingResponse.isEmpty && currentManifest.nonEmpty)
-      ProcessNextRequestChunksMessageResult(this, isSyncDone = true, List.empty)
-    else
-      ProcessNextRequestChunksMessageResult(this, isSyncDone = false, List.empty)
+  def processNextRequestChunksMessage: Either[Boolean, (SnapshotDownloadController, List[NetworkMessage])] = {
+    logger.info(s"Current requested queue ${requestedChunks.size}. Will be requested queue ${notYetRequested.size}.")
+    if (notYetRequested.nonEmpty) {
+      logger.info(s"Not yet requested not empty. Calculated new ids to request")
+      chunksIdsToDownload.asRight[Boolean]
+    } else if (cp.nonEmpty) {
+      logger.info(s"Not yet requested is empty. Fast sync is done.")
+      true.asLeft[(SnapshotDownloadController, List[NetworkMessage])]
+    } else false.asLeft[(SnapshotDownloadController, List[NetworkMessage])]
+  }
+
+  def processManifestHasChangedMessage(
+    previousManifestId: Array[Byte],
+    newManifest: SnapshotManifestProtoMessage,
+    history: History,
+    remote: ConnectedPeer
+  ): Either[Throwable, (SnapshotDownloadController, Option[NodeProtoMsg])] = {
+    logger.info(s"Got message Manifest has changed from ${remote.socketAddress}.")
+    val isValidManifest: Boolean = requiredManifestId.sameElements(previousManifestId) &&
+      checkManifestValidity(newManifest.manifestId.toByteArray, history)
+    if (isValidManifest)
+      Either.fromTry(SnapshotManifestSerializer.fromProto(newManifest)) match {
+        case Left(error) =>
+          logger.info(s"New manifest after manifest has changed was parsed with error ${error.getCause}. Ban peer!")
+          error.asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
+        case Right(newManifest) =>
+          logger.info(
+            s"Manifest ${Algos.encode(newManifest.manifestId)} after manifest has changed was parsed successfully."
+          )
+          (SnapshotDownloadController(
+            newManifest.manifestId,
+            newManifest.chunksKeys,
+            Set.empty[ByteArrayWrapper],
+            settings,
+            remote.some,
+            requiredManifestHeight
+          ) -> newManifest.rootNodeBytes.some).asRight[Throwable]
+      } else {
+      logger.info(s"Ban peer for invalid new manifest!")
+      new Exception("Invalid manifest has changed message").asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
+    }
   }
 
   private def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
-    val newToRequest: Set[ByteArrayWrapper] = needToBeRequested
-      .take(settings.snapshotSettings.chunksNumberPerRequest)
+    val newToRequest: Set[ByteArrayWrapper] = notYetRequested
+      .take(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
       .map(ByteArrayWrapper(_))
       .toSet
-    val updatedToRequest: List[Array[Byte]] = needToBeRequested.drop(settings.snapshotSettings.chunksNumberPerRequest)
+    val updatedToRequest: List[Array[Byte]] =
+      notYetRequested.drop(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
     val serializedToDownload: List[RequestChunkMessage] = newToRequest
-      .map(
-        e => RequestChunkMessage(e.data, currentManifest.map(_.ManifestId).getOrElse(Array.emptyByteArray))
-      )
+      .map(e => RequestChunkMessage(e.data))
       .toList
-    this.copy(needToBeRequested = updatedToRequest, awaitingResponse = newToRequest) -> serializedToDownload
+    this.copy(notYetRequested = updatedToRequest, requestedChunks = newToRequest) -> serializedToDownload
   }
+
+  private def checkManifestValidity(manifestId: Array[Byte], history: History): Boolean =
+    history.getBestHeaderAtHeight { requiredManifestHeight }.exists { header =>
+      Algos.hash(header.stateRoot ++ header.id).sameElements(manifestId)
+    }
 }
 
 object SnapshotDownloadController {
   def empty(settings: EncryAppSettings): SnapshotDownloadController =
-    SnapshotDownloadController(none, List.empty, Set.empty, settings, none)
-
-  final case class ProcessRequestedManifestResult(controller: SnapshotDownloadController,
-                                                  isForBan: Boolean,
-                                                  startRequestChunks: Boolean)
-
-  final case class ProcessRequestedChunkResult(controller: SnapshotDownloadController,
-                                               isForBan: Boolean,
-                                               newNodes: List[NodeProtoMsg])
-
-  final case class ProcessNextRequestChunksMessageResult(controller: SnapshotDownloadController,
-                                                         isSyncDone: Boolean,
-                                                         chunksToRequest: List[NetworkMessage])
-
+    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0)
 }

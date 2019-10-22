@@ -9,7 +9,7 @@ case class OperationInfo[K, V](insertedNodes: Map[ByteArrayWrapper, Node[K, V]] 
 
   def resolve: (Array[(ByteArrayWrapper, Node[K, V])], List[ByteArrayWrapper]) = {
     val toDelete = deletedNodes.diff(insertedNodes.keys.toSet)
-    val toInsert = insertedNodes.filterKeys(key => !toDelete.contains(key))
+    val toInsert = insertedNodes.filterKeys(key => !deletedNodes.contains(key))
     toInsert.toArray -> toDelete.toList
   }
 

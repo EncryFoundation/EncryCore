@@ -24,7 +24,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestToNodeViewHolder, NewChunkToApply, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestInfoToNodeViewHolder, NewChunkToApply, RequiredManifestHeight, SnapshotProcessorMessage, UpdateSnapshot}
 import encry.view.fastSync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
@@ -57,13 +57,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
-  var canDownloadPayloads: Boolean = !settings.snapshotSettings.startWith
 
   var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
-  val snapshotProcessorCreationCondition: Boolean = settings.snapshotSettings.creationHeight > settings.levelDB.maxVersions
+
+  var canDownloadPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
 
   nodeViewSynchronizer ! SnapshotProcessorMessage(snapshotProcessor)
-  println(s"NVH to NSSH procc")
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
@@ -92,7 +91,21 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     nodeView.history.closeStorage()
   }
 
-  override def receive: Receive = {
+  val enableSnapshotProcessing: Boolean =
+    settings.snapshotSettings.newSnapshotCreationHeight > settings.levelDB.maxVersions &&
+      settings.snapshotSettings.enableSnapshotCreation
+
+  override def receive: Receive =
+    if (settings.snapshotSettings.newSnapshotCreationHeight > settings.levelDB.maxVersions &&
+        settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
+      defaultMessages(canProcessPayloads = false).orElse(snapshotFastSyncProcessing).orElse(commonMessages)
+    else if (settings.snapshotSettings.newSnapshotCreationHeight > settings.levelDB.maxVersions &&
+        settings.snapshotSettings.enableSnapshotCreation)
+      defaultMessages(canProcessPayloads = true).orElse(snapshotCreationProcessing).orElse(commonMessages)
+    else
+      defaultMessages(canProcessPayloads = true).orElse(commonMessages)
+
+  def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -127,7 +140,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (state) sender() ! ChangedState(nodeView.state)
 
     case CompareViews(peer, modifierTypeId, modifierIds)
-        if (modifierTypeId == Payload.modifierTypeId && canDownloadPayloads) || modifierTypeId != Payload.modifierTypeId =>
+      if (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
       logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
@@ -143,44 +156,49 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
 
     case CompareViews(_, _, _) =>
+  }
 
-    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced && snapshotProcessorCreationCondition =>
-      logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
+  def snapshotCreationProcessing: Receive = {
+    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced =>
+      logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
       snapshotProcessor = newProcessor
+  }
 
-    case SemanticallySuccessfulModifier(_) =>
-    case ManifestToNodeViewHolder(m) =>
-      logger.info(s"NVH got ManifestToNvh with ${m}")
-      m.foreach { manifest =>
-      logger.info(s"Manifest non empty")
-        import encry.view.state.avlTree.utils.implicits.Instances._
-        val newAvl = AvlTree[StorageKey, StorageValue](manifest, createStateStorageFastSync)
-        val newState = nodeView.state.copy(tree = newAvl)
-        updateNodeView(updatedState = Some(newState))
-      }
+  def snapshotFastSyncProcessing: Receive = {
+    case ManifestInfoToNodeViewHolder(manifestId, height, rootNode) =>
+      logger.info(s"NodeViewHolder got new manifest ${Algos.encode(manifestId)}.")
+      import encry.view.state.avlTree.utils.implicits.Instances._
+      val avl: AvlTree[StorageKey, StorageValue] =
+        AvlTree[StorageKey, StorageValue](height, rootNode, createStateStorageFastSync)
+      val newState: UtxoState = nodeView.state.copy(tree = avl)
+      updateNodeView(updatedState = Some(newState))
 
     case FastSyncDoneAt(heightAt, id) if nodeView.state.validateTreeAfterFastSync() =>
-      canDownloadPayloads = true
-      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(heightAt + 1)
-      logger.info(s"||||||||||||||||||||${nodeView.history.getHeaderById(ModifierId @@ id)}||||||||||||||||||||")
-      nodeView.history.getHeaderById(ModifierId @@ id).foreach { h =>
-      logger.info(s"Update best block fast sync mod. Updated state height.")
-        updateNodeView(
-          updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)),
-          updatedState = Some(nodeView.state.copy(height = Height @@ heightAt))
-        )
-      }
-      nodeViewSynchronizer ! FastSyncDone
-
-    case FastSyncDoneAt(_, _) =>
-      EncryApp.forceStopApplication(999, "Tree after fast sync is incorrect")
-
+      logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
+      if (nodeView.state.validateTreeAfterFastSync()) {
+        canDownloadPayloads = true
+        nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(heightAt + 1)
+        nodeView.history.getHeaderById(ModifierId @@ id).foreach { h =>
+          logger.info(s"Updated best block in fast sync mod. Updated state height.")
+          updateNodeView(
+            updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)),
+            updatedState = Some(nodeView.state.copy(height = Height @@ heightAt))
+          )
+        }
+        nodeViewSynchronizer ! FastSyncDone
+        if (settings.snapshotSettings.enableSnapshotCreation) context.become(
+          defaultMessages(canProcessPayloads = true).orElse(snapshotCreationProcessing).orElse(commonMessages)
+        ) else context.become(defaultMessages(canProcessPayloads = true).orElse(commonMessages))
+      } else EncryApp.forceStopApplication(999, "Tree after fast sync is incorrect")
     case NewChunkToApply(list: List[NodeProtoMsg]) =>
-      val newState = nodeView.state.applyNodesFastSync(list)
+      logger.debug(s"NodeViewHolder got NewChunkToApply with ${list.size} chunks.")
+      val newState: UtxoState = nodeView.state.applyNodesFastSync(list)
       updateNodeView(updatedState = Some(newState))
-      logger.debug(s"NVH Updated state")
+  }
 
+  def commonMessages: Receive = {
+    case SemanticallySuccessfulModifier(_) =>
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
@@ -224,6 +242,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
+  @scala.annotation.tailrec
   private def updateState(history: History,
                           state: UtxoState,
                           progressInfo: ProgressInfo,
@@ -255,16 +274,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
-              if (!settings.snapshotSettings.startWith && newHis.isFullChainSynced) {
+              if (enableSnapshotProcessing && newHis.isFullChainSynced && newHis.getBestBlock.exists(l =>
+                l.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0
+                  && l.header.height != settings.constants.GenesisHeight)) {
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
-                if (snapshotProcessorCreationCondition && newHis.getBestBlock.exists(l =>
-                  l.header.height % settings.snapshotSettings.creationHeight == 0
-                    && l.header.height != settings.constants.GenesisHeight)) {
-                  newHis.getBestBlock.foreach { b =>
-                    val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
-                    snapshotProcessor = newProcess
-                  }
+                newHis.getBestBlock.foreach { b =>
+                  val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
+                  snapshotProcessor = newProcess
                 }
                 logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
                 logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
@@ -275,7 +292,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
-              logger.info(s"Application to state faild cause ${e}")
+              logger.info(s"Application to state failed cause $e")
               val (newHis: History, newProgressInfo: ProgressInfo) =
                 history.reportModifierIsInvalid(modToApply)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
@@ -317,9 +334,17 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            pmod match {
+              case h: Header =>
+                val requiredHeight: Int = h.height - settings.levelDB.maxVersions
+                if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
+                  logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight.")
+                  nodeViewSynchronizer ! RequiredManifestHeight(requiredHeight)
+                }
+              case _ =>
+            }
             influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
             if (newHistory.isHeadersChainSyncedVar) {
-              logger.info(s"Send to nvsh HeaderChainIsSynced")
               nodeViewSynchronizer ! HeaderChainIsSynced
             }
 
@@ -356,13 +381,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
           }
         case Left(e) =>
-          influxRef.foreach { ref =>
-            val isHeader: Boolean = pmod match {
-              case _: Header => true
-              case _: Payload => false
-            }
-            ref ! ModifierAppendedToHistory(isHeader, success = false)
-          }
+//          influxRef.foreach { ref =>
+//            val isHeader: Boolean = pmod match {
+//              case _: Header => true
+//              case _: Payload => false
+//            }
+//            ref ! ModifierAppendedToHistory(isHeader, success = false)
+//          }
           logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
             s" to history caused $e")
           context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
@@ -452,8 +477,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def createStateStorageFastSync: VersionalStorage = {
     val dir: File = UtxoState.getStateDir(settings)
-    dir.mkdirs()
-    dir.listFiles.foreach(_.delete())
+    import org.apache.commons.io.FileUtils
+    import org.apache.commons.io.filefilter.WildcardFileFilter
+    nodeView.state.tree.close()
+    FileUtils.deleteDirectory(dir)
     val stateDir: File = UtxoState.getStateDir(settings)
     stateDir.mkdirs()
     val versionalStorage: VersionalStorage = settings.storage.state match {

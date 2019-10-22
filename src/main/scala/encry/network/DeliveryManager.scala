@@ -73,7 +73,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var canProcessTransactions: Boolean = true
 
-  var canProcessPayloads: Boolean = !settings.snapshotSettings.startWith
+  var canProcessPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
 
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
@@ -141,7 +141,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsScheduler))
 
     case CheckPayloadsToDownload =>
-      logger.info(s"Got CheckPayloadsToDownload while snapshotSettings.startWith is ${settings.snapshotSettings.startWith}.")
+      logger.info(s"Got CheckPayloadsToDownload while snapshotSettings.startWith is ${settings.snapshotSettings.enableFastSynchronization}.")
       context.become(basicMessageHandler(
         history,
         isBlockChainSynced,
@@ -207,7 +207,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
-    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
+    case DownloadRequest(_, _, _) =>
       logger.info(s"DownloadRequest but canProcessPayloads = $canProcessPayloads")
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
@@ -342,7 +342,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
       } match {
         case Some((_, (cP, _, _))) =>
           cP.handlerRef ! RequestModifiersNetworkMessage(mTypeId -> Seq(modId))
-          logger.info(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
+          logger.debug(s"Re-asked ${peer.socketAddress} and handler: ${peer.handlerRef} for modifier of type: " +
             s"$mTypeId with id: ${Algos.encode(modId)}. Attempts: $attempts")
           priorityCalculator = priorityCalculator.incrementRequest(peer.socketAddress)
           expectedModifiers = expectedModifiers.updated(peer.socketAddress, peerRequests.updated(

@@ -42,6 +42,11 @@ object BlackList {
     case object SentInvForPayload extends BanReason
     case object ExpiredNumberOfConnections extends BanReason
     final case class InvalidNetworkMessage(msgName: String) extends BanReason
+    final case class InvalidManifestMessage(error: String) extends BanReason
+    final case class InvalidChunkMessage(error: String) extends BanReason
+    final case class InvalidManifestHasChangedMessage(error: String) extends BanReason
+    case object ExpiredNumberOfReRequestAttempts extends BanReason
+    case object ExpiredNumberOfRequests extends BanReason
   }
 
   sealed trait BanType

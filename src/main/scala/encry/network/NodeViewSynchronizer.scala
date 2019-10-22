@@ -36,7 +36,7 @@ import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.{SnapshotHolder, SnapshotProcessor}
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
 
 import scala.util.Try
 
@@ -90,7 +90,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case ChangedHistory(reader: History) =>
       logger.info(s"get history: $reader from $sender")
       deliveryManager ! UpdatedHistory(reader)
-      if (settings.snapshotSettings.startWith) snapshotHolder ! ChangedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
@@ -203,7 +202,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       snapshotHolder ! msg
     case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
     case msg@FastSyncDone =>
-      //nodeViewHolderRef ! msg
+      snapshotHolder ! msg
       deliveryManager ! msg
     case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
       deliveryManager ! UpdatedHistory(reader)
@@ -212,9 +211,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case RequestedModifiersForRemote(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
-    case msg@SnapshotProcessorMessage(_) =>
-      println(s"NVSH processor")
-      snapshotHolder ! msg
+    case SnapshotProcessorMessage(l) => snapshotHolder ! SnapshotProcessorAndHistory(l, history)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
@@ -223,7 +220,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
       peersKeeper ! FullBlockChainIsSynced
-      if (!settings.snapshotSettings.startWith) snapshotHolder ! FullBlockChainIsSynced
+      if (!settings.snapshotSettings.enableFastSynchronization) snapshotHolder ! FullBlockChainIsSynced
     case StopTransactionsValidation =>
       deliveryManager ! StopTransactionsValidation
       canProcessTransactions = false
