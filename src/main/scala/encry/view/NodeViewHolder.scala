@@ -60,7 +60,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var canDownloadPayloads: Boolean = !settings.snapshotSettings.startWith
 
   var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
-  val snapshotProcessorCreationCondition: Boolean = settings.snapshotSettings.creationHeight <= settings.levelDB.maxVersions
+  val snapshotProcessorCreationCondition: Boolean = settings.snapshotSettings.creationHeight > settings.levelDB.maxVersions
 
   nodeViewSynchronizer ! SnapshotProcessorMessage(snapshotProcessor)
   println(s"NVH to NSSH procc")
@@ -144,7 +144,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
     case CompareViews(_, _, _) =>
 
-    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced =>
+    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced && snapshotProcessorCreationCondition =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Has started processing it.")
       val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
       snapshotProcessor = newProcessor
