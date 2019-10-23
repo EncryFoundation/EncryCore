@@ -48,10 +48,14 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
 
   def connectPeer: Route = path("add") {
     post(entity(as[String]) { str =>
+      println(str)
       complete {
         Try {
           val split = str.split(':')
-          (split(0), split(1).toInt)
+          val a = (split(0), split(1).toInt)
+          println(split)
+          println(a)
+          a
         } match {
           case Success((host, port)) =>
             dataHolder ! PeerAdd(new InetSocketAddress(host, port))

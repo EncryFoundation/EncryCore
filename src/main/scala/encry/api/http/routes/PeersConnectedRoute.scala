@@ -1,11 +1,14 @@
 package encry.api.http.routes
 
+import java.net.InetSocketAddress
+
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetConnectedPeersHelper, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
+import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
 import encry.local.miner.Miner.MinerStatus
 import scalatags.Text.all.{div, span, td, _}
 import encry.settings.{NodeSettings, RESTApiSettings}
@@ -22,7 +25,7 @@ import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
 
-case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
@@ -31,20 +34,16 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 
   def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
-  def info: Future[(Map[String, Amount], List[String])] = for {
-    wallet <- walletF
-    pubKeys <- pubKeysF
-  } yield (wallet, pubKeys)
+  def peersAllF: Future[Seq[PeerInfoResponse]] = (dataHolder ? GetConnectedPeersHelper).mapTo[Seq[PeerInfoResponse]]
+
+  def info: Future[Seq[PeerInfoResponse]] = for {
+    peerAll <- peersAllF
+  } yield peerAll
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def walletScript(balances: Map[String, Amount], pubKeysList: List[String] ): Text.TypedTag[String] = {
+  def peerScript(peers: Seq[PeerInfoResponse] ): Text.TypedTag[String] = {
 
-    val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
-
-    val EttTokenId: String = Algos.encode(IntrinsicTokenId)
-
-    val aaa = balances.values.head.toString
     html(
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
@@ -53,46 +52,30 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function validateForm() {
-  var x = document.forms["myForm"]["addr"].value;
   var y = document.forms["myForm"]["fee"].value;
   var z = document.forms["myForm"]["amount"].value;
-  if (x == "") {
-    alert("Address must be filled out");
-    return false;
-  }
   if (y == "") {
-     alert("Fee must be filled out");
+     alert("Address must be filled out");
      return false;
    }
  if (z == "") {
-    alert("Amount must be filled out");
+    alert("Port must be filled out");
     return false;
   }
 }""")
         ),
         script(
           raw("""function wallet(){
-                 var a = document.forms["myForm"]["addr"].value;
                  var b = document.forms["myForm"]["fee"].value;
                  var x = document.forms["myForm"]["amount"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x);
+                    request.open('POST', "http://localhost:9051/peers/add", true);
                 //    request.setRequestHeader('content-type', 'application/json');
-                    request.send();
-                     window.alert("Transaction has been sent successfully");
-                    setTimeout(location.reload.bind(location), 3000);
+                    request.send(b.toString() + ':' + x.toString());
+                     window.alert("Info about adding peer was sent to node");
+                    setTimeout(location.reload.bind(location), 1500);
 
                   }""")
-        ),
-        script(
-          raw("""function keyCreate() {
-                   var request = new XMLHttpRequest();
-                     request.open('GET', "http://localhost:9051/wallet/createKey");
-                 //    request.setRequestHeader('content-type', 'application/json');
-                     request.send();
-                      window.alert("Key created successfully");
-                     setTimeout(location.reload.bind(location), 1500);
-}""")
         ),
 
         tag("title")(
@@ -206,7 +189,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   )
                 ),
                 li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./web/wallet",
+                  a(cls := "nav-link", href := "./wallet",
                     i(cls := "ni ni-planet text-blue"), "Wallet"
                   )
                 ),
@@ -347,18 +330,15 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   div(cls := "card-header border-0",
                     div(cls := "row align-items-center",
                       div(cls := "col",
-                        h3(cls := "mb-0", "Tokens")
+                        h3(cls := "mb-0", "Connected peers")
                       ),
                       div(cls := "col-md-4",
                         div(cls := "row",
                           div(cls := "col",
-                        button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form", "Transfer"),
-                          ),
-                          div(cls := "col",
-                        button(tpe := "button", onclick := "keyCreate()", cls := "btn btn-block btn-primary mb-3", "Create key")
+                            button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form", "Add peer"),
                           )
                         ),
-                        div(cls := "modal fade", id := "modal-form", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
+                          div(cls := "modal fade", id := "modal-form", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
                           div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",
                             div(cls := "modal-content",
                               div(cls := "modal-body p-0",
@@ -370,45 +350,34 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                         div(cls := "input-group input-group-alternative mb-3",
                                           div(cls := "input-group-prepend",
                                             span(cls := "input-group-text",
-                                              i(cls := "ni ni-email-83")
-                                            )
-                                          ),
-                                          input(cls := "form-control", id:="babo", name:="addr",  placeholder := "Address", tpe := "text")
-                                        )
-                                      ),
-                                      div(cls := "form-group",
-                                        div(cls := "input-group input-group-alternative mb-3",
-                                          div(cls := "input-group-prepend",
-                                            span(cls := "input-group-text",
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
-                                            script(
-                                            raw(
-                                              """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("bibo"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
-              });
-            """.stripMargin)
-                                            )
-                                            )
+                                          input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Address", tpe := "text"),
+//                                          script(
+//                                            raw(
+//                                              """
+//                                                 function setInputFilter(textbox, inputFilter) {
+//      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+//        textbox.oldValue = "";
+//         textbox.addEventListener(event, function() {
+//       if (inputFilter(this.value)) {
+//         this.oldValue = this.value;
+//         this.oldSelectionStart = this.selectionStart;
+//         this.oldSelectionEnd = this.selectionEnd;
+//       } else if (this.hasOwnProperty("oldValue")) {
+//         this.value = this.oldValue;
+//         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+//       }
+//     });
+//   });
+// }
+//              setInputFilter(document.getElementById("bibo"), function(value) {
+//                return /^-?\d*[.,]?\d*$/.test(value);
+//              });
+//            """.stripMargin)
+//                                          )
+                                        )
 
                                       ),
                                       div(cls := "form-group",
@@ -418,7 +387,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bobo", name:="amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id:="bobo", name:="amount", placeholder := "Port"),
                                           script(
                                             raw(
                                               """
@@ -438,30 +407,15 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
    });
  }
               setInputFilter(document.getElementById("bobo"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
               });
             """.stripMargin)
                                           ),
                                         )
                                       ),
-                                      div(cls := "form-group",
-                                            select(cls:="form-control",
 
-//                                              (for (b <- balances) yield {
-                                              for (coinIds <- balances.keys.toList) yield {
-                                                option(value := coinIds, if(coinIds == EttTokenId) "ETT ❤️\u200D" else coinIds)
-
-                                              }
-
-//                                              }
-
-                                          )
-
-
-                                      ),
                                       div(cls := "text-center",
-                                        button(tpe := "button", onclick:="wallet()", cls := "btn btn-primary mt-4", "Send Money")
+                                        button(tpe := "button", onclick:="wallet()", cls := "btn btn-primary mt-4", "Add")
                                       )
                                     )
                                   )
@@ -478,21 +432,20 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     table(cls := "table align-items-center table-flush", id:="myTable",
                       thead(cls := "thead-light",
                         tr(
-                          th(attr("scope") := "row", "TokenId"),
-                          th(attr("scope") := "row", "Balance")
+                          th(attr("scope") := "row", "Name"),
+                          th(attr("scope") := "row", "Address"),
+                          th(attr("scope") := "row", "Connection type")
                         )
                       ),
                       tbody(
 
-                        (for (b <- balances) yield {
-                          val tknStr = b._1 match {
-                            case encry if b._1 == EttTokenId => "ETT"
-                            case _ => b._1
-                          }
+                        (for (p <- peers) yield {
                           tr(
-                            th(tknStr
+                            th(p.name.getOrElse("").toString
                             ),
-                            th(b._2
+                            th(p.address
+                            ),
+                            th(p.connectionType.getOrElse("").toString
                             )
                           )
                         }).toSeq: _*
@@ -501,39 +454,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   )
                 )
               )
-              ),
-
-              div(cls := "row mt-5",
-              div(cls := "col-xl-12 mb-5 mb-xl-0",
-                div(cls := "card shadow",
-                  div(cls := "card-header border-0",
-                    div(cls := "row align-items-center",
-                      div(cls := "col",
-                        h3(cls := "mb-0", "Public keys")
-                      )
-                    )
-                  ),
-                  div(cls := "table-responsive",
-                    // Projects table
-                    table(cls := "table align-items-center table-flush",
-                      thead(cls := "thead-light",
-                        tr(
-                          th(attr("scope") := "col", "Key")
-                        )
-                      ),
-                      tbody(
-                        for (p <- pubKeysList) yield {
-                          tr(
-                            th(attr("scope") := "row", p)
-                          )
-                        }
-                      )
-                    )
-                  )
-                )
-              )
-              )
-              ,
+            )
+            ,
             // Footer
             footer(cls := "footer",
               div(cls := "row align-items-center justify-content-xl-between",
@@ -580,11 +502,11 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     )
   }
 
-  override def route: Route = (path("wallet") & get) {
+  override def route: Route = (path("connectedPeers") & get) {
     //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
     onComplete(info) {
       case Success(info) =>
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
+        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
     }
   }
 

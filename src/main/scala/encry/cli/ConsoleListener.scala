@@ -1,22 +1,15 @@
 package encry.cli
 
-import akka.actor.{ Actor, ActorRef, Props }
+import akka.actor.{Actor, ActorRef, Props}
 import encry.cli.commands._
-import encry.cli.commands.history.{
-  GetCandidate,
-  GetFullBlockById,
-  GetHeaderById,
-  GetLastHeaderIdsAtHeight,
-  GetLastHeaders,
-  GetTxById
-}
+import encry.cli.commands.history.{GetCandidate, GetFullBlockById, GetHeaderById, GetLastHeaderIdsAtHeight, GetLastHeaders, GetTxById}
 import encry.cli.commands.info.GetInfo
-import encry.cli.commands.peer.{ GetPeers, GetBannedPeers, GetConnectedPeers }
+import encry.cli.commands.peer.{GetBan, GetBannedPeers, GetConnectedPeers, GetPeers}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{ Failure, Success }
+import scala.util.{Failure, Success}
 
 class ConsoleListener(settings: EncryAppSettings,
                       dataHolder: ActorRef,
@@ -112,7 +105,8 @@ object ConsoleListener {
     "peer" -> Map(
       "all"       -> GetPeers, // table
       "banned"    -> GetBannedPeers, //table
-      "connected" -> GetConnectedPeers //table
+      "connected" -> GetConnectedPeers, //table
+      "ban"       -> GetBan
     )
   )
 

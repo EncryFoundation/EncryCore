@@ -55,6 +55,7 @@ class PeersKeeper(settings: EncryAppSettings,
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
+    context.system.eventStream.subscribe(self, classOf[PeerKeeper])
     context.system.scheduler.schedule(5.seconds, 5.seconds){
       dataHolder ! UpdatingPeersInfo(
         knownPeers.keys.toSeq,
@@ -238,6 +239,10 @@ class PeersKeeper(settings: EncryAppSettings,
       logger.info(s"Banning peer: ${peer.socketAddress} for $reason.")
       blackList = blackList.banPeer(reason, peer.socketAddress.getAddress)
       peer.handlerRef ! CloseConnection
+
+    case BanPeerFromAPI(peer, reason) =>
+      logger.info(s"Got msg from API... Removing peer: $peer, reason: $reason")
+      blackList = blackList.banPeer(reason, peer.getAddress)
   }
 
   //todo NPE in InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress)
@@ -282,6 +287,8 @@ class PeersKeeper(settings: EncryAppSettings,
 
 object PeersKeeper {
 
+  trait PeerKeeper
+
   final case class VerifyConnection(peer: InetSocketAddress,
                                     remoteConnection: ActorRef)
 
@@ -309,6 +316,8 @@ object PeersKeeper {
   final case class UpdatedPeersCollection(peers: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
 
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
+
+  final case class BanPeerFromAPI(peer: InetSocketAddress, reason: BanReason) extends PeerKeeper
 
   case object GetKnownPeers
 

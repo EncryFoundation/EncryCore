@@ -1,6 +1,7 @@
 package encry.api.http.routes
 
 import akka.actor.{ActorRef, ActorRefFactory}
+import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import akka.util.Timeout
@@ -20,9 +21,9 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
-
 import scala.concurrent.Future
-import scala.util.{Random, Try}
+import scala.util.{Failure, Random, Success, Try}
+
 
 case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSettings)(
   implicit val context: ActorRefFactory
@@ -90,7 +91,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
         case Some(tx: Transaction) =>
           println(tx)
           memoryPool ! NewTransaction(tx)
-          println("aaaa")
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

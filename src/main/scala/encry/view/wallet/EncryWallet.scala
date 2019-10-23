@@ -17,7 +17,7 @@ import scala.util.Try
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager, intrinsicTokenId: ADKey) extends StrictLogging with AutoCloseable {
 
-  val publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
+  def publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
 
   val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 

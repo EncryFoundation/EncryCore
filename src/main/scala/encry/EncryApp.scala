@@ -87,8 +87,11 @@ object EncryApp extends App with StrictLogging {
     }
 
     val apiRoutes: Seq[ApiRoute] = Seq(
-      HuiRoute(settings.restApi,settings.node, dataHolderForApi),
+      WebRoute(settings.restApi,settings.node, dataHolderForApi),
       WalletRoute(settings.restApi,settings.node, dataHolderForApi),
+      PeersRoute(settings.restApi,settings.node, dataHolderForApi),
+      PeersConnectedRoute(settings.restApi,settings.node, dataHolderForApi),
+      PeersBannedRoute(settings.restApi,settings.node, dataHolderForApi),
       ArgonRoute(settings.restApi),
       PeersApiRoute(settings.restApi, dataHolderForApi),
       InfoApiRoute(dataHolderForApi, settings, nodeId, timeProvider),

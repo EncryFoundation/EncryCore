@@ -39,35 +39,19 @@ case class InfoApi(name: String,
                    knownPeers: Seq[String]
                   )
 
-case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
 
   def statusF = (dataHolder ? GetMinerStatus).mapTo[MinerStatus]
 
-  def stop(): Unit = dataHolder ! StopMiner
-
-  implicit def ev: generic.AttrValue[Builder, Unit] = (t: Builder, a: Attr, v: Unit) => v
-
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def currentInfoF = for {
+  def currentInfoF: Future[(Json, MinerStatus)] = for {
     info <- infoHelper
     status <- statusF
   } yield (info, status)
-
-  //  def currentInfo: Json = Await.result(currentInfoF, 5000.millis)
-  //
-  //  val decoding = parser.decode[InfoApi](currentInfo.toString())
-
-  //  val sadasd = decoding match {
-  //    case Right(value) => value
-  //    case Left(er) => println(er)
-  //  }
-
-  //  def getAllInfonef(json: Future[Json]): Unit = json.onComplete(_.get)
-
 
   def woqdl(json: Json, minerStatus: MinerStatus): Text.TypedTag[String] = {
     val nodeInfo = parser.decode[InfoApi](json.toString())
@@ -218,13 +202,18 @@ case class HuiRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                   )
                 ),
                 li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./web/wallet",
+                  a(cls := "nav-link", href := "./wallet",
                     i(cls := "ni ni-planet text-blue"), "Wallet"
                   )
                 ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/maps.html",
-                    i(cls := "ni ni-pin-3 text-orange"), "Maps"
+                div(cls := "dropdown",
+                  a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
+                    i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"
+                  ),
+                  div(cls := "dropdown-menu dropdown-menu-right dropdown-menu-arrow",
+                    a(cls := "dropdown-item", href := "./peers", "All peers"),
+                    a(cls := "dropdown-item", href := "./connectedPeers", "Connected peers"),
+                    a(cls := "dropdown-item", href := "./bannedPeers", "Banned peers")
                   )
                 ),
                 li(cls := "nav-item",

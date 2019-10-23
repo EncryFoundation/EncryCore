@@ -16,8 +16,10 @@ import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
+import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
 import encry.view.actors.NodeViewHolder.CurrentView
 import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
@@ -36,6 +38,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
+
 
   override def receive: Receive = workingCycle()
 
@@ -161,6 +164,11 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
         .map(_.map(_.toString))
         .pipeTo(sender)
 
+    case GetBannedPeersHelperAPI =>
+      (self ? GetBannedPeers)
+        .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
+        .pipeTo(sender)
+
     case GetConnectedPeersHelper =>
       (self ? GetConnectedPeers)
         .mapTo[Seq[ConnectedPeer]]
@@ -231,6 +239,10 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case GetBlockInfo          => sender() ! blockInfo
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
+    case PeerBanHelper(peer, msg)    =>
+      println("aaa")
+      println(blackList)
+      context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMiner =>
       println("Able")
       context.system.eventStream.publish(EnableMining)
@@ -285,6 +297,8 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class Readers(h: Option[History], s: Option[UtxoStateReader])
 
+  case class PeerBanHelper(addr: InetSocketAddress, msg: String)
+
   case object GetViewSendTx
 
   case object GetInfoHelper
@@ -328,6 +342,8 @@ object DataHolderForApi { //scalastyle:ignore
   case object GetBlockInfo
 
   case object GetBannedPeersHelper
+
+  case object GetBannedPeersHelperAPI
 
   case object GetAllInfo
 
