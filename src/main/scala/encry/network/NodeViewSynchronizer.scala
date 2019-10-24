@@ -36,7 +36,7 @@ import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fastSync.{SnapshotHolder, SnapshotProcessor}
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
 
 import scala.util.Try
 
@@ -195,6 +195,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
+    case msg@RequiredManifestHeightAndId(_, _) => snapshotHolder ! msg
     case msg@SendToNetwork(_, _) =>
       logger.info(s"NVSH got SendToNetwork")
       peersKeeper ! msg

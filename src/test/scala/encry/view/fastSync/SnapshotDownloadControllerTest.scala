@@ -341,7 +341,7 @@ class SnapshotDownloadControllerTest
         val snapshotDownloadController = SnapshotDownloadController
           .empty(settings)
           .copy(notYetRequested = ids)
-        val result = snapshotDownloadController.processNextRequestChunksMessage
+        val result = snapshotDownloadController.processRequestChunksMessage
         result.isRight shouldBe true
         result.right.get._2.nonEmpty shouldBe true
         result.right.get._2.size == ids.size shouldBe true
@@ -358,7 +358,7 @@ class SnapshotDownloadControllerTest
           .empty(settings)
           .copy(requiredManifestId = manifest.manifestId, cp = Some(createRemote()))
 
-        val result = snapshotDownloadController.processNextRequestChunksMessage
+        val result = snapshotDownloadController.processRequestChunksMessage
         result.isLeft shouldBe true
         result.left.get shouldBe true
       }
@@ -366,7 +366,7 @@ class SnapshotDownloadControllerTest
         val snapshotDownloadController = SnapshotDownloadController
           .empty(settings)
           .copy(requestedChunks = Set(ByteArrayWrapper(Random.randomBytes())))
-        val result = snapshotDownloadController.processNextRequestChunksMessage
+        val result = snapshotDownloadController.processRequestChunksMessage
         result.isLeft shouldBe true
         result.left.get shouldBe false
       }

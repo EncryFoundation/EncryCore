@@ -184,7 +184,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def applyNodesFastSync(chunks: List[NodeProtoMsg]): UtxoState =
     this.copy(tree = tree.assembleTree(chunks.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_))))
 
-  def validateTreeAfterFastSync(): Boolean = {
+  def validateTreeAfterFastSync: Boolean = {
     val validationResult: Boolean = tree.selfInspectionAfterFastSync
     logger.info(s"After tree validation result is $validationResult.")
     validationResult
