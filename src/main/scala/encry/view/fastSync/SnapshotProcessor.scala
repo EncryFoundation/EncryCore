@@ -98,7 +98,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     block: Block,
     manifestIds: Seq[Array[Byte]]
   ): List[(StorageKey, StorageValue)] = {
-    val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] = state.tree.createSubtrees
+    val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] = state.tree.getChunks(state.tree.rootNode, 1)
     val newChunks: List[SnapshotChunk] = rawSubtrees.map { l =>
       val chunkId: Array[Byte] = l.headOption.map(_.hash).getOrElse(Array.emptyByteArray)
       SnapshotChunk(l.map(NodeSerilalizer.toProto[StorageKey, StorageValue](_)), chunkId)
