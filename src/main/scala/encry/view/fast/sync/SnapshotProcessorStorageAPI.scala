@@ -5,7 +5,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.fast.sync.SnapshotHolder.{SnapshotManifest, SnapshotManifestSerializer}
-import encry.view.fastSync.SnapshotHolder.{SnapshotManifest, SnapshotManifestSerializer}
 import org.encryfoundation.common.utils.Algos
 
 trait SnapshotProcessorStorageAPI extends StrictLogging {

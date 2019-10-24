@@ -111,8 +111,8 @@ class SnapshotHolder(settings: EncryAppSettings,
         case ResponseManifestMessage(manifest) =>
           snapshotDownloadController.processManifest(manifest, remote, history) match {
             case Left(error) =>
-              logger.info(s"New manifest is incorrect. ${error.getMessage}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.getMessage))
+              logger.info(s"New manifest is incorrect. ${error.msg}.")
+              nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.msg))
             case Right((newController, Some(rootNode))) =>
               snapshotDownloadController = newController
               nodeViewHolder ! ManifestInfoToNodeViewHolder(
@@ -126,8 +126,8 @@ class SnapshotHolder(settings: EncryAppSettings,
         case ResponseChunkMessage(chunk) =>
           snapshotDownloadController.processRequestedChunk(chunk, remote) match {
             case Left(error) =>
-              logger.info(s"Received chunk is invalid cause ${error.getMessage}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.getMessage))
+              logger.info(s"Received chunk is invalid cause ${error.msg}.")
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.msg))
             case Right((newProcessor, nodes)) if nodes.nonEmpty =>
               snapshotDownloadController = newProcessor
               nodeViewHolder ! NewChunkToApply(nodes)
@@ -144,8 +144,8 @@ class SnapshotHolder(settings: EncryAppSettings,
         case ManifestHasChanged(previousId, newManifest: SnapshotManifestProtoMessage) =>
           snapshotDownloadController.processManifestHasChangedMessage(previousId, newManifest, history, remote) match {
             case Left(error) =>
-              logger.info(s"Manifest has changed message is incorrect ${error.getMessage}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.getMessage))
+              logger.info(s"Manifest has changed message is incorrect ${error.msg}.")
+              nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.msg))
             case Right((newController, Some(rootNode))) =>
               snapshotDownloadController = newController
               nodeViewHolder ! ManifestInfoToNodeViewHolder(

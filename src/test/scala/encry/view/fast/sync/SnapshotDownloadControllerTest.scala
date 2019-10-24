@@ -8,7 +8,7 @@ import encry.modifiers.InstanceFactory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.TestNetSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fastSync.SnapshotHolder.SnapshotManifestSerializer
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifestSerializer
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.state.avlTree.NodeSerilalizer
 import io.iohk.iodb.ByteArrayWrapper
@@ -36,7 +36,7 @@ class SnapshotDownloadControllerTest
           requiredManifestHeight = blocks.last.header.height
         )
 
-        val result: Either[Exception, (SnapshotDownloadController, Option[NodeProtoMsg])] =
+        val result =
           correctController.processManifest(SnapshotManifestSerializer.toProto(manifest), createRemote(), history)
 
         result.isRight shouldBe true

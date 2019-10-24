@@ -1,18 +1,13 @@
 package encry.view.fast.sync
 
 import java.io.File
-import java.net.InetSocketAddress
-
-import akka.testkit.TestProbe
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils
-import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.TestNetSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest
-import encry.view.fastSync.SnapshotHolder.SnapshotManifest
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
@@ -20,7 +15,6 @@ import org.iq80.leveldb.Options
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.modifiers.history.Block
-import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.Height
 
 object FastSyncTestsUtils extends InstanceFactory with TestNetSettings {
