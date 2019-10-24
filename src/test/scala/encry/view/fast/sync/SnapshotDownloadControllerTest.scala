@@ -1,21 +1,23 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.TestProbe
 import encry.modifiers.InstanceFactory
-import encry.network.PeerConnectionHandler.{ ConnectedPeer, Incoming }
+import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.TestNetSettings
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.fastSync.SnapshotHolder.SnapshotManifestSerializer
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.state.avlTree.NodeSerilalizer
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
-import org.scalatest.{ Matchers, OneInstancePerTest, WordSpecLike }
+import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.utils.Random
 import FastSyncTestsUtils._
 import NodeMsg.NodeProtoMsg
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifestSerializer
 
 class SnapshotDownloadControllerTest
     extends WordSpecLike
@@ -44,7 +46,7 @@ class SnapshotDownloadControllerTest
         } shouldBe true
       }
       "if some manifest is already in process - skip new one" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, _, downloadController, blocks, manifest, history) = initializeTestState()
 
         val correctDownloadController: SnapshotDownloadController =
           downloadController.copy(
@@ -62,7 +64,7 @@ class SnapshotDownloadControllerTest
         res.right.get._2.isEmpty shouldBe true
       }
       "if manifest has wrong id - ban sender(when in process manifest exists)" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, _, downloadController, _, manifest, history) = initializeTestState()
 
         val correctController = downloadController.copy(cp = Some(createRemote("999")))
 
@@ -74,7 +76,7 @@ class SnapshotDownloadControllerTest
         res.isLeft shouldBe true
       }
       "if manifest has wrong id - ban sender(when in process manifest doesn't exist)" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, _, downloadController, _, manifest, history) = initializeTestState()
 
         val res = downloadController.processManifest(
           SnapshotManifestSerializer.toProto(manifest),
@@ -86,7 +88,7 @@ class SnapshotDownloadControllerTest
     }
     "process request chunk function" should {
       "validation success with correct peer and correct chunk" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, processor, downloadController, _, manifest, _) = initializeTestState()
 
         val correctDownloadController = downloadController
           .copy(cp = Some(createRemote()),
@@ -103,7 +105,7 @@ class SnapshotDownloadControllerTest
         result.right.get._1.requestedChunks.contains(ByteArrayWrapper(manifest.chunksKeys.head)) shouldBe false
       }
       "skip chunk from unknown peer" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, processor, downloadController, _, manifest, _) = initializeTestState()
 
         val result = downloadController.processRequestedChunk(
           processor.getChunkById(manifest.chunksKeys.head).get,
@@ -114,7 +116,7 @@ class SnapshotDownloadControllerTest
         result.right.get._2.isEmpty shouldBe true
       }
       "validation error with incorrect chunk" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, processor, downloadController, _, manifest, _) = initializeTestState()
 
         val snapshotDownloadController = downloadController
           .copy(cp = Some(createRemote()))
@@ -127,7 +129,7 @@ class SnapshotDownloadControllerTest
         result.isLeft shouldBe true
       }
       "validation error with un-waited chunk" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, processor, downloadController, _, manifest, _) = initializeTestState()
 
         val snapshotDownloadController = downloadController
           .copy(
@@ -143,7 +145,7 @@ class SnapshotDownloadControllerTest
         result.isLeft shouldBe true
       }
       "correctly process correct chunk" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, processor, downloadController, _, manifest, _) = initializeTestState()
 
         val snapshotDownloadController = downloadController
           .copy(cp = Some(createRemote()),
@@ -170,7 +172,7 @@ class SnapshotDownloadControllerTest
     }
     "process manifest has changed function" should {
       "skip manifest if new is incorrect" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, _, downloadController, _, manifest, history) = initializeTestState()
 
         val res = downloadController.processManifestHasChangedMessage(
           Random.randomBytes(),
@@ -182,7 +184,7 @@ class SnapshotDownloadControllerTest
         res.isLeft shouldBe true
       }
       "process if all conditions are correct" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, _, downloadController, blocks, manifest, history) = initializeTestState()
 
         val prevManifestId = Random.randomBytes()
         val correctDownloadProcessor = downloadController.copy(
@@ -216,7 +218,7 @@ class SnapshotDownloadControllerTest
         result.right.get._2.size == ids.size shouldBe true
       }
       "Set fast sync done correctly" in {
-        val (avl, processor, downloadController, blocks, manifest, history) = initializeTestState()
+        val (_, _, downloadController, _, manifest, _) = initializeTestState()
 
         val snapshotDownloadController = downloadController
           .copy(requiredManifestId = manifest.manifestId, cp = Some(createRemote()))

@@ -12,7 +12,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
-import encry.view.fastSync.SnapshotHolder
+import encry.view.fast.sync.SnapshotHolder
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import org.encryfoundation.common.utils.TaggedTypes.Height

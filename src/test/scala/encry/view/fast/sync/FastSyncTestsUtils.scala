@@ -1,7 +1,8 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import java.io.File
 import java.net.InetSocketAddress
+
 import akka.testkit.TestProbe
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils
@@ -10,6 +11,7 @@ import encry.settings.TestNetSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest
 import encry.view.fastSync.SnapshotHolder.SnapshotManifest
 import encry.view.history.History
 import encry.view.state.UtxoState

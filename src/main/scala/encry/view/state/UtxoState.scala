@@ -22,7 +22,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
-import encry.view.fastSync.SnapshotHolder.SnapshotChunk
+import encry.view.fast.sync.SnapshotHolder.SnapshotChunk
 import encry.view.state.UtxoState.StateChange
 import encry.view.state.avlTree.{AvlTree, Node, NodeSerilalizer}
 import encry.view.state.avlTree.utils.implicits.Instances._

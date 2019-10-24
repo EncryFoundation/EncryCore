@@ -1,10 +1,10 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import encry.view.fastSync.SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
+import SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.view.history.History

@@ -1,4 +1,4 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
@@ -10,7 +10,7 @@ import encry.network.Broadcast
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.settings.EncryAppSettings
-import encry.view.fastSync.SnapshotHolder._
+import SnapshotHolder._
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._

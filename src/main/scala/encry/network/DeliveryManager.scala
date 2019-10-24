@@ -26,7 +26,6 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.fastSync.SnapshotHolder.FastSyncDone
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
