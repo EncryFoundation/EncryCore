@@ -142,10 +142,14 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }
   }._1
 
+  def coinbaseAt(height: Int): Transaction =
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 10L, 0, Height @@ height)
+
+
   def generateNextBlock(history: History,
                         difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
-                        txsQty: Int = 100,
+                        txsQty: Int = 0,
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
@@ -153,7 +157,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(history.settings.constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
-      Seq(coinbaseTransaction)
+      Seq(coinbaseAt(history.getBestHeaderHeight + 1))
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.getBestHeaderHeight + 1,
