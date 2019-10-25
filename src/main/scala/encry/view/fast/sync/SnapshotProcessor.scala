@@ -56,7 +56,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     logger.info(s"condition = $condition")
     if (condition == 0) {
       logger.info(s"Start updating actual manifest to new one at height " +
-        s"${block.header.height} with block id ${block.encodedId}")
+        s"${block.header.height} with block id ${block.encodedId}.")
       updateActualSnapshot(history, block.header.height - settings.levelDB.maxVersions)
     } else {
       logger.info(s"Doesn't need to update actual manifest.")
@@ -103,8 +103,13 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
     val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
     logger.info(s"A new snapshot created successfully. Insertion started.")
-    storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)
-    this.asRight[ProcessNewSnapshotError]
+    Either.fromTry(Try(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty))) match {
+      case Left(value) =>
+        logger.info(value.getMessage)
+        ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
+      case Right(_) =>
+        this.asRight[ProcessNewSnapshotError]
+    }
   }
 
   private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] =
@@ -113,8 +118,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
         val id: Digest32 = Algos.hash(header.stateRoot ++ header.id)
         logger.info(
           s"Block id at height $height is ${header.encodedId}. State root is ${Algos.encode(header.stateRoot)}" +
-            s" Expected manifest id is ${Algos.encode(id)}"
-        )
+            s" Expected manifest id is ${Algos.encode(id)}")
         id
       },
       ProcessNewBlockError(s"There is no best header at height $height")
