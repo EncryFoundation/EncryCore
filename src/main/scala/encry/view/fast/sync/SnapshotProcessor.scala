@@ -1,27 +1,32 @@
 package encry.view.fast.sync
 
 import java.io.File
-
 import SnapshotChunkProto.SnapshotChunkMessage
-import SnapshotManifestProto.SnapshotManifestProtoMessage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.{ EncryAppSettings, LevelDBSettings }
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
-import encry.view.state.avlTree.{InternalNode, Node, NodeSerilalizer, ShadowNode}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.view.fast.sync.SnapshotHolder.{
+  SnapshotChunk,
+  SnapshotChunkSerializer,
+  SnapshotManifest,
+  SnapshotManifestSerializer
+}
+import encry.view.state.avlTree.{ InternalNode, Node, NodeSerilalizer, ShadowNode }
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import org.iq80.leveldb.{DB, Options}
+import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
-
 import scala.language.postfixOps
+import cats.syntax.either._
+import encry.view.fast.sync.SnapshotProcessor.{ ProcessNewBlockError, ProcessNewSnapshotError }
+import encry.view.history.History
 import scala.util.Try
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
@@ -29,73 +34,47 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
 
-  def processNewSnapshot(state: UtxoState, block: Block): SnapshotProcessor = {
+  def processNewSnapshot(state: UtxoState, block: Block): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
     val potentialManifestId: Digest32 = Algos.hash(state.tree.rootHash ++ block.id)
-    val manifestIds: Seq[Array[Byte]] = potentialManifestsIds
-    val toApply = manifestIds
-      .find(_.sameElements(potentialManifestId))
-      .flatMap(bytes => manifestById(StorageKey @@ bytes)) match {
-      case Some(elem) => updateBestPotentialSnapshot(elem)
-      case None       => createNewSnapshot(state, block, manifestIds: Seq[Array[Byte]])
-    }
-    if (toApply.nonEmpty) {
-      logger.info(s"A new snapshot created successfully. Insertion started.")
-      storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List empty)
-    } else logger.info(s"The new snapshot didn't create after processing.")
     logger.info(
-      s"Best potential manifest after processing snapshot info is ${bestPotentialManifest
-        .map(e => Algos.encode(e.manifestId))}. Actual manifest is ${actualManifest.map(e => Algos.encode(e.manifestId))}. " +
-        s"Blocks height is ${block.header.height}, id is ${block.encodedId}."
+      s"Started processing new snapshot with block ${block.encodedId} at height ${block.header.height}" +
+        s" and manifest id ${Algos.encode(potentialManifestId)}."
     )
-    this
+    val manifestIds: Seq[Array[Byte]] = potentialManifestsIds
+    if (!potentialManifestsIds.exists(_.sameElements(potentialManifestId))) {
+      logger.info(s"Need to create new best potential snapshot.")
+      createNewSnapshot(state, block, manifestIds)
+    } else {
+      logger.info(s"This snapshot already exists.")
+      this.asRight[ProcessNewSnapshotError]
+    }
   }
 
-  def processNewBlock(block: Block): SnapshotProcessor = {
-    val condition
-      : Int = (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
+  def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotProcessor] = {
+    val condition: Int =
+      (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
     logger.info(s"condition = $condition")
-    val (toDelete, toInsertNew) =
-      if (condition == 0) updateActualSnapshot()
-      else List.empty -> List.empty
-    if (toDelete.nonEmpty || toInsertNew.nonEmpty) {
-      logger.info(
-        s"Actual manifest updated. Removed all unnecessary chunks|manifests." +
-          s" Block height is ${block.header.height}, id ${block.encodedId}."
-      )
-      storage.insert(StorageVersion @@ Random.randomBytes(), toInsertNew, toDelete.map(StorageKey @@ _))
-      //updateChunksManifestId(actualManifest)
-    } else
-      logger.info(
-        s"Didn't need to update actual manifest. Block height is ${block.header.height}, id is ${block.encodedId}."
-      )
-    logger.info(
-      s"Best potential manifest after processing new block is ${bestPotentialManifest.map(
-        e => Algos.encode(e.manifestId)
-      )}. Actual manifest is ${actualManifest
-        .map(e => Algos.encode(e.manifestId))}. Block height is ${block.header.height}, id is ${block.encodedId}."
-    )
-    this
+    if (condition == 0) {
+      logger.info(s"Start updating actual manifest to new one at height " +
+        s"${block.header.height} with block id ${block.encodedId}")
+      updateActualSnapshot(history, block.header.height - settings.levelDB.maxVersions)
+    } else {
+      logger.info(s"Doesn't need to update actual manifest.")
+      this.asRight[ProcessNewBlockError]
+    }
   }
 
   def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
     storage.get(StorageKey @@ chunkId).flatMap(e => Try(SnapshotChunkMessage.parseFrom(e)).toOption)
 
-  private def updateBestPotentialSnapshot(
-    elem: SnapshotManifest
-  ): List[(StorageKey, StorageValue)] =
-    if (!bestPotentialManifest.exists(_.manifestId.sameElements(elem.manifestId))) {
-      val updatedManifest = BestPotentialManifestKey -> StorageValue @@ SnapshotManifestSerializer
-        .toProto(elem)
-        .toByteArray
-      List(updatedManifest)
-    } else List.empty
-
   private def createNewSnapshot(
     state: UtxoState,
     block: Block,
     manifestIds: Seq[Array[Byte]]
-  ): List[(StorageKey, StorageValue)] = {
-    val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] = state.tree.getChunks(state.tree.rootNode, 1)
+  ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
+    //todo add only exists chunks
+    val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] =
+      state.tree.getChunks(state.tree.rootNode, currentChunkHeight = 1)
     val newChunks: List[SnapshotChunk] = rawSubtrees.map { l =>
       val chunkId: Array[Byte] = l.headOption.map(_.hash).getOrElse(Array.emptyByteArray)
       SnapshotChunk(l.map(NodeSerilalizer.toProto[StorageKey, StorageValue](_)), chunkId)
@@ -116,58 +95,65 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
       StorageKey @@ elem.id -> StorageValue @@ bytes
     }
-    val serializedManifest: StorageValue = StorageValue @@ SnapshotManifestSerializer.toProto(manifest).toByteArray
     val manifestToDB: (StorageKey, StorageValue) =
-      StorageKey @@ manifest.manifestId -> StorageValue @@ serializedManifest
-    val newBestPotentialManifest: (StorageKey, StorageValue) = BestPotentialManifestKey -> serializedManifest
+      StorageKey @@ manifest.manifestId -> StorageValue @@ SnapshotManifestSerializer
+        .toProto(manifest)
+        .toByteArray
     val updateList: (StorageKey, StorageValue) =
       PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
-    newBestPotentialManifest :: manifestToDB :: updateList :: snapshotToDB
+    val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
+    logger.info(s"A new snapshot created successfully. Insertion started.")
+    storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)
+    this.asRight[ProcessNewSnapshotError]
   }
 
-  private def updateActualSnapshot(): (List[Array[Byte]], List[(StorageKey, StorageValue)]) = {
-    //new actual manifest bytes
-    val newActualManifestBytes: Array[Byte] =
-      manifestBytesById(BestPotentialManifestKey).getOrElse(Array.emptyByteArray)
-    //new actual manifest
-    val bestPotentialManifestOpt: Option[SnapshotManifest] =
-      SnapshotManifestSerializer.fromProto(SnapshotManifestProtoMessage.parseFrom(newActualManifestBytes)).toOption
-    //current actual manifest
-    val actualManifestOpt: Option[SnapshotManifest] = actualManifest
-    //manifests ids to remove excluding new actual without current actual
-    val potentialManifestsExcludingBestPotential: Seq[Array[Byte]] = bestPotentialManifestOpt
-      .fold(potentialManifestsIds)(
-        elem => potentialManifestsIds.filterNot(_.sameElements(elem.manifestId))
-      )
-    //manifests ids to remove including actual
-    val toDeleteManifests: Seq[Array[Byte]] = actualManifestOpt
-      .fold(potentialManifestsExcludingBestPotential)(potentialManifestsExcludingBestPotential :+ _.manifestId)
-    //chunks ids connected with new actual manifest
-    val newActualChunks: Set[ByteArrayWrapper] = bestPotentialManifestOpt
-      .map(_.chunksKeys)
-      .getOrElse(List.empty)
-      .map(ByteArrayWrapper(_))
-      .toSet
-    //chunks keys to delete
-    val keysToDeleteChunks: List[Array[Byte]] = toDeleteManifests.flatMap { manifestId =>
-      manifestById(StorageKey @@ manifestId)
-        .map(_.chunksKeys.map(ByteArrayWrapper(_)).toSet)
-        .getOrElse(Set.empty)
-        .diff(newActualChunks)
-    }.distinct.map(_.data).toList
-
-    val updateNewActualManifest: (StorageKey, StorageValue) =
-      ActualManifestKey -> StorageValue @@ newActualManifestBytes
-
-    (PotentialManifestsIdsKey :: BestPotentialManifestKey :: keysToDeleteChunks ::: toDeleteManifests.toList) -> List(
-      updateNewActualManifest
-    )
-  }
+  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] =
+    Either.fromOption(
+      history.getBestHeaderAtHeight(height).map { header =>
+        val id: Digest32 = Algos.hash(header.stateRoot ++ header.id)
+        logger.info(
+          s"Block id at height $height is ${header.encodedId}. State root is ${Algos.encode(header.stateRoot)}" +
+            s" Expected manifest id is ${Algos.encode(id)}"
+        )
+        id
+      },
+      ProcessNewBlockError(s"There is no best header at height $height")
+    ) match {
+      case Left(error) =>
+        logger.info(error.toString)
+        error.asLeft[SnapshotProcessor]
+      case Right(bestManifestId) =>
+        logger.info(s"Expected manifest id at height $height is ${Algos.encode(bestManifestId)}")
+        val manifestIdsToRemove: Seq[Array[Byte]]    = potentialManifestsIds.filterNot(_.sameElements(bestManifestId))
+        val manifestsToRemove: Seq[SnapshotManifest] = manifestIdsToRemove.flatMap(l => manifestById(StorageKey @@ l))
+        val chunksToRemove: Set[ByteArrayWrapper] =
+          manifestsToRemove.flatMap(_.chunksKeys.map(ByteArrayWrapper(_))).toSet
+        val newActualManifest: Option[SnapshotManifest] = manifestById(StorageKey @@ bestManifestId)
+        val excludedIds: Set[ByteArrayWrapper] =
+          newActualManifest.toList.flatMap(_.chunksKeys.map(ByteArrayWrapper(_))).toSet
+        val resultedChunksToRemove: List[Array[Byte]] = chunksToRemove.diff(excludedIds).map(_.data).toList
+        val toDelete: List[Array[Byte]] =
+          PotentialManifestsIdsKey :: manifestIdsToRemove.toList ::: resultedChunksToRemove
+        val toApply: (StorageKey, StorageValue) = ActualManifestKey -> StorageValue @@ bestManifestId
+        Either.fromTry(
+          Try(storage.insert(StorageVersion @@ Random.randomBytes(), List(toApply), toDelete.map(StorageKey @@ _)))
+        ) match {
+          case Left(error) =>
+            logger.info(error.getMessage)
+            ProcessNewBlockError(error.getMessage).asLeft[SnapshotProcessor]
+          case Right(_) =>
+            this.asRight[ProcessNewBlockError]
+        }
+    }
 
   override def close(): Unit = storage.close()
 }
 
 object SnapshotProcessor extends StrictLogging {
+
+  sealed trait SnapshotProcessorError
+  final case class ProcessNewSnapshotError(str: String) extends SnapshotProcessorError
+  final case class ProcessNewBlockError(str: String)    extends SnapshotProcessorError
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDir(settings))
 

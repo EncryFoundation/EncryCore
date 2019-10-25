@@ -210,20 +210,24 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def workMod(snapshotProcessor: SnapshotProcessor): Receive = {
+    case NewManifestId(id, newManifest) =>
+      connectionsHandler.liveConnections.foreach { case (connection, _) =>
+        connection.handlerRef ! ManifestHasChanged(id, SnapshotManifestSerializer.toProto(newManifest))
+      }
     case DataFromPeer(message, remote) =>
       message match {
         case RequestManifestMessage(requiredManifestId)
-            if connectionsHandler.canBeProcessed(snapshotProcessor, remote.socketAddress, requiredManifestId) =>
+            if connectionsHandler.canBeProcessed(snapshotProcessor, remote, requiredManifestId) =>
           logger.info(s"Got message RequestManifestMessage from ${remote.socketAddress}.")
           logger.info(s"Actual manifest with id ${Algos.encode(requiredManifestId)} is same as requested.")
           snapshotProcessor.actualManifest.foreach { m =>
             logger.info(s"Sent to remote actual manifest with id ${Algos.encode(requiredManifestId)}")
             remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
-            connectionsHandler = connectionsHandler.addNewConnect(remote.socketAddress, m.chunksKeys.size)
+            connectionsHandler = connectionsHandler.addNewConnect(remote, m.chunksKeys.size)
           }
 
         case RequestManifestMessage(_) =>
-        case RequestChunkMessage(chunkId) if connectionsHandler.canProcessResponse(remote.socketAddress) =>
+        case RequestChunkMessage(chunkId) if connectionsHandler.canProcessResponse(remote) =>
           logger.info(s"Got RequestChunkMessage. Current handledRequests ${connectionsHandler.handledRequests}.")
           val chunkFromDB: Option[SnapshotChunkMessage] = snapshotProcessor.getChunkById(chunkId)
           chunkFromDB.foreach { chunk =>
@@ -231,12 +235,12 @@ class SnapshotHolder(settings: EncryAppSettings,
             val networkMessage: NetworkMessage = ResponseChunkMessage(chunk)
             remote.handlerRef ! networkMessage
           }
-          connectionsHandler = connectionsHandler.processRequest(remote.socketAddress)
+          connectionsHandler = connectionsHandler.processRequest(remote)
         case RequestChunkMessage(_)
-            if connectionsHandler.liveConnections.getOrElse(remote.socketAddress, 0 -> 0L)._1 == 0 =>
+            if connectionsHandler.liveConnections.getOrElse(remote, 0 -> 0L)._1 == 0 =>
           logger.info(s"Ban peer $remote.")
           nodeViewSynchronizer ! BanPeer(remote, ExpiredNumberOfRequests)
-          connectionsHandler = connectionsHandler.removeConnection(remote.socketAddress)
+          connectionsHandler = connectionsHandler.removeConnection(remote)
         case RequestChunkMessage(_) =>
         case _                      =>
       }
@@ -257,6 +261,8 @@ object SnapshotHolder {
   case object DropProcessedCount
 
   final case class RequiredManifestHeightAndId(height: Int, manifestId: Array[Byte])
+
+  final case class NewManifestId(prevId: Array[Byte], newManifest: SnapshotManifest)
 
   final case class SnapshotProcessorMessage(sp: SnapshotProcessor) extends AnyVal
 
