@@ -4,7 +4,6 @@ import "avl/NodeMsg.proto";
 message SnapshotManifestProtoMessage {
 
     bytes manifestId = 1;
-    NodeProtoMsg rootNodeBytes = 2;
-    repeated bytes chunksIds = 3;
+    repeated bytes chunksIds = 2;
 
 }

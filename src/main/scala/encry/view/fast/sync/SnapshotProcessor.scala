@@ -1,38 +1,42 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
-import encry.view.fast.sync.SnapshotHolder.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
-import encry.view.state.avlTree.{ InternalNode, Node, NodeSerilalizer, ShadowNode }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.view.state.avlTree.{InternalNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
-import org.iq80.leveldb.{ DB, Options }
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.hash.Digest32
+
 import scala.language.postfixOps
 import cats.syntax.either._
-import encry.view.fast.sync.SnapshotProcessor.{ ProcessNewBlockError, ProcessNewSnapshotError }
+import encry.view.fast.sync.SnapshotProcessor.{ChunkApplyError, ChunkValidationError, ProcessNewBlockError, ProcessNewSnapshotError}
 import encry.view.history.History
+
 import scala.util.Try
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
+
+  def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotProcessor] = ???
+
+  def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] = ???
+
+  def getUtxo: UtxoState = ???
 
   def processNewSnapshot(state: UtxoState, block: Block): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
     val potentialManifestId: Digest32 = Algos.hash(state.tree.rootHash ++ block.id)
@@ -158,6 +162,9 @@ object SnapshotProcessor extends StrictLogging {
   sealed trait SnapshotProcessorError
   final case class ProcessNewSnapshotError(str: String) extends SnapshotProcessorError
   final case class ProcessNewBlockError(str: String)    extends SnapshotProcessorError
+
+  final case class ChunkApplyError(msg: String)
+  final case class ChunkValidationError(msg: String)
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDir(settings))
 
