@@ -35,8 +35,9 @@ import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
-import encry.view.fastSync.{SnapshotHolder, SnapshotProcessor}
-import encry.view.fastSync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fast.sync.SnapshotHolder
+import encry.view.fast.sync.SnapshotProcessor
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
 
 import scala.util.Try
 

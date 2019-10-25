@@ -1,29 +1,26 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
-import encry.view.fastSync.SnapshotHolder.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
-import encry.view.state.avlTree.{ InternalNode, Node, NodeSerilalizer, ShadowNode }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.view.state.avlTree.{InternalNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
-import org.iq80.leveldb.{ DB, Options }
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.hash.Digest32
+
 import scala.language.postfixOps
 import scala.util.Try
 

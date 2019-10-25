@@ -1,4 +1,4 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import java.io.File
 import SnapshotChunkProto.SnapshotChunkMessage
@@ -9,7 +9,7 @@ import encry.settings.TestNetSettings
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.utils.FileHelper
-import encry.view.fastSync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer }
+import SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer }
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{ AvlTree, Node, NodeSerilalizer }
 import io.iohk.iodb.ByteArrayWrapper

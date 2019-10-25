@@ -1,7 +1,6 @@
-package encry.view.fastSync
+package encry.view.fast.sync
 
 import java.net.InetSocketAddress
-
 import encry.settings.EncryAppSettings
 
 final case class IncomingConnectionsHandler(liveConnections: Map[InetSocketAddress, (Int, Long)],

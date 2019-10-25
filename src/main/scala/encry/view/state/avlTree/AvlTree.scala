@@ -10,7 +10,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.fastSync.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}

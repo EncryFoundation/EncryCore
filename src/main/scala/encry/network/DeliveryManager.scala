@@ -13,7 +13,6 @@ import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest, SerializedModifierFromNetwork}
 import encry.view.history.History
 import encry.settings.EncryAppSettings
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
@@ -26,7 +25,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.fastSync.SnapshotHolder.FastSyncDone
+import encry.view.fast.sync.SnapshotHolder.FastSyncDone
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
