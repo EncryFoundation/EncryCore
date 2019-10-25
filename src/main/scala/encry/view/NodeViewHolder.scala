@@ -24,7 +24,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestInfoToNodeViewHolder, NewChunkToApply, RequiredManifestHeightAndId, SnapshotProcessorMessage}
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestInfoToNodeViewHolder, NewChunkToApply, NewManifestId, RequiredManifestHeightAndId, SnapshotProcessorMessage}
 import encry.view.fast.sync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
@@ -157,8 +157,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def snapshotCreationProcessing: Receive = {
     case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")
-      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
-      snapshotProcessor = newProcessor
+      val condition
+      : Int = (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
+      val actualId = snapshotProcessor.actualManifest.map(_.manifestId)
+//      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
+//      snapshotProcessor = newProcessor
+    if (condition == 0 && actualId.nonEmpty && snapshotProcessor.actualManifest.nonEmpty) {
+      logger.info(s"Snapshot manifest has changed message")
+      nodeViewSynchronizer ! NewManifestId(actualId.get, snapshotProcessor.actualManifest.get)
+    }
   }
 
   def snapshotFastSyncProcessing: Receive = {
@@ -285,8 +292,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
                 newHis.getBestBlock.foreach { b =>
-                  val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
-                  snapshotProcessor = newProcess
+                  //val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
+                  //snapshotProcessor = newProcess
                 }
                 logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
                 logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")

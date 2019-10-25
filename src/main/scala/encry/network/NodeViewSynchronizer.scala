@@ -37,7 +37,7 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fast.sync.SnapshotHolder
 import encry.view.fast.sync.SnapshotProcessor
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, NewManifestId, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
 
 import scala.util.Try
 
@@ -218,6 +218,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
     case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
+    case m@NewManifestId(_, _) => snapshotHolder ! m
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
