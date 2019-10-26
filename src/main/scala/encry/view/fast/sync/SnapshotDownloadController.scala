@@ -70,25 +70,25 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   def processRequestedChunk(
     chunkMessage: SnapshotChunkMessage,
     remote: ConnectedPeer
-  ): Either[ProcessRequestedChunkException, (SnapshotDownloadController, List[NodeProtoMsg])] = {
+  ): Either[ProcessRequestedChunkException, (SnapshotDownloadController, NodeProtoMsg)] = {
     logger.info(s"Got new chunk from ${remote.socketAddress}.")
     if (cp.exists(_.socketAddress == remote.socketAddress))
       Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
         case Left(error) =>
           ProcessRequestedChunkException(s"Chunk was parsed with error ${error.getCause}.")
-            .asLeft[(SnapshotDownloadController, List[NodeProtoMsg])]
+            .asLeft[(SnapshotDownloadController, NodeProtoMsg)]
         case Right(chunk) =>
           val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
           if (requestedChunks.contains(chunkId)) {
             logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
-            (this.copy(requestedChunks = requestedChunks - chunkId) -> chunk.nodesList)
+            (this.copy(requestedChunks = requestedChunks - chunkId) -> NodeSerilalizer.toProto(chunk.node))
               .asRight[ProcessRequestedChunkException]
           } else
             ProcessRequestedChunkException(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-              .asLeft[(SnapshotDownloadController, List[NodeProtoMsg])]
+              .asLeft[(SnapshotDownloadController, NodeProtoMsg)]
       } else {
       logger.info(s"Got chunk from unknown peer ${remote.socketAddress}.")
-      (this -> List.empty[NodeProtoMsg]).asRight[ProcessRequestedChunkException]
+      (this -> NodeProtoMsg).asRight[ProcessRequestedChunkException]
     }
   }
 

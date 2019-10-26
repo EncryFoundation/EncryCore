@@ -3,12 +3,12 @@ package encry.view.fast.sync
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{ Actor, ActorRef, Cancellable, Props }
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
-import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
 import encry.settings.EncryAppSettings
 import SnapshotHolder._
 import encry.view.state.UtxoState
@@ -16,14 +16,11 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.option._
-import encry.network.BlackList.BanReason.{
-  ExpiredNumberOfReRequestAttempts,
-  ExpiredNumberOfRequests,
-  InvalidChunkMessage,
-  InvalidManifestHasChangedMessage,
-  InvalidManifestMessage
-}
+import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidManifestHasChangedMessage, InvalidManifestMessage}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.history.History
+import encry.view.state.avlTree.Node
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -290,8 +287,8 @@ object SnapshotHolder {
     override def toString: String = s"Manifest id: ${Algos.encode(manifestId)}. Chunks size: ${chunksKeys.size}."
   }
 
-  final case class SnapshotChunk(nodesList: List[NodeProtoMsg], id: Array[Byte]) {
-    override def toString: String = s"Snapshot chunk id: ${Algos.encode(id)}. Nodes size: ${nodesList.size}."
+  final case class SnapshotChunk(node: Node[StorageKey, StorageValue], id: Array[Byte]) {
+    override def toString: String = s"Snapshot chunk id: ${Algos.encode(id)}."
   }
 
   object SnapshotManifestSerializer {

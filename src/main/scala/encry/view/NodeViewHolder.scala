@@ -38,6 +38,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.constants.Constants
 import org.iq80.leveldb.Options
 
 import scala.collection.{IndexedSeq, Seq, mutable}
@@ -538,6 +539,9 @@ object NodeViewHolder {
         case otherwise => 1
       })
 
-  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef, settings: EncryAppSettings): Props =
+  def props(memoryPoolRef: ActorRef,
+            influxRef: Option[ActorRef],
+            dataHolder: ActorRef,
+            settings: EncryAppSettings): Props =
     Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder, settings))
 }

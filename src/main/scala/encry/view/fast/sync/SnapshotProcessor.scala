@@ -12,31 +12,108 @@ import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
-import encry.view.state.avlTree.{InternalNode, Node, NodeSerilalizer, ShadowNode}
+import encry.view.state.avlTree.{AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.hash.Digest32
-
 import scala.language.postfixOps
 import cats.syntax.either._
-import encry.view.fast.sync.SnapshotProcessor.{ChunkApplyError, ChunkValidationError, ProcessNewBlockError, ProcessNewSnapshotError}
+import com.google.common.primitives.Ints
+import encry.view.fast.sync.ChunkValidator.ChunkValidationError
+import encry.view.fast.sync.SnapshotProcessor.{ChunkApplyError, EmptyHeightKey, EmptyRootNodeError, ProcessNewBlockError, ProcessNewSnapshotError, UtxoCreationError}
 import encry.view.history.History
-
-import scala.util.Try
+import org.encryfoundation.common.utils.TaggedTypes.Height
+import org.encryfoundation.common.utils.constants.Constants
+import scala.collection.immutable.HashSet
+import scala.util.{Failure, Success, Try}
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
 
-  def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotProcessor] = ???
+  var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty[ByteArrayWrapper]
 
-  def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] = ???
+  def setRSnapshotData(rootNodeId: Array[Byte], utxoHeight: Height): SnapshotProcessor = {
+    storage.insert(
+      StorageVersion @@ Random.randomBytes(),
+      AvlTree.rootNodeKey -> StorageValue @@ rootNodeId ::
+        UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(utxoHeight) :: Nil
+    )
+    this
+  }
 
-  def getUtxo: UtxoState = ???
+  private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
+    case shadowNode: ShadowNode[StorageKey, StorageValue] => shadowNode :: Nil
+    case leaf: LeafNode[StorageKey, StorageValue] => leaf :: Nil
+    case internalNode: InternalNode[StorageKey, StorageValue] =>
+      internalNode ::
+        internalNode.leftChild.map(flatten).getOrElse(List.empty[Node[StorageKey, StorageValue]]) :::
+        internalNode.rightChild.map(flatten).getOrElse(List.empty[Node[StorageKey, StorageValue]])
+  }
+
+  def applyChunk(chunk: SnapshotChunk)
+                (vSerializer: Serializer[StorageValue]): Either[ChunkApplyError, SnapshotProcessor] = {
+    val kSerializer: Serializer[StorageKey] = implicitly[Serializer[StorageKey]]
+    val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
+    val toApplicable = nodes.collect{case node: ShadowNode[StorageKey, StorageValue] => node}
+    val toStorage = nodes.collect{
+      case leaf: LeafNode[StorageKey, StorageValue] => leaf
+      case internal: InternalNode[StorageKey, StorageValue] => internal
+    }
+    val nodesToInsert: List[(StorageKey, StorageValue)] = toStorage.flatMap { node =>
+      val fullData: (StorageKey, StorageValue) =
+        StorageKey @@ Algos.hash(kSerializer.toBytes(node.key).reverse) -> StorageValue @@ vSerializer.toBytes(node.value)
+      val shadowData: (StorageKey, StorageValue) =
+        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
+        fullData :: shadowData :: Nil
+    }
+    Try {
+      storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
+    } match {
+      case Success(_) =>
+        applicableChunks =
+          (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
+            toApplicable.map(node => ByteArrayWrapper(node.hash))
+        this.asRight[ChunkApplyError]
+      case Failure(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotProcessor]
+    }
+  }
+
+  def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] = for {
+      _ <- ChunkValidator.checkForIdConsistent(chunk)
+      _ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
+    } yield chunk
+
+  def getUtxo: Either[UtxoCreationError, UtxoState] =
+    for {
+      rootNode <- getRootNode
+      height <- getHeight
+      avlTree = new AvlTree[StorageKey, StorageValue](rootNode, storage)
+    } yield UtxoState(avlTree, height, settings.constants)
+
+  private def getHeight: Either[EmptyHeightKey, Height] =
+    storage.get(UtxoState.bestHeightKey)
+      .fold(EmptyHeightKey("bestHeightKey is empty").asLeft[Height])(bytes => (Height @@ Ints.fromByteArray(bytes)).asRight[EmptyHeightKey])
+
+  private def getRootNodeId: Either[EmptyRootNodeError, StorageKey] =
+    storage.get(AvlTree.rootNodeKey) match {
+      case Some(id) => (StorageKey !@@ id).asRight[EmptyRootNodeError]
+      case None => EmptyRootNodeError("Key root node doesn't exist!").asLeft[StorageKey]
+    }
+
+  private def getRootNode: Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] = for {
+    rootNodeId <- getRootNodeId
+    node <- storage.get(rootNodeId).fold(
+      EmptyRootNodeError(s"Node with id ${Algos.encode(rootNodeId)} doesn't exist")
+        .asLeft[Node[StorageKey, StorageValue]]
+    )(nodeBytes =>
+      NodeSerilalizer.fromBytes[StorageKey, StorageValue](nodeBytes).asRight[EmptyRootNodeError]
+    )
+  } yield node
 
   def processNewSnapshot(state: UtxoState, block: Block): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
     val potentialManifestId: Digest32 = Algos.hash(state.tree.rootHash ++ block.id)
@@ -77,25 +154,14 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     manifestIds: Seq[Array[Byte]]
   ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
     //todo add only exists chunks
-    val rawSubtrees: List[List[Node[StorageKey, StorageValue]]] =
-      state.tree.getChunks(state.tree.rootNode, currentChunkHeight = 1)
-    val newChunks: List[SnapshotChunk] = rawSubtrees.map { l =>
-      val chunkId: Array[Byte] = l.headOption.map(_.hash).getOrElse(Array.emptyByteArray)
-      SnapshotChunk(l.map(NodeSerilalizer.toProto[StorageKey, StorageValue](_)), chunkId)
-    }
-    val manifest: SnapshotManifest = state.tree.rootNode match {
-      case i: InternalNode[StorageKey, StorageValue] =>
-        SnapshotManifest(Algos.hash(state.tree.rootHash ++ block.id), NodeSerilalizer.toProto(i), newChunks.map(_.id))
-      case s: ShadowNode[StorageKey, StorageValue] =>
-        SnapshotManifest(Algos.hash(state.tree.rootHash ++ block.id),
-                         NodeSerilalizer.toProto(s.restoreFullNode(storage)),
-                         newChunks.map(_.id))
-    }
-    val updatedSubtrees: Option[SnapshotChunk]    = newChunks.headOption.map(node => node.copy(node.nodesList.drop(1)))
-    val subtreesWithOutFirst: List[SnapshotChunk] = newChunks.drop(1)
-    val chunks: List[SnapshotChunk]               = updatedSubtrees.fold(subtreesWithOutFirst)(_ :: subtreesWithOutFirst)
-
-    val snapshotToDB: List[(StorageKey, StorageValue)] = chunks.map { elem =>
+    val newChunks: List[SnapshotChunk] =
+      AvlTree.getChunks(state.tree.rootNode, currentChunkHeight = 1, state.tree.storage)
+    val manifest: SnapshotManifest =
+        SnapshotManifest(
+          Algos.hash(state.tree.rootHash ++ block.id),
+          NodeSerilalizer.toProto(newChunks.head.node), newChunks.map(_.id)
+        )
+    val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
       StorageKey @@ elem.id -> StorageValue @@ bytes
     }
@@ -164,9 +230,13 @@ object SnapshotProcessor extends StrictLogging {
   final case class ProcessNewBlockError(str: String)    extends SnapshotProcessorError
 
   final case class ChunkApplyError(msg: String)
-  final case class ChunkValidationError(msg: String)
 
-  def initialize(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDir(settings))
+  sealed trait UtxoCreationError
+  final case class EmptyRootNodeError(msg: String) extends UtxoCreationError
+  final case class EmptyHeightKey(msg: String) extends UtxoCreationError
+
+  def initialize(settings: EncryAppSettings): SnapshotProcessor =
+    create(settings, getDir(settings))
 
   def getDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 

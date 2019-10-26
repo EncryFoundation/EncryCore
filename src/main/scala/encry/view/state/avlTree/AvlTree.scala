@@ -538,45 +538,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
                                              kMonoid: Monoid[K],
                                              vMonoid: Monoid[V]): AvlTree[K, V] = insertionInFastSyncMod(chunks)
 
-  def getChunks(node: Node[K, V], currentChunkHeight: Int)(implicit kSer: Serializer[K],
-                                                            vSer: Serializer[V],
-                                                            kM: Monoid[K],
-                                                            vM: Monoid[V]): List[List[Node[K, V]]] = {
-    import cats.implicits._
-
-    def rootToList(node: Node[K, V]): List[Node[K, V]] = node match {
-      case internalNode: InternalNode[K, V] =>
-        List(ShadowNode.childsToShadowNode(internalNode)) ++
-          internalNode.leftChild.map(rootToList).getOrElse(List.empty) ++
-          internalNode.rightChild.map(rootToList).getOrElse(List.empty)
-      case node => List(node)
-    }
-
-    def restoreNodesUntilDepthAndReturnLeafs(depth: Int,
-                                             node: Node[K, V]): (Node[K, V], List[Node[K, V]]) = node match {
-      case shadowNode: ShadowNode[K, V] =>
-        val newNode = shadowNode.restoreFullNode(storage)
-        restoreNodesUntilDepthAndReturnLeafs(depth, newNode)
-      case internalNode: InternalNode[K, V] if depth != 0 =>
-        val (recoveredLeftChild, leftSubTreeChildren) = internalNode.leftChild
-            .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
-            .separate.map(_.getOrElse(List.empty))
-        val (recoveredRightChild, rightSubTreeChildren) = internalNode.rightChild
-          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
-          .separate.map(_.getOrElse(List.empty))
-        internalNode.copy(
-          leftChild = recoveredLeftChild,
-          rightChild = recoveredRightChild
-        ) -> (rightSubTreeChildren ++ leftSubTreeChildren)
-      case internalNode: InternalNode[K, V] =>
-        internalNode -> List(internalNode.leftChild, internalNode.rightChild).flatten
-      case leaf: LeafNode[K, V] => leaf -> List.empty[Node[K, V]]
-    }
-
-    val (rootChunk, rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
-    List(rootToList(rootChunk)) ++ rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight))
-  }
-
   @scala.annotation.tailrec
   private def handleChild(child: Node[K, V]): (List[Node[K, V]], Node[K, V]) = child match {
     case s: ShadowNode[K, V] => handleChild(s.restoreFullNode(storage))
@@ -630,5 +591,41 @@ object AvlTree {
       List(UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(blockHeight))
     )
     initTree.insertionInFastSyncMod(List(root), isRoot = true)
+  }
+
+  def getChunks(node: Node[StorageKey, StorageValue],
+                currentChunkHeight: Int,
+                storage: VersionalStorage)
+               (implicit kSer: Serializer[StorageKey],
+                vSer: Serializer[StorageValue],
+                kM: Monoid[StorageKey],
+                vM: Monoid[StorageValue],
+                hashKey: Hashable[StorageKey]): List[SnapshotChunk] = {
+    import cats.implicits._
+
+    def restoreNodesUntilDepthAndReturnLeafs(depth: Int,
+                                             node: Node[StorageKey, StorageValue]): (Node[StorageKey, StorageValue], List[Node[StorageKey, StorageValue]]) = node match {
+      case shadowNode: ShadowNode[StorageKey, StorageValue] =>
+        val newNode = shadowNode.restoreFullNode(storage)
+        restoreNodesUntilDepthAndReturnLeafs(depth, newNode)
+      case internalNode: InternalNode[StorageKey, StorageValue] if depth != 0 =>
+        val (recoveredLeftChild, leftSubTreeChildren) = internalNode.leftChild
+          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
+          .separate.map(_.getOrElse(List.empty))
+        val (recoveredRightChild, rightSubTreeChildren) = internalNode.rightChild
+          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
+          .separate.map(_.getOrElse(List.empty))
+        internalNode.copy(
+          leftChild = recoveredLeftChild,
+          rightChild = recoveredRightChild
+        ) -> (rightSubTreeChildren ++ leftSubTreeChildren)
+      case internalNode: InternalNode[StorageKey, StorageValue] =>
+        internalNode -> List(internalNode.leftChild, internalNode.rightChild).flatten
+      case leaf: LeafNode[StorageKey, StorageValue] => leaf -> List.empty[Node[StorageKey, StorageValue]]
+    }
+
+    val (rootChunk, rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
+    SnapshotChunk(rootChunk, rootChunk.hash) ::
+      rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight, storage))
   }
 }
