@@ -3,32 +3,44 @@ package encry.view.fast.sync
 import java.io.File
 
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.{ EncryAppSettings, LevelDBSettings }
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
-import encry.view.state.avlTree.{AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.view.fast.sync.SnapshotHolder.{
+  SnapshotChunk,
+  SnapshotChunkSerializer,
+  SnapshotManifest,
+  SnapshotManifestSerializer
+}
+import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import org.iq80.leveldb.{DB, Options}
+import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
 import scala.language.postfixOps
 import cats.syntax.either._
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.ChunkValidator.ChunkValidationError
-import encry.view.fast.sync.SnapshotProcessor.{ChunkApplyError, EmptyHeightKey, EmptyRootNodeError, ProcessNewBlockError, ProcessNewSnapshotError, UtxoCreationError}
+import encry.view.fast.sync.SnapshotProcessor.{
+  ChunkApplyError,
+  EmptyHeightKey,
+  EmptyRootNodeError,
+  ProcessNewBlockError,
+  ProcessNewSnapshotError,
+  UtxoCreationError
+}
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.encryfoundation.common.utils.constants.Constants
 import scala.collection.immutable.HashSet
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
@@ -37,10 +49,18 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty[ByteArrayWrapper]
 
+  def reInitStorage: SnapshotProcessor = {
+    storage.close()
+    val dir: File = SnapshotProcessor.getDir(settings)
+    import org.apache.commons.io.FileUtils
+    FileUtils.deleteDirectory(dir)
+    SnapshotProcessor.initialize(settings)
+  }
+
   def setRSnapshotData(rootNodeId: Array[Byte], utxoHeight: Height): SnapshotProcessor = {
     storage.insert(
       StorageVersion @@ Random.randomBytes(),
-      AvlTree.rootNodeKey -> StorageValue @@ rootNodeId ::
+      AvlTree.rootNodeKey       -> StorageValue @@ rootNodeId ::
         UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(utxoHeight) :: Nil
     )
     this
@@ -48,7 +68,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
     case shadowNode: ShadowNode[StorageKey, StorageValue] => shadowNode :: Nil
-    case leaf: LeafNode[StorageKey, StorageValue] => leaf :: Nil
+    case leaf: LeafNode[StorageKey, StorageValue]         => leaf :: Nil
     case internalNode: InternalNode[StorageKey, StorageValue] =>
       internalNode ::
         internalNode.leftChild.map(flatten).getOrElse(List.empty[Node[StorageKey, StorageValue]]) :::
@@ -56,20 +76,22 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   }
 
   def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotProcessor] = {
-    val kSerializer: Serializer[StorageKey] = implicitly[Serializer[StorageKey]]
-    val vSerializer: Serializer[StorageValue] = implicitly[Serializer[StorageValue]]
+    val kSerializer: Serializer[StorageKey]         = implicitly[Serializer[StorageKey]]
+    val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
-    val toApplicable = nodes.collect{case node: ShadowNode[StorageKey, StorageValue] => node}
-    val toStorage = nodes.collect{
-      case leaf: LeafNode[StorageKey, StorageValue] => leaf
+    val toApplicable                                = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
+    val toStorage = nodes.collect {
+      case leaf: LeafNode[StorageKey, StorageValue]         => leaf
       case internal: InternalNode[StorageKey, StorageValue] => internal
     }
     val nodesToInsert: List[(StorageKey, StorageValue)] = toStorage.flatMap { node =>
       val fullData: (StorageKey, StorageValue) =
-        StorageKey @@ Algos.hash(kSerializer.toBytes(node.key).reverse) -> StorageValue @@ vSerializer.toBytes(node.value)
+        StorageKey @@ Algos.hash(kSerializer.toBytes(node.key).reverse) -> StorageValue @@ vSerializer.toBytes(
+          node.value
+        )
       val shadowData: (StorageKey, StorageValue) =
         StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
-        fullData :: shadowData :: Nil
+      fullData :: shadowData :: Nil
     }
     Try {
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
@@ -83,7 +105,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     }
   }
 
-  def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] = for {
+  def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
+    for {
       _ <- ChunkValidator.checkForIdConsistent(chunk)
       _ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
     } yield chunk
@@ -91,76 +114,65 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   def getUtxo: Either[UtxoCreationError, UtxoState] =
     for {
       rootNode <- getRootNode
-      height <- getHeight
-      avlTree = new AvlTree[StorageKey, StorageValue](rootNode, storage)
+      height   <- getHeight
+      avlTree  = new AvlTree[StorageKey, StorageValue](rootNode, storage)
     } yield UtxoState(avlTree, height, settings.constants)
 
   private def getHeight: Either[EmptyHeightKey, Height] =
-    storage.get(UtxoState.bestHeightKey)
-      .fold(EmptyHeightKey("bestHeightKey is empty").asLeft[Height])(bytes => (Height @@ Ints.fromByteArray(bytes)).asRight[EmptyHeightKey])
+    storage
+      .get(UtxoState.bestHeightKey)
+      .fold(EmptyHeightKey("bestHeightKey is empty").asLeft[Height])(
+        bytes => (Height @@ Ints.fromByteArray(bytes)).asRight[EmptyHeightKey]
+      )
 
   private def getRootNodeId: Either[EmptyRootNodeError, StorageKey] =
     storage.get(AvlTree.rootNodeKey) match {
       case Some(id) => (StorageKey !@@ id).asRight[EmptyRootNodeError]
-      case None => EmptyRootNodeError("Key root node doesn't exist!").asLeft[StorageKey]
+      case None     => EmptyRootNodeError("Key root node doesn't exist!").asLeft[StorageKey]
     }
 
-  private def getRootNode: Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] = for {
-    rootNodeId <- getRootNodeId
-    node <- storage.get(rootNodeId).fold(
-      EmptyRootNodeError(s"Node with id ${Algos.encode(rootNodeId)} doesn't exist")
-        .asLeft[Node[StorageKey, StorageValue]]
-    )(nodeBytes =>
-      NodeSerilalizer.fromBytes[StorageKey, StorageValue](nodeBytes).asRight[EmptyRootNodeError]
-    )
-  } yield node
+  private def getRootNode: Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
+    for {
+      rootNodeId <- getRootNodeId
+      node <- storage
+               .get(rootNodeId)
+               .fold(
+                 EmptyRootNodeError(s"Node with id ${Algos.encode(rootNodeId)} doesn't exist")
+                   .asLeft[Node[StorageKey, StorageValue]]
+               )(
+                 nodeBytes => NodeSerilalizer.fromBytes[StorageKey, StorageValue](nodeBytes).asRight[EmptyRootNodeError]
+               )
+    } yield node
 
-  def processNewSnapshot(state: UtxoState, block: Block): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
-    val potentialManifestId: Digest32 = Algos.hash(state.tree.rootHash ++ block.id)
-    logger.info(
-      s"Started processing new snapshot with block ${block.encodedId} at height ${block.header.height}" +
-        s" and manifest id ${Algos.encode(potentialManifestId)}."
-    )
-    val manifestIds: Seq[Array[Byte]] = potentialManifestsIds
-    if (!potentialManifestsIds.exists(_.sameElements(potentialManifestId))) {
+  def processNewSnapshot(potentialManifestId: Array[Byte],
+                         newChunks: List[SnapshotChunk],
+                         manifestIds: Seq[Array[Byte]]): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
       logger.info(s"Need to create new best potential snapshot.")
-      createNewSnapshot(state, block, manifestIds)
-    } else {
-      logger.info(s"This snapshot already exists.")
-      this.asRight[ProcessNewSnapshotError]
-    }
+      createNewSnapshot(potentialManifestId, manifestIds, newChunks)
   }
 
   def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotProcessor] = {
-    val condition: Int =
-      (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
-    logger.info(s"condition = $condition")
-    if (condition == 0) {
-      logger.info(s"Start updating actual manifest to new one at height " +
-        s"${block.header.height} with block id ${block.encodedId}.")
-      updateActualSnapshot(history, block.header.height - settings.levelDB.maxVersions)
-    } else {
-      logger.info(s"Doesn't need to update actual manifest.")
-      this.asRight[ProcessNewBlockError]
-    }
+    logger.info(
+      s"Start updating actual manifest to new one at height " +
+        s"${block.header.height} with block id ${block.encodedId}."
+    )
+    updateActualSnapshot(history, block.header.height - settings.levelDB.maxVersions)
   }
 
   def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
     storage.get(StorageKey @@ chunkId).flatMap(e => Try(SnapshotChunkMessage.parseFrom(e)).toOption)
 
   private def createNewSnapshot(
-    state: UtxoState,
-    block: Block,
-    manifestIds: Seq[Array[Byte]]
+    id: Array[Byte],
+    manifestIds: Seq[Array[Byte]],
+    newChunks: List[SnapshotChunk]
   ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
     //todo add only exists chunks
-    val newChunks: List[SnapshotChunk] =
-      AvlTree.getChunks(state.tree.rootNode, currentChunkHeight = 1, state.tree.storage)
     val manifest: SnapshotManifest =
-        SnapshotManifest(
-          Algos.hash(state.tree.rootHash ++ block.id),
-          newChunks.map(_.id)
-        )
+      SnapshotManifest(
+        id,
+        newChunks.map(_.id)
+      )
     val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
       StorageKey @@ elem.id -> StorageValue @@ bytes
@@ -188,7 +200,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
         val id: Digest32 = Algos.hash(header.stateRoot ++ header.id)
         logger.info(
           s"Block id at height $height is ${header.encodedId}. State root is ${Algos.encode(header.stateRoot)}" +
-            s" Expected manifest id is ${Algos.encode(id)}")
+            s" Expected manifest id is ${Algos.encode(id)}"
+        )
         id
       },
       ProcessNewBlockError(s"There is no best header at height $height")
@@ -233,7 +246,7 @@ object SnapshotProcessor extends StrictLogging {
 
   sealed trait UtxoCreationError
   final case class EmptyRootNodeError(msg: String) extends UtxoCreationError
-  final case class EmptyHeightKey(msg: String) extends UtxoCreationError
+  final case class EmptyHeightKey(msg: String)     extends UtxoCreationError
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor =
     create(settings, getDir(settings))

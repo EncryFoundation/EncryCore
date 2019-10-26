@@ -24,7 +24,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, HeaderChainIsSynced, ManifestInfoToNodeViewHolder, NewChunkToApply, NewManifestId, RequiredManifestHeightAndId, SnapshotProcessorMessage}
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, FastSyncFinished, HeaderChainIsSynced, ManifestInfoToNodeViewHolder, NewChunkToApply, NewManifestId, RequiredManifestHeightAndId, SnapshotChunk, SnapshotProcessorMessage, TreeChunks}
 import encry.view.fast.sync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
@@ -40,6 +40,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId, ModifierTypeId}
 import org.encryfoundation.common.utils.constants.Constants
 import org.iq80.leveldb.Options
+import scorex.crypto.hash.Digest32
 
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
@@ -59,11 +60,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
-  var snapshotProcessor: SnapshotProcessor = SnapshotProcessor.initialize(settings)
-
   var canDownloadPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
-
-  nodeViewSynchronizer ! SnapshotProcessorMessage(snapshotProcessor)
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
@@ -98,13 +95,26 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   override def receive: Receive =
     if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
-      defaultMessages(canProcessPayloads = false).orElse(snapshotFastSyncProcessing).orElse(commonMessages)
-    else if ( settings.snapshotSettings.enableSnapshotCreation)
-      defaultMessages(canProcessPayloads = true).orElse(snapshotCreationProcessing).orElse(commonMessages)
+      defaultMessages(canProcessPayloads = false)
     else
-      defaultMessages(canProcessPayloads = true).orElse(commonMessages)
+      defaultMessages(canProcessPayloads = true)
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
+    case FastSyncFinished(state) =>
+      if (state.validateTreeAfterFastSync) {
+        logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
+        canDownloadPayloads = true
+        nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
+        nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
+          logger.info(s"Updated best block in fast sync mod. Updated state height.")
+          updateNodeView(
+            updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)),
+            updatedState = Some(state)
+          )
+        }
+      } else {
+        EncryApp.forceStopApplication(999, "Tree after fast sync is incorrect")
+      }
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -153,54 +163,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
-  }
-
-  def snapshotCreationProcessing: Receive = {
-    case SemanticallySuccessfulModifier(block: Block) if nodeView.history.isFullChainSynced =>
-      logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")
-      val condition
-      : Int = (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
-      val actualId = snapshotProcessor.actualManifest.map(_.manifestId)
-//      val newProcessor: SnapshotProcessor = snapshotProcessor.processNewBlock(block)
-//      snapshotProcessor = newProcessor
-    if (condition == 0 && actualId.nonEmpty && snapshotProcessor.actualManifest.nonEmpty) {
-      logger.info(s"Snapshot manifest has changed message")
-      nodeViewSynchronizer ! NewManifestId(actualId.get, snapshotProcessor.actualManifest.get)
-    }
-  }
-
-  def snapshotFastSyncProcessing: Receive = {
-    case ManifestInfoToNodeViewHolder(manifestId, height, rootNode) =>
-      logger.info(s"NodeViewHolder got new manifest ${Algos.encode(manifestId)}.")
-      import encry.view.state.avlTree.utils.implicits.Instances._
-      val avl: AvlTree[StorageKey, StorageValue] =
-        AvlTree[StorageKey, StorageValue](height, rootNode, createStateStorageFastSync)
-      val newState: UtxoState = nodeView.state.copy(tree = avl)
-      updateNodeView(updatedState = Some(newState))
-    case FastSyncDoneAt(heightAt, id) if nodeView.state.validateTreeAfterFastSync =>
-      logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
-      canDownloadPayloads = true
-      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(heightAt + 1)
-      nodeView.history.getHeaderById(ModifierId @@ id).foreach { h =>
-        logger.info(s"Updated best block in fast sync mod. Updated state height.")
-        updateNodeView(
-          updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)),
-          updatedState = Some(nodeView.state.copy(height = Height @@ heightAt))
-        )
-      }
-      nodeViewSynchronizer ! FastSyncDone
-      if (settings.snapshotSettings.enableSnapshotCreation) context.become(
-        defaultMessages(canProcessPayloads = true).orElse(snapshotCreationProcessing).orElse(commonMessages)
-      ) else context.become(defaultMessages(canProcessPayloads = true).orElse(commonMessages))
-    case FastSyncDoneAt(_, _) =>
-      EncryApp.forceStopApplication(999, "Tree after fast sync is incorrect")
-    case NewChunkToApply(list: List[NodeProtoMsg]) =>
-      logger.debug(s"NodeViewHolder got NewChunkToApply with ${list.size} chunks.")
-      val newState: UtxoState = nodeView.state.applyNodesFastSync(list)
-      updateNodeView(updatedState = Some(newState))
-  }
-
-  def commonMessages: Receive = {
     case SemanticallySuccessfulModifier(_) =>
     case CompareViews(_, _, _) =>
     case msg => logger.error(s"Got strange message on nvh: $msg")
@@ -292,10 +254,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   && l.header.height != settings.constants.GenesisHeight)) {
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
+                import encry.view.state.avlTree.utils.implicits.Instances._
+
                 newHis.getBestBlock.foreach { b =>
-                  //val newProcess: SnapshotProcessor = snapshotProcessor.processNewSnapshot(stateAfterApply, b)
-                  //snapshotProcessor = newProcess
+                  val chunks: List[SnapshotChunk] =
+                    AvlTree.getChunks(state.tree.rootNode, currentChunkHeight = 1, stateAfterApply.tree.storage)
+                  val potentialManifestId: Digest32 = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
+                  nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
                 }
+
                 logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
                 logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
               }

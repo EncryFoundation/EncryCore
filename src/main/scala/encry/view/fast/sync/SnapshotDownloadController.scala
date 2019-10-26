@@ -4,7 +4,7 @@ import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
+import SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.view.history.History
@@ -12,18 +12,12 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.SnapshotDownloadController.{
-  ProcessManifestExceptionFatal,
-  ProcessManifestExceptionNonFatal,
-  ProcessManifestHasChangedMessageException,
-  ProcessRequestedChunkException,
-  SnapshotDownloadControllerException
-}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.view.fast.sync.SnapshotDownloadController.{ProcessManifestExceptionFatal, ProcessManifestExceptionNonFatal, ProcessManifestHasChangedMessageException, ProcessRequestedChunkException, SnapshotDownloadControllerException}
 import encry.view.state.avlTree.NodeSerilalizer
 import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.modifiers.history.Header
-import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
+import org.encryfoundation.common.network.BasicMessagesRepo.{NetworkMessage, RequestChunkMessage}
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             notYetRequested: List[Array[Byte]],
@@ -76,17 +70,6 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     }
   }
 
-  def processRequestChunksMessage: Either[Boolean, (SnapshotDownloadController, List[NetworkMessage])] = {
-    logger.info(s"Current requested queue ${requestedChunks.size}. Will be requested queue ${notYetRequested.size}.")
-    if (notYetRequested.nonEmpty) {
-      logger.info(s"Not yet requested not empty. Calculated new ids to request")
-      chunksIdsToDownload.asRight[Boolean]
-    } else {
-      logger.info(s"Not yet requested is empty. Fast sync is done.")
-      true.asLeft[(SnapshotDownloadController, List[NetworkMessage])]
-    }
-  }
-
   def processManifestHasChangedMessage(
     newManifest: SnapshotManifestProtoMessage,
     remote: ConnectedPeer
@@ -113,7 +96,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     }
   }
 
-  private def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
+  def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
     val newToRequest: Set[ByteArrayWrapper] = notYetRequested
       .take(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
       .map(ByteArrayWrapper(_))
@@ -134,14 +117,6 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   def canNewManifestBeProcessed: Boolean = cp.isEmpty
 
   def canChunkBeProcessed(remote: ConnectedPeer): Boolean = cp.exists(_.socketAddress == remote.socketAddress)
-
-  private def isCorrectRootNode(manifest: SnapshotManifest, header: Option[Header]): Boolean =
-    header.exists { h =>
-      NodeSerilalizer
-        .fromProto[StorageKey, StorageValue](manifest.rootNodeBytes)
-        .hash
-        .sameElements(h.stateRoot)
-    }
 }
 
 object SnapshotDownloadController {

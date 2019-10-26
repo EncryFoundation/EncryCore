@@ -37,7 +37,7 @@ import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fast.sync.SnapshotHolder
 import encry.view.fast.sync.SnapshotProcessor
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, NewManifestId, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, UpdateSnapshot}
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, NewManifestId, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, TreeChunks, UpdateSnapshot}
 
 import scala.util.Try
 
@@ -88,9 +88,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   override def receive: Receive = awaitingHistoryCycle
 
   def awaitingHistoryCycle: Receive = {
-    case ChangedHistory(reader: History) =>
+    case msg@ChangedHistory(reader: History) =>
       logger.info(s"get history: $reader from $sender")
       deliveryManager ! UpdatedHistory(reader)
+      snapshotHolder ! msg
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
@@ -188,6 +189,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
       deliveryManager ! msg
+    case msg@TreeChunks(_, _) => snapshotHolder ! msg
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
