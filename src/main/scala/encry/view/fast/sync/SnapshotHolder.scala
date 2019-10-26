@@ -3,12 +3,12 @@ package encry.view.fast.sync
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import akka.actor.{ Actor, ActorRef, Cancellable, Props }
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.settings.EncryAppSettings
 import SnapshotHolder._
 import encry.view.state.UtxoState
@@ -16,10 +16,21 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.option._
-import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidManifestHasChangedMessage, InvalidManifestMessage}
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.network.BlackList.BanReason.{
+  ExpiredNumberOfReRequestAttempts,
+  ExpiredNumberOfRequests,
+  InvalidChunkMessage,
+  InvalidManifestHasChangedMessage,
+  InvalidManifestMessage
+}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.view.fast.sync.SnapshotDownloadController.{
+  ProcessManifestExceptionFatal,
+  ProcessManifestExceptionNonFatal,
+  ProcessManifestHasChangedMessageException
+}
 import encry.view.history.History
-import encry.view.state.avlTree.Node
+import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 
 import scala.util.Try
 
@@ -34,6 +45,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   //todo 1. Add connection agreement (case while peer reconnects with other handler.ref)
 
+  var snapshotProcessor: SnapshotProcessor                   = SnapshotProcessor.initialize(settings)
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var connectionsHandler: IncomingConnectionsHandler         = IncomingConnectionsHandler.empty(settings)
 
@@ -74,7 +86,6 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def fastSyncMod(history: History,
                   needToProcessHeaderChainSyncedMessage: Boolean,
-                  processor: SnapshotProcessor,
                   responseTimeout: Option[Cancellable],
                   reRequestsNumber: Int): Receive = {
     case RequestNextChunks =>
@@ -106,60 +117,77 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
       message match {
         case ResponseManifestMessage(manifest) =>
-          snapshotDownloadController.processManifest(manifest, remote, history) match {
+          val isValidManifest: Boolean =
+            snapshotDownloadController.checkManifestValidity(manifest.manifestId.toByteArray, history)
+          val canBeProcessed: Boolean = snapshotDownloadController.canNewManifestBeProcessed
+          if (isValidManifest && canBeProcessed) {
+            snapshotDownloadController.processManifest(manifest, remote, history) match {
+              case Left(error: ProcessManifestExceptionFatal) =>
+                logger.info(s"New manifest is incorrect. ${error.msg}.")
+                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.msg))
+              case Right(newController) =>
+                snapshotDownloadController = newController
+                self ! RequestNextChunks
+            }
+          } else if (!isValidManifest) {
+            logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
+            nodeViewSynchronizer ! BanPeer(
+              remote,
+              InvalidManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
+            )
+          } else logger.info(s"Doesn't need new manifest processing.")
+
+        case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
+          (for {
+            controllerAndChunk <- snapshotDownloadController.processRequestedChunk(chunk, remote)
+            validChunk         <- snapshotProcessor.validateChunk(controllerAndChunk._2)
+            processor          <- snapshotProcessor.applyChunk(validChunk)
+          } yield (controllerAndChunk._1, processor)) match {
             case Left(error) =>
-              logger.info(s"New manifest is incorrect. ${error.msg}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.msg))
-            case Right((newController, Some(rootNode))) =>
-              snapshotDownloadController = newController
-              nodeViewHolder ! ManifestInfoToNodeViewHolder(
-                newController.requiredManifestId,
-                newController.requiredManifestHeight,
-                rootNode
-              )
-              self ! RequestNextChunks
-            case Right(_) =>
+              logger.info(s"Received chunk is invalid cause ${error.toString}.")
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
+            //todo re-init fast sync mod
+            case Right((controller, processor)) =>
+              logger.info(s"Finished processing new chunk.")
+              snapshotDownloadController = controller
+              snapshotProcessor = processor
+              if (snapshotDownloadController.requestedChunks.isEmpty && snapshotDownloadController.notYetRequested.isEmpty)
+                //todo finish fast sync
+                ()
+              else if (snapshotDownloadController.requestedChunks.isEmpty)
+                self ! RequestNextChunks
+              else
+                ()
           }
-        case ResponseChunkMessage(chunk) =>
-          snapshotDownloadController.processRequestedChunk(chunk, remote) match {
-            case Left(error) =>
-              logger.info(s"Received chunk is invalid cause ${error.msg}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.msg))
-            case Right((newProcessor, nodes)) if nodes.nonEmpty =>
-              snapshotDownloadController = newProcessor
-              nodeViewHolder ! NewChunkToApply(nodes)
-              if (snapshotDownloadController.requestedChunks.isEmpty) {
-                logger.info(s"Requested collection is empty. Request next chunks batch")
-                self ! snapshotDownloadController
-              }
-            case Right(_) =>
-              if (snapshotDownloadController.requestedChunks.isEmpty) {
-                logger.info(s"Requested collection is empty. Request next chunks batch")
-                self ! snapshotDownloadController
-              }
+
+        case ManifestHasChanged(previousId, newManifest) =>
+          val isValidNewManifest: Boolean =
+            snapshotDownloadController.checkManifestValidity(newManifest.manifestId.toByteArray, history)
+          val isValidMessage: Boolean = snapshotDownloadController.requiredManifestId.sameElements(previousId)
+          if (isValidNewManifest && isValidMessage) {
+            snapshotDownloadController.processManifestHasChangedMessage(newManifest, remote) match {
+              case Left(error) =>
+                logger.info(s"Manifest has changed message is incorrect ${error.msg}.")
+                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.msg))
+              case Right(newController) =>
+                logger.info(s"Manifest has changed message is correct")
+                snapshotDownloadController = newController
+                //todo re-init state
+                self ! RequestNextChunks
+            }
+          } else {
+            logger.info(s"Manifest has changed message is invalid.")
+            nodeViewSynchronizer ! BanPeer(remote,
+                                           InvalidManifestHasChangedMessage("Invalid manifest has changed message"))
           }
-        case ManifestHasChanged(previousId, newManifest: SnapshotManifestProtoMessage) =>
-          snapshotDownloadController.processManifestHasChangedMessage(previousId, newManifest, history, remote) match {
-            case Left(error) =>
-              logger.info(s"Manifest has changed message is incorrect ${error.msg}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.msg))
-            case Right((newController, Some(rootNode))) =>
-              snapshotDownloadController = newController
-              nodeViewHolder ! ManifestInfoToNodeViewHolder(
-                newController.requiredManifestId,
-                newController.requiredManifestHeight,
-                rootNode
-              )
-              self ! RequestNextChunks
-            case Right(_) =>
-          }
-        case _ =>
       }
     case RequiredManifestHeightAndId(height, manifestId) =>
-      logger.info(s"Snapshot holder while header sync got message RequiredManifestHeight with height $height.")
+      logger.info(
+        s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
+          s"New required manifest id is ${Algos.encode(manifestId)}."
+      )
       snapshotDownloadController =
         snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
-      logger.info(s"New required manifest id is ${Algos.encode(manifestId)}. Height is $height.")
     case HeaderChainIsSynced if needToProcessHeaderChainSyncedMessage =>
       logger.info(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
@@ -208,8 +236,9 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def workMod(snapshotProcessor: SnapshotProcessor): Receive = {
     case NewManifestId(id, newManifest) =>
-      connectionsHandler.liveConnections.foreach { case (connection, _) =>
-        connection.handlerRef ! ManifestHasChanged(id, SnapshotManifestSerializer.toProto(newManifest))
+      connectionsHandler.liveConnections.foreach {
+        case (connection, _) =>
+          connection.handlerRef ! ManifestHasChanged(id, SnapshotManifestSerializer.toProto(newManifest))
       }
     case DataFromPeer(message, remote) =>
       message match {
@@ -233,8 +262,7 @@ class SnapshotHolder(settings: EncryAppSettings,
             remote.handlerRef ! networkMessage
           }
           connectionsHandler = connectionsHandler.processRequest(remote)
-        case RequestChunkMessage(_)
-            if connectionsHandler.liveConnections.getOrElse(remote, 0 -> 0L)._1 == 0 =>
+        case RequestChunkMessage(_) if connectionsHandler.liveConnections.getOrElse(remote, 0 -> 0L)._1 == 0 =>
           logger.info(s"Ban peer $remote.")
           nodeViewSynchronizer ! BanPeer(remote, ExpiredNumberOfRequests)
           connectionsHandler = connectionsHandler.removeConnection(remote)
@@ -281,28 +309,22 @@ object SnapshotHolder {
 
   case object HeaderChainIsSynced
 
-  final case class SnapshotManifest(manifestId: Array[Byte],
-                                    rootNodeBytes: NodeProtoMsg,
-                                    chunksKeys: List[Array[Byte]]) {
-    override def toString: String = s"Manifest id: ${Algos.encode(manifestId)}. Chunks size: ${chunksKeys.size}."
-  }
+  import encry.view.state.avlTree.utils.implicits.Instances._
 
-  final case class SnapshotChunk(node: Node[StorageKey, StorageValue], id: Array[Byte]) {
-    override def toString: String = s"Snapshot chunk id: ${Algos.encode(id)}."
-  }
+  final case class SnapshotManifest(manifestId: Array[Byte], chunksKeys: List[Array[Byte]])
+
+  final case class SnapshotChunk(node: Node[StorageKey, StorageValue], id: Array[Byte])
 
   object SnapshotManifestSerializer {
 
     def toProto(manifest: SnapshotManifest): SnapshotManifestProtoMessage =
       SnapshotManifestProtoMessage()
         .withManifestId(ByteString.copyFrom(manifest.manifestId))
-        .withRootNodeBytes(manifest.rootNodeBytes)
         .withChunksIds(manifest.chunksKeys.map(ByteString.copyFrom))
 
     def fromProto(manifest: SnapshotManifestProtoMessage): Try[SnapshotManifest] = Try(
       SnapshotManifest(
         manifest.manifestId.toByteArray,
-        manifest.rootNodeBytes.get,
         manifest.chunksIds.map(_.toByteArray).toList
       )
     )
@@ -312,11 +334,11 @@ object SnapshotHolder {
 
     def toProto(chunk: SnapshotChunk): SnapshotChunkMessage =
       SnapshotChunkMessage()
-        .withChunks(chunk.nodesList)
+        .withChunk(NodeSerilalizer.toProto(chunk.node))
         .withId(ByteString.copyFrom(chunk.id))
 
-    def fromProto(chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
-      SnapshotChunk(chunk.chunks.toList, chunk.id.toByteArray)
+    def fromProto[K, V](chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
+      SnapshotChunk(NodeSerilalizer.fromProto(chunk.chunk.get), chunk.id.toByteArray)
     )
   }
 

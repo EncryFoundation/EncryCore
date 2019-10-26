@@ -4,24 +4,26 @@ import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import SnapshotHolder.{ SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
+import SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer }
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import encry.view.fast.sync.SnapshotDownloadController.{
-  ProcessManifestException,
+  ProcessManifestExceptionFatal,
+  ProcessManifestExceptionNonFatal,
   ProcessManifestHasChangedMessageException,
-  ProcessRequestedChunkException
+  ProcessRequestedChunkException,
+  SnapshotDownloadControllerException
 }
 import encry.view.state.avlTree.NodeSerilalizer
 import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             notYetRequested: List[Array[Byte]],
@@ -35,60 +37,42 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     manifestProto: SnapshotManifestProtoMessage,
     remote: ConnectedPeer,
     history: History
-  ): Either[ProcessManifestException, (SnapshotDownloadController, Option[NodeProtoMsg])] = {
+  ): Either[SnapshotDownloadControllerException, SnapshotDownloadController] = {
     logger.info(s"Got new manifest from ${remote.socketAddress}.")
-    val (isManifestValid: Boolean, header: Option[Header]) =
-      checkManifestValidity(manifestProto.manifestId.toByteArray, history)
-    if (isManifestValid && cp.isEmpty) {
-      Either.fromTry(SnapshotManifestSerializer.fromProto(manifestProto)) match {
-        case Left(error) =>
-          ProcessManifestException(s"Manifest was parsed with error ${error.getCause}")
-            .asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
-        case Right(manifest) if isCorrectRootNode(manifest, header) =>
-          logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} contains correct root node.")
-          (SnapshotDownloadController(
-            requiredManifestId,
-            manifest.chunksKeys,
-            Set.empty[ByteArrayWrapper],
-            settings,
-            remote.some,
-            requiredManifestHeight
-          ) -> manifest.rootNodeBytes.some).asRight[ProcessManifestException]
-        case Right(manifest) =>
-          ProcessManifestException(s"Manifest ${Algos.encode(manifest.manifestId)} root node is incorrect.")
-            .asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
-      }
-    } else if (!isManifestValid) {
-      ProcessManifestException(s"Got invalid manifest with id ${Algos.encode(manifestProto.manifestId.toByteArray)}")
-        .asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
-    } else {
-      logger.info(s"Got manifest message, but we already have another one. Skip this one.")
-      (this -> none).asRight[ProcessManifestException]
+    Either.fromTry(SnapshotManifestSerializer.fromProto(manifestProto)) match {
+      case Left(error) =>
+        ProcessManifestExceptionFatal(s"Manifest was parsed with error ${error.getCause}")
+          .asLeft[SnapshotDownloadController]
+      case Right(manifest) =>
+        logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} contains correct root node.")
+        SnapshotDownloadController(
+          requiredManifestId,
+          manifest.chunksKeys,
+          Set.empty[ByteArrayWrapper],
+          settings,
+          remote.some,
+          requiredManifestHeight
+        ).asRight[SnapshotDownloadControllerException]
     }
   }
 
   def processRequestedChunk(
     chunkMessage: SnapshotChunkMessage,
     remote: ConnectedPeer
-  ): Either[ProcessRequestedChunkException, (SnapshotDownloadController, NodeProtoMsg)] = {
+  ): Either[ProcessRequestedChunkException, (SnapshotDownloadController, SnapshotChunk)] = {
     logger.info(s"Got new chunk from ${remote.socketAddress}.")
-    if (cp.exists(_.socketAddress == remote.socketAddress))
-      Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
-        case Left(error) =>
-          ProcessRequestedChunkException(s"Chunk was parsed with error ${error.getCause}.")
-            .asLeft[(SnapshotDownloadController, NodeProtoMsg)]
-        case Right(chunk) =>
-          val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
-          if (requestedChunks.contains(chunkId)) {
-            logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
-            (this.copy(requestedChunks = requestedChunks - chunkId) -> NodeSerilalizer.toProto(chunk.node))
-              .asRight[ProcessRequestedChunkException]
-          } else
-            ProcessRequestedChunkException(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-              .asLeft[(SnapshotDownloadController, NodeProtoMsg)]
-      } else {
-      logger.info(s"Got chunk from unknown peer ${remote.socketAddress}.")
-      (this -> NodeProtoMsg).asRight[ProcessRequestedChunkException]
+    Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
+      case Left(error) =>
+        ProcessRequestedChunkException(s"Chunk was parsed with error ${error.getCause}.")
+          .asLeft[(SnapshotDownloadController, SnapshotChunk)]
+      case Right(chunk) =>
+        val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
+        if (requestedChunks.contains(chunkId)) {
+          logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
+          (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[ProcessRequestedChunkException]
+        } else
+          ProcessRequestedChunkException(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+            .asLeft[(SnapshotDownloadController, SnapshotChunk)]
     }
   }
 
@@ -104,38 +88,29 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   }
 
   def processManifestHasChangedMessage(
-    previousManifestId: Array[Byte],
     newManifest: SnapshotManifestProtoMessage,
-    history: History,
     remote: ConnectedPeer
-  ): Either[ProcessManifestHasChangedMessageException, (SnapshotDownloadController, Option[NodeProtoMsg])] = {
+  ): Either[ProcessManifestHasChangedMessageException, SnapshotDownloadController] = {
     logger.info(
       s"Got message Manifest has changed from ${remote.socketAddress}. " +
         s"New manifest id is ${Algos.encode(newManifest.manifestId.toByteArray)}"
     )
-    val (isValidNewManifest: Boolean, header: Option[Header]) =
-      checkManifestValidity(newManifest.manifestId.toByteArray, history)
-    val isValidMessage: Boolean = requiredManifestId.sameElements(previousManifestId)
-    if (isValidMessage && isValidNewManifest) {
-      Either.fromTry(SnapshotManifestSerializer.fromProto(newManifest)) match {
-        case Left(error) =>
-          ProcessManifestHasChangedMessageException(
-            s"New manifest after manifest has changed was parsed with error ${error.getCause}."
-          ).asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
-        case Right(newManifest) if isCorrectRootNode(newManifest, header) =>
-          logger.info(s"Manifest ${Algos.encode(newManifest.manifestId)} contains correct root node.")
-          (SnapshotDownloadController(
-            newManifest.manifestId,
-            newManifest.chunksKeys,
-            Set.empty[ByteArrayWrapper],
-            settings,
-            remote.some,
-            requiredManifestHeight
-          ) -> newManifest.rootNodeBytes.some).asRight[ProcessManifestHasChangedMessageException]
-      }
-    } else
-      ProcessManifestHasChangedMessageException("Invalid manifest has changed message")
-        .asLeft[(SnapshotDownloadController, Option[NodeProtoMsg])]
+    Either.fromTry(SnapshotManifestSerializer.fromProto(newManifest)) match {
+      case Left(error) =>
+        ProcessManifestHasChangedMessageException(
+          s"New manifest after manifest has changed was parsed with error ${error.getCause}."
+        ).asLeft[SnapshotDownloadController]
+      case Right(newManifest) =>
+        logger.info(s"Manifest ${Algos.encode(newManifest.manifestId)} contains correct root node.")
+        SnapshotDownloadController(
+          newManifest.manifestId,
+          newManifest.chunksKeys,
+          Set.empty[ByteArrayWrapper],
+          settings,
+          remote.some,
+          requiredManifestHeight
+        ).asRight[ProcessManifestHasChangedMessageException]
+    }
   }
 
   private def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
@@ -151,12 +126,14 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     this.copy(notYetRequested = updatedToRequest, requestedChunks = newToRequest) -> serializedToDownload
   }
 
-  private def checkManifestValidity(manifestId: Array[Byte], history: History): (Boolean, Option[Header]) = {
-    val header: Option[Header] = history.getBestHeaderAtHeight { requiredManifestHeight }
-    header.exists { header =>
+  def checkManifestValidity(manifestId: Array[Byte], history: History): Boolean =
+    history.getBestHeaderAtHeight { requiredManifestHeight }.exists { header =>
       Algos.hash(header.stateRoot ++ header.id).sameElements(manifestId)
-    } -> header
-  }
+    }
+
+  def canNewManifestBeProcessed: Boolean = cp.isEmpty
+
+  def canChunkBeProcessed(remote: ConnectedPeer): Boolean = cp.exists(_.socketAddress == remote.socketAddress)
 
   private def isCorrectRootNode(manifest: SnapshotManifest, header: Option[Header]): Boolean =
     header.exists { h =>
@@ -170,7 +147,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 object SnapshotDownloadController {
 
   sealed trait SnapshotDownloadControllerException
-  final case class ProcessManifestException(msg: String)                  extends SnapshotDownloadControllerException
+  final case class ProcessManifestExceptionFatal(msg: String)             extends SnapshotDownloadControllerException
+  final case class ProcessManifestExceptionNonFatal(msg: String)          extends SnapshotDownloadControllerException
   final case class ProcessRequestedChunkException(msg: String)            extends SnapshotDownloadControllerException
   final case class ProcessManifestHasChangedMessageException(msg: String) extends SnapshotDownloadControllerException
 

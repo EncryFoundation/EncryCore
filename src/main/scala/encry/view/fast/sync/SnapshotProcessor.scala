@@ -55,9 +55,9 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
         internalNode.rightChild.map(flatten).getOrElse(List.empty[Node[StorageKey, StorageValue]])
   }
 
-  def applyChunk(chunk: SnapshotChunk)
-                (vSerializer: Serializer[StorageValue]): Either[ChunkApplyError, SnapshotProcessor] = {
+  def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotProcessor] = {
     val kSerializer: Serializer[StorageKey] = implicitly[Serializer[StorageKey]]
+    val vSerializer: Serializer[StorageValue] = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
     val toApplicable = nodes.collect{case node: ShadowNode[StorageKey, StorageValue] => node}
     val toStorage = nodes.collect{
@@ -159,7 +159,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     val manifest: SnapshotManifest =
         SnapshotManifest(
           Algos.hash(state.tree.rootHash ++ block.id),
-          NodeSerilalizer.toProto(newChunks.head.node), newChunks.map(_.id)
+          newChunks.map(_.id)
         )
     val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray

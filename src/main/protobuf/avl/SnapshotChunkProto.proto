@@ -3,7 +3,7 @@ import "avl/NodeMsg.proto";
 
 message SnapshotChunkMessage {
 
-    NodeProtoMsg chunks = 1;
+    NodeProtoMsg chunk = 1;
     bytes id = 2;
 
 }
