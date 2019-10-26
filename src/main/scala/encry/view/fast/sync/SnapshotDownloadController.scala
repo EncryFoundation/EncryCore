@@ -1,10 +1,9 @@
 package encry.view.fast.sync
 
-import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.view.history.History
@@ -12,12 +11,13 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.SnapshotDownloadController.{ProcessManifestExceptionFatal, ProcessManifestExceptionNonFatal, ProcessManifestHasChangedMessageException, ProcessRequestedChunkException, SnapshotDownloadControllerException}
-import encry.view.state.avlTree.NodeSerilalizer
-import encry.view.state.avlTree.utils.implicits.Instances._
-import org.encryfoundation.common.modifiers.history.Header
-import org.encryfoundation.common.network.BasicMessagesRepo.{NetworkMessage, RequestChunkMessage}
+import encry.view.fast.sync.ChunkValidator.{ ChunkValidationError, InvalidChunkBytes }
+import encry.view.fast.sync.SnapshotDownloadController.{
+  ProcessManifestExceptionFatal,
+  ProcessManifestHasChangedMessageException,
+  SnapshotDownloadControllerException
+}
+import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             notYetRequested: List[Array[Byte]],
@@ -35,10 +35,11 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     logger.info(s"Got new manifest from ${remote.socketAddress}.")
     Either.fromTry(SnapshotManifestSerializer.fromProto(manifestProto)) match {
       case Left(error) =>
+        logger.info(s"Manifest was parsed with error ${error.getCause}.")
         ProcessManifestExceptionFatal(s"Manifest was parsed with error ${error.getCause}")
           .asLeft[SnapshotDownloadController]
       case Right(manifest) =>
-        logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} contains correct root node.")
+        logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
         SnapshotDownloadController(
           requiredManifestId,
           manifest.chunksKeys,
@@ -53,20 +54,23 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   def processRequestedChunk(
     chunkMessage: SnapshotChunkMessage,
     remote: ConnectedPeer
-  ): Either[ProcessRequestedChunkException, (SnapshotDownloadController, SnapshotChunk)] = {
+  ): Either[ChunkValidationError, (SnapshotDownloadController, SnapshotChunk)] = {
     logger.info(s"Got new chunk from ${remote.socketAddress}.")
     Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
       case Left(error) =>
-        ProcessRequestedChunkException(s"Chunk was parsed with error ${error.getCause}.")
+        logger.info(s"Chunk was parsed with error ${error.getCause}.")
+        InvalidChunkBytes(s"Chunk was parsed with error ${error.getCause}.")
           .asLeft[(SnapshotDownloadController, SnapshotChunk)]
       case Right(chunk) =>
         val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
         if (requestedChunks.contains(chunkId)) {
           logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
-          (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[ProcessRequestedChunkException]
-        } else
-          ProcessRequestedChunkException(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+          (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
+        } else {
+          logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+          InvalidChunkBytes(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
             .asLeft[(SnapshotDownloadController, SnapshotChunk)]
+        }
     }
   }
 

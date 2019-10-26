@@ -38,7 +38,6 @@ import encry.view.fast.sync.SnapshotProcessor.{
 }
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.encryfoundation.common.utils.constants.Constants
 import scala.collection.immutable.HashSet
 import scala.util.{ Failure, Success, Try }
 
@@ -51,10 +50,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   def reInitStorage: SnapshotProcessor = {
     storage.close()
-    val dir: File = SnapshotProcessor.getDir(settings)
+    val dir: File = SnapshotProcessor.getDirFastSync(settings)
     import org.apache.commons.io.FileUtils
     FileUtils.deleteDirectory(dir)
-    SnapshotProcessor.initialize(settings)
+    SnapshotProcessor.initialize(settings, fatsSync = true)
   }
 
   def setRSnapshotData(rootNodeId: Array[Byte], utxoHeight: Height): SnapshotProcessor = {
@@ -248,10 +247,12 @@ object SnapshotProcessor extends StrictLogging {
   final case class EmptyRootNodeError(msg: String) extends UtxoCreationError
   final case class EmptyHeightKey(msg: String)     extends UtxoCreationError
 
-  def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    create(settings, getDir(settings))
+  def initialize(settings: EncryAppSettings, fatsSync: Boolean): SnapshotProcessor =
+    if (fatsSync) create(settings, getDirFastSync(settings))
+    else create(settings, getDirProcessSnapshots(settings))
 
-  def getDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
+  def getDirFastSync(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
+  def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {
     snapshotsDir.mkdirs()

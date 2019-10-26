@@ -101,7 +101,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
-      if (state.validateTreeAfterFastSync) {
         logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
         canDownloadPayloads = true
         nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
@@ -112,9 +111,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             updatedState = Some(state)
           )
         }
-      } else {
-        EncryApp.forceStopApplication(999, "Tree after fast sync is incorrect")
-      }
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -255,7 +251,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
                 import encry.view.state.avlTree.utils.implicits.Instances._
-
                 newHis.getBestBlock.foreach { b =>
                   val chunks: List[SnapshotChunk] =
                     AvlTree.getChunks(state.tree.rootNode, currentChunkHeight = 1, stateAfterApply.tree.storage)
