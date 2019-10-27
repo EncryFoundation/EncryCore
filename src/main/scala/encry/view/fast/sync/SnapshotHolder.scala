@@ -26,11 +26,10 @@ import encry.network.BlackList.BanReason.{
 }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{ FastSyncException, InvalidManifestBytes }
+import encry.view.fast.sync.FastSyncExceptions.FastSyncException
 import encry.view.history.History
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import cats.syntax.either._
-
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -259,10 +258,11 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def workMod(history: History): Receive = {
     case TreeChunks(chunks, id) =>
+      //todo add collection with potentialManifestsIds to NVH
       val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
       if (!manifestIds.exists(_.sameElements(id))) {
         logger.info(s"Processing new snapshot")
-        snapshotProcessor.processNewSnapshot(id, chunks, manifestIds)
+        snapshotProcessor.createNewSnapshot(id, manifestIds, chunks)
       }
 
     case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
@@ -270,19 +270,18 @@ class SnapshotHolder(settings: EncryAppSettings,
       val condition: Int =
         (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
       logger.info(s"condition = $condition")
-      if (condition == 0)
-        snapshotProcessor.processNewBlock(block, history) match {
-          case Left(value) =>
-          case Right(newProcessor) =>
-            snapshotProcessor = newProcessor
-            if (newProcessor.actualManifest.nonEmpty) connectionsHandler.liveConnections.foreach {
-              case (connection, _) =>
-                connection.handlerRef ! ManifestHasChanged(
-                  newProcessor.actualManifest.get.manifestId,
-                  SnapshotManifestSerializer.toProto(newProcessor.actualManifest.get)
-                )
-            }
-        }
+      if (condition == 0) snapshotProcessor.processNewBlock(block, history) match {
+        case Left(value) =>
+        case Right(newProcessor) =>
+          snapshotProcessor = newProcessor
+          if (newProcessor.actualManifest.nonEmpty) connectionsHandler.liveConnections.foreach {
+            case (connection, _) =>
+              connection.handlerRef ! ManifestHasChanged(
+                newProcessor.actualManifest.get.manifestId,
+                SnapshotManifestSerializer.toProto(newProcessor.actualManifest.get)
+              )
+          }
+      }
 
     case DataFromPeer(message, remote) =>
       message match {
@@ -306,7 +305,7 @@ class SnapshotHolder(settings: EncryAppSettings,
             remote.handlerRef ! networkMessage
           }
           connectionsHandler = connectionsHandler.processRequest(remote)
-        case RequestChunkMessage(_) if connectionsHandler.liveConnections.getOrElse(remote, 0 -> 0L)._1 == 0 =>
+        case RequestChunkMessage(_) if connectionsHandler.liveConnections.getOrElse(remote, 0 -> 0L)._1 <= 0 =>
           logger.info(s"Ban peer $remote.")
           nodeViewSynchronizer ! BanPeer(remote, ExpiredNumberOfRequests)
           connectionsHandler = connectionsHandler.removeConnection(remote)

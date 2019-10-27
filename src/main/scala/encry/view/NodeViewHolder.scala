@@ -24,7 +24,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncDoneAt, FastSyncFinished, HeaderChainIsSynced, ManifestInfoToNodeViewHolder, NewChunkToApply, NewManifestId, RequiredManifestHeightAndId, SnapshotChunk, SnapshotProcessorMessage, TreeChunks}
+import encry.view.fast.sync.SnapshotHolder.{FastSyncFinished, HeaderChainIsSynced,RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
 import encry.view.fast.sync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions

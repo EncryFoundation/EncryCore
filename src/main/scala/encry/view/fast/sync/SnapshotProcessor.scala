@@ -1,35 +1,44 @@
 package encry.view.fast.sync
 
 import java.io.File
-
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.{ EncryAppSettings, LevelDBSettings }
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
-import encry.view.state.avlTree.{AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.view.fast.sync.SnapshotHolder.{
+  SnapshotChunk,
+  SnapshotChunkSerializer,
+  SnapshotManifest,
+  SnapshotManifestSerializer
+}
+import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import org.iq80.leveldb.{DB, Options}
+import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
-
 import scala.language.postfixOps
 import cats.syntax.either._
 import com.google.common.primitives.Ints
-import encry.view.fast.sync.ChunkValidator.ChunkValidationError
-import encry.view.fast.sync.FastSyncExceptions.{ChunkApplyError, ChunkValidationError, EmptyHeightKey, EmptyRootNodeError, ProcessNewBlockError, ProcessNewSnapshotError, UtxoCreationError}
+import encry.view.fast.sync.FastSyncExceptions.{
+  ChunkApplyError,
+  ChunkValidationError,
+  EmptyHeightKey,
+  EmptyRootNodeError,
+  ProcessNewBlockError,
+  ProcessNewSnapshotError,
+  UtxoCreationError
+}
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
-
 import scala.collection.immutable.HashSet
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
@@ -133,13 +142,6 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
                )
     } yield node
 
-  def processNewSnapshot(potentialManifestId: Array[Byte],
-                         newChunks: List[SnapshotChunk],
-                         manifestIds: Seq[Array[Byte]]): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
-      logger.info(s"Need to create new best potential snapshot.")
-      createNewSnapshot(potentialManifestId, manifestIds, newChunks)
-  }
-
   def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotProcessor] = {
     logger.info(
       s"Start updating actual manifest to new one at height " +
@@ -151,7 +153,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
     storage.get(StorageKey @@ chunkId).flatMap(e => Try(SnapshotChunkMessage.parseFrom(e)).toOption)
 
-  private def createNewSnapshot(
+  def createNewSnapshot(
     id: Array[Byte],
     manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
@@ -231,7 +233,7 @@ object SnapshotProcessor extends StrictLogging {
     if (fatsSync) create(settings, getDirFastSync(settings))
     else create(settings, getDirProcessSnapshots(settings))
 
-  def getDirFastSync(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
+  def getDirFastSync(settings: EncryAppSettings): File         = new File(s"${settings.directory}/state")
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {

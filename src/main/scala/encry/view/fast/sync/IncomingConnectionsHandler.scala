@@ -1,7 +1,5 @@
 package encry.view.fast.sync
 
-import java.net.InetSocketAddress
-
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 
@@ -15,7 +13,7 @@ final case class IncomingConnectionsHandler(liveConnections: Map[ConnectedPeer, 
       !liveConnections.contains(remote)
 
   def canProcessResponse(remote: ConnectedPeer): Boolean =
-    handledRequests != settings.snapshotSettings.requestsPerTime &&
+    handledRequests <= settings.snapshotSettings.requestsPerTime &&
       liveConnections.getOrElse(remote, 0 -> 0L)._1 > 0
 
   def addNewConnect(remote: ConnectedPeer, chunksNumber: Int): IncomingConnectionsHandler =
