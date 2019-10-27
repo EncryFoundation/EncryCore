@@ -45,20 +45,20 @@ message GeneralizedNetworkProtoMessage {
     }
 
     message RequestManifestProtoMessage {
+        bytes manifestId =1;
     }
     message ResponseManifestProtoMessage {
         SnapshotManifestProtoMessage manifest = 1;
     }
     message RequestChunkProtoMessage {
-        bytes manifestId = 1;
-        bytes chunkId = 2;
+        bytes chunkId = 1;
     }
     message ResponseChunkProtoMessage {
         SnapshotChunkMessage chunk = 1;
     }
     message ManifestHasChangedProtoMessage {
         bytes requestedManifestId = 1;
-        bytes newManifestId = 2;
+        SnapshotManifestProtoMessage snapshotManifestProtoMessage = 2;
     }
 
     bytes magic = 1;

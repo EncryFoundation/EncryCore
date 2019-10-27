@@ -49,7 +49,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   def reInitStorage: SnapshotProcessor = {
     storage.close()
-    val dir: File = SnapshotProcessor.getDirFastSync(settings)
+    val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
     import org.apache.commons.io.FileUtils
     FileUtils.deleteDirectory(dir)
     SnapshotProcessor.initialize(settings, fatsSync = true)
@@ -230,10 +230,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 object SnapshotProcessor extends StrictLogging {
 
   def initialize(settings: EncryAppSettings, fatsSync: Boolean): SnapshotProcessor =
-    if (fatsSync) create(settings, getDirFastSync(settings))
+    if (fatsSync) create(settings, getDirProcessSnapshots(settings))
     else create(settings, getDirProcessSnapshots(settings))
 
-  def getDirFastSync(settings: EncryAppSettings): File         = new File(s"${settings.directory}/state")
+  //def getDirFastSync(settings: EncryAppSettings): File         = new File(s"${settings.directory}/state")
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {

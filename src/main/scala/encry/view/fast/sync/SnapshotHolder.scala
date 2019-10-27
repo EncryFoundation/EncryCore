@@ -220,7 +220,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
 
     case HeaderChainIsSynced if processHeaderSyncedMsg =>
-      logger.info(
+      println(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
       )
