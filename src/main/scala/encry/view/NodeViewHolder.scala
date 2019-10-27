@@ -232,11 +232,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
               modToApply match {
-                case h: Header =>
-                  val requiredHeight: Int = h.height - settings.levelDB.maxVersions
+                case header: Header =>
+                  val requiredHeight: Int = header.height - settings.levelDB.maxVersions
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
-                    logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight.")
-                    nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
+                    newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
+                      logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
+                        s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
+                        s"\n\n\n header - ${h} \n\n\n")
+                      nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
+                    }
                   }
                 case _ =>
               }

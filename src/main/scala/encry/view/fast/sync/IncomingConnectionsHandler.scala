@@ -1,16 +1,20 @@
 package encry.view.fast.sync
 
+import com.typesafe.scalalogging.StrictLogging
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 
 final case class IncomingConnectionsHandler(liveConnections: Map[ConnectedPeer, (Int, Long)],
                                             handledRequests: Int,
-                                            settings: EncryAppSettings) {
+                                            settings: EncryAppSettings) extends StrictLogging {
 
-  def canBeProcessed(processor: SnapshotProcessor, remote: ConnectedPeer, manifestId: Array[Byte]): Boolean =
-    processor.actualManifest.exists(_.manifestId.sameElements(manifestId)) &&
-      liveConnections.size < settings.network.maxConnections &&
-      !liveConnections.contains(remote)
+  def canBeProcessed(processor: SnapshotProcessor, remote: ConnectedPeer, manifestId: Array[Byte]): Boolean = {
+    val cond1 = processor.actualManifest.exists(_.manifestId.sameElements(manifestId))
+    val cond2 = liveConnections.size < settings.network.maxConnections
+    val cond3 = !liveConnections.contains(remote)
+    logger.info(s"Conditions $cond1, $cond2, $cond3")
+    cond1 && cond2 && cond3
+  }
 
   def canProcessResponse(remote: ConnectedPeer): Boolean =
     handledRequests <= settings.snapshotSettings.requestsPerTime &&
@@ -29,7 +33,7 @@ final case class IncomingConnectionsHandler(liveConnections: Map[ConnectedPeer, 
 
   def iterationProcessing: IncomingConnectionsHandler = {
     import scala.concurrent.duration._
-    this.copy(liveConnections = liveConnections.filter(l => System.currentTimeMillis() - l._2._2 < 10.minutes.toMillis),
+    this.copy(liveConnections = liveConnections.filter(l => System.currentTimeMillis() - l._2._2 < 1.minutes.toMillis),
               handledRequests = 0)
   }
 

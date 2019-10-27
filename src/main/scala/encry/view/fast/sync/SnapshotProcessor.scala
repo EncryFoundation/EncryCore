@@ -47,6 +47,14 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty[ByteArrayWrapper]
 
+  def addRootChunk(history: History, height: Int): SnapshotProcessor = {
+    val id = history.getBestHeaderAtHeight(height).map { header =>
+      ByteArrayWrapper(header.stateRoot)
+    }.getOrElse(ByteArrayWrapper(Array.emptyByteArray))
+    applicableChunks = HashSet(id)
+    this
+  }
+
   def reInitStorage: SnapshotProcessor = {
     storage.close()
     val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
@@ -55,7 +63,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     SnapshotProcessor.initialize(settings, fatsSync = true)
   }
 
-  def setRSnapshotData(rootNodeId: Array[Byte], utxoHeight: Height): SnapshotProcessor = {
+  def setRSnapshotData(rootNodeId: Array[Byte], utxoHeight: Int): SnapshotProcessor = {
     storage.insert(
       StorageVersion @@ Random.randomBytes(),
       AvlTree.rootNodeKey       -> StorageValue @@ rootNodeId ::
@@ -98,6 +106,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
         applicableChunks =
           (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
             toApplicable.map(node => ByteArrayWrapper(node.hash))
+        logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
         this.asRight[ChunkApplyError]
       case Failure(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotProcessor]
     }
@@ -106,7 +115,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
     for {
       _ <- ChunkValidator.checkForIdConsistent(chunk)
-      _ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
+      //_ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
     } yield chunk
 
   def getUtxo: Either[UtxoCreationError, UtxoState] =
@@ -185,7 +194,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     }
   }
 
-  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] =
+  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] = {
+    val startTime = System.currentTimeMillis()
     Either.fromOption(
       history.getBestHeaderAtHeight(height).map { header =>
         val id: Digest32 = Algos.hash(header.stateRoot ++ header.id)
@@ -220,9 +230,11 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
             logger.info(error.getMessage)
             ProcessNewBlockError(error.getMessage).asLeft[SnapshotProcessor]
           case Right(_) =>
+            logger.info(s"Finished processing new manifest. Time ${(System.currentTimeMillis() - startTime)/1000}s")
             this.asRight[ProcessNewBlockError]
         }
     }
+  }
 
   override def close(): Unit = storage.close()
 }

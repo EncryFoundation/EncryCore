@@ -103,6 +103,17 @@ class SnapshotHolder(settings: EncryAppSettings,
                 nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.error))
               case Right(newController) =>
                 snapshotDownloadController = newController
+                snapshotProcessor =
+                  snapshotProcessor.addRootChunk(history, snapshotDownloadController.requiredManifestHeight)
+                val rootBytes: Array[Byte] = history.getBestHeaderAtHeight {
+                  snapshotDownloadController.requiredManifestHeight
+                }.map { header =>
+                  header.stateRoot
+                }.getOrElse {
+                  Array.emptyByteArray
+                }
+                snapshotProcessor =
+                  snapshotProcessor.setRSnapshotData(rootBytes, snapshotDownloadController.requiredManifestHeight)
                 self ! RequestNextChunks
             }
           } else if (!isValidManifest) {
@@ -119,6 +130,7 @@ class SnapshotHolder(settings: EncryAppSettings,
             validChunk         <- snapshotProcessor.validateChunk(controllerAndChunk._2)
             processor          <- snapshotProcessor.applyChunk(validChunk)
             _ <- if (controllerAndChunk._1.requestedChunks.isEmpty && controllerAndChunk._1.notYetRequested.isEmpty) {
+                  logger.info(s"Start state creation")
                   processor.getUtxo match {
                     case Right(state) if state.validateTreeAfterFastSync =>
                       nodeViewHolder ! FastSyncFinished(state)
@@ -184,6 +196,8 @@ class SnapshotHolder(settings: EncryAppSettings,
                 logger.info(s"Manifest has changed message is correct")
                 snapshotDownloadController = newController
                 snapshotProcessor = snapshotProcessor.reInitStorage
+                snapshotProcessor =
+                  snapshotProcessor.addRootChunk(history, snapshotDownloadController.requiredManifestHeight)
                 self ! RequestNextChunks
             }
           } else {
@@ -197,7 +211,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
-      logger.info(s"Current requested queue ${snapshotDownloadController.requestedChunks.size}.")
+      logger.info(s"Current notYetRequested queue ${snapshotDownloadController.notYetRequested.size}.")
       val (newController, toDownload) = snapshotDownloadController.chunksIdsToDownload
       snapshotDownloadController = newController
       toDownload.foreach { msg =>
@@ -299,7 +313,8 @@ class SnapshotHolder(settings: EncryAppSettings,
             connectionsHandler = connectionsHandler.addNewConnect(remote, m.chunksKeys.size)
           }
 
-        case RequestManifestMessage(_) =>
+        case RequestManifestMessage(manifest) =>
+          logger.info(s"Got request for manifest with ${Algos.encode(manifest)}")
         case RequestChunkMessage(chunkId) if connectionsHandler.canProcessResponse(remote) =>
           logger.info(s"Got RequestChunkMessage. Current handledRequests ${connectionsHandler.handledRequests}.")
           val chunkFromDB: Option[SnapshotChunkMessage] = snapshotProcessor.getChunkById(chunkId)
