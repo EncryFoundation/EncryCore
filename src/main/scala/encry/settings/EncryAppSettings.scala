@@ -110,7 +110,7 @@ final case class StorageSettings(history: StorageType, state: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
 final case class BlackListSettings(banTime: FiniteDuration, cleanupTime: FiniteDuration)
-final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32)
+final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32, keySize: Int = 32)
 final case class MonitoringSettings(kamonEnabled: Boolean)
 final case class RESTApiSettings(enabled: Option[Boolean],
                                  bindAddress: InetSocketAddress,
