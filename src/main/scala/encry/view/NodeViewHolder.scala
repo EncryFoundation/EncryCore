@@ -1,8 +1,6 @@
 package encry.view
 
 import java.io.File
-
-import NodeMsg.NodeProtoMsg
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -17,7 +15,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.stats.StatsSender._
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -25,7 +22,6 @@ import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
 import encry.view.fast.sync.SnapshotHolder.{FastSyncFinished, HeaderChainIsSynced,RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
-import encry.view.fast.sync.SnapshotProcessor
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -37,11 +33,9 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height, ModifierId, ModifierTypeId}
-import org.encryfoundation.common.utils.constants.Constants
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}

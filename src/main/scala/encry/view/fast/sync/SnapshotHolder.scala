@@ -130,9 +130,9 @@ class SnapshotHolder(settings: EncryAppSettings,
                         context.stop(self)
                       }
                       true.asRight[FastSyncException]
-                    case Left(error) | Right(_) =>
-                      logger.info(s"State after fats sync is invalid ${error.error}.")
-                      nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync(error.toString))
+                    case _ =>
+                      logger.info(s"State after fats sync is invalid.")
+                      nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fats sync is invalid"))
                       snapshotProcessor = processor.reInitStorage
                       self ! HeaderChainIsSynced
                       context.become(
