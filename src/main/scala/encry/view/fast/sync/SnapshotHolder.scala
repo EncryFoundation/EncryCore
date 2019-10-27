@@ -56,6 +56,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     }
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     logger.info(s"SnapshotHolder started.")
+    println()
     networkController ! RegisterMessagesHandler(
       Seq(
         RequestManifestMessage.NetworkMessageTypeID  -> "RequestManifest",
@@ -73,13 +74,15 @@ class SnapshotHolder(settings: EncryAppSettings,
   def awaitingHistory: Receive = {
     case ChangedHistory(history) =>
       if (settings.snapshotSettings.enableFastSynchronization) {
+        logger.info(s"Start in fast sync regime")
         context.become(
           fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
         )
       } else {
+        logger.info(s"Start in snapshot processing regime")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
-        workMod(history).orElse(commonMessages)
+        context.become(workMod(history).orElse(commonMessages))
       }
   }
 
@@ -132,7 +135,8 @@ class SnapshotHolder(settings: EncryAppSettings,
                       true.asRight[FastSyncException]
                     case _ =>
                       logger.info(s"State after fats sync is invalid.")
-                      nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fats sync is invalid"))
+                      nodeViewSynchronizer ! BanPeer(remote,
+                                                     InvalidStateAfterFastSync("State after fats sync is invalid"))
                       snapshotProcessor = processor.reInitStorage
                       self ! HeaderChainIsSynced
                       context.become(
@@ -259,11 +263,11 @@ class SnapshotHolder(settings: EncryAppSettings,
   def workMod(history: History): Receive = {
     case TreeChunks(chunks, id) =>
       //todo add collection with potentialManifestsIds to NVH
+      logger.info(s"Got TreeChunks message")
       val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
       if (!manifestIds.exists(_.sameElements(id))) {
-        logger.info(s"Processing new snapshot")
         snapshotProcessor.createNewSnapshot(id, manifestIds, chunks)
-      }
+      } else logger.info(s"Doesn't need to create snapshot")
 
     case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")

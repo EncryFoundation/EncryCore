@@ -189,7 +189,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
       deliveryManager ! msg
-    case msg@TreeChunks(_, _) => snapshotHolder ! msg
+    case msg@TreeChunks(l, b) => snapshotHolder ! msg
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
