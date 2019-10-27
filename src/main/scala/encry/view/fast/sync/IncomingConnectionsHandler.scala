@@ -3,6 +3,7 @@ package encry.view.fast.sync
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
+import org.encryfoundation.common.utils.Algos
 
 final case class IncomingConnectionsHandler(liveConnections: Map[ConnectedPeer, (Int, Long)],
                                             handledRequests: Int,
@@ -13,6 +14,7 @@ final case class IncomingConnectionsHandler(liveConnections: Map[ConnectedPeer, 
     val cond2 = liveConnections.size < settings.network.maxConnections
     val cond3 = !liveConnections.contains(remote)
     logger.info(s"Conditions $cond1, $cond2, $cond3")
+    logger.info(s"Current manifest id ${processor.actualManifest.map(l => Algos.encode(l.manifestId))}")
     cond1 && cond2 && cond3
   }
 

@@ -183,29 +183,6 @@ class SnapshotHolder(settings: EncryAppSettings,
             InvalidChunkMessage(s"Received chunk from unexpected peer ${remote.socketAddress}")
           )
 
-        case ManifestHasChanged(previousId, newManifest) =>
-          val isValidNewManifest: Boolean =
-            snapshotDownloadController.checkManifestValidity(newManifest.manifestId.toByteArray, history)
-          val isValidMessage: Boolean = snapshotDownloadController.requiredManifestId.sameElements(previousId)
-          if (isValidNewManifest && isValidMessage) {
-            snapshotDownloadController.processManifestHasChangedMessage(newManifest, remote) match {
-              case Left(error) =>
-                logger.info(s"Manifest has changed message is incorrect ${error.error}.")
-                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.error))
-              case Right(newController) =>
-                logger.info(s"Manifest has changed message is correct")
-                snapshotDownloadController = newController
-                snapshotProcessor = snapshotProcessor.reInitStorage
-                snapshotProcessor =
-                  snapshotProcessor.addRootChunk(history, snapshotDownloadController.requiredManifestHeight)
-                self ! RequestNextChunks
-            }
-          } else {
-            logger.info(s"Manifest has changed message is invalid.")
-            nodeViewSynchronizer ! BanPeer(remote,
-                                           InvalidManifestHasChangedMessage("Invalid manifest has changed message"))
-          }
-
         case _ =>
       }
 
@@ -226,12 +203,19 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
 
     case RequiredManifestHeightAndId(height, manifestId) =>
-      logger.info(
+      println(
         s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
           s"New required manifest id is ${Algos.encode(manifestId)}."
       )
+      snapshotDownloadController = SnapshotDownloadController.empty(settings)
       snapshotDownloadController =
         snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
+      snapshotProcessor = snapshotProcessor.reInitStorage
+      self ! HeaderChainIsSynced
+      context.become(
+        fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
+          .orElse(commonMessages)
+      )
 
     case HeaderChainIsSynced if processHeaderSyncedMsg =>
       println(
@@ -289,16 +273,8 @@ class SnapshotHolder(settings: EncryAppSettings,
         (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight
       logger.info(s"condition = $condition")
       if (condition == 0) snapshotProcessor.processNewBlock(block, history) match {
-        case Left(value) =>
-        case Right(newProcessor) =>
-          snapshotProcessor = newProcessor
-          if (newProcessor.actualManifest.nonEmpty) connectionsHandler.liveConnections.foreach {
-            case (connection, _) =>
-              connection.handlerRef ! ManifestHasChanged(
-                newProcessor.actualManifest.get.manifestId,
-                SnapshotManifestSerializer.toProto(newProcessor.actualManifest.get)
-              )
-          }
+        case Left(value)         =>
+        case Right(newProcessor) => snapshotProcessor = newProcessor
       }
 
     case DataFromPeer(message, remote) =>
