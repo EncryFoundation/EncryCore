@@ -11,9 +11,9 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.view.fast.sync.ChunkValidator.{ ChunkValidationError, InvalidChunkBytes }
-import encry.view.fast.sync.SnapshotDownloadController.{
-  ProcessManifestExceptionFatal,
+import encry.view.fast.sync.FastSyncExceptions.{ ChunkValidationError, InvalidChunkBytes }
+import encry.view.fast.sync.FastSyncExceptions.{
+  InvalidManifestBytes,
   ProcessManifestHasChangedMessageException,
   SnapshotDownloadControllerException
 }
@@ -36,7 +36,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     Either.fromTry(SnapshotManifestSerializer.fromProto(manifestProto)) match {
       case Left(error) =>
         logger.info(s"Manifest was parsed with error ${error.getCause}.")
-        ProcessManifestExceptionFatal(s"Manifest was parsed with error ${error.getCause}")
+        InvalidManifestBytes(s"Manifest was parsed with error ${error.getCause}")
           .asLeft[SnapshotDownloadController]
       case Right(manifest) =>
         logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
@@ -124,12 +124,6 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 }
 
 object SnapshotDownloadController {
-
-  sealed trait SnapshotDownloadControllerException
-  final case class ProcessManifestExceptionFatal(msg: String)             extends SnapshotDownloadControllerException
-  final case class ProcessManifestExceptionNonFatal(msg: String)          extends SnapshotDownloadControllerException
-  final case class ProcessRequestedChunkException(msg: String)            extends SnapshotDownloadControllerException
-  final case class ProcessManifestHasChangedMessageException(msg: String) extends SnapshotDownloadControllerException
 
   def empty(settings: EncryAppSettings): SnapshotDownloadController =
     SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0)

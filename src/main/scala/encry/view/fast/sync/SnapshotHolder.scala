@@ -21,13 +21,15 @@ import encry.network.BlackList.BanReason.{
   ExpiredNumberOfRequests,
   InvalidChunkMessage,
   InvalidManifestHasChangedMessage,
-  InvalidManifestMessage
+  InvalidManifestMessage,
+  InvalidStateAfterFastSync
 }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.SnapshotDownloadController.ProcessManifestExceptionFatal
+import encry.view.fast.sync.FastSyncExceptions.{ FastSyncException, InvalidManifestBytes }
 import encry.view.history.History
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
+import cats.syntax.either._
 
 import scala.util.Try
 
@@ -95,8 +97,8 @@ class SnapshotHolder(settings: EncryAppSettings,
           val canBeProcessed: Boolean = snapshotDownloadController.canNewManifestBeProcessed
           if (isValidManifest && canBeProcessed) {
             snapshotDownloadController.processManifest(manifest, remote, history) match {
-              case Left(error: ProcessManifestExceptionFatal) =>
-                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.msg))
+              case Left(error) =>
+                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.error))
               case Right(newController) =>
                 snapshotDownloadController = newController
                 self ! RequestNextChunks
@@ -114,33 +116,9 @@ class SnapshotHolder(settings: EncryAppSettings,
             controllerAndChunk <- snapshotDownloadController.processRequestedChunk(chunk, remote)
             validChunk         <- snapshotProcessor.validateChunk(controllerAndChunk._2)
             processor          <- snapshotProcessor.applyChunk(validChunk)
-          } yield (controllerAndChunk._1, processor)) match {
-            case Left(error) =>
-              logger.info(s"Received chunk is invalid cause ${error.toString}.")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
-              snapshotProcessor = snapshotProcessor.reInitStorage
-              self ! HeaderChainIsSynced
-              context.become(
-                fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
-              )
-            case Right((controller, processor)) =>
-              logger.info(s"Finished processing new chunk.")
-              snapshotDownloadController = controller
-              snapshotProcessor = processor
-              if (snapshotDownloadController.requestedChunks.isEmpty && snapshotDownloadController.notYetRequested.isEmpty) {
-                snapshotProcessor.getUtxo match {
-                  case Left(error) =>
-                    logger.info(s"Received chunk is invalid cause ${error.toString}.")
-                    nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
-                    snapshotProcessor = snapshotProcessor.reInitStorage
-                    self ! HeaderChainIsSynced
-                    context.become(
-                      fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
-                        .orElse(commonMessages)
-                    )
-                  case Right(state) =>
-                    logger.info(s"Fast sync finished")
-                    if (state.validateTreeAfterFastSync) {
+            _ <- if (controllerAndChunk._1.requestedChunks.isEmpty && controllerAndChunk._1.notYetRequested.isEmpty) {
+                  processor.getUtxo match {
+                    case Right(state) if state.validateTreeAfterFastSync =>
                       nodeViewHolder ! FastSyncFinished(state)
                       if (settings.snapshotSettings.enableSnapshotCreation) {
                         snapshotProcessor = SnapshotProcessor.initialize(settings, fatsSync = false)
@@ -152,21 +130,35 @@ class SnapshotHolder(settings: EncryAppSettings,
                         logger.info(s"Stop processing snapshots")
                         context.stop(self)
                       }
-                    } else {
-                      logger.info(s"Invalid state after fast sync.")
-                      nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(s"Invalid state after fast sync."))
-                      snapshotProcessor = snapshotProcessor.reInitStorage
+                      true.asRight[FastSyncException]
+                    case Left(error) | Right(_) =>
+                      logger.info(s"State after fats sync is invalid ${error.error}.")
+                      nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync(error.toString))
+                      snapshotProcessor = processor.reInitStorage
                       self ! HeaderChainIsSynced
                       context.become(
                         fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
                           .orElse(commonMessages)
                       )
-                    }
+                      true.asRight[FastSyncException]
+                  }
+                } else if (controllerAndChunk._1.requestedChunks.isEmpty) {
+                  self ! RequestNextChunks
+                  true.asRight[FastSyncException]
+                } else {
+                  true.asRight[FastSyncException]
                 }
-              } else if (snapshotDownloadController.requestedChunks.isEmpty)
-                self ! RequestNextChunks
-              else
-                ()
+          } yield (controllerAndChunk._1, processor)) match {
+            case Left(error) =>
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
+              snapshotProcessor = snapshotProcessor.reInitStorage
+              self ! HeaderChainIsSynced
+              context.become(
+                fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
+              )
+            case Right((controller, processor)) =>
+              snapshotDownloadController = controller
+              snapshotProcessor = processor
           }
 
         case ResponseChunkMessage(_) =>
@@ -183,8 +175,8 @@ class SnapshotHolder(settings: EncryAppSettings,
           if (isValidNewManifest && isValidMessage) {
             snapshotDownloadController.processManifestHasChangedMessage(newManifest, remote) match {
               case Left(error) =>
-                logger.info(s"Manifest has changed message is incorrect ${error.msg}.")
-                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.msg))
+                logger.info(s"Manifest has changed message is incorrect ${error.error}.")
+                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestHasChangedMessage(error.error))
               case Right(newController) =>
                 logger.info(s"Manifest has changed message is correct")
                 snapshotDownloadController = newController

@@ -3,43 +3,33 @@ package encry.view.fast.sync
 import java.io.File
 
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
-import encry.view.fast.sync.SnapshotHolder.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
-import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.view.state.avlTree.{AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
-import org.iq80.leveldb.{ DB, Options }
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.hash.Digest32
+
 import scala.language.postfixOps
 import cats.syntax.either._
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.ChunkValidator.ChunkValidationError
-import encry.view.fast.sync.SnapshotProcessor.{
-  ChunkApplyError,
-  EmptyHeightKey,
-  EmptyRootNodeError,
-  ProcessNewBlockError,
-  ProcessNewSnapshotError,
-  UtxoCreationError
-}
+import encry.view.fast.sync.FastSyncExceptions.{ChunkApplyError, ChunkValidationError, EmptyHeightKey, EmptyRootNodeError, ProcessNewBlockError, ProcessNewSnapshotError, UtxoCreationError}
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
+
 import scala.collection.immutable.HashSet
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
@@ -236,16 +226,6 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 }
 
 object SnapshotProcessor extends StrictLogging {
-
-  sealed trait SnapshotProcessorError
-  final case class ProcessNewSnapshotError(str: String) extends SnapshotProcessorError
-  final case class ProcessNewBlockError(str: String)    extends SnapshotProcessorError
-
-  final case class ChunkApplyError(msg: String)
-
-  sealed trait UtxoCreationError
-  final case class EmptyRootNodeError(msg: String) extends UtxoCreationError
-  final case class EmptyHeightKey(msg: String)     extends UtxoCreationError
 
   def initialize(settings: EncryAppSettings, fatsSync: Boolean): SnapshotProcessor =
     if (fatsSync) create(settings, getDirFastSync(settings))
