@@ -510,6 +510,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       } else keysToInspect
 
     logger.info(s"Start tree validation")
+    println(rootNode)
     val keys: Set[ByteArrayWrapper] = loop(List(rootNode), List.empty).map(ByteArrayWrapper(_)).toSet
     val allKeysFromDB: Set[ByteArrayWrapper] = storage.getAllKeys(-1)
       .map(ByteArrayWrapper(_)).toSet - ByteArrayWrapper(UtxoState.bestHeightKey) - ByteArrayWrapper(AvlTree.rootNodeKey)
@@ -625,7 +626,8 @@ object AvlTree {
       case leaf: LeafNode[StorageKey, StorageValue] => leaf -> List.empty[Node[StorageKey, StorageValue]]
     }
 
-    val (rootChunk, rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
+    val (rootChunk: Node[StorageKey, StorageValue], rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
+    println(s"root chunk ${rootChunk}")
     SnapshotChunk(rootChunk, rootChunk.hash) ::
       rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight, storage))
   }
