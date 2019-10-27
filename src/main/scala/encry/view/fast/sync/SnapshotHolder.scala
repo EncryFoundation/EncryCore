@@ -53,6 +53,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.info(s"Stop self(~_~)SnapshotHolder(~_~)")
       context.stop(self)
     }
+    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     logger.info(s"SnapshotHolder started.")
     networkController ! RegisterMessagesHandler(
       Seq(
@@ -66,16 +67,15 @@ class SnapshotHolder(settings: EncryAppSettings,
     )
   }
 
-  override def receive: Receive = awaitingProcessor
+  override def receive: Receive = awaitingHistory
 
-  def awaitingProcessor: Receive = {
+  def awaitingHistory: Receive = {
     case ChangedHistory(history) =>
-      if (settings.snapshotSettings.enableFastSynchronization)
+      if (settings.snapshotSettings.enableFastSynchronization) {
         context.become(
-          fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
-            .orElse(commonMessages)
+          fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
         )
-      else {
+      } else {
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
         workMod(history).orElse(commonMessages)

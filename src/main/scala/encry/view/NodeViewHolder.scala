@@ -58,6 +58,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  if (settings.snapshotSettings.enableFastSynchronization) nodeView.state.tree.close()
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
   var canDownloadPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
