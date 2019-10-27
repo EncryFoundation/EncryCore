@@ -44,6 +44,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
     .withDispatcher("peers-keeper-dispatcher"), "PeersKeeper")
 
+
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
 
