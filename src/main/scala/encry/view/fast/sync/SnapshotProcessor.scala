@@ -1,6 +1,7 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
@@ -23,21 +24,25 @@ import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
 import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
+
 import scala.language.postfixOps
 import cats.syntax.either._
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
+  CacheDoesNotContainApplicableChunk,
   ChunkApplyError,
   ChunkValidationError,
   EmptyHeightKey,
   EmptyRootNodeError,
+  FastSyncException,
   ProcessNewBlockError,
   ProcessNewSnapshotError,
   UtxoCreationError
 }
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import scala.collection.immutable.HashSet
+
+import scala.collection.immutable.{ HashMap, HashSet }
 import scala.util.{ Failure, Success, Try }
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
@@ -47,10 +52,20 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
 
   var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty[ByteArrayWrapper]
 
+  var chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = HashMap.empty
+
+  def putChunkIntoCache(chunk: SnapshotChunk): SnapshotProcessor = {
+    chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk)
+    this
+  }
+
   def addRootChunk(history: History, height: Int): SnapshotProcessor = {
-    val id = history.getBestHeaderAtHeight(height).map { header =>
-      ByteArrayWrapper(header.stateRoot)
-    }.getOrElse(ByteArrayWrapper(Array.emptyByteArray))
+    val id = history
+      .getBestHeaderAtHeight(height)
+      .map { header =>
+        ByteArrayWrapper(header.stateRoot)
+      }
+      .getOrElse(ByteArrayWrapper(Array.emptyByteArray))
     applicableChunks = HashSet(id)
     this
   }
@@ -115,8 +130,33 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
     for {
       _ <- ChunkValidator.checkForIdConsistent(chunk)
-      //_ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
+      // _ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
     } yield chunk
+
+  private def getNextChunk: Either[CacheDoesNotContainApplicableChunk, SnapshotChunk] =
+    for {
+      idAndChunk <- Either.fromOption(chunksCache.find {
+                     case (id, _) => applicableChunks.contains(id)
+                   }, CacheDoesNotContainApplicableChunk("No applicable chunk"))
+    } yield {
+      chunksCache = chunksCache - idAndChunk._1
+      idAndChunk._2
+    }
+
+  @scala.annotation.tailrec
+  def processNextApplicableChunk: Either[FastSyncException, SnapshotProcessor] =
+    (for {
+      chunk     <- getNextChunk
+      processor <- applyChunk(chunk)
+    } yield processor) match {
+      case Left(_: CacheDoesNotContainApplicableChunk) =>
+        logger.info(s"There are no applicable chunks in cache")
+        this.asRight[ChunkApplyError]
+      case l @ Left(_) => l
+      case Right(processor) =>
+        logger.info(s"New chunk applied successfully. Start next application")
+        processor.processNextApplicableChunk
+    }
 
   def getUtxo: Either[UtxoCreationError, UtxoState] =
     for {
@@ -230,7 +270,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
             logger.info(error.getMessage)
             ProcessNewBlockError(error.getMessage).asLeft[SnapshotProcessor]
           case Right(_) =>
-            logger.info(s"Finished processing new manifest. Time ${(System.currentTimeMillis() - startTime)/1000}s")
+            logger.info(s"Finished processing new manifest. Time ${(System.currentTimeMillis() - startTime) / 1000}s")
             this.asRight[ProcessNewBlockError]
         }
     }

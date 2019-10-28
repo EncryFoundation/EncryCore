@@ -26,10 +26,11 @@ import encry.network.BlackList.BanReason.{
 }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.FastSyncException
+import encry.view.fast.sync.FastSyncExceptions.{ CacheDoesNotContainApplicableChunk, FastSyncException }
 import encry.view.history.History
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import cats.syntax.either._
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -128,42 +129,9 @@ class SnapshotHolder(settings: EncryAppSettings,
           (for {
             controllerAndChunk <- snapshotDownloadController.processRequestedChunk(chunk, remote)
             validChunk         <- snapshotProcessor.validateChunk(controllerAndChunk._2)
-            processor          <- snapshotProcessor.applyChunk(validChunk)
-            _ <- if (controllerAndChunk._1.requestedChunks.isEmpty && controllerAndChunk._1.notYetRequested.isEmpty) {
-                  logger.info(s"Start state creation")
-                  processor.getUtxo match {
-                    case Right(state) if state.validateTreeAfterFastSync =>
-                      nodeViewHolder ! FastSyncFinished(state)
-                      if (settings.snapshotSettings.enableSnapshotCreation) {
-                        snapshotProcessor = SnapshotProcessor.initialize(settings, fatsSync = false)
-                        logger.info(s"Snapshot holder context.become to snapshot processing")
-                        context.system.scheduler
-                          .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
-                        context.become(workMod(history).orElse(commonMessages))
-                      } else {
-                        logger.info(s"Stop processing snapshots")
-                        context.stop(self)
-                      }
-                      true.asRight[FastSyncException]
-                    case _ =>
-                      logger.info(s"State after fats sync is invalid.")
-                      nodeViewSynchronizer ! BanPeer(remote,
-                                                     InvalidStateAfterFastSync("State after fats sync is invalid"))
-                      snapshotProcessor = processor.reInitStorage
-                      self ! HeaderChainIsSynced
-                      context.become(
-                        fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
-                          .orElse(commonMessages)
-                      )
-                      true.asRight[FastSyncException]
-                  }
-                } else if (controllerAndChunk._1.requestedChunks.isEmpty) {
-                  self ! RequestNextChunks
-                  true.asRight[FastSyncException]
-                } else {
-                  true.asRight[FastSyncException]
-                }
-          } yield (controllerAndChunk._1, processor)) match {
+            processor          = snapshotProcessor.putChunkIntoCache(validChunk)
+            newProcessor       <- processor.processNextApplicableChunk
+          } yield (newProcessor, controllerAndChunk._1)) match {
             case Left(error) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
               snapshotProcessor = snapshotProcessor.reInitStorage
@@ -171,9 +139,45 @@ class SnapshotHolder(settings: EncryAppSettings,
               context.become(
                 fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
               )
-            case Right((controller, processor)) =>
+            case Right((processor, controller))
+                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty && processor.chunksCache.nonEmpty =>
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("avc"))
+              snapshotProcessor = snapshotProcessor.reInitStorage
+              self ! HeaderChainIsSynced
+              context.become(
+                fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
+              )
+            case Right((processor, controller))
+                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
+              processor.getUtxo match {
+                case Right(state) if state.validateTreeAfterFastSync =>
+                  nodeViewHolder ! FastSyncFinished(state)
+                  if (settings.snapshotSettings.enableSnapshotCreation) {
+                    snapshotProcessor = SnapshotProcessor.initialize(settings, fatsSync = false)
+                    logger.info(s"Snapshot holder context.become to snapshot processing")
+                    context.system.scheduler
+                      .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
+                    context.become(workMod(history).orElse(commonMessages))
+                  } else {
+                    logger.info(s"Stop processing snapshots")
+                    context.stop(self)
+                  }
+                  true.asRight[FastSyncException]
+                case _ =>
+                  logger.info(s"State after fats sync is invalid.")
+                  nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fats sync is invalid"))
+                  snapshotProcessor = processor.reInitStorage
+                  self ! HeaderChainIsSynced
+                  context.become(
+                    fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
+                      .orElse(commonMessages)
+                  )
+                  true.asRight[FastSyncException]
+              }
+            case Right((processor, controller)) =>
               snapshotDownloadController = controller
               snapshotProcessor = processor
+              if (snapshotDownloadController.requestedChunks.isEmpty) self ! RequestNextChunks
           }
 
         case ResponseChunkMessage(_) =>

@@ -1,6 +1,7 @@
 package encry.view.history
 
 import java.io.File
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
@@ -17,6 +18,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
+import supertagged.@@
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
@@ -138,9 +140,12 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
 
   def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
     logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
+    val modsRaw: List[(StorageKey, StorageValue)] =
+      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+    val bestBlock = BestBlockKey -> StorageValue @@ headerId
     historyStorage.insert(
       StorageVersion @@ validityKey(payloadId).untag(StorageKey),
-      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+      bestBlock :: modsRaw
     )
     this
   }

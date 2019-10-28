@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -21,7 +22,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotHolder.{FastSyncFinished, HeaderChainIsSynced,RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -36,6 +37,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.Digest32
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -101,10 +103,12 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
+          val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
           updateNodeView(
-            updatedHistory = Some(nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)),
+            updatedHistory = Some(history),
             updatedState = Some(state)
           )
+          nodeViewSynchronizer ! FastSyncDone
         }
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)

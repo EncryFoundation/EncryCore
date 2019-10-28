@@ -2,8 +2,9 @@ package encry.view.state.avlTree
 
 import NodeMsg.NodeProtoMsg.NodeTypes.LeafNodeProto
 import cats.Monoid
+import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
-import encry.view.state.avlTree.utils.implicits.{ Hashable, Serializer }
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
@@ -12,7 +13,10 @@ import scala.util.Try
 final case class LeafNode[K: Serializer: Monoid, V: Serializer: Monoid](key: K, value: V)(implicit hashK: Hashable[K])
     extends Node[K, V] {
 
-  override val hash: Array[Byte] = Algos.hash(implicitly[Serializer[K]].toBytes(key))
+  override val hash: Array[Byte] = Algos.hash(Bytes.concat(
+    implicitly[Serializer[K]].toBytes(key)
+    //implicitly[Serializer[V]].toBytes(value))
+  ))
 
   override val balance: Int = 0
 
