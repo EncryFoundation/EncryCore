@@ -29,7 +29,7 @@ object Transfer extends Command {
     (nodeViewHolder ?
       GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
         Try {
-          val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
+          val secret: PrivateKey25519 = view.vault.accountManagers.head.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
           val fee: Long = args.requireArg[Ast.Num]("fee").i
           val amount: Long = args.requireArg[Ast.Num]("amount").i
