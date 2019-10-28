@@ -20,7 +20,7 @@ object PrintPrivKeys extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (nodeViewHolder ?
       GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Response]] { view =>
-        Some(Response(view.vault.accountManager.accounts.foldLeft("")((str, k) =>
+        Some(Response(view.vault.accountManagers.head.accounts.foldLeft("")((str, k) =>
           str + Algos.encode(k.privKeyBytes)  + "\n"))
         )
       }).mapTo[Option[Response]]

@@ -2,12 +2,14 @@ package encry.view.wallet
 
 import java.io.File
 
+import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
+import io.iohk.iodb.{LSMStore, Store}
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
@@ -17,17 +19,26 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.iq80.leveldb.{DB, Options}
-
 import scala.util.{Failure, Success, Try}
 
-case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManager: AccountManager)
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
   extends StrictLogging with AutoCloseable with Settings {
 
-  val publicKeys: Set[PublicKey25519] = accountManager.publicAccounts.toSet
+  assert(accountManagers.nonEmpty)
 
-  val propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
+  def addAccount(seed: String, password: String): Option[EncryWallet] = if (accountManagers.map(_.number).max < Byte.MaxValue) {
+    val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
+    this.copy(accountManagers = accountManagers :+ newAccount).some
+  } else {
+    logger.warn("Maximum number of accounts exceeded")
+    None
+  }
+
+  def publicKeys: Set[PublicKey25519] = accountManagers.flatMap(_.publicAccounts).toSet
+
+  def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
   def scanPersistent(modifier: PersistentModifier): EncryWallet = modifier match {
     case block: Block =>
@@ -109,11 +120,11 @@ object EncryWallet extends StrictLogging {
     val keysDir: File = getKeysDir(settings)
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
-    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
     val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
-    val accountManager = AccountManager(accountManagerStore, settings.wallet)
+    val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
+    val accountManager = AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0)
     //init keys
-    accountManager.mandatoryAccount
-    EncryWallet(walletStorage, accountManager)
+    EncryWallet(walletStorage, Seq(accountManager), accountManagerStore)
   }
 }

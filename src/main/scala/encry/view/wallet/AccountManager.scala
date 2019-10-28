@@ -13,24 +13,29 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try
 
-case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) extends StrictLogging {
+case class AccountManager(store: Store, password: String, seedOpt: Option[String], number: Byte) extends StrictLogging {
 
   import encry.storage.EncryStorage._
+  import AccountManager._
 
-  lazy val mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
-    store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
-      PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
-    }
-  } getOrElse createMandatory(walletSettings.flatMap(_.seed))
+  private val mandatoryAccountKey: ByteArrayWrapper = ByteArrayWrapper(Array(MetaInfoPrefix, number) ++ Algos.hash(s"account"))
+
+  lazy val mandatoryAccount: PrivateKey25519 = if (number == 0 ) {
+    store.get(mandatoryAccountKey).flatMap { res =>
+      store.get(Array(AccountManager.AccountPrefix, number) ++ res.data).map { secretRes =>
+        PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
+      }
+    } getOrElse createMandatory(seedOpt)
+  } else createMandatory(seedOpt)
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
-    if (k.data.head == AccountManager.AccountPrefix)
+    if (k.data.take(2).sameElements(Array(AccountManager.AccountPrefix, number)))
       acc :+ PrivateKey25519(PrivateKey @@ decrypt(v.data), PublicKey @@ k.data)
     else acc
   }
 
   def publicAccounts: Seq[PublicKey25519] = store.getAll().foldLeft(Seq.empty[PublicKey25519]) { case (acc, (k, _)) =>
-    if (k.data.head == AccountManager.AccountPrefix) acc :+ PublicKey25519(PublicKey @@ k.data.tail)
+    if (k.data.take(2).sameElements(Array(AccountManager.AccountPrefix, number))) acc :+ PublicKey25519(PublicKey @@ k.data.drop(2))
     else acc
   }
 
@@ -57,13 +62,12 @@ case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) 
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
-      Seq((AccountManager.MandatoryAccountKey, ByteArrayWrapper(acc.publicKeyBytes)))
+      Seq((mandatoryAccountKey, ByteArrayWrapper(acc.publicKeyBytes)))
     )
     acc
   }
 
-  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, walletSettings.map(_.password)
-    .getOrElse(throw new RuntimeException("password not specified"))))
+  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, password))
     .fold(e => {
       EncryApp.forceStopApplication(500, s"AccountManager: decryption failed cause ${e.getCause}")
     }, r => r)
@@ -72,10 +76,10 @@ case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) 
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
-
-      Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey),
-        ByteArrayWrapper(AES.encrypt(privateKey, walletSettings.map(_.password)
-          .getOrElse(throw new RuntimeException("password not specified"))))))
+      Seq((ByteArrayWrapper(
+        Array(AccountManager.AccountPrefix, number) ++ publicKey),
+        ByteArrayWrapper(AES.encrypt(privateKey, password))
+      ))
 
     )
   }
@@ -84,5 +88,4 @@ case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) 
 object AccountManager {
   val AccountPrefix: Byte = 0x05
   val MetaInfoPrefix: Byte = 0x15
-  val MandatoryAccountKey: ByteArrayWrapper = ByteArrayWrapper(MetaInfoPrefix +: Algos.hash("account"))
 }
