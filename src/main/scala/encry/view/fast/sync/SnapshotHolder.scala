@@ -3,12 +3,12 @@ package encry.view.fast.sync
 import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import akka.actor.{ Actor, ActorRef, Cancellable, Props }
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.settings.EncryAppSettings
 import SnapshotHolder._
 import encry.view.state.UtxoState
@@ -16,12 +16,23 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.option._
-import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidManifestHasChangedMessage, InvalidManifestMessage, InvalidStateAfterFastSync}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{CacheDoesNotContainApplicableChunk, ChunkApplyError, FastSyncException}
+import encry.network.BlackList.BanReason.{
+  ExpiredNumberOfReRequestAttempts,
+  ExpiredNumberOfRequests,
+  InvalidChunkMessage,
+  InvalidManifestHasChangedMessage,
+  InvalidManifestMessage,
+  InvalidStateAfterFastSync
+}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.view.fast.sync.FastSyncExceptions.{
+  ApplicableChunkIsAbsent,
+  ChunkApplyError,
+  FastSyncException
+}
 import encry.view.history.History
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
+import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import cats.syntax.either._
 
 import scala.util.Try
@@ -122,11 +133,11 @@ class SnapshotHolder(settings: EncryAppSettings,
           (for {
             controllerAndChunk <- snapshotDownloadController.processRequestedChunk(chunk, remote)
             validChunk         <- snapshotProcessor.validateChunk(controllerAndChunk._2)
-            processor          = snapshotProcessor.putChunkIntoCache(validChunk)
-            newProcessor       <- processor.processNextApplicableChunk.leftFlatMap {
-              case e: CacheDoesNotContainApplicableChunk => processor.asRight[FastSyncException]
-              case t => t.asLeft[SnapshotProcessor]
-            }
+            processor          = snapshotProcessor.updateCache(validChunk)
+            newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
+                             case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
+                             case t                                     => t.asLeft[SnapshotProcessor]
+                           }
           } yield (newProcessor, controllerAndChunk._1)) match {
             case Left(error) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))

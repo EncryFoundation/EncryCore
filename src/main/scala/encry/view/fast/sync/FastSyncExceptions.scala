@@ -26,5 +26,5 @@ object FastSyncExceptions {
   final case class ProcessRequestedChunkException(error: String)            extends SnapshotDownloadControllerException
   final case class ProcessManifestHasChangedMessageException(error: String) extends SnapshotDownloadControllerException
 
-  final case class CacheDoesNotContainApplicableChunk(error: String) extends FastSyncException
+  final case class ApplicableChunkIsAbsent(error: String, processor: SnapshotProcessor) extends FastSyncException
 }

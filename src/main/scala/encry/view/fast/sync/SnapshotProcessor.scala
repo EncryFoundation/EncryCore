@@ -1,9 +1,7 @@
 package encry.view.fast.sync
 
 import java.io.File
-
 import SnapshotChunkProto.SnapshotChunkMessage
-import cats.Monad
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
@@ -25,12 +23,11 @@ import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
 import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
-import cats.instances.either
 import cats.syntax.either._
 import scala.language.postfixOps
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
-  CacheDoesNotContainApplicableChunk,
+  ApplicableChunkIsAbsent,
   ChunkApplyError,
   ChunkValidationError,
   EmptyHeightKey,
@@ -42,31 +39,30 @@ import encry.view.fast.sync.FastSyncExceptions.{
 }
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
-
 import scala.collection.immutable.{ HashMap, HashSet }
 import scala.util.{ Failure, Success, Try }
 
-final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
+final case class SnapshotProcessor(settings: EncryAppSettings,
+                                   storage: VersionalStorage,
+                                   applicableChunks: HashSet[ByteArrayWrapper],
+                                   chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk])
     extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
 
-  var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty
+  //var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty
 
-  var chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = HashMap.empty
+  //var chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = HashMap.empty
 
-  def putChunkIntoCache(chunk: SnapshotChunk): SnapshotProcessor = {
-    chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk)
-    this
-  }
+  def updateCache(chunk: SnapshotChunk): SnapshotProcessor =
+    this.copy(chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk))
 
   def addRootChunk(history: History, height: Int): SnapshotProcessor = {
-    val id = history
+    val id: ByteArrayWrapper = history
       .getBestHeaderAtHeight(height)
       .map(header => ByteArrayWrapper(header.stateRoot))
       .getOrElse(ByteArrayWrapper(Array.emptyByteArray))
-    applicableChunks = HashSet(id)
-    this
+    this.copy(applicableChunks = HashSet(id))
   }
 
   def reInitStorage: SnapshotProcessor = {
@@ -117,11 +113,11 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
     } match {
       case Success(_) =>
-        applicableChunks =
-          (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
-            toApplicable.map(node => ByteArrayWrapper(node.hash))
         logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
-        this.asRight[ChunkApplyError]
+        val newApplicableChunk = (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
+          toApplicable.map(node => ByteArrayWrapper(node.hash))
+        logger.info(s"applyChunk -> newApplicableChunk -> newApplicableChunk.size -> ${newApplicableChunk.size}")
+        this.copy(applicableChunks = newApplicableChunk).asRight[ChunkApplyError]
       case Failure(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotProcessor]
     }
   }
@@ -133,21 +129,20 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       // _ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
     } yield chunk
 
-  private def getNextChunk: Either[CacheDoesNotContainApplicableChunk, SnapshotChunk] =
+  private def getNextApplicableChunk: Either[FastSyncException, (SnapshotChunk, SnapshotProcessor)] =
     for {
-      idAndChunk <- Either.fromOption(chunksCache.find {
-                     case (id, _) => applicableChunks.contains(id)
-                   }, CacheDoesNotContainApplicableChunk("No applicable chunk"))
-    } yield {
-      chunksCache = chunksCache - idAndChunk._1
-      idAndChunk._2
-    }
+      idAndChunk <- Either.fromOption(chunksCache.find { case (id, _) => applicableChunks.contains(id) },
+                                      ApplicableChunkIsAbsent("There are no applicable chunks in cache", this))
+      (id: ByteArrayWrapper, chunk: SnapshotChunk)             = idAndChunk
+      newChunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = chunksCache - id
+    } yield (chunk, this.copy(chunksCache = newChunksCache))
 
-  def processNextApplicableChunk: Either[FastSyncException, SnapshotProcessor] =
+  def processNextApplicableChunk(snapshotProcessor: SnapshotProcessor): Either[FastSyncException, SnapshotProcessor] =
     for {
-      chunk                  <- getNextChunk
-      processorAfterApplying <- applyChunk(chunk)
-      processor              <- processorAfterApplying.processNextApplicableChunk
+      chunkAndProcessor  <- snapshotProcessor.getNextApplicableChunk
+      (chunk, processor) = chunkAndProcessor
+      resultedProcessor  <- processor.applyChunk(chunk)
+      processor          <- resultedProcessor.processNextApplicableChunk(resultedProcessor)
     } yield processor
 
   def getUtxo: Either[UtxoCreationError, UtxoState] =
@@ -292,6 +287,6 @@ object SnapshotProcessor extends StrictLogging {
         val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
     }
-    new SnapshotProcessor(settings, storage)
+    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty)
   }
 }
