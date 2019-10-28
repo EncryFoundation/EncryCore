@@ -21,7 +21,7 @@ import encry.network.BlackList.BanReason.{
   ExpiredNumberOfRequests,
   InvalidChunkMessage,
   InvalidManifestHasChangedMessage,
-  InvalidManifestMessage,
+  InvalidResponseManifestMessage,
   InvalidStateAfterFastSync
 }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
@@ -99,26 +99,26 @@ class SnapshotHolder(settings: EncryAppSettings,
             snapshotDownloadController.checkManifestValidity(manifest.manifestId.toByteArray, history)
           val canBeProcessed: Boolean = snapshotDownloadController.canNewManifestBeProcessed
           if (isValidManifest && canBeProcessed) {
-            snapshotDownloadController.processManifest(manifest, remote, history) match {
+            (for {
+              controller <- snapshotDownloadController.processManifest(manifest, remote, history)
+              processor <- snapshotProcessor.initializeApplicableChunksCache(
+                            history,
+                            snapshotDownloadController.requiredManifestHeight
+                          )
+            } yield (controller, processor)) match {
               case Left(error) =>
-                nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.error))
-              case Right(newController) =>
-                snapshotDownloadController = newController
-                snapshotProcessor.initializeApplicableChunksCache(
-                  history,
-                  snapshotDownloadController.requiredManifestHeight
-                ) match {
-                  case Left(error)  =>
-                  case Right(processor) =>
-                    snapshotProcessor = processor
-                    self ! RequestNextChunks
-                }
+                nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
+              case Right((controller, processor)) =>
+                logger.info(s"Request manifest message successfully processed")
+                snapshotDownloadController = controller
+                snapshotProcessor = processor
+                self ! RequestNextChunks
             }
           } else if (!isValidManifest) {
             logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
             nodeViewSynchronizer ! BanPeer(
               remote,
-              InvalidManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
+              InvalidResponseManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
             )
           } else logger.info(s"Doesn't need to process new manifest.")
 

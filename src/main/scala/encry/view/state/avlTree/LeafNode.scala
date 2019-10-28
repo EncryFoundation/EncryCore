@@ -4,19 +4,19 @@ import NodeMsg.NodeProtoMsg.NodeTypes.LeafNodeProto
 import cats.Monoid
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
-import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
-import io.iohk.iodb.ByteArrayWrapper
+import encry.view.state.avlTree.utils.implicits.{ Hashable, Serializer }
 import org.encryfoundation.common.utils.Algos
-
 import scala.util.Try
 
 final case class LeafNode[K: Serializer: Monoid, V: Serializer: Monoid](key: K, value: V)(implicit hashK: Hashable[K])
     extends Node[K, V] {
 
-  override val hash: Array[Byte] = Algos.hash(Bytes.concat(
-    implicitly[Serializer[K]].toBytes(key)
-    //implicitly[Serializer[V]].toBytes(value))
-  ))
+  override val hash: Array[Byte] = Algos.hash(
+    Bytes.concat(
+      implicitly[Serializer[K]].toBytes(key),
+      implicitly[Serializer[V]].toBytes(value)
+    )
+  )
 
   override val balance: Int = 0
 
@@ -34,8 +34,9 @@ object LeafNode {
       .withKey(ByteString.copyFrom(kSer.toBytes(leaf.key)))
       .withValue(ByteString.copyFrom(vSer.toBytes(leaf.value)))
 
-  def fromProto[K: Hashable : Monoid, V : Monoid](leafProto: LeafNodeProto)(implicit kSer: Serializer[K],
-                                                                            vSer: Serializer[V]): Try[LeafNode[K, V]] = Try {
+  def fromProto[K: Hashable: Monoid, V: Monoid](
+    leafProto: LeafNodeProto
+  )(implicit kSer: Serializer[K], vSer: Serializer[V]): Try[LeafNode[K, V]] = Try {
     LeafNode(
       kSer.fromBytes(leafProto.key.toByteArray),
       vSer.fromBytes(leafProto.value.toByteArray),
