@@ -1,7 +1,8 @@
 package encry.view
 
 import java.io.File
-
+import java.nio.file.Path
+import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -22,9 +23,11 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
+import encry.view.fast.sync.{SnapshotHolder, SnapshotProcessor}
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
+import encry.view.state.UtxoState.logger
 import encry.view.state._
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
@@ -99,16 +102,37 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
         logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
-        canDownloadPayloads = true
-        nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
-        nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
-          logger.info(s"Updated best block in fast sync mod. Updated state height.")
-          val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
-          updateNodeView(
-            updatedHistory = Some(history),
-            updatedState = Some(state)
-          )
-          nodeViewSynchronizer ! FastSyncDone
+
+      import org.apache.commons.io.FileUtils
+      import org.apache.commons.io.filefilter.WildcardFileFilter
+      nodeView.state.tree.storage.close()
+      FileUtils.deleteDirectory(UtxoState.getStateDir(settings))
+      val stateDir: Path = UtxoState.getStateDir(settings).toPath
+      val snapshotProcessorDir: Path = SnapshotProcessor.getDirProcessSnapshots(settings).toPath
+      import java.io.File
+      import java.nio.file.{Files, Path, StandardCopyOption}
+      val newPath: Path = Files.move(snapshotProcessorDir, stateDir, StandardCopyOption.ATOMIC_MOVE)
+      val stateDirNew: File = newPath.toFile
+      val newState: UtxoState = state.copy(tree = state.tree.copy(storage = settings.storage.state match {
+        case VersionalStorage.IODB =>
+          logger.info("Init state with iodb storage")
+          IODBWrapper(new LSMStore(stateDirNew, keepVersions = settings.constants.DefaultKeepVersions))
+        case VersionalStorage.LevelDB =>
+          logger.info("Init state with levelDB storage")
+          val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
+      }))
+
+      canDownloadPayloads = true
+      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
+      nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
+        logger.info(s"Updated best block in fast sync mod. Updated state height.")
+        val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
+        updateNodeView(
+          updatedHistory = Some(history),
+          updatedState = Some(newState)
+        )
+        nodeViewSynchronizer ! FastSyncDone
         }
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
