@@ -3,7 +3,6 @@ package encry.view.wallet
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.crypto.encryption.AES
-import encry.settings.WalletSettings
 import encry.utils.Mnemonic
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
@@ -13,20 +12,7 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try
 
-case class AccountManager private(store: Store, password: String, privateKey: PrivateKey25519, number: Byte) extends StrictLogging {
-
-  import encry.storage.EncryStorage._
-  import AccountManager._
-
-  private val mandatoryAccountKey: ByteArrayWrapper = ByteArrayWrapper(Array(MetaInfoPrefix, number) ++ Algos.hash(s"account"))
-
-  lazy val mandatoryAccount: PrivateKey25519 = if (number == 0 ) {
-    store.get(mandatoryAccountKey).flatMap { res =>
-      store.get(Array(AccountManager.AccountPrefix, number) ++ res.data).map { secretRes =>
-        PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
-      }
-    } getOrElse createMandatory(privateKey)
-  } else createMandatory(privateKey)
+case class AccountManager private(store: Store, password: String, mandatoryAccount: PrivateKey25519, number: Byte) extends StrictLogging {
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.take(2).sameElements(Array(AccountManager.AccountPrefix, number)))
@@ -57,16 +43,6 @@ case class AccountManager private(store: Store, password: String, privateKey: Pr
     PrivateKey25519(privateKey, publicKey)
   }
 
-  def createMandatory(acc: PrivateKey25519): PrivateKey25519 = {
-    saveAccount(acc.privKeyBytes, acc.publicKeyBytes)
-    store.update(
-      scala.util.Random.nextLong(),
-      Seq.empty,
-      Seq((mandatoryAccountKey, ByteArrayWrapper(acc.publicKeyBytes)))
-    )
-    acc
-  }
-
   private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, password))
     .fold(e => {
       EncryApp.forceStopApplication(500, s"AccountManager: decryption failed cause ${e.getCause}")
@@ -89,6 +65,25 @@ object AccountManager {
   val AccountPrefix: Byte = 0x05
   val MetaInfoPrefix: Byte = 0x15
 
+  def restoreAccounts(store: Store, password: String): Seq[AccountManager] =
+    (0.toByte to Byte.MaxValue).foldLeft((Seq.empty[AccountManager], true)) { case ((retrieved, foundLast), number) =>
+      if (!foundLast) retrieved -> false
+      else {
+        val mandatoryAccountKey: ByteArrayWrapper = ByteArrayWrapper(Array(MetaInfoPrefix, number.toByte) ++ Algos.hash("account"))
+        val accOpt: Option[PrivateKey25519] = store.get(mandatoryAccountKey).flatMap{ res =>
+        val key: ByteArrayWrapper = ByteArrayWrapper(Array(AccountManager.AccountPrefix, number.toByte) ++ res.data)
+          store.get(key).map { secretRes =>
+            PrivateKey25519(PrivateKey @@ AES.decrypt(secretRes.data, password), PublicKey @@ res.data)
+          }
+        }
+
+        accOpt match {
+          case Some(acc) => (retrieved :+ this(store, password, acc, number.toByte)) -> true
+          case None => retrieved -> false
+        }
+      }
+    }._1
+
   def apply(store: Store, password: String, seedOpt: Option[String], number: Byte): AccountManager = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
@@ -103,6 +98,18 @@ object AccountManager {
           }
       )
     )
+    saveAccount(store, password, number, privateKey, publicKey)
     this(store, password, PrivateKey25519(privateKey, publicKey), number)
+  }
+
+  private def saveAccount(store: Store, password: String, number: Byte, privateKey: PrivateKey, publicKey: PublicKey): Unit = {
+    store.update(
+      scala.util.Random.nextLong(),
+      Seq.empty,
+      Seq(
+        ByteArrayWrapper(Array(AccountManager.AccountPrefix, number) ++ publicKey) -> ByteArrayWrapper(AES.encrypt(privateKey, password)),
+        ByteArrayWrapper(Array(MetaInfoPrefix, number) ++ Algos.hash("account")) -> ByteArrayWrapper(publicKey)
+      )
+    )
   }
 }
