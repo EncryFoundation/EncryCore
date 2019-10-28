@@ -77,13 +77,16 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       this
     }
 
-  def reInitStorage: SnapshotProcessor = {
-    storage.close()
-    val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
-    import org.apache.commons.io.FileUtils
-    FileUtils.deleteDirectory(dir)
-    SnapshotProcessor.initialize(settings)
-  }
+  def reInitStorage: SnapshotProcessor =
+    try {
+      storage.close()
+      val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
+      import org.apache.commons.io.FileUtils
+      FileUtils.deleteDirectory(dir)
+      SnapshotProcessor.initialize(settings)
+    } catch {
+      case _: Throwable => sys.exit(9999)
+    }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
     case shadowNode: ShadowNode[StorageKey, StorageValue] => shadowNode :: Nil
