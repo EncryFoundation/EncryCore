@@ -13,7 +13,7 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try
 
-case class AccountManager(store: Store, password: String, seedOpt: Option[String], number: Byte) extends StrictLogging {
+case class AccountManager private(store: Store, password: String, privateKey: PrivateKey25519, number: Byte) extends StrictLogging {
 
   import encry.storage.EncryStorage._
   import AccountManager._
@@ -25,8 +25,8 @@ case class AccountManager(store: Store, password: String, seedOpt: Option[String
       store.get(Array(AccountManager.AccountPrefix, number) ++ res.data).map { secretRes =>
         PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
       }
-    } getOrElse createMandatory(seedOpt)
-  } else createMandatory(seedOpt)
+    } getOrElse createMandatory(privateKey)
+  } else createMandatory(privateKey)
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.take(2).sameElements(Array(AccountManager.AccountPrefix, number)))
@@ -57,8 +57,8 @@ case class AccountManager(store: Store, password: String, seedOpt: Option[String
     PrivateKey25519(privateKey, publicKey)
   }
 
-  def createMandatory(seedOpt: Option[String]): PrivateKey25519 = {
-    val acc: PrivateKey25519 = createAccount(seedOpt)
+  def createMandatory(acc: PrivateKey25519): PrivateKey25519 = {
+    saveAccount(acc.privKeyBytes, acc.publicKeyBytes)
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
@@ -88,4 +88,21 @@ case class AccountManager(store: Store, password: String, seedOpt: Option[String
 object AccountManager {
   val AccountPrefix: Byte = 0x05
   val MetaInfoPrefix: Byte = 0x15
+
+  def apply(store: Store, password: String, seedOpt: Option[String], number: Byte): AccountManager = {
+    val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
+      Blake2b256.hash(
+        seedOpt
+          .map {
+            Mnemonic.seedFromMnemonic(_)
+          }
+          .getOrElse {
+            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+            println(s"\nMnemonic code is:\n$phrase")
+            Mnemonic.seedFromMnemonic(phrase)
+          }
+      )
+    )
+    this(store, password, PrivateKey25519(privateKey, publicKey), number)
+  }
 }
