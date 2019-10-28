@@ -3,47 +3,33 @@ package encry.view.fast.sync
 import java.io.File
 
 import SnapshotChunkProto.SnapshotChunkMessage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import cats.Monad
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
-import encry.view.fast.sync.SnapshotHolder.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
-import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.view.state.avlTree.{AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
-import org.iq80.leveldb.{ DB, Options }
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.hash.Digest32
 
 import scala.language.postfixOps
 import cats.syntax.either._
 import com.google.common.primitives.Ints
-import encry.view.fast.sync.FastSyncExceptions.{
-  CacheDoesNotContainApplicableChunk,
-  ChunkApplyError,
-  ChunkValidationError,
-  EmptyHeightKey,
-  EmptyRootNodeError,
-  FastSyncException,
-  ProcessNewBlockError,
-  ProcessNewSnapshotError,
-  UtxoCreationError
-}
+import encry.view.fast.sync.FastSyncExceptions.{CacheDoesNotContainApplicableChunk, ChunkApplyError, ChunkValidationError, EmptyHeightKey, EmptyRootNodeError, FastSyncException, ProcessNewBlockError, ProcessNewSnapshotError, UtxoCreationError}
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
 
-import scala.collection.immutable.{ HashMap, HashSet }
-import scala.util.{ Failure, Success, Try }
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.util.{Failure, Success, Try}
 
 final case class SnapshotProcessor(settings: EncryAppSettings, storage: VersionalStorage)
     extends StrictLogging
@@ -62,9 +48,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
   def addRootChunk(history: History, height: Int): SnapshotProcessor = {
     val id = history
       .getBestHeaderAtHeight(height)
-      .map { header =>
-        ByteArrayWrapper(header.stateRoot)
-      }
+      .map(header => ByteArrayWrapper(header.stateRoot))
       .getOrElse(ByteArrayWrapper(Array.emptyByteArray))
     applicableChunks = HashSet(id)
     this
@@ -127,6 +111,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
     }
   }
 
+  //todo: rename
   def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
     for {
       _ <- ChunkValidator.checkForIdConsistent(chunk)
@@ -143,20 +128,27 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       idAndChunk._2
     }
 
-  @scala.annotation.tailrec
   def processNextApplicableChunk: Either[FastSyncException, SnapshotProcessor] =
-    (for {
+    {
+      (for {
       chunk     <- getNextChunk
       processor <- applyChunk(chunk)
-    } yield processor) match {
-      case Left(_: CacheDoesNotContainApplicableChunk) =>
-        logger.info(s"There are no applicable chunks in cache")
-        this.asRight[ChunkApplyError]
-      case l @ Left(_) => l
-      case Right(processor) =>
-        logger.info(s"New chunk applied successfully. Start next application")
-        processor.processNextApplicableChunk
+      } yield processor) match {
+        case Left(_: CacheDoesNotContainApplicableChunk) =>
+          logger.info(s"There are no applicable chunks in cache")
+          this.asRight[ChunkApplyError]
+        case l @ Left(_) => l
+        case Right(processor) =>
+          logger.info(s"New chunk applied successfully. Start next application")
+          processor.processNextApplicableChunk
+      }
+//      for {
+//        chunk <- getNextChunk
+//        processor <- applyChunk(chunk)
+//        _ <- processNextApplicableChunk
+//      } yield this
     }
+
 
   def getUtxo: Either[UtxoCreationError, UtxoState] =
     for {
@@ -178,17 +170,17 @@ final case class SnapshotProcessor(settings: EncryAppSettings, storage: Versiona
       case None     => EmptyRootNodeError("Key root node doesn't exist!").asLeft[StorageKey]
     }
 
+  private def getNode(nodeId: Array[Byte]): Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
+    storage
+      .get(StorageKey @@ nodeId)
+      .fold(EmptyRootNodeError(s"Node with id ${Algos.encode(nodeId)} doesn't exist")
+          .asLeft[Node[StorageKey, StorageValue]]
+      )(NodeSerilalizer.fromBytes[StorageKey, StorageValue](_).asRight[EmptyRootNodeError])
+
   private def getRootNode: Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
     for {
       rootNodeId <- getRootNodeId
-      node <- storage
-               .get(rootNodeId)
-               .fold(
-                 EmptyRootNodeError(s"Node with id ${Algos.encode(rootNodeId)} doesn't exist")
-                   .asLeft[Node[StorageKey, StorageValue]]
-               )(
-                 nodeBytes => NodeSerilalizer.fromBytes[StorageKey, StorageValue](nodeBytes).asRight[EmptyRootNodeError]
-               )
+      node <- getNode(rootNodeId)
     } yield node
 
   def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotProcessor] = {
