@@ -26,11 +26,7 @@ import encry.network.BlackList.BanReason.{
 }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{
-  ApplicableChunkIsAbsent,
-  ChunkApplyError,
-  FastSyncException
-}
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, ChunkApplyError, FastSyncException }
 import encry.view.history.History
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import cats.syntax.either._
@@ -131,14 +127,15 @@ class SnapshotHolder(settings: EncryAppSettings,
 
         case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
           (for {
-            controllerAndChunk <- snapshotDownloadController.processRequestedChunk(chunk, remote)
-            validChunk         <- snapshotProcessor.validateChunk(controllerAndChunk._2)
-            processor          = snapshotProcessor.updateCache(validChunk)
+            controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
+            (controller, chunk) = controllerAndChunk
+            validChunk          <- snapshotProcessor.validateChunkId(chunk)
+            processor           = snapshotProcessor.updateCache(validChunk)
             newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
                              case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
-                             case t                                     => t.asLeft[SnapshotProcessor]
+                             case t                          => t.asLeft[SnapshotProcessor]
                            }
-          } yield (newProcessor, controllerAndChunk._1)) match {
+          } yield (newProcessor, controller)) match {
             case Left(error) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
               snapshotProcessor = snapshotProcessor.reInitStorage
@@ -156,7 +153,7 @@ class SnapshotHolder(settings: EncryAppSettings,
               )
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
-              processor.getUtxo match {
+              processor.assembleUTXOState match {
                 case Right(state) if state.validateTreeAfterFastSync =>
                   nodeViewHolder ! FastSyncFinished(state)
                   if (settings.snapshotSettings.enableSnapshotCreation) {

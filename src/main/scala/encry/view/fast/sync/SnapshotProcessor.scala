@@ -1,6 +1,7 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
@@ -24,6 +25,7 @@ import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
 import org.iq80.leveldb.{ DB, Options }
 import scorex.crypto.hash.Digest32
 import cats.syntax.either._
+
 import scala.language.postfixOps
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
@@ -33,12 +35,14 @@ import encry.view.fast.sync.FastSyncExceptions.{
   EmptyHeightKey,
   EmptyRootNodeError,
   FastSyncException,
+  InconsistentChunkId,
   ProcessNewBlockError,
   ProcessNewSnapshotError,
   UtxoCreationError
 }
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
+
 import scala.collection.immutable.{ HashMap, HashSet }
 import scala.util.{ Failure, Success, Try }
 
@@ -49,10 +53,6 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
-
-  //var applicableChunks: HashSet[ByteArrayWrapper] = HashSet.empty
-
-  //var chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = HashMap.empty
 
   def updateCache(chunk: SnapshotChunk): SnapshotProcessor =
     this.copy(chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk))
@@ -122,12 +122,12 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     }
   }
 
-  //todo: rename
-  def validateChunk(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
-    for {
-      _ <- ChunkValidator.checkForIdConsistent(chunk)
-      // _ <- ChunkValidator.checkForApplicableChunk(chunk, applicableChunks)
-    } yield chunk
+  def validateChunkId(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
+    if (chunk.node.hash.sameElements(chunk.id)) chunk.asRight[ChunkValidationError]
+    else
+      InconsistentChunkId(
+        s"Node hash:(${Algos.encode(chunk.node.hash)}) doesn't equal to chunk id:(${Algos.encode(chunk.id)})"
+      ).asLeft[SnapshotChunk]
 
   private def getNextApplicableChunk: Either[FastSyncException, (SnapshotChunk, SnapshotProcessor)] =
     for {
@@ -145,7 +145,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       processor          <- resultedProcessor.processNextApplicableChunk(resultedProcessor)
     } yield processor
 
-  def getUtxo: Either[UtxoCreationError, UtxoState] =
+  def assembleUTXOState: Either[UtxoCreationError, UtxoState] =
     for {
       rootNode <- getRootNode
       height   <- getHeight
@@ -153,25 +153,20 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     } yield UtxoState(avlTree, height, settings.constants)
 
   private def getHeight: Either[EmptyHeightKey, Height] =
-    storage
-      .get(UtxoState.bestHeightKey)
-      .fold(EmptyHeightKey("bestHeightKey is empty").asLeft[Height])(
-        bytes => (Height @@ Ints.fromByteArray(bytes)).asRight[EmptyHeightKey]
-      )
+    Either.fromOption(storage.get(UtxoState.bestHeightKey).map(Height @@ Ints.fromByteArray(_)),
+                      EmptyHeightKey("bestHeightKey is empty"))
 
   private def getRootNodeId: Either[EmptyRootNodeError, StorageKey] =
-    storage.get(AvlTree.rootNodeKey) match {
-      case Some(id) => (StorageKey !@@ id).asRight[EmptyRootNodeError]
-      case None     => EmptyRootNodeError("Key root node doesn't exist!").asLeft[StorageKey]
-    }
+    Either.fromOption(
+      storage.get(AvlTree.rootNodeKey).map(StorageKey !@@ _),
+      EmptyRootNodeError("Root node key doesn't exist")
+    )
 
   private def getNode(nodeId: Array[Byte]): Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
-    storage
-      .get(StorageKey @@ nodeId)
-      .fold(
-        EmptyRootNodeError(s"Node with id ${Algos.encode(nodeId)} doesn't exist")
-          .asLeft[Node[StorageKey, StorageValue]]
-      )(NodeSerilalizer.fromBytes[StorageKey, StorageValue](_).asRight[EmptyRootNodeError])
+    Either.fromOption(
+      storage.get(StorageKey @@ nodeId).map(NodeSerilalizer.fromBytes[StorageKey, StorageValue](_)),
+      EmptyRootNodeError(s"Node with id ${Algos.encode(nodeId)} doesn't exist")
+    )
 
   private def getRootNode: Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
     for {

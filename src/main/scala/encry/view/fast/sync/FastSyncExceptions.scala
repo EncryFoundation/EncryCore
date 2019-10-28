@@ -17,7 +17,7 @@ object FastSyncExceptions {
   final case class EmptyHeightKey(error: String)     extends UtxoCreationError
 
   sealed trait ChunkValidationError extends FastSyncException
-  final case class InconsistentId(error: String) extends ChunkValidationError
+  final case class InconsistentChunkId(error: String) extends ChunkValidationError
   final case class NotApplicableId(error: String) extends ChunkValidationError
   final case class InvalidChunkBytes(error: String) extends ChunkValidationError
 
