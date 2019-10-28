@@ -80,7 +80,7 @@ object EncryWallet extends StrictLogging {
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
     val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
     val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
-    val accountManager = AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0)
+    val accountManager = AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte)
     //init keys
     accountManager.mandatoryAccount
     EncryWallet(walletStorage, Seq(accountManager), settings.constants.IntrinsicTokenId, accountManagerStore)
