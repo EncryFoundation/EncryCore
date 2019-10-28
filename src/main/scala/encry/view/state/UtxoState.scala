@@ -102,6 +102,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               combinedStateChange.inputsToDb.toList,
               Height @@ block.header.height
             )
+            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}")
+            logger.info(s"block.header.stateRoot ${Algos.encode(block.header.stateRoot)}")
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
               logger.info(s"Invalid state root!")
               List(StateModifierApplyError(s"Incorrect state root after block (${block.header.encodedId}) applying. " +

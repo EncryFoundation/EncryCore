@@ -3,7 +3,7 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg
 import NodeMsg.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
 import cats.Monoid
-import com.google.common.primitives.Ints
+import com.google.common.primitives.{Bytes, Ints}
 import com.google.protobuf.ByteString
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
@@ -18,6 +18,20 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
                                                                                       leftChild: Option[Node[K, V]],
                                                                                       rightChild: Option[Node[K, V]])
     extends Node[K, V] {
+
+  override val hash: Array[Byte] = {
+    val serK = implicitly[Serializer[K]]
+    val serV = implicitly[Serializer[V]]
+    Algos.hash(
+      Bytes.concat(serK.toBytes(key),
+        serV.toBytes(value),
+        Ints.toByteArray(height),
+        Ints.toByteArray(balance),
+        leftChild.map(_.hash).getOrElse(Array.emptyByteArray),
+        rightChild.map(_.hash).getOrElse(Array.emptyByteArray)
+      )
+    )
+  }
 
   override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] =
     if (leftChild.isEmpty & rightChild.isEmpty) {
