@@ -27,4 +27,6 @@ object FastSyncExceptions {
   final case class ProcessManifestHasChangedMessageException(error: String) extends SnapshotDownloadControllerException
 
   final case class ApplicableChunkIsAbsent(error: String, processor: SnapshotProcessor) extends FastSyncException
+  final case class BestHeaderAtHeightIsAbsent(error: String) extends FastSyncException
+  final case class InitializeHeightAndRootKeysException(error: String) extends FastSyncException
 }

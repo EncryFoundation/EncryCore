@@ -30,12 +30,14 @@ import scala.language.postfixOps
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
   ApplicableChunkIsAbsent,
+  BestHeaderAtHeightIsAbsent,
   ChunkApplyError,
   ChunkValidationError,
   EmptyHeightKey,
   EmptyRootNodeError,
   FastSyncException,
   InconsistentChunkId,
+  InitializeHeightAndRootKeysException,
   ProcessNewBlockError,
   ProcessNewSnapshotError,
   UtxoCreationError
@@ -57,13 +59,29 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
   def updateCache(chunk: SnapshotChunk): SnapshotProcessor =
     this.copy(chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk))
 
-  def addRootChunk(history: History, height: Int): SnapshotProcessor = {
-    val id: ByteArrayWrapper = history
-      .getBestHeaderAtHeight(height)
-      .map(header => ByteArrayWrapper(header.stateRoot))
-      .getOrElse(ByteArrayWrapper(Array.emptyByteArray))
-    this.copy(applicableChunks = HashSet(id))
-  }
+  def initializeApplicableChunksCache(history: History, height: Int): Either[FastSyncException, SnapshotProcessor] =
+    for {
+      stateRoot <- Either.fromOption(
+                    history.getBestHeaderAtHeight(height).map(_.stateRoot),
+                    BestHeaderAtHeightIsAbsent(s"There is no best header at required height $height")
+                  )
+      processor: SnapshotProcessor = this.copy(applicableChunks = HashSet(ByteArrayWrapper(stateRoot)))
+      resultedProcessor <- processor.initializeHeightAndRootKeys(stateRoot, height) match {
+                            case Left(error) =>
+                              InitializeHeightAndRootKeysException(error.getMessage).asLeft[SnapshotProcessor]
+                            case Right(newProcessor) => newProcessor.asRight[FastSyncException]
+                          }
+    } yield resultedProcessor
+
+  private def initializeHeightAndRootKeys(rootNodeId: Array[Byte], height: Int): Either[Throwable, SnapshotProcessor] =
+    Either.catchNonFatal {
+      storage.insert(
+        StorageVersion @@ Random.randomBytes(),
+        AvlTree.rootNodeKey       -> StorageValue @@ rootNodeId ::
+          UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(height) :: Nil
+      )
+      this
+    }
 
   def reInitStorage: SnapshotProcessor = {
     storage.close()
@@ -71,15 +89,6 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     import org.apache.commons.io.FileUtils
     FileUtils.deleteDirectory(dir)
     SnapshotProcessor.initialize(settings, fatsSync = true)
-  }
-
-  def setRSnapshotData(rootNodeId: Array[Byte], utxoHeight: Int): SnapshotProcessor = {
-    storage.insert(
-      StorageVersion @@ Random.randomBytes(),
-      AvlTree.rootNodeKey       -> StorageValue @@ rootNodeId ::
-        UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(utxoHeight) :: Nil
-    )
-    this
   }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {

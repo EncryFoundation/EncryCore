@@ -104,18 +104,15 @@ class SnapshotHolder(settings: EncryAppSettings,
                 nodeViewSynchronizer ! BanPeer(remote, InvalidManifestMessage(error.error))
               case Right(newController) =>
                 snapshotDownloadController = newController
-                snapshotProcessor =
-                  snapshotProcessor.addRootChunk(history, snapshotDownloadController.requiredManifestHeight)
-                val rootBytes: Array[Byte] = history.getBestHeaderAtHeight {
+                snapshotProcessor.initializeApplicableChunksCache(
+                  history,
                   snapshotDownloadController.requiredManifestHeight
-                }.map { header =>
-                  header.stateRoot
-                }.getOrElse {
-                  Array.emptyByteArray
+                ) match {
+                  case Left(error)  =>
+                  case Right(processor) =>
+                    snapshotProcessor = processor
+                    self ! RequestNextChunks
                 }
-                snapshotProcessor =
-                  snapshotProcessor.setRSnapshotData(rootBytes, snapshotDownloadController.requiredManifestHeight)
-                self ! RequestNextChunks
             }
           } else if (!isValidManifest) {
             logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")

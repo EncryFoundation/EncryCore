@@ -101,8 +101,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
-        logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
-
+      logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
       import org.apache.commons.io.FileUtils
       import org.apache.commons.io.filefilter.WildcardFileFilter
       nodeView.state.tree.storage.close()
