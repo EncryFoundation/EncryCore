@@ -90,6 +90,15 @@ trait HttpApi { // scalastyle:ignore
     )
   }
 
+  def bestFullHeaderId: Future[String] = get("/info") flatMap { r =>
+    val response = jsonAnswerAs[Json](r.getResponseBody)
+    val eitherId = response.hcursor.downField("bestFullHeaderId").as[Option[String]]
+    eitherId.fold[Future[String]](
+      e => Future.failed(new Exception(s"Error getting `bestFullHeaderId` from /info response: $e\n$response", e)),
+      maybeId => Future.successful(maybeId.getOrElse(""))
+    )
+  }
+
   def balances: Future[Map[String, Long]] = get("/wallet/info") flatMap { r =>
     val response = jsonAnswerAs[Json](r.getResponseBody)
     val eitherBalance = response.hcursor.downField("balances").as[Map[String, String]]
@@ -148,13 +157,23 @@ trait HttpApi { // scalastyle:ignore
     waitFor[Int](_.headersHeight, h => h >= expectedHeight, retryingInterval)
   }
 
+  def waitForBestFullHeaderId(expectedId: String, retryingInterval: FiniteDuration = 1.minute): Future[String] = {
+    waitFor[String](_.bestFullHeaderId, id => id == expectedId, retryingInterval)
+  }
+
   def waitFor[A](f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
     timer.retryUntil(f(this), cond, retryInterval)
   }
 
   def connect(addressAndPort: String): Future[Unit] = post("/peers/connect", addressAndPort).map(_ => ())
 
+  def shutdown: Future[Unit] = post("/node/shutdown", "").map(_ => ())
+
   def postJson[A: Encoder](path: String, body: A): Future[Response] =
     post(path, body.asJson.toString())
+
+  def error(): Unit = {
+
+  }
 
 }

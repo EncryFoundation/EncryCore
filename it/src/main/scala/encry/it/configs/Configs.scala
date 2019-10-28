@@ -22,6 +22,12 @@ object Configs {
     """.stripMargin
   )
 
+  def connectOnlyWithKnownPeers(connectOnlyWithKnownPeersEnable: Boolean): Config = ConfigFactory.parseString(
+    s"""
+       |encry.network.connectOnlyWithKnownPeers=$connectOnlyWithKnownPeersEnable
+    """.stripMargin
+  )
+
   def miningDelay(miningDelay: Int): Config = ConfigFactory.parseString(
     s"""
        |encry.node.miningDelay=${miningDelay}s
@@ -44,4 +50,23 @@ object Configs {
        |encry.wallet.seed="$key"
      """.stripMargin
   )
+
+  def networkAddress(address: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.network.bindAddress = "$address"
+     """.stripMargin
+  )
+
+  def apiAddress(address: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.restApi.bindAddress = "$address"
+     """.stripMargin
+  )
+
+  def constantsClass(name: String): Config = ConfigFactory.parseString(
+    s"""
+       |encry.node.constantsClass="$name"
+    """.stripMargin
+  )
+
 }

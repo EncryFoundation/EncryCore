@@ -1,6 +1,6 @@
 package encry.it.transactions
 
-import TransactionGenerator.CreateTransaction
+import encry.it.utils.CreateTransaction
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
