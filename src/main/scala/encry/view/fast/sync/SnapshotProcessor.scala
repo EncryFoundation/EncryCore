@@ -1,8 +1,6 @@
 package encry.view.fast.sync
 
 import java.io.File
-
-import SnapshotChunkProto.SnapshotChunkMessage
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
@@ -23,9 +21,7 @@ import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
 import org.iq80.leveldb.{ DB, Options }
-import scorex.crypto.hash.Digest32
 import cats.syntax.either._
-
 import scala.language.postfixOps
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
@@ -44,9 +40,7 @@ import encry.view.fast.sync.FastSyncExceptions.{
 }
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
-
 import scala.collection.immutable.{ HashMap, HashSet }
-import scala.util.{ Failure, Success, Try }
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
                                    storage: VersionalStorage,
@@ -88,7 +82,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
     import org.apache.commons.io.FileUtils
     FileUtils.deleteDirectory(dir)
-    SnapshotProcessor.initialize(settings, fatsSync = true)
+    SnapshotProcessor.initialize(settings)
   }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
@@ -118,16 +112,15 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
         StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
       fullData :: shadowData :: Nil
     }
-    Try {
+    Either.catchNonFatal(
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-    } match {
-      case Success(_) =>
+    ) match {
+      case Right(_) =>
         logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
         val newApplicableChunk = (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
           toApplicable.map(node => ByteArrayWrapper(node.hash))
-        logger.info(s"applyChunk -> newApplicableChunk -> newApplicableChunk.size -> ${newApplicableChunk.size}")
         this.copy(applicableChunks = newApplicableChunk).asRight[ChunkApplyError]
-      case Failure(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotProcessor]
+      case Left(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotProcessor]
     }
   }
 
@@ -191,20 +184,13 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     updateActualSnapshot(history, block.header.height - settings.levelDB.maxVersions)
   }
 
-  def getChunkById(chunkId: Array[Byte]): Option[SnapshotChunkMessage] =
-    storage.get(StorageKey @@ chunkId).flatMap(e => Try(SnapshotChunkMessage.parseFrom(e)).toOption)
-
   def createNewSnapshot(
     id: Array[Byte],
     manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
   ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
     //todo add only exists chunks
-    val manifest: SnapshotManifest =
-      SnapshotManifest(
-        id,
-        newChunks.map(_.id)
-      )
+    val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
     val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
       val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
       StorageKey @@ elem.id -> StorageValue @@ bytes
@@ -217,32 +203,19 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
     val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
     logger.info(s"A new snapshot created successfully. Insertion started.")
-    Either.fromTry(Try(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty))) match {
-      case Left(value) =>
-        logger.info(value.getMessage)
-        ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
-      case Right(_) =>
-        this.asRight[ProcessNewSnapshotError]
+    Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
+      case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
+      case Right(_)    => this.asRight[ProcessNewSnapshotError]
     }
   }
 
-  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] = {
-    val startTime = System.currentTimeMillis()
-    Either.fromOption(
-      history.getBestHeaderAtHeight(height).map { header =>
-        val id: Digest32 = Algos.hash(header.stateRoot ++ header.id)
-        logger.info(
-          s"Block id at height $height is ${header.encodedId}. State root is ${Algos.encode(header.stateRoot)}" +
-            s" Expected manifest id is ${Algos.encode(id)}"
-        )
-        id
-      },
-      ProcessNewBlockError(s"There is no best header at height $height")
-    ) match {
-      case Left(error) =>
-        logger.info(error.toString)
-        error.asLeft[SnapshotProcessor]
-      case Right(bestManifestId) =>
+  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] =
+    for {
+      bestManifestId <- Either.fromOption(
+                         history.getBestHeaderAtHeight(height).map(header => Algos.hash(header.stateRoot ++ header.id)),
+                         ProcessNewBlockError(s"There is no best header at height $height")
+                       )
+      processor <- {
         logger.info(s"Expected manifest id at height $height is ${Algos.encode(bestManifestId)}")
         val manifestIdsToRemove: Seq[Array[Byte]]    = potentialManifestsIds.filterNot(_.sameElements(bestManifestId))
         val manifestsToRemove: Seq[SnapshotManifest] = manifestIdsToRemove.flatMap(l => manifestById(StorageKey @@ l))
@@ -255,29 +228,22 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
         val toDelete: List[Array[Byte]] =
           PotentialManifestsIdsKey :: manifestIdsToRemove.toList ::: resultedChunksToRemove
         val toApply: (StorageKey, StorageValue) = ActualManifestKey -> StorageValue @@ bestManifestId
-        Either.fromTry(
-          Try(storage.insert(StorageVersion @@ Random.randomBytes(), List(toApply), toDelete.map(StorageKey @@ _)))
+        Either.catchNonFatal(
+          storage.insert(StorageVersion @@ Random.randomBytes(), List(toApply), toDelete.map(StorageKey @@ _))
         ) match {
-          case Left(error) =>
-            logger.info(error.getMessage)
-            ProcessNewBlockError(error.getMessage).asLeft[SnapshotProcessor]
-          case Right(_) =>
-            logger.info(s"Finished processing new manifest. Time ${(System.currentTimeMillis() - startTime) / 1000}s")
-            this.asRight[ProcessNewBlockError]
+          case Left(error) => ProcessNewBlockError(error.getMessage).asLeft[SnapshotProcessor]
+          case Right(_)    => this.asRight[ProcessNewBlockError]
         }
-    }
-  }
+      }
+    } yield processor
 
   override def close(): Unit = storage.close()
 }
 
 object SnapshotProcessor extends StrictLogging {
 
-  def initialize(settings: EncryAppSettings, fatsSync: Boolean): SnapshotProcessor =
-    if (fatsSync) create(settings, getDirProcessSnapshots(settings))
-    else create(settings, getDirProcessSnapshots(settings))
+  def initialize(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDirProcessSnapshots(settings))
 
-  //def getDirFastSync(settings: EncryAppSettings): File         = new File(s"${settings.directory}/state")
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {

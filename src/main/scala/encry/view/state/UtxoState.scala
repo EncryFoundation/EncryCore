@@ -127,6 +127,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
     val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
+    logger.info(s"UTXO -> rollbackTo ->${tree.storage.get(UtxoState.bestHeightKey)} ")
     val height: Height = Height !@@ Ints.fromByteArray(tree.storage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants)
   }
@@ -182,15 +183,6 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     } else tx.semanticValidity.errors.headOption
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
-
-  def applyNodesFastSync(chunks: List[NodeProtoMsg]): UtxoState =
-    this.copy(tree = tree.assembleTree(chunks.map(NodeSerilalizer.fromProto[StorageKey, StorageValue](_))))
-
-  def validateTreeAfterFastSync: Boolean = {
-    val validationResult: Boolean = tree.selfInspectionAfterFastSync
-    logger.info(s"After tree validation result is $validationResult.")
-    validationResult
-  }
 
   def close(): Unit = tree.close()
 }

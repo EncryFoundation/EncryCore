@@ -510,37 +510,11 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
           loop(updatedNodeToProcess ::: next, Algos.hash(kSer.toBytes(i.key).reverse) :: i.hash :: current ::: keysToInspect)
         case l: LeafNode[K, V] => loop(nodesToProcess.drop(1), Algos.hash(kSer.toBytes(l.key).reverse) :: l.hash :: keysToInspect)
       } else keysToInspect
-
-    logger.info(s"Start tree validation")
-    println(rootNode)
     val keys: Set[ByteArrayWrapper] = loop(List(rootNode), List.empty).map(ByteArrayWrapper(_)).toSet
     val allKeysFromDB: Set[ByteArrayWrapper] = storage.getAllKeys(-1)
       .map(ByteArrayWrapper(_)).toSet - ByteArrayWrapper(UtxoState.bestHeightKey) - ByteArrayWrapper(AvlTree.rootNodeKey)
     (allKeysFromDB -- keys).isEmpty
   }
-
-  private def insertionInFastSyncMod(nodes: List[Node[K, V]], isRoot: Boolean = false)(implicit kSerializer: Serializer[K],
-                                                                                       vSerializer: Serializer[V],
-                                                                                       kMonoid: Monoid[K],
-                                                                                       vMonoid: Monoid[V]): AvlTree[K, V] = {
-    val nodesToInsert: List[(StorageKey, StorageValue)] = nodes.flatMap { node =>
-      val fullData: (StorageKey, StorageValue) =
-        StorageKey @@ Algos.hash(kSerializer.toBytes(node.key).reverse) -> StorageValue @@ vSerializer.toBytes(node.value)
-      val shadowData: (StorageKey, StorageValue) =
-        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
-      if (isRoot)
-        fullData :: shadowData :: (AvlTree.rootNodeKey -> StorageValue @@ ShadowNode.childsToShadowNode(node).hash) :: Nil
-      else
-        fullData :: shadowData :: Nil
-    }
-    storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-    this
-  }
-
-  def assembleTree(chunks: List[Node[K, V]])(implicit kSerializer: Serializer[K],
-                                             vSerializer: Serializer[V],
-                                             kMonoid: Monoid[K],
-                                             vMonoid: Monoid[V]): AvlTree[K, V] = insertionInFastSyncMod(chunks)
 
   @scala.annotation.tailrec
   private def handleChild(child: Node[K, V]): (List[Node[K, V]], Node[K, V]) = child match {
@@ -584,18 +558,6 @@ object AvlTree {
 
   def apply[K: Monoid: Order: Hashable : Serializer, V: Monoid : Serializer](storage: VersionalStorage): AvlTree[K, V] =
     new AvlTree[K, V](EmptyNode(), storage)
-
-  def apply[K: Serializer : Monoid : Order : Hashable, V: Serializer : Monoid](blockHeight: Int,
-                                                                               rootNode: NodeProtoMsg,
-                                                                               storage: VersionalStorage): AvlTree[K, V] = {
-    val root: Node[K, V] = NodeSerilalizer.fromProto(rootNode)
-    val initTree: AvlTree[K, V] = new AvlTree(root, storage)
-    storage.insert(
-      StorageVersion @@ Random.randomBytes(),
-      List(UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(blockHeight))
-    )
-    initTree.insertionInFastSyncMod(List(root), isRoot = true)
-  }
 
   def getChunks(node: Node[StorageKey, StorageValue],
                 currentChunkHeight: Int,

@@ -20,18 +20,17 @@ import encry.network.BlackList.BanReason.{
   ExpiredNumberOfReRequestAttempts,
   ExpiredNumberOfRequests,
   InvalidChunkMessage,
-  InvalidManifestHasChangedMessage,
   InvalidResponseManifestMessage,
   InvalidStateAfterFastSync
 }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, ChunkApplyError, FastSyncException }
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException }
 import encry.view.history.History
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import cats.syntax.either._
-
 import scala.util.Try
+import encry.view.state.avlTree.utils.implicits.Instances._
 
 class SnapshotHolder(settings: EncryAppSettings,
                      networkController: ActorRef,
@@ -45,7 +44,7 @@ class SnapshotHolder(settings: EncryAppSettings,
   //todo 1. Add connection agreement (case while peer reconnects with other handler.ref)
 
   var snapshotProcessor: SnapshotProcessor =
-    SnapshotProcessor.initialize(settings, settings.snapshotSettings.enableFastSynchronization)
+    SnapshotProcessor.initialize(settings)
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var connectionsHandler: IncomingConnectionsHandler         = IncomingConnectionsHandler.empty(settings)
 
@@ -109,7 +108,7 @@ class SnapshotHolder(settings: EncryAppSettings,
               case Left(error) =>
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
               case Right((controller, processor)) =>
-                logger.info(s"Request manifest message successfully processed")
+                logger.info(s"Request manifest message successfully processed.")
                 snapshotDownloadController = controller
                 snapshotProcessor = processor
                 self ! RequestNextChunks
@@ -151,10 +150,10 @@ class SnapshotHolder(settings: EncryAppSettings,
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
               processor.assembleUTXOState match {
-                case Right(state) if state.validateTreeAfterFastSync =>
+                case Right(state) if state.tree.selfInspectionAfterFastSync =>
                   nodeViewHolder ! FastSyncFinished(state)
                   if (settings.snapshotSettings.enableSnapshotCreation) {
-                    snapshotProcessor = SnapshotProcessor.initialize(settings, fatsSync = false)
+                    snapshotProcessor = SnapshotProcessor.initialize(settings)
                     logger.info(s"Snapshot holder context.become to snapshot processing")
                     context.system.scheduler
                       .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
@@ -266,7 +265,6 @@ class SnapshotHolder(settings: EncryAppSettings,
   def workMod(history: History): Receive = {
     case TreeChunks(chunks, id) =>
       //todo add collection with potentialManifestsIds to NVH
-      logger.info(s"Got TreeChunks message")
       val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
       if (!manifestIds.exists(_.sameElements(id))) {
         snapshotProcessor.createNewSnapshot(id, manifestIds, chunks)
