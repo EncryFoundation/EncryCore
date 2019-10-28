@@ -215,50 +215,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                     a(cls := "dropdown-item", href := "./connectedPeers", "Connected peers"),
                     a(cls := "dropdown-item", href := "./bannedPeers", "Banned peers")
                   )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/profile.html",
-                    i(cls := "ni ni-single-02 text-yellow"), "User profile"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/tables.html",
-                    i(cls := "ni ni-bullet-list-67 text-red"), "Tables"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/login.html",
-                    i(cls := "ni ni-key-25 text-info"), "Start Mining"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/register.html",
-                    i(cls := "ni ni-circle-08 text-pink"), "Register"
-                  )
                 )
               ),
-              // Divider
-              hr(cls := "my-3"),
-              // Heading
-              h6(cls := "navbar-heading text-muted", "Documentation"),
-              // Navigation
-              ul(cls := "navbar-nav mb-md-3",
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "https://demos.creative-tim.com/argon-dashboard/docs/getting-started/overview.html",
-                    i(cls := "ni ni-spaceship"), "Getting started"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "https://demos.creative-tim.com/argon-dashboard/docs/foundation/colors.html",
-                    i(cls := "ni ni-palette"), "Foundation"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "https://demos.creative-tim.com/argon-dashboard/docs/components/alerts.html",
-                    i(cls := "ni ni-ui-04"), "Components"
-                  )
-                )
-              )
             )
           )
         ),
@@ -269,60 +227,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
             div(cls := "container-fluid",
               // Brand
               a(cls := "h4 mb-0 text-white text-uppercase d-none d-lg-inline-block", href := "/web", "Encry"),
-              // Form
-              form(cls := "navbar-search navbar-search-dark form-inline mr-3 d-none d-md-flex ml-lg-auto",
-                div(cls := "form-group mb-0",
-                  div(cls := "input-group input-group-alternative",
-                    div(cls := "input-group-prepend",
-                      span(cls := "input-group-text",
-                        i(cls := "fas fa-search")
-                      )
-                    ),
-                    input(cls := "form-control", placeholder := "Search", tpe := "text")
-                  )
-                )
-              ),
-              // User
-              ul(cls := "navbar-nav align-items-center d-none d-md-flex",
-                li(cls := "nav-item dropdown",
-                  a(cls := "nav-link pr-0", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
-                    div(cls := "media align-items-center",
-                      span(cls := "avatar avatar-sm rounded-circle",
-                        img(alt := "Image placeholder", src := "argon/assets/img/theme/team-4-800x800.jpg")
-                      ),
-                      div(cls := "media-body ml-2 d-none d-lg-block",
-                        span(cls := "mb-0 text-sm  font-weight-bold", "Jessica Jones")
-                      )
-                    )
-                  ),
-                  div(cls := "dropdown-menu dropdown-menu-arrow dropdown-menu-right",
-                    div(cls := " dropdown-header noti-title",
-                      h6(cls := "text-overflow m-0", "Welcome!")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-single-02"),
-                      span("My profile")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-settings-gear-65"),
-                      span("Settings")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-calendar-grid-58"),
-                      span("Activity")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-support-16"),
-                      span("Support")
-                    ),
-                    div(cls := "dropdown-divider"),
-                    a(href := "#!", cls := "dropdown-item",
-                      i(cls := "ni ni-user-run"),
-                      span("Logout")
-                    )
-                  )
-                )
-              )
+
+
             )
           ),
           // Header

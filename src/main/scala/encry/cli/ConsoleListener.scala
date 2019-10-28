@@ -80,7 +80,8 @@ object ConsoleListener {
       "pubKeys"   -> PrintPubKeys, // table
       "balance"   -> GetBalance,  // table
       "transfer"  -> Transfer, // add
-      "privKeys"  -> PrintPrivKeys //Todo delete
+      "privKeys"  -> PrintPrivKeys, //Todo delete
+      "createToken" -> CreateToken
     )
   )
 

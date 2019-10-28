@@ -125,11 +125,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
        val balance: Map[String, Amount] = wallet.getBalances.toMap
 //        println(balance +" 123124")
        if (balance.isEmpty) Map.empty[String, Amount] else balance
-//        if (balance.isEmpty) Seq(Map.empty) else Seq(c)
-//          wallet.getBalances.foldLeft("")(
-//            (str, tokenInfo) => str.concat(s"TokenID(${tokenInfo._1}) : ${tokenInfo._2}\n")
-//          )
-//        if (balance.length == 0) "0" else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>

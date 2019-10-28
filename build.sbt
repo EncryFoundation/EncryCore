@@ -144,6 +144,8 @@ assemblyMergeStrategy in assembly := {
   case _ => MergeStrategy.first
 }
 
+unmanagedResourceDirectories in Compile += { baseDirectory.value / "src/main/resources/argon" }
+
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "encry" / "Version.scala"
   val versionExtractor = """(\d+)\.(\d+)\.(\d+).*""".r

@@ -8,31 +8,39 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp.memoryPool
-import encry.api.http.DataHolderForApi.{GetDataFromWallet, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
+import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetDataFromWallet, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.RESTApiSettings
+import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.storage.levelDb.versionalLevelDB.WalletVersionalLevelDB
+import encry.utils.Mnemonic
+import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.state.box.AssetBox
+import scala.concurrent.duration._
+import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
-import scala.concurrent.Future
+import scorex.crypto.hash.Blake2b256
+import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
+
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Random, Success, Try}
 
 
-case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSettings)(
+case class WalletInfoApiRoute(dataHolder: ActorRef,
+                              restApiSettings: RESTApiSettings,
+                              settingsApp: EncryAppSettings)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute
   with FailFastCirceSupport
   with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
-    infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ aaa
+    infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ createTokenR ~ dataTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -65,7 +73,60 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
     getAddresses.map(_.asJson).okJson()
   }
 
-  def aaa = (path("transfer") & get) {
+  def createTokenR: Route = (path("createToken") & get) {
+    parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>
+      (dataHolder ?
+        GetDataFromWallet[Option[Transaction]] { wallet =>
+          Try {
+            val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
+            val boxes: AssetBox         = wallet.walletStorage
+              .getAllBoxes().collect { case ab: AssetBox => ab }.head
+            println(boxes + " boxes")
+            TransactionFactory.assetIssuingTransactionScratch(
+              secret,
+              fee,
+              System.currentTimeMillis(),
+              IndexedSeq(boxes).map(_ -> None),
+              PubKeyLockedContract(wallet.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+              amount)
+          }.toOption
+        }).flatMap {
+        case Some(tx: Transaction) =>
+          memoryPool ! NewTransaction(tx)
+          Future.successful(Some(Response(tx.toString)))
+        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+      }
+      complete("Token was created")
+    }
+    }
+
+  def dataTransactionR: Route = (path("data") & get) {
+    parameters('fee.as[Int], 'data) {(fee, data) =>
+      (dataHolder ?
+        GetDataFromWallet[Option[Transaction]] { wallet =>
+          Try {
+            val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
+            val boxes: AssetBox         = wallet.walletStorage
+              .getAllBoxes().collect { case ab: AssetBox => ab }.head
+            TransactionFactory.dataTransactionScratch(secret,
+              fee,
+              System.currentTimeMillis(),
+              IndexedSeq(boxes).map(_ -> None),
+              PubKeyLockedContract(wallet.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+              data.getBytes)
+          }.toOption
+        }).flatMap {
+        case Some(tx: Transaction) =>
+          println(tx)
+          memoryPool ! NewTransaction(tx)
+          Future.successful(Some(Response(tx.toString)))
+        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+      }
+      complete(s"Tx with data  has been sent!!'")
+    }
+  }
+
+  def transferR: Route = (path("transfer") & get) {
     parameters('addr, 'fee.as[Int], 'amount.as[Long]) { (addr, fee, amount) =>
       (dataHolder ?
         GetDataFromWallet[Option[Transaction]] { wallet =>
@@ -112,6 +173,27 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, restApiSettings: RESTApiSett
     getBalance.map(_.asJson).okJson()
   }
 
+
+  //  def connectPeer: Route = path("add") {
+  //    post(entity(as[String]) { str =>
+  //      println(str)
+  //      complete {
+  //        Try {
+  //          val split = str.split(':')
+  //          val a = (split(0), split(1).toInt)
+  //          println(split)
+  //          println(a)
+  //          a
+  //        } match {
+  //          case Success((host, port)) =>
+  //            dataHolder ! PeerAdd(new InetSocketAddress(host, port))
+  //            StatusCodes.OK
+  //          case Failure(_) =>
+  //            StatusCodes.BadRequest
+  //        }
+  //      }
+  //    })
+  //  }
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet.map { w =>
       Random.shuffle(w.walletStorage.getAllBoxes(1000)).asJson

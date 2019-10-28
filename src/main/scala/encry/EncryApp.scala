@@ -97,7 +97,7 @@ object EncryApp extends App with StrictLogging {
       InfoApiRoute(dataHolderForApi, settings, nodeId, timeProvider),
       HistoryApiRoute(dataHolderForApi, settings, nodeId),
       TransactionsApiRoute(dataHolderForApi, memoryPool,  settings.restApi),
-      WalletInfoApiRoute(dataHolderForApi, settings.restApi),
+      WalletInfoApiRoute(dataHolderForApi, settings.restApi, settings),
       NodeRoute(dataHolderForApi, settings)
     )
     Http().bindAndHandle(

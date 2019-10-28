@@ -52,6 +52,20 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
         meta(name := "author", content := "Creative Tim"),
         script(
+          raw("""function validateForm2() {
+  var y = document.forms["myForm2"]["fee"].value;
+  var z = document.forms["myForm2"]["data`"].value;
+  if (y == "") {
+     alert("Fee must be filled out");
+     return false;
+   }
+ if (z == "") {
+    alert("Data must be filled out");
+    return false;
+  }
+}""")
+        ),
+        script(
           raw("""function validateForm() {
   var x = document.forms["myForm"]["addr"].value;
   var y = document.forms["myForm"]["fee"].value;
@@ -60,6 +74,20 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     alert("Address must be filled out");
     return false;
   }
+  if (y == "") {
+     alert("Fee must be filled out");
+     return false;
+   }
+ if (z == "") {
+    alert("Amount must be filled out");
+    return false;
+  }
+}""")
+        ),
+        script(
+          raw("""function validateForm1() {
+  var y = document.forms["myForm1"]["fee"].value;
+  var z = document.forms["myForm1"]["amount"].value;
   if (y == "") {
      alert("Fee must be filled out");
      return false;
@@ -80,6 +108,32 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                 //    request.setRequestHeader('content-type', 'application/json');
                     request.send();
                      window.alert("Transaction has been sent successfully");
+                    setTimeout(location.reload.bind(location), 3000);
+
+                  }""")
+        ),
+        script(
+          raw("""function token(){
+                 var b = document.forms["myForm1"]["fee"].value;
+                 var x = document.forms["myForm1"]["amount"].value;
+                    var request = new XMLHttpRequest();
+                    request.open('GET', "http://localhost:9051/wallet/createToken?fee="+b+"&amount="+x);
+                //    request.setRequestHeader('content-type', 'application/json');
+                    request.send();
+                     window.alert("Token has been created successfully");
+                    setTimeout(location.reload.bind(location), 3000);
+
+                  }""")
+        ),
+        script(
+          raw("""function dataTx(){
+                 var b = document.forms["myForm2"]["fee"].value;
+                 var x = document.forms["myForm2"]["data"].value;
+                    var request = new XMLHttpRequest();
+                    request.open('GET', "http://localhost:9051/wallet/data?fee="+b+"&data="+x);
+                //    request.setRequestHeader('content-type', 'application/json');
+                    request.send();
+                     window.alert("Data has been created successfully");
                     setTimeout(location.reload.bind(location), 3000);
 
                   }""")
@@ -219,48 +273,6 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     a(cls := "dropdown-item", href := "./connectedPeers", "Connected peers"),
                     a(cls := "dropdown-item", href := "./bannedPeers", "Banned peers")
                   )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/profile.html",
-                    i(cls := "ni ni-single-02 text-yellow"), "User profile"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/tables.html",
-                    i(cls := "ni ni-bullet-list-67 text-red"), "Tables"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/login.html",
-                    i(cls := "ni ni-key-25 text-info"), "Start Mining"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "argon/examples/register.html",
-                    i(cls := "ni ni-circle-08 text-pink"), "Register"
-                  )
-                )
-              ),
-              // Divider
-              hr(cls := "my-3"),
-              // Heading
-              h6(cls := "navbar-heading text-muted", "Documentation"),
-              // Navigation
-              ul(cls := "navbar-nav mb-md-3",
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "https://demos.creative-tim.com/argon-dashboard/docs/getting-started/overview.html",
-                    i(cls := "ni ni-spaceship"), "Getting started"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "https://demos.creative-tim.com/argon-dashboard/docs/foundation/colors.html",
-                    i(cls := "ni ni-palette"), "Foundation"
-                  )
-                ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "https://demos.creative-tim.com/argon-dashboard/docs/components/alerts.html",
-                    i(cls := "ni ni-ui-04"), "Components"
-                  )
                 )
               )
             )
@@ -273,60 +285,6 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
             div(cls := "container-fluid",
               // Brand
               a(cls := "h4 mb-0 text-white text-uppercase d-none d-lg-inline-block", href := "/web", "Encry"),
-              // Form
-              form(cls := "navbar-search navbar-search-dark form-inline mr-3 d-none d-md-flex ml-lg-auto",
-                div(cls := "form-group mb-0",
-                  div(cls := "input-group input-group-alternative",
-                    div(cls := "input-group-prepend",
-                      span(cls := "input-group-text",
-                        i(cls := "fas fa-search")
-                      )
-                    ),
-                    input(cls := "form-control", placeholder := "Search", tpe := "text")
-                  )
-                )
-              ),
-              // User
-              ul(cls := "navbar-nav align-items-center d-none d-md-flex",
-                li(cls := "nav-item dropdown",
-                  a(cls := "nav-link pr-0", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
-                    div(cls := "media align-items-center",
-                      span(cls := "avatar avatar-sm rounded-circle",
-                        img(alt := "Image placeholder", src := "argon/assets/img/theme/team-4-800x800.jpg")
-                      ),
-                      div(cls := "media-body ml-2 d-none d-lg-block",
-                        span(cls := "mb-0 text-sm  font-weight-bold", "Jessica Jones")
-                      )
-                    )
-                  ),
-                  div(cls := "dropdown-menu dropdown-menu-arrow dropdown-menu-right",
-                    div(cls := " dropdown-header noti-title",
-                      h6(cls := "text-overflow m-0", "Welcome!")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-single-02"),
-                      span("My profile")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-settings-gear-65"),
-                      span("Settings")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-calendar-grid-58"),
-                      span("Activity")
-                    ),
-                    a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                      i(cls := "ni ni-support-16"),
-                      span("Support")
-                    ),
-                    div(cls := "dropdown-divider"),
-                    a(href := "#!", cls := "dropdown-item",
-                      i(cls := "ni ni-user-run"),
-                      span("Logout")
-                    )
-                  )
-                )
-              )
             )
           ),
           // Header
@@ -356,8 +314,196 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                           ),
                           div(cls := "col",
                         button(tpe := "button", onclick := "keyCreate()", cls := "btn btn-block btn-primary mb-3", "Create key")
+                          ),
+                          div(cls := "col",
+                            button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form2", "Create token")
+                          ),
+                          div(cls := "col",
+                            button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form3", "Create data tx")
                           )
                         ),
+
+                        //Create Data Tx Form
+                        div(cls := "modal fade", id := "modal-form3", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
+                          div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",
+                            div(cls := "modal-content",
+                              div(cls := "modal-body p-0",
+                                div(cls := "card bg-secondary shadow border-0",
+                                  div(cls := "card-body px-lg-5 py-lg-5",
+                                    form(role := "form", onsubmit:="return validateForm2()", id:="myForm2",
+
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-money-coins")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id:="bibo2", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bibo2"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          )
+                                        )
+
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-credit-card")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id:="bobo2", name:="data", placeholder := "Data"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bobo2"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          ),
+                                        )
+                                      ),
+
+                                      div(cls := "text-center",
+                                        button(tpe := "button", onclick:="dataTx()", cls := "btn btn-primary mt-4", "Send data tx")
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        ),
+                        //
+                        //Create Token Form
+                        div(cls := "modal fade", id := "modal-form2", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
+                          div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",
+                            div(cls := "modal-content",
+                              div(cls := "modal-body p-0",
+                                div(cls := "card bg-secondary shadow border-0",
+                                  div(cls := "card-body px-lg-5 py-lg-5",
+                                    form(role := "form", onsubmit:="return validateForm1()", id:="myForm1",
+
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-money-coins")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id:="bibo1", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bibo1"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          )
+                                        )
+
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-credit-card")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id:="bobo1", name:="amount", placeholder := "Amount"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bobo1"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          ),
+                                        )
+                                      ),
+
+                                      div(cls := "text-center",
+                                        button(tpe := "button", onclick:="token()", cls := "btn btn-primary mt-4", "Create token")
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        ),
+                        //
+                        //Create Transfer Form
                         div(cls := "modal fade", id := "modal-form", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
                           div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",
                             div(cls := "modal-content",
@@ -447,18 +593,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                       ),
                                       div(cls := "form-group",
                                             select(cls:="form-control",
-
-//                                              (for (b <- balances) yield {
                                               for (coinIds <- balances.keys.toList) yield {
-                                                option(value := coinIds, if(coinIds == EttTokenId) "ETT ❤️\u200D" else coinIds)
-
+                                                option(value := coinIds, if(coinIds == EttTokenId) "ETT" else coinIds)
                                               }
-
-//                                              }
-
                                           )
-
-
                                       ),
                                       div(cls := "text-center",
                                         button(tpe := "button", onclick:="wallet()", cls := "btn btn-primary mt-4", "Send Money")
@@ -473,6 +611,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                       )
                     )
                   ),
+                  //
                   div(cls := "table-responsive",
                     // Projects table
                     table(cls := "table align-items-center table-flush", id:="myTable",
