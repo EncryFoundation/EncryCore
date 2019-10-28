@@ -9,13 +9,14 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.TestNetSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.state.avlTree.utils.implicits.Instances._
-import encry.view.state.avlTree.NodeSerilalizer
+import encry.view.state.avlTree.{AvlTree, NodeSerilalizer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.utils.Random
 import FastSyncTestsUtils._
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifestSerializer
+import SnapshotChunkProto.SnapshotChunkMessage
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunkSerializer, SnapshotManifestSerializer}
 
 class SnapshotDownloadControllerTest
     extends WordSpecLike
@@ -24,6 +25,29 @@ class SnapshotDownloadControllerTest
     with OneInstancePerTest
     with TestNetSettings {
   implicit val system: ActorSystem = ActorSystem("SynchronousTestingSpec")
+
+  "d" should {
+    "f" in {
+      val avl1: AvlTree[StorageKey, StorageValue] =
+        createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 0, 20)
+
+      val chunks = AvlTree.getChunks(avl1.rootNode, 1, avl1.storage)
+
+      val s = chunks.map { elem =>
+       SnapshotChunkSerializer.toProto(elem).toByteArray
+      }
+
+      println(chunks.head)
+
+      println("\n----------//////--------\n")
+
+      val d = s.map { el =>
+        SnapshotChunkSerializer.fromProto(SnapshotChunkMessage.parseFrom(el)).get
+      }
+
+      println(d.head)
+    }
+  }
 
 //  "SnapshotDownloadController" should {
 //    "process manifest function" should {

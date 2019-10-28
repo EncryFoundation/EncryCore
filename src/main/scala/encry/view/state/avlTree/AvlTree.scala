@@ -627,7 +627,7 @@ object AvlTree {
     }
 
     val (rootChunk: Node[StorageKey, StorageValue], rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
-    println(s"root chunk ${rootChunk}")
+    //println(s"root chunk ${rootChunk}")
     SnapshotChunk(rootChunk, rootChunk.hash) ::
       rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight, storage))
   }
