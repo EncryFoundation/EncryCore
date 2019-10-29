@@ -95,17 +95,26 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import org.apache.commons.io.FileUtils
       nodeView.state.tree.storage.close()
       state.tree.storage.close()
-      val file = UtxoState.getStateDir(settings)
-      FileUtils.cleanDirectory(file)
-      val snapshotProcessorDir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
-      FileUtils.copyDirectory(snapshotProcessorDir, file)
+      FileUtils.deleteDirectory(UtxoState.getStateDir(settings))
+      val stateDir: Path = UtxoState.getStateDir(settings).toPath
+      val snapshotProcessorDir: Path = SnapshotProcessor.getDirProcessSnapshots(settings).toPath
+      import java.io.File
+      import java.nio.file.{Files, Path, StandardCopyOption}
+      val newPath: Path = Files.move(
+        snapshotProcessorDir,
+        stateDir,
+        //StandardCopyOption.REPLACE_EXISTING
+                 StandardCopyOption.ATOMIC_MOVE
+        //          StandardCopyOption.COPY_ATTRIBUTES
+      )
+      val stateDirNew: File = newPath.toFile
       val newState: UtxoState = state.copy(tree = state.tree.copy(storage = settings.storage.state match {
         case VersionalStorage.IODB =>
           logger.info("Init state with iodb storage")
-          IODBWrapper(new LSMStore(file, keepVersions = settings.constants.DefaultKeepVersions))
+          IODBWrapper(new LSMStore(stateDirNew, keepVersions = settings.constants.DefaultKeepVersions))
         case VersionalStorage.LevelDB =>
           logger.info("Init state with levelDB storage")
-          val levelDBInit = LevelDbFactory.factory.open(file, new Options)
+          val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
       }))
       logger.info(s"Start validation")
