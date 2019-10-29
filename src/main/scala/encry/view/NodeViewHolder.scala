@@ -96,7 +96,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import org.apache.commons.io.FileUtils
       nodeView.state.tree.storage.close()
       state.tree.storage.close()
-      FileUtils.deleteDirectory(UtxoState.getStateDir(settings))
+      FileUtils.cleanDirectory(UtxoState.getStateDir(settings))
       val stateDir: Path = UtxoState.getStateDir(settings).toPath
       val snapshotProcessorDir: Path = SnapshotProcessor.getDirProcessSnapshots(settings).toPath
       import java.io.File
