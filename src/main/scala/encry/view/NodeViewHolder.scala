@@ -100,7 +100,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val snapshotProcessorDir: Path = SnapshotProcessor.getDirProcessSnapshots(settings).toPath
       import java.io.File
       import java.nio.file.{Files, Path, StandardCopyOption}
-      val newPath: Path = Files.move(snapshotProcessorDir, stateDir, StandardCopyOption.ATOMIC_MOVE)
+      val newPath: Path = Files.move(
+        snapshotProcessorDir,
+        stateDir,
+        StandardCopyOption.REPLACE_EXISTING
+//          StandardCopyOption.ATOMIC_MOVE,
+//          StandardCopyOption.COPY_ATTRIBUTES
+      )
       val stateDirNew: File = newPath.toFile
       val newState: UtxoState = state.copy(tree = state.tree.copy(storage = settings.storage.state match {
         case VersionalStorage.IODB =>
