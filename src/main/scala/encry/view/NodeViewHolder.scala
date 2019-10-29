@@ -105,7 +105,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import java.io.File
       import java.nio.file.{Files, Path, StandardCopyOption}
       import collection.JavaConverters._
-      Files.walkFileTree(SnapshotProcessor.getDirProcessSnapshots(settings).toPath, new SimpleFileVisitor[Path])
+      class ABC extends SimpleFileVisitor[Path]
+      Files.walkFileTree(SnapshotProcessor.getDirProcessSnapshots(settings).toPath, new ABC)
         .iterator()
         .asScala
         .foreach { file =>
