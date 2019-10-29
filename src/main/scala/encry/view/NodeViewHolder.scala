@@ -105,14 +105,22 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import java.io.File
       import java.nio.file.{Files, Path, StandardCopyOption}
       import collection.JavaConverters._
-      class ABC extends SimpleFileVisitor[Path]
-      Files.walkFileTree(SnapshotProcessor.getDirProcessSnapshots(settings).toPath, new ABC)
+      Files.walk(SnapshotProcessor.getDirProcessSnapshots(settings).toPath)
         .iterator()
         .asScala
+        .drop(1)
         .foreach { file =>
           logger.info(s"Move ${file.getFileName} to ${stateDir.getName}")
           Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
         }
+      //class ABC extends SimpleFileVisitor[Path]
+//      Files.walkFileTree(SnapshotProcessor.getDirProcessSnapshots(settings).toPath, new ABC)
+//        .iterator()
+//        .asScala
+//        .foreach { file =>
+//          logger.info(s"Move ${file.getFileName} to ${stateDir.getName}")
+//          Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
+//        }
       //FileUtils.moveFileToDirectory(file.toFile, stateDir, true)
       //Files.move(snapshotProcessorDir.toPath, stateDir.toPath)
 
