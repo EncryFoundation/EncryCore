@@ -110,10 +110,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         .foreach { file =>
           val target = UtxoState.getStateDir(settings).toPath
           logger.info(s"File ${file.getFileName.toString}")
-          if (file.getFileName.toString != "LOCK") {
+          //if (file.getFileName.toString != "LOCK") {
             logger.info(s"Move ${file.getFileName} to $target.")
-            Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING)
-          }
+            Files.copy(file, target)
+          //}
         }
       val newState: UtxoState = UtxoState.create(stateDir, settings)
       logger.info(s"Start validation")
