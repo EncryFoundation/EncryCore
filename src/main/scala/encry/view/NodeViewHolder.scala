@@ -95,30 +95,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
-      import org.apache.commons.io.FileUtils
-      nodeView.state.tree.storage.close()
-      state.tree.storage.close()
-      val stateDir = UtxoState.getStateDir(settings)
-      FileUtils.deleteDirectory(stateDir)
-      stateDir.mkdir()
-      import java.nio.file.{Files, StandardCopyOption}
-      import collection.JavaConverters._
-      Files.walk(SnapshotProcessor.getDirProcessSnapshots(settings).toPath)
-        .iterator()
-        .asScala
-        .drop(1)
-        .foreach { file =>
-          val target = UtxoState.getStateDir(settings).toPath
-          logger.info(s"File ${file.getFileName.toString}")
-          //if (file.getFileName.toString != "LOCK") {
-            logger.info(s"Move ${file.getFileName} to $target.")
-            //Files.copy(file, target)
-            FileUtils.moveFileToDirectory(file.toFile, target.toFile, false)
-          //}
-        }
-      val newState: UtxoState = UtxoState.create(stateDir, settings)
-      logger.info(s"Start validation")
-      if (newState.tree.selfInspectionAfterFastSync) {
+      if (state.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
           nodeView.history.blockDownloadProcessor.updateBestBlock(h)
@@ -127,7 +104,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
           updateNodeView(
             updatedHistory = Some(history),
-            updatedState = Some(newState)
+            updatedState = Some(state)
           )
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))

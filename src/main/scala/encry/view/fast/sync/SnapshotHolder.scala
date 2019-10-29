@@ -42,8 +42,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   //todo 1. Add connection agreement (case while peer reconnects with other handler.ref)
 
-  var snapshotProcessor: SnapshotProcessor =
-    SnapshotProcessor.initialize(settings)
+  var snapshotProcessor: SnapshotProcessor                   = SnapshotProcessor.initialize(settings)
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var connectionsHandler: IncomingConnectionsHandler         = IncomingConnectionsHandler.empty(settings)
 
@@ -222,7 +221,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
-        snapshotProcessor = SnapshotProcessor.initialize(settings)
+        snapshotProcessor = SnapshotProcessor.recreate(settings)
         logger.info(s"Snapshot holder context.become to snapshot processing")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
