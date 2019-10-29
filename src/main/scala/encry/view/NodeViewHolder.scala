@@ -2,6 +2,7 @@ package encry.view
 
 import java.io.File
 import java.nio.file.Path
+
 import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
@@ -27,7 +28,7 @@ import encry.view.fast.sync.SnapshotProcessor
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state._
+import encry.view.state.{UtxoState, _}
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.LSMStore
@@ -38,6 +39,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import org.iq80.leveldb.Options
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -96,13 +98,20 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import org.apache.commons.io.FileUtils
       nodeView.state.tree.storage.close()
       state.tree.storage.close()
-      FileUtils.cleanDirectory(UtxoState.getStateDir(settings))
       val stateDir = UtxoState.getStateDir(settings)
-      val snapshotProcessorDir = SnapshotProcessor.getDirProcessSnapshots(settings)
+      FileUtils.cleanDirectory(stateDir)
+      val snapshotProcessorDir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
+       // .renameTo()
       import java.io.File
       import java.nio.file.{Files, Path, StandardCopyOption}
-      FileUtils.copyDirectory(snapshotProcessorDir, stateDir, true)
-      val stateDirNew: File =  UtxoState.getStateDir(settings)
+      import collection.JavaConverters._
+      Files.walk(SnapshotProcessor.getDirProcessSnapshots(settings).toPath)
+        .iterator()
+        .asScala
+        .foreach { file => Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)}
+      //Files.move(snapshotProcessorDir.toPath, stateDir.toPath)
+     // FileUtils.copyDirectory(snapshotProcessorDir, stateDir, true)
+      //val stateDirNew: File =  UtxoState.getStateDir(settings)
       val newState: UtxoState = UtxoState.create(stateDir, settings)
       logger.info(s"Start validation")
       if (newState.tree.selfInspectionAfterFastSync) {
