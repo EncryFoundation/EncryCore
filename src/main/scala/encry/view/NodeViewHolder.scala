@@ -95,19 +95,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import org.apache.commons.io.FileUtils
       nodeView.state.tree.storage.close()
       state.tree.storage.close()
-      FileUtils.deleteDirectory(UtxoState.getStateDir(settings))
-      val stateDir: Path = UtxoState.getStateDir(settings).toPath
-      val snapshotProcessorDir: Path = SnapshotProcessor.getDirProcessSnapshots(settings).toPath
-      import java.io.File
-      import java.nio.file.{Files, Path, StandardCopyOption}
-      val newPath: Path = Files.move(
-        snapshotProcessorDir,
-        stateDir,
-        StandardCopyOption.REPLACE_EXISTING
-//          StandardCopyOption.ATOMIC_MOVE,
-//          StandardCopyOption.COPY_ATTRIBUTES
-      )
-      val stateDirNew: File = newPath.toFile
+      FileUtils.cleanDirectory(UtxoState.getStateDir(settings))
+      val stateDir: File = UtxoState.getStateDir(settings)
+      val snapshotProcessorDir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
+      FileUtils.copyDirectory(snapshotProcessorDir, stateDir)
+      val stateDirNew: File = UtxoState.getStateDir(settings)
       val newState: UtxoState = state.copy(tree = state.tree.copy(storage = settings.storage.state match {
         case VersionalStorage.IODB =>
           logger.info("Init state with iodb storage")
