@@ -169,12 +169,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     Algos.hash(vldbInit.get(levelDBElems(5).elemsToInsert.head._1).get) shouldEqual
       Algos.hash(levelDBElems(5).elemsToInsert.head._2)
 
-    val iterator = vldbInit.db.iterator()
-    iterator.seekToFirst()
-    while(iterator.hasNext) {
-      val key = iterator.next()
-      println(s"elem: ${Algos.encode(key.getKey)}. value: ${Algos.encode(key.getValue)}")
-    }
+
   }
 
   property("deleted key from deleted version should not exist") {
@@ -192,20 +187,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
     val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(6) + 1)
-
-    println(levelDbElems.mkString("\n "))
-
-    println("++++ " + Algos.encode(VersionalLevelDBCompanion.VERSION_PREFIX +: DELETION_PREFIX))
-
-    levelDbElems.foreach(vldbInit.insert)
-
-    val iterator = vldbInit.db.iterator()
-    iterator.seekToFirst()
-    while(iterator.hasNext) {
-      val key = iterator.next()
-      println(s"elem: ${Algos.encode(key.getKey)}. value: ${Algos.encode(key.getValue)}")
-    }
-
+    
     levelDbElems.last.elemsToInsert.forall{case (key, value) =>
       vldbInit.get(key).exists(dbValue => Algos.hash(dbValue) sameElements Algos.hash(value))
     } shouldBe true
@@ -299,11 +281,6 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
       vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)) == null
     } shouldEqual true
 
-    val iterator = vldbInit.db.iterator()
-    iterator.seekToFirst()
-    while(iterator.hasNext) {
-      val key = iterator.next()
-      println(s"elem: ${Algos.encode(key.getKey)}. value: ${Algos.encode(key.getValue)}")
-    }
+
   }
 }
