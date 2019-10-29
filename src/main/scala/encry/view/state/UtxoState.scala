@@ -96,6 +96,9 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             val combinedStateChange: UtxoState.StateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
             logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart) / 1000L} s")
             val insertTimestart = System.currentTimeMillis()
+            logger.info(s"applyModifier -> newTree ${tree.storage.getAllKeys(-1).map(Algos.encode(_))}")
+            logger.info(s"applyModifier -> outputsToDb -> ${combinedStateChange.outputsToDb.map(j => Algos.encode(j._1))}")
+            logger.info(s"applyModifier -> inputsToDb -> ${combinedStateChange.inputsToDb.map(j => Algos.encode(j))}")
             val newTree: AvlTree[StorageKey, StorageValue] = tree.insertAndDeleteMany(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,

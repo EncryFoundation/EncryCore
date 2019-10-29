@@ -101,6 +101,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val kSerializer: Serializer[StorageKey]         = implicitly[Serializer[StorageKey]]
     val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
+    logger.info(s"applyChunk -> nodes -> ${nodes.map(l => Algos.encode(l.hash) -> Algos.encode(l.key))}")
     val toApplicable                                = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
     val toStorage = nodes.collect {
       case leaf: LeafNode[StorageKey, StorageValue]         => leaf
@@ -140,7 +141,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
                                       ApplicableChunkIsAbsent("There are no applicable chunks in cache", this))
       (id: ByteArrayWrapper, chunk: SnapshotChunk)             = idAndChunk
       newChunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = chunksCache - id
-    } yield (chunk, this.copy(chunksCache = newChunksCache))
+    } yield {
+      logger.info(s"getNextApplicableChunk get from cache -> ${Algos.encode(id.data)}")
+      (chunk, this.copy(chunksCache = newChunksCache))
+    }
 
   def processNextApplicableChunk(snapshotProcessor: SnapshotProcessor): Either[FastSyncException, SnapshotProcessor] =
     for {
