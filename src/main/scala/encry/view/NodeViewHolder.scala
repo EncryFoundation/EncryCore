@@ -111,6 +111,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
       }))
+      logger.info(s"Start validation")
       if (newState.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
