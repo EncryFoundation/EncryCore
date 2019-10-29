@@ -70,7 +70,7 @@ object AccountManager {
       if (!foundLast) retrieved -> false
       else {
         val mandatoryAccountKey: ByteArrayWrapper = ByteArrayWrapper(Array(MetaInfoPrefix, number.toByte) ++ Algos.hash("account"))
-        val accOpt: Option[PrivateKey25519] = store.get(mandatoryAccountKey).flatMap{ res =>
+        val accOpt: Option[PrivateKey25519] = store.get(mandatoryAccountKey).flatMap { res =>
         val key: ByteArrayWrapper = ByteArrayWrapper(Array(AccountManager.AccountPrefix, number.toByte) ++ res.data)
           store.get(key).map { secretRes =>
             PrivateKey25519(PrivateKey @@ AES.decrypt(secretRes.data, password), PublicKey @@ res.data)
