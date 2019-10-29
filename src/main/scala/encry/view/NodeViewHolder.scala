@@ -101,7 +101,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val snapshotProcessorDir = SnapshotProcessor.getDirProcessSnapshots(settings)
       import java.io.File
       import java.nio.file.{Files, Path, StandardCopyOption}
-      FileUtils.copyDirectory(snapshotProcessorDir, stateDir, false)
+      FileUtils.copyDirectory(snapshotProcessorDir, stateDir, true)
       val stateDirNew: File =  UtxoState.getStateDir(settings)
       val newState: UtxoState = UtxoState.create(stateDir, settings)
       logger.info(s"Start validation")
