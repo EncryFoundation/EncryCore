@@ -72,7 +72,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def awaitingHistory: Receive = {
     case ChangedHistory(history) =>
-      if (settings.snapshotSettings.enableFastSynchronization) {
+      if (settings.snapshotSettings.enableFastSynchronization && !history.isBestBlockDefined &&
+          !settings.node.offlineGeneration) {
         logger.info(s"Start in fast sync regime")
         context.become(
           fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
