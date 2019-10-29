@@ -142,7 +142,8 @@ class SnapshotHolder(settings: EncryAppSettings,
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
               processor.assembleUTXOState match {
-                case Right(state) => //if state.tree.selfInspectionAfterFastSync =>
+                case Right(state) if state.tree.selfInspectionAfterFastSync =>
+                  logger.info(s"Tree is valid on Snapshot holder!")
                   (nodeViewHolder ! FastSyncFinished(state)).asRight[FastSyncException]
                 case _ =>
                   nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
