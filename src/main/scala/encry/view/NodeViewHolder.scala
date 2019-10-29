@@ -23,11 +23,10 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.{SnapshotHolder, SnapshotProcessor}
+import encry.view.fast.sync.SnapshotProcessor
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state.UtxoState.logger
 import encry.view.state._
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
@@ -39,8 +38,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 import org.iq80.leveldb.Options
-import scorex.crypto.hash.Digest32
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -57,7 +54,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  //if (settings.snapshotSettings.enableFastSynchronization) nodeView.state.tree.close()
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
   var canDownloadPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
@@ -88,10 +84,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
   }
-
-  val enableSnapshotProcessing: Boolean =
-    settings.snapshotSettings.newSnapshotCreationHeight > settings.levelDB.maxVersions &&
-      settings.snapshotSettings.enableSnapshotCreation
 
   override def receive: Receive =
     if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
@@ -258,22 +250,25 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
+
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
-                  if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
+                  if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
+                    newHis.isHeadersChainSynced) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
-                        s"\n\n\n header - ${h} \n\n\n")
+                        s"\n\n\n header - $h \n\n\n")
                       nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
                     }
                   }
                 case _ =>
               }
-              if (enableSnapshotProcessing && newHis.isFullChainSynced && newHis.getBestBlock.exists(l =>
-                l.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0
-                  && l.header.height != settings.constants.GenesisHeight)) {
+              if (settings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
+                newHis.getBestBlock.exists { block =>
+                block.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
+                  block.header.height != settings.constants.GenesisHeight }) {
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
                 import encry.view.state.avlTree.utils.implicits.Instances._
@@ -286,6 +281,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
                 logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
               }
+
               influxRef.foreach(ref =>
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
@@ -335,10 +331,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
             influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
-            if (newHistory.isHeadersChainSyncedVar) {
-              nodeViewSynchronizer ! HeaderChainIsSynced
-            }
-
+            if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
             influxRef.foreach { ref =>
               logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
               ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)

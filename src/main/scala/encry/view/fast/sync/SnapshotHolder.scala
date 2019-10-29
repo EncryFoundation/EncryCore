@@ -1,6 +1,5 @@
 package encry.view.fast.sync
 
-import NodeMsg.NodeProtoMsg
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import akka.actor.{ Actor, ActorRef, Cancellable, Props }
@@ -120,7 +119,6 @@ class SnapshotHolder(settings: EncryAppSettings,
               InvalidResponseManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
             )
           } else logger.info(s"Doesn't need to process new manifest.")
-
         case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
           (for {
             controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
@@ -133,25 +131,17 @@ class SnapshotHolder(settings: EncryAppSettings,
                            }
           } yield (newProcessor, controller)) match {
             case Left(error) =>
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.toString))
-              snapshotProcessor = snapshotProcessor.reInitStorage
-              self ! HeaderChainIsSynced
-              context.become(
-                fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
-              )
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
+              restartFastSync(history)
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty && processor.chunksCache.nonEmpty =>
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("avc"))
-              snapshotProcessor = snapshotProcessor.reInitStorage
-              self ! HeaderChainIsSynced
-              context.become(
-                fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
-              )
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
+              restartFastSync(history)
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) if state.tree.selfInspectionAfterFastSync =>
-                  nodeViewHolder ! FastSyncFinished(state)
+                  (nodeViewHolder ! FastSyncFinished(state)).asRight[FastSyncException]
                   if (settings.snapshotSettings.enableSnapshotCreation) {
                     snapshotProcessor = SnapshotProcessor.initialize(settings)
                     logger.info(s"Snapshot holder context.become to snapshot processing")
@@ -162,17 +152,9 @@ class SnapshotHolder(settings: EncryAppSettings,
                     logger.info(s"Stop processing snapshots")
                     context.stop(self)
                   }
-                  true.asRight[FastSyncException]
                 case _ =>
-                  logger.info(s"State after fats sync is invalid.")
-                  nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fats sync is invalid"))
-                  snapshotProcessor = processor.reInitStorage
-                  self ! HeaderChainIsSynced
-                  context.become(
-                    fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
-                      .orElse(commonMessages)
-                  )
-                  true.asRight[FastSyncException]
+                  nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
+                  restartFastSync(history).asLeft[Unit]
               }
             case Right((processor, controller)) =>
               snapshotDownloadController = controller
@@ -207,22 +189,16 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
 
     case RequiredManifestHeightAndId(height, manifestId) =>
-      println(
+      logger.info(
         s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
           s"New required manifest id is ${Algos.encode(manifestId)}."
       )
-      snapshotDownloadController = SnapshotDownloadController.empty(settings)
       snapshotDownloadController =
         snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
-      snapshotProcessor = snapshotProcessor.reInitStorage
-      self ! HeaderChainIsSynced
-      context.become(
-        fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
-          .orElse(commonMessages)
-      )
+      restartFastSync(history)
 
     case HeaderChainIsSynced if processHeaderSyncedMsg =>
-      println(
+      logger.info(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
       )
@@ -248,18 +224,8 @@ class SnapshotHolder(settings: EncryAppSettings,
       snapshotDownloadController.cp.foreach { peer =>
         logger.info(s"Ban peer ${peer.socketAddress} for ExpiredNumberOfReRequestAttempts.")
         nodeViewSynchronizer ! BanPeer(peer, ExpiredNumberOfReRequestAttempts)
+        restartFastSync(history)
       }
-      val newProcessor: SnapshotDownloadController = SnapshotDownloadController
-        .empty(settings)
-        .copy(requiredManifestId = snapshotDownloadController.requiredManifestId,
-              requiredManifestHeight = snapshotDownloadController.requiredManifestHeight)
-      snapshotDownloadController = newProcessor
-      snapshotProcessor = snapshotProcessor.reInitStorage
-      self ! HeaderChainIsSynced
-      context.become(
-        fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0)
-          .orElse(commonMessages)
-      )
   }
 
   def workMod(history: History): Receive = {
@@ -284,14 +250,11 @@ class SnapshotHolder(settings: EncryAppSettings,
       message match {
         case RequestManifestMessage(requiredManifestId)
             if connectionsHandler.canBeProcessed(snapshotProcessor, remote, requiredManifestId) =>
-          logger.info(s"Got message RequestManifestMessage from ${remote.socketAddress}.")
-          logger.info(s"Actual manifest with id ${Algos.encode(requiredManifestId)} is same as requested.")
           snapshotProcessor.actualManifest.foreach { m =>
             logger.info(s"Sent to remote actual manifest with id ${Algos.encode(requiredManifestId)}")
             remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
             connectionsHandler = connectionsHandler.addNewConnect(remote, m.chunksKeys.size)
           }
-
         case RequestManifestMessage(manifest) =>
           logger.info(s"Got request for manifest with ${Algos.encode(manifest)}")
         case RequestChunkMessage(chunkId) if connectionsHandler.canProcessResponse(remote) =>
@@ -303,7 +266,9 @@ class SnapshotHolder(settings: EncryAppSettings,
             remote.handlerRef ! networkMessage
           }
           connectionsHandler = connectionsHandler.processRequest(remote)
-        case RequestChunkMessage(_) if connectionsHandler.liveConnections.getOrElse(remote, 0 -> 0L)._1 <= 0 =>
+        case RequestChunkMessage(_) if connectionsHandler.liveConnections.exists {
+              case (peer, (lastRequests, _)) => peer.socketAddress == remote.socketAddress && lastRequests <= 0
+            } =>
           logger.info(s"Ban peer $remote.")
           nodeViewSynchronizer ! BanPeer(remote, ExpiredNumberOfRequests)
           connectionsHandler = connectionsHandler.removeConnection(remote)
@@ -316,10 +281,26 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def commonMessages: Receive = {
+
     case HeaderChainIsSynced               =>
     case SemanticallySuccessfulModifier(_) =>
-    case RequiredManifestHeightAndId(_, _) =>
     case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
+  }
+
+  def restartFastSync(history: History): Unit = {
+    logger.info(s"Restart fast sync!")
+    val newController: SnapshotDownloadController = SnapshotDownloadController
+      .empty(settings)
+      .copy(
+        requiredManifestHeight = snapshotDownloadController.requiredManifestHeight,
+        requiredManifestId = snapshotDownloadController.requiredManifestId
+      )
+    snapshotDownloadController = newController
+    snapshotProcessor = snapshotProcessor.reInitStorage
+    self ! HeaderChainIsSynced
+    context.become(
+      fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
+    )
   }
 }
 
@@ -333,19 +314,7 @@ object SnapshotHolder {
 
   final case class RequiredManifestHeightAndId(height: Int, manifestId: Array[Byte])
 
-  final case class NewManifestId(prevId: Array[Byte], newManifest: SnapshotManifest)
-
-  final case class SnapshotProcessorMessage(sp: SnapshotProcessor) extends AnyVal
-
-  final case class SnapshotProcessorAndHistory(sp: SnapshotProcessor, history: History)
-
-  final case class ManifestInfoToNodeViewHolder(manifestId: Array[Byte], blockHeight: Int, rootNode: NodeProtoMsg)
-
-  final case class NewChunkToApply(list: List[NodeProtoMsg]) extends AnyVal
-
   final case class UpdateSnapshot(bestBlock: Block, state: UtxoState)
-
-  final case class FastSyncDoneAt(height: Int, headerId: Array[Byte])
 
   case object FastSyncDone
 

@@ -113,12 +113,12 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 final case class SnapshotSettings(enableSnapshotCreation: Boolean,
                                   enableFastSynchronization: Boolean,
                                   newSnapshotCreationHeight: Int,
-                                  requestTimeout: FiniteDuration,
                                   chunksNumberPerRequestWhileFastSyncMod: Int,
                                   responseTimeout: FiniteDuration,
                                   reRequestAttempts: Int,
                                   requestsPerTime: Int,
-                                  updateRequestsPerTime: FiniteDuration)
+                                  updateRequestsPerTime: FiniteDuration,
+                                  liveConnectionTimeout: FiniteDuration)
 final case class StorageSettings(history: StorageType, state: StorageType, snapshotHolder: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)

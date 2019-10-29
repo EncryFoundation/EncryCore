@@ -248,7 +248,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       logger.info(s"Before rollback node key: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
       logger.info(s"Before rollback root node: ${rootNode}")
       storage.rollbackTo(to)
-      logger.info(s"Storage success rollbacked")
+      logger.info(s"Storage success rolled back")
       logger.info(s"rootNodeKey: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
       val newRootNode =
         NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
@@ -591,7 +591,6 @@ object AvlTree {
     }
 
     val (rootChunk: Node[StorageKey, StorageValue], rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
-    //println(s"root chunk ${rootChunk}")
     SnapshotChunk(rootChunk, rootChunk.hash) ::
       rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight, storage))
   }

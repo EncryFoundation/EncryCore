@@ -30,15 +30,12 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fast.sync.SnapshotHolder
-import encry.view.fast.sync.SnapshotProcessor
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, NewManifestId, RequiredManifestHeightAndId, SnapshotProcessorAndHistory, SnapshotProcessorMessage, TreeChunks, UpdateSnapshot}
-
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks, UpdateSnapshot}
 import scala.util.Try
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -213,12 +210,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case RequestedModifiersForRemote(remote, txs) => sendResponse(
       remote, Transaction.modifierTypeId, txs.map(tx => tx.id -> TransactionProtoSerializer.toProto(tx).toByteArray)
     )
-    case SnapshotProcessorMessage(l) => snapshotHolder ! SnapshotProcessorAndHistory(l, history)
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
     case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
-    case m@NewManifestId(_, _) => snapshotHolder ! m
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
