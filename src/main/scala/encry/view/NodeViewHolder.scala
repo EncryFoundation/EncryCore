@@ -262,6 +262,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
+                  logger.info(s"NVH NVH MVH ${requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0} " +
+                    s"${newHis.isNewHeader(header)}")
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
                   newHis.isNewHeader(header)) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
