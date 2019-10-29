@@ -103,15 +103,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import java.nio.file.{Files, Path, StandardCopyOption}
       FileUtils.copyDirectory(snapshotProcessorDir, stateDir, false)
       val stateDirNew: File =  UtxoState.getStateDir(settings)
-      val newState: UtxoState = state.copy(tree = state.tree.copy(storage = settings.storage.state match {
-        case VersionalStorage.IODB =>
-          logger.info("Init state with iodb storage")
-          IODBWrapper(new LSMStore(stateDirNew, keepVersions = settings.constants.DefaultKeepVersions))
-        case VersionalStorage.LevelDB =>
-          logger.info("Init state with levelDB storage")
-          val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
-          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
-      }))
+      val newState: UtxoState = UtxoState.create(stateDir, settings)
       logger.info(s"Start validation")
       if (newState.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
