@@ -94,9 +94,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
+      //todo implement wallet scanning
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
-      FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDir"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
       if (state.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
