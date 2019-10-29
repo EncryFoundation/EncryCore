@@ -84,6 +84,7 @@ class SnapshotHolder(settings: EncryAppSettings,
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
         context.become(workMod(history).orElse(commonMessages))
       }
+    case nonsense => logger.info(s"Snapshot holder got $nonsense while history awaiting")
   }
 
   def fastSyncMod(history: History,
