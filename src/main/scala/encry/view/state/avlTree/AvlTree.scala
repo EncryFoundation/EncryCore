@@ -52,6 +52,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
+
     logger.info("New root :: " + newRoot.toString)
    // val deletedNodes  = newRoot.opInfo.deletedNodes
     val (insertedNodes, deletedNodes) = newRoot.opInfo.resolve

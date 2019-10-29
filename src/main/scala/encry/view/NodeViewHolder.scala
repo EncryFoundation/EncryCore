@@ -56,8 +56,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
-  var canDownloadPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
-
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
 
@@ -113,17 +111,19 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
       }))
-      canDownloadPayloads = true
-      nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
-      nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
-        logger.info(s"Updated best block in fast sync mod. Updated state height.")
-        val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
-        updateNodeView(
-          updatedHistory = Some(history),
-          updatedState = Some(newState)
-        )
-        nodeViewSynchronizer ! FastSyncDone
+      if (newState.tree.selfInspectionAfterFastSync) {
+        nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
+        nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
+          logger.info(s"Updated best block in fast sync mod. Updated state height.")
+          val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
+          updateNodeView(
+            updatedHistory = Some(history),
+            updatedState = Some(newState)
+          )
+          nodeViewSynchronizer ! FastSyncDone
+          context.become(defaultMessages(true))
         }
+      } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
