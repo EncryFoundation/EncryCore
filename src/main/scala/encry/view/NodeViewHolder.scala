@@ -108,9 +108,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       Files.walk(SnapshotProcessor.getDirProcessSnapshots(settings).toPath)
         .iterator()
         .asScala
-        .foreach { file => Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)}
+        .foreach { file =>
+          logger.info(s"Move ${file.getFileName} to ${stateDir.getName}")
+          FileUtils.moveFileToDirectory(file.toFile, stateDir, true)
+        }
+      //Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
       //Files.move(snapshotProcessorDir.toPath, stateDir.toPath)
-     // FileUtils.copyDirectory(snapshotProcessorDir, stateDir, true)
+
       //val stateDirNew: File =  UtxoState.getStateDir(settings)
       val newState: UtxoState = UtxoState.create(stateDir, settings)
       logger.info(s"Start validation")
