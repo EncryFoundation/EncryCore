@@ -250,7 +250,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 object SnapshotProcessor extends StrictLogging {
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    if (settings.snapshotSettings.enableFastSynchronization) create(settings, UtxoState.getStateDir(settings))
+    if (settings.snapshotSettings.enableFastSynchronization) create(settings, new File(s"${settings.directory}/state"))
     else create(settings, getDirProcessSnapshots(settings))
 
   def recreate(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDirProcessSnapshots(settings))
