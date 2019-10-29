@@ -93,10 +93,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
-      logger.info(s"Node view holder got message FastSyncDoneAt. Started tree validation.")
+      logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       import org.apache.commons.io.FileUtils
-      import org.apache.commons.io.filefilter.WildcardFileFilter
       nodeView.state.tree.storage.close()
+      state.tree.storage.close()
       FileUtils.deleteDirectory(UtxoState.getStateDir(settings))
       val stateDir: Path = UtxoState.getStateDir(settings).toPath
       val snapshotProcessorDir: Path = SnapshotProcessor.getDirProcessSnapshots(settings).toPath
@@ -113,7 +113,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
       }))
-
       canDownloadPayloads = true
       nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
       nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>

@@ -202,7 +202,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@HeaderChainIsSynced =>
       snapshotHolder ! msg
     case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
-    case msg@FastSyncDone => deliveryManager ! msg
+    case msg@FastSyncDone =>
+      deliveryManager ! msg
+      snapshotHolder ! FastSyncDone
     case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)

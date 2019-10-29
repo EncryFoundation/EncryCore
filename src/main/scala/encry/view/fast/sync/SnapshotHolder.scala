@@ -142,16 +142,6 @@ class SnapshotHolder(settings: EncryAppSettings,
               processor.assembleUTXOState match {
                 case Right(state) if state.tree.selfInspectionAfterFastSync =>
                   (nodeViewHolder ! FastSyncFinished(state)).asRight[FastSyncException]
-                  if (settings.snapshotSettings.enableSnapshotCreation) {
-                    snapshotProcessor = SnapshotProcessor.initialize(settings)
-                    logger.info(s"Snapshot holder context.become to snapshot processing")
-                    context.system.scheduler
-                      .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
-                    context.become(workMod(history).orElse(commonMessages))
-                  } else {
-                    logger.info(s"Stop processing snapshots")
-                    context.stop(self)
-                  }
                 case _ =>
                   nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
                   restartFastSync(history).asLeft[Unit]
@@ -225,6 +215,18 @@ class SnapshotHolder(settings: EncryAppSettings,
         logger.info(s"Ban peer ${peer.socketAddress} for ExpiredNumberOfReRequestAttempts.")
         nodeViewSynchronizer ! BanPeer(peer, ExpiredNumberOfReRequestAttempts)
         restartFastSync(history)
+      }
+
+    case FastSyncDone =>
+      if (settings.snapshotSettings.enableSnapshotCreation) {
+        snapshotProcessor = SnapshotProcessor.initialize(settings)
+        logger.info(s"Snapshot holder context.become to snapshot processing")
+        context.system.scheduler
+          .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
+        context.become(workMod(history).orElse(commonMessages))
+      } else {
+        logger.info(s"Stop processing snapshots")
+        context.stop(self)
       }
   }
 
