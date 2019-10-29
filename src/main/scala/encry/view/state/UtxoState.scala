@@ -101,7 +101,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             logger.info(s"applyModifier -> inputsToDb -> ${combinedStateChange.inputsToDb.map(j => Algos.encode(j))}")
             logger.info(s"jfkdsvkjdfh ${
               tree.storage
-                .get(StorageKey @@ Algos.decode("8d750d34906c0d347be4c1f80394c8698ac8385c643678e300728b8bf4764b90").get
+                .get(StorageKey @@ Algos.decode("99dc04128df7b8f62b0fbf548bb2da7cada120230f833f80f8273c11e6700380").get
               )}")
             val newTree: AvlTree[StorageKey, StorageValue] = tree.insertAndDeleteMany(
               StorageVersion !@@ block.id,
