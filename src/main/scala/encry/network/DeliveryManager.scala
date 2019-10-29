@@ -72,8 +72,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var canProcessTransactions: Boolean = true
 
-  var canProcessPayloads: Boolean = !settings.snapshotSettings.enableFastSynchronization
-
   override def preStart(): Unit = {
     networkControllerRef ! RegisterMessagesHandler(
       Seq(ModifiersNetworkMessage.NetworkMessageTypeID -> "ModifiersNetworkMessage"), self)
@@ -122,7 +120,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case _ =>
       }
 
-    case CheckPayloadsToDownload if canProcessPayloads =>
+    case CheckPayloadsToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.info(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
@@ -138,19 +136,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
       val nextCheckModsScheduler =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
       context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsScheduler))
-
-    case CheckPayloadsToDownload =>
-      logger.info(s"Got CheckPayloadsToDownload while snapshotSettings.startWith is ${settings.snapshotSettings.enableFastSynchronization}.")
-      context.become(basicMessageHandler(
-        history,
-        isBlockChainSynced,
-        settings.node.mining,
-        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
-      ))
-
-    case FastSyncDone =>
-      logger.info(s"Delivery manager got FastSyncDone message.")
-      canProcessPayloads = true
 
     case SemanticallySuccessfulModifier(mod) =>
       logger.info(s"Got SemanticallySuccessfulModifier with id: ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} on dm")
@@ -200,14 +185,14 @@ class DeliveryManager(influxRef: Option[ActorRef],
     }
 
     case DownloadRequest(modifierTypeId, modifiersId, previousModifier) if
-    (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
+    (modifierTypeId == Payload.modifierTypeId && history.isHeadersChainSynced) || modifierTypeId != Payload.modifierTypeId =>
       if (modifierTypeId != Transaction.modifierTypeId)
         logger.info(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
     case DownloadRequest(_, _, _) =>
-      logger.info(s"DownloadRequest but canProcessPayloads = $canProcessPayloads")
+      logger.info(s"DownloadRequest but canProcessPayloads = ${history.isHeadersChainSynced}")
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 

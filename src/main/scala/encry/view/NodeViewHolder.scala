@@ -112,9 +112,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
       }))
       if (newState.tree.selfInspectionAfterFastSync) {
-        nodeView.history.blockDownloadProcessor.updateMinimalBlockHeightVar(state.height + 1)
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
+          nodeView.history.blockDownloadProcessor.updateBestBlock(h)
+          nodeView.history.isHeadersChainSyncedVar = true
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
           updateNodeView(
             updatedHistory = Some(history),
@@ -254,7 +255,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
-                    newHis.isHeadersChainSynced) {
+                  newHis.isNewHeader(header)) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
