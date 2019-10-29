@@ -99,32 +99,19 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       nodeView.state.tree.storage.close()
       state.tree.storage.close()
       val stateDir = UtxoState.getStateDir(settings)
-      FileUtils.cleanDirectory(stateDir)
-      val snapshotProcessorDir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
-       // .renameTo()
-      import java.io.File
-      import java.nio.file.{Files, Path, StandardCopyOption}
+      FileUtils.deleteDirectory(stateDir)
+      stateDir.mkdir()
+      import java.nio.file.{Files, StandardCopyOption}
       import collection.JavaConverters._
       Files.walk(SnapshotProcessor.getDirProcessSnapshots(settings).toPath)
         .iterator()
         .asScala
         .drop(1)
         .foreach { file =>
-          logger.info(s"Move ${file.getFileName} to ${stateDir.getName}")
-          Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
+          val target = UtxoState.getStateDir(settings).toPath
+          logger.info(s"Move ${file.getFileName} to $target")
+          Files.copy(file, target, StandardCopyOption.REPLACE_EXISTING)
         }
-      //class ABC extends SimpleFileVisitor[Path]
-//      Files.walkFileTree(SnapshotProcessor.getDirProcessSnapshots(settings).toPath, new ABC)
-//        .iterator()
-//        .asScala
-//        .foreach { file =>
-//          logger.info(s"Move ${file.getFileName} to ${stateDir.getName}")
-//          Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
-//        }
-      //FileUtils.moveFileToDirectory(file.toFile, stateDir, true)
-      //Files.move(snapshotProcessorDir.toPath, stateDir.toPath)
-
-      //val stateDirNew: File =  UtxoState.getStateDir(settings)
       val newState: UtxoState = UtxoState.create(stateDir, settings)
       logger.info(s"Start validation")
       if (newState.tree.selfInspectionAfterFastSync) {
