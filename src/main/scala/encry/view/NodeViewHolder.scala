@@ -104,8 +104,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         snapshotProcessorDir,
         stateDir,
         //StandardCopyOption.REPLACE_EXISTING
-                 StandardCopyOption.ATOMIC_MOVE
-        //          StandardCopyOption.COPY_ATTRIBUTES
+                 //StandardCopyOption.ATOMIC_MOVE
+                  StandardCopyOption.COPY_ATTRIBUTES
       )
       val stateDirNew: File = newPath.toFile
       val newState: UtxoState = state.copy(tree = state.tree.copy(storage = settings.storage.state match {
