@@ -208,7 +208,9 @@ object UtxoState extends StrictLogging {
 
   def initialStateBoxes: List[AssetBox] = List(AssetBox(EncryProposition.open, -9, 0))
 
-  def getStateDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/state")
+  def getStateDir(settings: EncryAppSettings): File =
+    if (settings.snapshotSettings.enableSnapshotCreation) new File(s"${settings.directory}/tmpDir")
+    else new File(s"${settings.directory}/state")
 
   def create(stateDir: File, settings: EncryAppSettings): UtxoState = {
     val versionalStorage = settings.storage.state match {

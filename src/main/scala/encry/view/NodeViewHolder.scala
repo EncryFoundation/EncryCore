@@ -95,6 +95,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case FastSyncFinished(state) =>
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
+      nodeView.state.tree.storage.close()
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDir"))
       if (state.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
@@ -439,26 +441,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         toApply.foldLeft(startState) { (s, m) => s.applyValidModifier(m) }
     }
-
-  def createStateStorageFastSync: VersionalStorage = {
-    val dir: File = UtxoState.getStateDir(settings)
-    import org.apache.commons.io.FileUtils
-    import org.apache.commons.io.filefilter.WildcardFileFilter
-    nodeView.state.tree.close()
-    FileUtils.deleteDirectory(dir)
-    val stateDir: File = UtxoState.getStateDir(settings)
-    stateDir.mkdirs()
-    val versionalStorage: VersionalStorage = settings.storage.state match {
-      case VersionalStorage.IODB =>
-        logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        logger.info("Init state with levelDB storage")
-        val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
-    }
-    versionalStorage
-  }
 
   override def close(): Unit = {
     nodeView.history.close()
