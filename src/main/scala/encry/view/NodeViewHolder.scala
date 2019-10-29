@@ -1,7 +1,7 @@
 package encry.view
 
 import java.io.File
-import java.nio.file.Path
+import java.nio.file.{Path, SimpleFileVisitor}
 
 import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
@@ -105,14 +105,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       import java.io.File
       import java.nio.file.{Files, Path, StandardCopyOption}
       import collection.JavaConverters._
-      Files.walk(SnapshotProcessor.getDirProcessSnapshots(settings).toPath)
+
+      Files.walkFileTree(SnapshotProcessor.getDirProcessSnapshots(settings).toPath, SimpleFileVisitor[Path])
         .iterator()
         .asScala
         .foreach { file =>
           logger.info(s"Move ${file.getFileName} to ${stateDir.getName}")
-          FileUtils.moveFileToDirectory(file.toFile, stateDir, true)
+          Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
         }
-      //Files.copy(file, stateDir.toPath, StandardCopyOption.REPLACE_EXISTING)
+      //FileUtils.moveFileToDirectory(file.toFile, stateDir, true)
       //Files.move(snapshotProcessorDir.toPath, stateDir.toPath)
 
       //val stateDirNew: File =  UtxoState.getStateDir(settings)
