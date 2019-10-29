@@ -82,6 +82,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
   }
+  var isHeaderChainSyncedLocal: Boolean = false
 
   override def receive: Receive =
     if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
@@ -264,8 +265,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
                   logger.info(s"NVH NVH MVH ${requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0} " +
                     s"${newHis.isNewHeader(header)}")
-                  if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
-                  newHis.isNewHeader(header)) {
+
+                  //todo invalid condition!?!??!?!?!?!?!?!?!??!?!
+                  if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
