@@ -112,7 +112,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           logger.info(s"File ${file.getFileName.toString}")
           //if (file.getFileName.toString != "LOCK") {
             logger.info(s"Move ${file.getFileName} to $target.")
-            Files.copy(file, target)
+            //Files.copy(file, target)
+            FileUtils.moveFileToDirectory(file.toFile, target.toFile, false)
           //}
         }
       val newState: UtxoState = UtxoState.create(stateDir, settings)
