@@ -111,7 +111,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           val levelDBInit = LevelDbFactory.factory.open(stateDirNew, new Options)
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
       }))
-      //if (newState.tree.selfInspectionAfterFastSync) {
+      if (newState.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
           nodeView.history.blockDownloadProcessor.updateBestBlock(h)
@@ -125,7 +125,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))
         }
-//      } else sys.exit(1234567)
+      } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
