@@ -55,7 +55,6 @@ class MemoryPool(settings: EncryAppSettings,
 
   def transactionsProcessor(currentNumberOfProcessedTransactions: Int): Receive = {
     case NewTransaction(transaction) =>
-      println("mempool")
       val (newMemoryPool: MemoryPoolStorage, validatedTransaction: Option[Transaction]) =
         memoryPool.validateTransaction(transaction)
       memoryPool = newMemoryPool

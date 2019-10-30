@@ -1,5 +1,7 @@
 package encry.modifiers.mempool
 
+import cats.Applicative
+import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
@@ -7,14 +9,12 @@ import org.encryfoundation.common.modifiers.mempool.directive.{AssetIssuingDirec
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.MonetaryBox
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
-
-import scala.util.Random
 
 object TransactionFactory extends StrictLogging {
 
@@ -88,8 +88,6 @@ object TransactionFactory extends StrictLogging {
 
     val change: Long = amount
 
-    println(change)
-
     if (change < 0) {
       logger.info(s"Transaction impossible: required amount is bigger than available. Change is: $change.")
       throw new RuntimeException("Transaction impossible: required amount is bigger than available.")
@@ -113,11 +111,15 @@ object TransactionFactory extends StrictLogging {
                                 recipient: String,
                                 amount: Long,
                                 tokenIdOpt: Option[ADKey] = None): Transaction = {
-    val howMuchCanTransfer: Long = useOutputs.map(_._1.amount).sum - fee
-    val howMuchWillTransfer: Long = amount
-    val change: Long = howMuchCanTransfer - howMuchWillTransfer
+    val howMuchCanTransfer: Long =
+      if (tokenIdOpt.isEmpty) useOutputs.map(_._1.amount).sum - fee
+      else useOutputs.map(_._1).collect {
+        case ab: AssetBox if Applicative[Option].map2(ab.tokenIdOpt, tokenIdOpt)(_.sameElements(_)).getOrElse(false) => ab
+        case tib: TokenIssuingBox if tokenIdOpt.exists(_.sameElements(tib.tokenId)) => tib
+      }.map(_.amount).sum
+    val change: Long = howMuchCanTransfer - amount
     val directives: IndexedSeq[TransferDirective] =
-      IndexedSeq(TransferDirective(recipient, howMuchWillTransfer, tokenIdOpt))
+      IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
     prepareTransaction(privKey, fee, timestamp, useOutputs, directives, change, tokenIdOpt)
   }
 
