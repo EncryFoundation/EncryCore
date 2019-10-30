@@ -75,12 +75,12 @@ object ConsoleListener {
 // link "wallet"
   private val walletCmds = Map(
     "wallet" -> Map(
-      "addrs"     -> PrintAddresses, //table
-      "createKey" -> CreateKey, //button
-      "pubKeys"   -> PrintPubKeys, // table
-      "balance"   -> GetBalance,  // table
-      "transfer"  -> Transfer, // add
-      "privKeys"  -> PrintPrivKeys, //Todo delete
+      "addrs"       -> PrintAddresses, //table
+      "createKey"   -> CreateKey, //button
+      "pubKeys"     -> PrintPubKeys, // table
+      "balance"     -> GetBalance,  // table
+      "transfer"    -> Transfer, // add
+      "privKeys"    -> PrintPrivKeys, //Todo delete
       "createToken" -> CreateToken
     )
   )

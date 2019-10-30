@@ -7,6 +7,7 @@ object Ast {
   sealed trait Value
   case class Num(i: Long) extends Value
   case class Str(s: String) extends Value
+  case class Opt[A](opt: Option[A]) extends Value
 
   sealed trait Bool extends Value
   case object True extends Value with Bool
