@@ -61,4 +61,16 @@ class AccountManagerSpec extends PropSpec with Matchers with MockitoSugar {
       .update(any[Long], eq_(Iterable.empty[ByteArrayWrapper]), eq_(Iterable(keyToStore, dataToStore)))
   }
 
+  property("Create new accounts") {
+    val account: AccountManager = AccountManager(storageMock, storagePassword, seed, 0.toByte)
+    account.createAccount(seed)
+
+    val keyToStore =
+      ByteArrayWrapper(Array(AccountManager.AccountPrefix, 0.toByte) ++ account.mandatoryAccount.publicKeyBytes) ->
+        ByteArrayWrapper(AES.encrypt(account.mandatoryAccount.privKeyBytes, storagePassword))
+
+    verify(storageMock, times(1))
+      .update(any[Long], eq_(Iterable.empty[ByteArrayWrapper]), eq_(Iterable(keyToStore)))
+  }
+
 }
