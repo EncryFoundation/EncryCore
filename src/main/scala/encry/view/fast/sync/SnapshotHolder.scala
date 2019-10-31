@@ -60,8 +60,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         RequestManifestMessage.NetworkMessageTypeID  -> "RequestManifest",
         ResponseManifestMessage.NetworkMessageTypeID -> "ResponseManifestMessage",
         RequestChunkMessage.NetworkMessageTypeID     -> "RequestChunkMessage",
-        ResponseChunkMessage.NetworkMessageTypeID    -> "ResponseChunkMessage",
-        ManifestHasChanged.NetworkMessageTypeID      -> "ManifestHasChanged"
+        ResponseChunkMessage.NetworkMessageTypeID    -> "ResponseChunkMessage"
       ),
       self
     )

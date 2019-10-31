@@ -56,10 +56,6 @@ message GeneralizedNetworkProtoMessage {
     message ResponseChunkProtoMessage {
         SnapshotChunkMessage chunk = 1;
     }
-    message ManifestHasChangedProtoMessage {
-        bytes requestedManifestId = 1;
-        SnapshotManifestProtoMessage snapshotManifestProtoMessage = 2;
-    }
 
     bytes magic = 1;
     bytes checksum = 2;
@@ -75,6 +71,5 @@ message GeneralizedNetworkProtoMessage {
         ResponseManifestProtoMessage responseManifestProtoMessage = 11;
         RequestChunkProtoMessage requestChunkProtoMessage = 12;
         ResponseChunkProtoMessage responseChunkProtoMessage = 13;
-        ManifestHasChangedProtoMessage manifestHasChangedProtoMessage = 14;
     }
 }

@@ -66,7 +66,7 @@ libraryDependencies ++= (Seq(
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
-  "org.encry" %% "encry-common" % "0.9.3",
+  "org.encry" %% "encry-common" % "0.9.2",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
@@ -89,8 +89,7 @@ libraryDependencies ++= (Seq(
   "org.typelevel" % "cats-macros_2.12" % "1.0.1",
   "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
   "com.google.guava" % "guava" % "27.1-jre"
-).map(_.exclude("org.encry.encry-common", "0.9.0"))
-  ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies)
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies)
 
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
