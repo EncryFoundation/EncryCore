@@ -66,16 +66,13 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
       )
     case _: VLDBWrapper =>
+      logger.info(s"Inserting2: $objectsToInsert")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>
           StorageKey @@ key -> StorageValue @@ value
         } ++ objectsToInsert.map { obj =>
-        val ser = HistoryModifiersProtoSerializer.toProto(obj)
-        if (obj.modifierTypeId == Header.modifierTypeId) {
-          logger.info(s"Insert header ${obj.encodedId} as ${HistoryModifiersProtoSerializer.fromProto(ser)}")
-        }
-          StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ ser
+          StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
         }).toList
       )
   }

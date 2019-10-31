@@ -125,7 +125,6 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     case FullBlockChainIsSynced =>
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
-    case TransactionsForMiner(_) =>
     case DisableMining | SemanticallySuccessfulModifier(_) =>
   }
 

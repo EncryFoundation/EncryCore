@@ -1,5 +1,8 @@
 package encry.view.state.avlTree
 
+import cats.syntax.order._
+import cats.{Monoid, Order}
+import com.google.common.primitives.Ints
 import NodeMsg.NodeProtoMsg
 import cats.syntax.order._
 import cats.{Monoid, Order}
@@ -15,6 +18,8 @@ import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
@@ -52,12 +57,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
-
-    logger.info("New root :: " + newRoot.toString)
    // val deletedNodes  = newRoot.opInfo.deletedNodes
     val (insertedNodes, deletedNodes) = newRoot.opInfo.resolve
     val shadowedRoot  = ShadowNode.childsToShadowNode(newRoot.node)
-    logger.info(s"shadowedRoot ${shadowedRoot.toString}")
+    val startInsertTime = System.currentTimeMillis()
     storage.insert(
       version,
       toInsert.map {
@@ -80,6 +83,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
+    logger.info(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
     //println(newRoot.node)
     AvlTree(shadowedRoot, storage)
   }

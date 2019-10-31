@@ -1,7 +1,6 @@
 package encry.view.history
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._

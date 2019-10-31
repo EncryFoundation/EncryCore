@@ -1,14 +1,8 @@
 package encry.view.state
 
 import java.io.File
-
-import NodeMsg.NodeProtoMsg
-import cats.data.Validated
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.google.common.primitives.Ints
-import encry.utils.implicits.Validation._
+import akka.actor.ActorRef
+import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
@@ -20,13 +14,16 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
+import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
-import encry.view.fast.sync.SnapshotHolder.SnapshotChunk
-import encry.view.state.UtxoState.StateChange
-import encry.view.state.avlTree.{AvlTree, Node, NodeSerilalizer}
-import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.LSMStore
+import cats.data.Validated
+import cats.Traverse
+import cats.syntax.traverse._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.validated._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -40,9 +37,9 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
+import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
-
-import scala.collection.immutable
+import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
@@ -228,7 +225,7 @@ object UtxoState extends StrictLogging {
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300, 32), keySize = 32))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = settings.levelDB.keySize))
     }
     val height = Height @@ Ints.fromByteArray(versionalStorage.get(UtxoState.bestHeightKey).get)
     logger.info(s"State created.")
@@ -250,7 +247,7 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
-    if (!settings.snapshotSettings.enableFastSynchronization) storage.insert(
+    storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
     )

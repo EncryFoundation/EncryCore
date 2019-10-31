@@ -20,6 +20,8 @@ import encry.stats.StatsSender._
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.settings.EncryAppSettings
+import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
@@ -32,6 +34,10 @@ import encry.view.state.{UtxoState, _}
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.LSMStore
+import encry.view.history.History
+import encry.view.mempool.MemoryPool.RolledBackTransactions
+import encry.view.state._
+import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
@@ -67,10 +73,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
-  override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
-    logger.info(s"Node view holder started.")
-  }
+  override def preStart(): Unit = logger.info(s"Node view holder started.")
 
   override def preRestart(reason: Throwable, message: Option[Any]): Unit = {
     reason.printStackTrace()
