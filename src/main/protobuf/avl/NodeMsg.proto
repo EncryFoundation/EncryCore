@@ -15,8 +15,8 @@ message NodeProtoMsg {
             bytes value = 2;
             int32 height = 3;
             int32 balance = 4;
-            ShadowNodeProto leftChild = 5;
-            ShadowNodeProto rightChild = 6;
+            NodeProtoMsg leftChild = 5;
+            NodeProtoMsg rightChild = 6;
             bytes hash = 7;
         }
 
