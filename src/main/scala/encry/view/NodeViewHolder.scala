@@ -244,8 +244,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
                   logger.info(s"NVH NVH MVH ${requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0} " +
                     s"${newHis.isNewHeader(header)}")
-
-                  //todo invalid condition!?!??!?!?!?!?!?!?!??!?!
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
