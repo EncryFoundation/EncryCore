@@ -31,7 +31,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
     getWallet
       .map { w =>
         Map(
-          "balances" -> w.getBalances.map(i => i._1 -> i._2.toString).toMap.asJson,
+          "balances" -> w.getBalances.map(i => s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}").asJson,
           "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
         ).asJson
       }
