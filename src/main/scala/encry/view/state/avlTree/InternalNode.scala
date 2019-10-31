@@ -1,10 +1,11 @@
 package encry.view.state.avlTree
 
-import NodeMsg.NodeProtoMsg.NodeTypes.{ InternalNodeProto, ShadowNodeProto }
+import NodeMsg.NodeProtoMsg
+import NodeMsg.NodeProtoMsg.NodeTypes.{InternalNodeProto, ShadowNodeProto}
 import cats.Monoid
 import com.google.common.primitives.Ints
 import com.google.protobuf.ByteString
-import encry.view.state.avlTree.utils.implicits.{ Hashable, Serializer }
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
@@ -71,31 +72,25 @@ object InternalNode {
       .withKey(ByteString.copyFrom(kSer.toBytes(node.key)))
       .withValue(ByteString.copyFrom(vSer.toBytes(node.value)))
     val withLeftChild = node.leftChild.map { leftChild =>
-      val shadowNode = ShadowNodeProto()
-        .withBalance(leftChild.balance)
-        .withHash(ByteString.copyFrom(leftChild.hash))
-        .withHeight(leftChild.height)
-      msg.withLeftChild(shadowNode)
+      val child: NodeProtoMsg = NodeSerilalizer.toProto(leftChild)
+      msg.withLeftChild(child)
     }.getOrElse(msg)
     node.rightChild.map { rightChild =>
-      val shadowNode = ShadowNodeProto()
-        .withBalance(rightChild.balance)
-        .withHash(ByteString.copyFrom(rightChild.hash))
-        .withHeight(rightChild.height)
-      withLeftChild.withRightChild(shadowNode)
+      val child: NodeProtoMsg = NodeSerilalizer.toProto(rightChild)
+      withLeftChild.withRightChild(child)
     }.getOrElse(withLeftChild)
   }
 
   def fromProto[K: Monoid: Hashable, V: Monoid](
-    protoInternal: InternalNodeProto
-  )(implicit kSer: Serializer[K], vSer: Serializer[V]): Try[InternalNode[K, V]] = Try {
+                                                 protoInternal: InternalNodeProto
+                                               )(implicit kSer: Serializer[K], vSer: Serializer[V]): Try[InternalNode[K, V]] = Try {
     new InternalNode(
       key = kSer.fromBytes(protoInternal.key.toByteArray),
       value = vSer.fromBytes(protoInternal.value.toByteArray),
       height = protoInternal.height,
       balance = protoInternal.balance,
-      leftChild = protoInternal.leftChild.map(elem => ShadowNode.fromProto[K, V](elem).get),
-      rightChild = protoInternal.rightChild.map(elem => ShadowNode.fromProto[K, V](elem).get)
+      leftChild = protoInternal.leftChild.map(elem => NodeSerilalizer.fromProto[K, V](elem)),
+      rightChild = protoInternal.rightChild.map(elem => NodeSerilalizer.fromProto[K, V](elem))
     )
   }
 
