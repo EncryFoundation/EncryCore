@@ -16,7 +16,7 @@ case class AccountManager private(store: Store, password: String, mandatoryAccou
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.take(2).sameElements(Array(AccountManager.AccountPrefix, number)))
-      acc :+ PrivateKey25519(PrivateKey @@ decrypt(v.data), PublicKey @@ k.data)
+      acc :+ PrivateKey25519(PrivateKey @@ decrypt(v.data), PublicKey @@ k.data.drop(2))
     else acc
   }
 
