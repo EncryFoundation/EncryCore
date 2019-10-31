@@ -164,11 +164,13 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
 
       val validBalance: Boolean = {
         val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs, constants.IntrinsicTokenId).map {
-          case (key, value) => Algos.encode(key) -> value
+          case ((_, key), value) => Algos.encode(key) -> value
         }
         val creditB: Map[String, Amount] = {
           val balanceSheet: Map[TokenId, Amount] =
-            BalanceCalculator.balanceSheet(tx.newBoxes, constants.IntrinsicTokenId, excludeTokenIssuance = true)
+            BalanceCalculator.balanceSheet(tx.newBoxes, constants.IntrinsicTokenId, excludeTokenIssuance = true).map {
+              case ((_, key), value) => key -> value
+            }
           val intrinsicBalance: Amount = balanceSheet.getOrElse(constants.IntrinsicTokenId, 0L)
           balanceSheet.updated(constants.IntrinsicTokenId, intrinsicBalance + tx.fee)
           }.map { case (tokenId, amount) => Algos.encode(tokenId) -> amount }

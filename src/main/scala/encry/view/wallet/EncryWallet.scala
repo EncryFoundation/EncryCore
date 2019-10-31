@@ -77,7 +77,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
-  def getBalances: Seq[(String, Long)] = walletStorage.getBalances.toSeq
+  def getBalances: Seq[((String, String), Long)] = walletStorage.getBalances.toSeq
 
   override def close(): Unit = walletStorage.close()
 }
