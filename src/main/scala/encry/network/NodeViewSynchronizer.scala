@@ -19,7 +19,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._

@@ -20,8 +20,8 @@ import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
-import encry.view.actors.NodeViewHolder.CurrentView
-import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.CurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
