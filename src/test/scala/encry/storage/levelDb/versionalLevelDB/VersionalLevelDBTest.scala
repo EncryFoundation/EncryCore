@@ -186,14 +186,20 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(6) + 1)
-    
+    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, maxVersions + 2)
+
+    levelDbElems.foreach(vldbInit.insert)
+
     levelDbElems.last.elemsToInsert.forall{case (key, value) =>
       vldbInit.get(key).exists(dbValue => Algos.hash(dbValue) sameElements Algos.hash(value))
     } shouldBe true
 
     levelDbElems.last.elemsToDelete.forall{key =>
       vldbInit.get(key) == Option.empty[VersionalLevelDbValue]
+    } shouldBe true
+
+    levelDbElems.head.elemsToDelete.forall{key =>
+      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)) == Option.empty[VersionalLevelDbValue]
     } shouldBe true
   }
 
