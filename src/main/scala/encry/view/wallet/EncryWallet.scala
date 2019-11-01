@@ -5,19 +5,26 @@ import java.io.File
 import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{EncryAppSettings, Settings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
 import io.iohk.iodb.{LSMStore, Store}
+import encry.view.state.UtxoState
+import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
   extends StrictLogging with AutoCloseable with Settings {
@@ -61,6 +68,16 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
     case _ => this
   }
 
+  def scanWalletFromUtxo(state: UtxoState): EncryWallet = {
+    val bxsToAdd = EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, propositions)
+    walletStorage.updateWallet(
+      ModifierId !@@ state.tree.storage.currentVersion,
+      bxsToAdd,
+      List.empty,
+      settings.constants.IntrinsicTokenId)
+    this
+  }
+
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
   def getBalances: Seq[((String, String), Long)] = {
@@ -87,6 +104,32 @@ object EncryWallet extends StrictLogging {
   def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
 
   def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
+
+  def scanTree(node: Node[StorageKey, StorageValue],
+               storage: VersionalStorage,
+               accounts: Set[EncryProposition]): List[EncryBaseBox] = node match {
+    case sh: ShadowNode[StorageKey, StorageValue] =>
+      val restoredNode = sh.restoreFullNode(storage)
+      scanTree(restoredNode, storage, accounts)
+    case internalNode: InternalNode[StorageKey, StorageValue] =>
+      StateModifierSerializer.parseBytes(internalNode.value, internalNode.key.head) match {
+        case Success(bx) => collectBx(bx, accounts) :::
+          internalNode.leftChild.map(leftNode => scanTree(leftNode, storage, accounts)).getOrElse(List.empty) :::
+          internalNode.rightChild.map(rightChild => scanTree(rightChild, storage, accounts)).getOrElse(List.empty)
+        case Failure(exception) => throw exception //???????
+      }
+    case leafNode: LeafNode[StorageKey, StorageValue] =>
+      StateModifierSerializer.parseBytes(leafNode.value, leafNode.key.head) match {
+        case Success(bx) => collectBx(bx, accounts)
+        case Failure(exception) => throw exception //???????
+      }
+  }
+
+  def collectBx(box: EncryBaseBox, accounts: Set[EncryProposition]): List[EncryBaseBox] = box match {
+    case monetary: MonetaryBox if accounts.exists(_.contractHash sameElements monetary.proposition.contractHash) =>
+      List(monetary)
+    case _ => List.empty[MonetaryBox]
+  }
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
     val walletDir: File = getWalletDir(settings)
