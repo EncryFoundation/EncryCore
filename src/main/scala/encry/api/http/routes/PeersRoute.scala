@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
@@ -119,58 +119,11 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
               span(cls := "navbar-toggler-icon")
             ),
             // Brand
-            a(cls := "navbar-brand pt-0", href := "https://www.w3schools.com",
-              img(src := "argon/assets/img/brand/blue.png", cls := "navbar-brand-img", alt := "...")
+            a(cls := "navbar-brand pt-0", href := "/web",
+              img(src := "argon/assets/img/brand/encry-logo.png", cls := "navbar-brand-img", alt := "...")
             ),
             // User
-            ul(cls := "nav align-items-center d-md-none",
-              li(cls := "nav-item dropdown",
-                a(cls := "nav-link nav-link-icon", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
-                  i(cls := "ni ni-bell-55")
-                ),
-                div(cls := "dropdown-menu dropdown-menu-arrow dropdown-menu-right", aria.labelledby := "navbar-default_dropdown_1",
-                  a(cls := "dropdown-item", href := "#", "Action"),
-                  a(cls := "dropdown-item", href := "#", "Another action"),
-                  div(cls := "dropdown-divider"),
-                  a(cls := "dropdown-item", href := "#", "Something else here")
-                )
-              ),
-              li(cls := "nav-item dropdown",
-                a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
-                  div(cls := "media align-items-center",
-                    span(cls := "avatar avatar-sm rounded-circle",
-                      img(alt := "Image placeholder", src := "argon/assets/img/theme/team-1-800x800.jpg")
-                    )
-                  )
-                ),
-                div(cls := "dropdown-menu dropdown-menu-arrow dropdown-menu-right",
-                  div(cls := " dropdown-header noti-title",
-                    h6(cls := "text-overflow m-0", "Welcome!")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-single-02"),
-                    span("My profile")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-settings-gear-65"),
-                    span("Settings")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-calendar-grid-58"),
-                    span("Activity")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-support-16"),
-                    span("Support")
-                  ),
-                  div(cls := "dropdown-divider"),
-                  a(href := "#!", cls := "dropdown-item",
-                    i(cls := "ni ni-user-run"),
-                    span("Logout")
-                  )
-                )
-              )
-            ),
+
             // Collapse
             div(cls := "collapse navbar-collapse", id := "sidenav-collapse-main",
               // Collapse header
@@ -208,7 +161,7 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
                   )
                 ),
                 li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./wallet",
+                  a(cls := "nav-link", href := "./webWallet",
                     i(cls := "ni ni-planet text-blue"), "Wallet"
                   )
                 ),
@@ -217,7 +170,7 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
                     i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"
                   ),
                   div(cls := "dropdown-menu dropdown-menu-right dropdown-menu-arrow",
-                    a(cls := "dropdown-item", href := "./peers", "All peers"),
+                    a(cls := "dropdown-item", href := "./allPeers", "All peers"),
                     a(cls := "dropdown-item", href := "./connectedPeers", "Connected peers"),
                     a(cls := "dropdown-item", href := "./bannedPeers", "Banned peers")
                   )
@@ -327,13 +280,16 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
     )
   }
 
-  override def route: Route = (path("peers") & get) {
-    //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
-    onComplete(info) {
-      case Success(info) =>
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+  override def route: Route = (path("allPeers") & get) {
+    extractClientIP { ip =>
+      if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
+        //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
+        onComplete(info) {
+          case Success(info) =>
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+        }
+      } else reject(ValidationRejection("Restricted!"))
     }
   }
-
 
 }

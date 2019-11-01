@@ -11,7 +11,10 @@ case class ArgonRoute(appSettings: RESTApiSettings)(implicit val context: ActorR
 
   override def route: Route = pathPrefix("argon"){
     {
-      getFromBrowseableDirectory("src/main/resources/argon")
+      println("test")
+
+//      getFromBrowseableDirectory("src/main/resources/argon")
+      getFromResourceDirectory("argon")
     }
   }
 }

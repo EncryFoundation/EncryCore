@@ -104,6 +104,11 @@ object EncryApp extends App with StrictLogging {
       CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
       settings.restApi.bindAddress.getAddress.getHostAddress,
       settings.restApi.bindAddress.getPort)
+
+//    Http().bindAndHandle(
+//      CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
+//      settings.restApi.bindAddress.getAddress.getHostAddress,
+//      settings.restApi.bindAddress.getPort)
   }
 
   system.actorOf(Props[Zombie], "zombie")

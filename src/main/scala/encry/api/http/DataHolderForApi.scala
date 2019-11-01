@@ -36,9 +36,10 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
   implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
+  var permissionedUsers: Seq[String] = Seq("127.0.0.1")
+
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
-
 
   override def receive: Receive = workingCycle()
 
@@ -159,6 +160,10 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
         .map(_.map(_.toString))
         .pipeTo(sender)
 
+    case GetAllPermissionedUsers =>
+      println("permissioned users " + permissionedUsers)
+      sender() ! permissionedUsers
+
     case GetBannedPeersHelperAPI =>
       (self ? GetBannedPeers)
         .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
@@ -184,6 +189,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
           _.headerIdsAtHeight(i).map(Algos.encode)
         }
         .pipeTo(sender)
+
+    case AddUser(ip) => permissionedUsers = permissionedUsers :+ ip
 
     case GetAllInfoHelper => {
 
@@ -292,9 +299,13 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class Readers(h: Option[History], s: Option[UtxoStateReader])
 
+  final case class AddUser(ip: String)
+
   case class PeerBanHelper(addr: InetSocketAddress, msg: String)
 
   case object GetViewSendTx
+
+  case object GetAllPermissionedUsers
 
   case object GetInfoHelper
 

@@ -1,10 +1,16 @@
 package encry.api.http.routes
 
+import java.net.{InetAddress, InetSocketAddress}
+import java.util.concurrent.TimeUnit
+
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import akka.util.Timeout
+import io.circe.parser
+import io.circe.generic.auto._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp.memoryPool
@@ -19,11 +25,14 @@ import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
+
 import scala.concurrent.duration._
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
@@ -40,7 +49,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
-    infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ createTokenR ~ dataTransactionR
+     infoR ~ loginRoute ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ createTokenR ~ dataTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -72,6 +81,73 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   def printAddressR: Route = (path("addr") & get) {
     getAddresses.map(_.asJson).okJson()
   }
+
+  def errorR: Route = path("restricted") {
+    reject(ValidationRejection("Restricted!"))
+  }
+
+  case class LoginRequest(a:String, b:String)
+
+  // JWT
+  val superSecretPasswordDb = Map(
+    "admin" -> "admin",
+    "daniel" -> "Rockthejvm1!"
+  )
+
+  val algorithm = JwtAlgorithm.HS256
+  val secretKey = "encry"
+
+  def checkPassword(username: String, password: String): Boolean =
+    superSecretPasswordDb.contains(username) && superSecretPasswordDb(username) == password
+
+  def createToken(username: String, expirationPeriodInDays: Int): String = {
+    val claims = JwtClaim(
+      expiration = Some(System.currentTimeMillis() / 1000 + TimeUnit.DAYS.toSeconds(expirationPeriodInDays)),
+      issuedAt = Some(System.currentTimeMillis() / 1000),
+      issuer = Some("rockthejvm.com"),
+      subject = Some(username)
+    )
+
+    JwtSprayJson.encode(claims, secretKey, algorithm) // JWT string
+  }
+
+  def isTokenExpired(token: String): Boolean = JwtSprayJson.decode(token, secretKey, Seq(algorithm)) match {
+    case Success(claims) => claims.expiration.getOrElse(0L) < System.currentTimeMillis() / 1000
+    case Failure(_) => true
+  }
+
+  def isTokenValid(token: String): Boolean = JwtSprayJson.isValid(token, secretKey, Seq(algorithm))
+
+  def loginRoute =
+    post {
+      entity(as[LoginRequest]) {
+        case LoginRequest(username, password) if checkPassword(username, password) =>
+          val token = createToken(username, 1)
+          respondWithHeader(RawHeader("Access-Token", token)) {
+            complete(StatusCodes.OK)
+          }
+        case _ => complete(StatusCodes.Unauthorized)
+      }
+    }
+
+  val authenticatedRoute =
+    (path("secureEndpoint") & get) {
+      optionalHeaderValueByName("Authorization") {
+        case Some(token) =>
+          if (isTokenValid(token)) {
+            if (isTokenExpired(token)) {
+              complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
+            } else {
+              complete("User accessed authorized endpoint!")
+            }
+          } else {
+            complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid, or has been tampered with."))
+          }
+        case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
+      }
+    }
+
+  //  JWT
 
   def createTokenR: Route = (path("createToken") & get) {
     parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>

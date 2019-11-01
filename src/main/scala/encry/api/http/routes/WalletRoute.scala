@@ -1,8 +1,12 @@
 package encry.api.http.routes
 
+import java.util.concurrent.TimeUnit
+
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
+import akka.http.scaladsl.model.headers.RawHeader
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
+import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
@@ -10,9 +14,11 @@ import encry.local.miner.Miner.MinerStatus
 import scalatags.Text.all.{div, span, td, _}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.Json
+import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scalatags.{Text, generic}
-import io.circe.parser
-import io.circe.generic.auto._
+import spray.json.DefaultJsonProtocol
+//import io.circe.parser
+//import io.circe.generic.auto._
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
@@ -38,7 +44,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def walletScript(balances: Map[String, Amount], pubKeysList: List[String] ): Text.TypedTag[String] = {
+  def walletScript(balances: Map[String, Amount], pubKeysList: List[String]): Text.TypedTag[String] = {
 
     val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
 
@@ -52,7 +58,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
         meta(name := "author", content := "Creative Tim"),
         script(
-          raw("""function validateForm2() {
+          raw(
+            """function validateForm2() {
   var y = document.forms["myForm2"]["fee"].value;
   var z = document.forms["myForm2"]["data`"].value;
   if (y == "") {
@@ -66,7 +73,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 }""")
         ),
         script(
-          raw("""function validateForm() {
+          raw(
+            """function validateForm() {
   var x = document.forms["myForm"]["addr"].value;
   var y = document.forms["myForm"]["fee"].value;
   var z = document.forms["myForm"]["amount"].value;
@@ -85,7 +93,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 }""")
         ),
         script(
-          raw("""function validateForm1() {
+          raw(
+            """function validateForm1() {
   var y = document.forms["myForm1"]["fee"].value;
   var z = document.forms["myForm1"]["amount"].value;
   if (y == "") {
@@ -99,7 +108,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 }""")
         ),
         script(
-          raw("""function wallet(){
+          raw(
+            """function wallet(){
                  var a = document.forms["myForm"]["addr"].value;
                  var b = document.forms["myForm"]["fee"].value;
                  var x = document.forms["myForm"]["amount"].value;
@@ -113,7 +123,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   }""")
         ),
         script(
-          raw("""function token(){
+          raw(
+            """function token(){
                  var b = document.forms["myForm1"]["fee"].value;
                  var x = document.forms["myForm1"]["amount"].value;
                     var request = new XMLHttpRequest();
@@ -126,7 +137,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   }""")
         ),
         script(
-          raw("""function dataTx(){
+          raw(
+            """function dataTx(){
                  var b = document.forms["myForm2"]["fee"].value;
                  var x = document.forms["myForm2"]["data"].value;
                     var request = new XMLHttpRequest();
@@ -139,7 +151,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   }""")
         ),
         script(
-          raw("""function keyCreate() {
+          raw(
+            """function keyCreate() {
                    var request = new XMLHttpRequest();
                      request.open('GET', "http://localhost:9051/wallet/createKey");
                  //    request.setRequestHeader('content-type', 'application/json');
@@ -148,6 +161,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                      setTimeout(location.reload.bind(location), 1500);
 }""")
         ),
+
 
         tag("title")(
           "Argon Dashboard - Free Dashboard for Bootstrap 4"
@@ -171,58 +185,11 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
               span(cls := "navbar-toggler-icon")
             ),
             // Brand
-            a(cls := "navbar-brand pt-0", href := "https://www.w3schools.com",
-              img(src := "argon/assets/img/brand/blue.png", cls := "navbar-brand-img", alt := "...")
+            a(cls := "navbar-brand pt-0", href := "/web",
+              img(src := "argon/assets/img/brand/encry-logo.png", cls := "navbar-brand-img", alt := "...")
             ),
             // User
-            ul(cls := "nav align-items-center d-md-none",
-              li(cls := "nav-item dropdown",
-                a(cls := "nav-link nav-link-icon", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
-                  i(cls := "ni ni-bell-55")
-                ),
-                div(cls := "dropdown-menu dropdown-menu-arrow dropdown-menu-right", aria.labelledby := "navbar-default_dropdown_1",
-                  a(cls := "dropdown-item", href := "#", "Action"),
-                  a(cls := "dropdown-item", href := "#", "Another action"),
-                  div(cls := "dropdown-divider"),
-                  a(cls := "dropdown-item", href := "#", "Something else here")
-                )
-              ),
-              li(cls := "nav-item dropdown",
-                a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
-                  div(cls := "media align-items-center",
-                    span(cls := "avatar avatar-sm rounded-circle",
-                      img(alt := "Image placeholder", src := "argon/assets/img/theme/team-1-800x800.jpg")
-                    )
-                  )
-                ),
-                div(cls := "dropdown-menu dropdown-menu-arrow dropdown-menu-right",
-                  div(cls := " dropdown-header noti-title",
-                    h6(cls := "text-overflow m-0", "Welcome!")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-single-02"),
-                    span("My profile")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-settings-gear-65"),
-                    span("Settings")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-calendar-grid-58"),
-                    span("Activity")
-                  ),
-                  a(href := "argon/examples/profile.html", cls := "dropdown-item",
-                    i(cls := "ni ni-support-16"),
-                    span("Support")
-                  ),
-                  div(cls := "dropdown-divider"),
-                  a(href := "#!", cls := "dropdown-item",
-                    i(cls := "ni ni-user-run"),
-                    span("Logout")
-                  )
-                )
-              )
-            ),
+
             // Collapse
             div(cls := "collapse navbar-collapse", id := "sidenav-collapse-main",
               // Collapse header
@@ -260,7 +227,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   )
                 ),
                 li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./web/wallet",
+                  a(cls := "nav-link", href := "./webWallet",
                     i(cls := "ni ni-planet text-blue"), "Wallet"
                   )
                 ),
@@ -269,7 +236,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"
                   ),
                   div(cls := "dropdown-menu dropdown-menu-right dropdown-menu-arrow",
-                    a(cls := "dropdown-item", href := "./peers", "All peers"),
+                    a(cls := "dropdown-item", href := "./allPeers", "All peers"),
                     a(cls := "dropdown-item", href := "./connectedPeers", "Connected peers"),
                     a(cls := "dropdown-item", href := "./bannedPeers", "Banned peers")
                   )
@@ -310,10 +277,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                       div(cls := "col-md-4",
                         div(cls := "row",
                           div(cls := "col",
-                        button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form", "Transfer"),
+                            button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form", "Transfer"),
                           ),
                           div(cls := "col",
-                        button(tpe := "button", onclick := "keyCreate()", cls := "btn btn-block btn-primary mb-3", "Create key")
+                            button(tpe := "button", onclick := "keyCreate()", cls := "btn btn-block btn-primary mb-3", "Create key")
                           ),
                           div(cls := "col",
                             button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form2", "Create token")
@@ -330,7 +297,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                               div(cls := "modal-body p-0",
                                 div(cls := "card bg-secondary shadow border-0",
                                   div(cls := "card-body px-lg-5 py-lg-5",
-                                    form(role := "form", onsubmit:="return validateForm2()", id:="myForm2",
+                                    form(role := "form", onsubmit := "return validateForm2()", id := "myForm2",
 
                                       div(cls := "form-group",
                                         div(cls := "input-group input-group-alternative mb-3",
@@ -339,7 +306,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bibo2", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "bibo2", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
                                           script(
                                             raw(
                                               """
@@ -374,7 +341,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bobo2", name:="data", placeholder := "Data"),
+                                          input(cls := "form-control", id := "bobo2", name := "data", placeholder := "Data"),
                                           script(
                                             raw(
                                               """
@@ -403,7 +370,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                       ),
 
                                       div(cls := "text-center",
-                                        button(tpe := "button", onclick:="dataTx()", cls := "btn btn-primary mt-4", "Send data tx")
+                                        button(tpe := "button", onclick := "dataTx()", cls := "btn btn-primary mt-4", "Send data tx")
                                       )
                                     )
                                   )
@@ -420,7 +387,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                               div(cls := "modal-body p-0",
                                 div(cls := "card bg-secondary shadow border-0",
                                   div(cls := "card-body px-lg-5 py-lg-5",
-                                    form(role := "form", onsubmit:="return validateForm1()", id:="myForm1",
+                                    form(role := "form", onsubmit := "return validateForm1()", id := "myForm1",
 
                                       div(cls := "form-group",
                                         div(cls := "input-group input-group-alternative mb-3",
@@ -429,7 +396,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bibo1", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "bibo1", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
                                           script(
                                             raw(
                                               """
@@ -464,7 +431,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bobo1", name:="amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "bobo1", name := "amount", placeholder := "Amount"),
                                           script(
                                             raw(
                                               """
@@ -493,7 +460,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                       ),
 
                                       div(cls := "text-center",
-                                        button(tpe := "button", onclick:="token()", cls := "btn btn-primary mt-4", "Create token")
+                                        button(tpe := "button", onclick := "token()", cls := "btn btn-primary mt-4", "Create token")
                                       )
                                     )
                                   )
@@ -510,7 +477,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                               div(cls := "modal-body p-0",
                                 div(cls := "card bg-secondary shadow border-0",
                                   div(cls := "card-body px-lg-5 py-lg-5",
-                                    form(role := "form", onsubmit:="return validateForm()", id:="myForm",
+                                    form(role := "form", onsubmit := "return validateForm()", id := "myForm",
 
                                       div(cls := "form-group",
                                         div(cls := "input-group input-group-alternative mb-3",
@@ -519,7 +486,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-email-83")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="babo", name:="addr",  placeholder := "Address", tpe := "text")
+                                          input(cls := "form-control", id := "babo", name := "addr", placeholder := "Address", tpe := "text")
                                         )
                                       ),
                                       div(cls := "form-group",
@@ -529,8 +496,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Fee (min = 0)", tpe := "text"),
-                                            script(
+                                          input(cls := "form-control", id := "bibo", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          script(
                                             raw(
                                               """
                                                  function setInputFilter(textbox, inputFilter) {
@@ -553,8 +520,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
               });
             """.stripMargin)
-                                            )
-                                            )
+                                          )
+                                        )
 
                                       ),
                                       div(cls := "form-group",
@@ -564,7 +531,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bobo", name:="amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "bobo", name := "amount", placeholder := "Amount"),
                                           script(
                                             raw(
                                               """
@@ -592,14 +559,14 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                         )
                                       ),
                                       div(cls := "form-group",
-                                            select(cls:="form-control",
-                                              for (coinIds <- balances.keys.toList) yield {
-                                                option(value := coinIds, if(coinIds == EttTokenId) "ETT" else coinIds)
-                                              }
-                                          )
+                                        select(cls := "form-control",
+                                          for (coinIds <- balances.keys.toList) yield {
+                                            option(value := coinIds, if (coinIds == EttTokenId) "ETT" else coinIds)
+                                          }
+                                        )
                                       ),
                                       div(cls := "text-center",
-                                        button(tpe := "button", onclick:="wallet()", cls := "btn btn-primary mt-4", "Send Money")
+                                        button(tpe := "button", onclick := "wallet()", cls := "btn btn-primary mt-4", "Send Money")
                                       )
                                     )
                                   )
@@ -614,7 +581,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   //
                   div(cls := "table-responsive",
                     // Projects table
-                    table(cls := "table align-items-center table-flush", id:="myTable",
+                    table(cls := "table align-items-center table-flush", id := "myTable",
                       thead(cls := "thead-light",
                         tr(
                           th(attr("scope") := "row", "TokenId"),
@@ -640,9 +607,9 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   )
                 )
               )
-              ),
+            ),
 
-              div(cls := "row mt-5",
+            div(cls := "row mt-5",
               div(cls := "col-xl-12 mb-5 mb-xl-0",
                 div(cls := "card shadow",
                   div(cls := "card-header border-0",
@@ -671,8 +638,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                   )
                 )
               )
-              )
-              ,
+            )
+            ,
             // Footer
             footer(cls := "footer",
               div(cls := "row align-items-center justify-content-xl-between",
@@ -719,13 +686,32 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     )
   }
 
-  override def route: Route = (path("wallet") & get) {
-    //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
-    onComplete(info) {
-      case Success(info) =>
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
-    }
-  }
+  //  def authRoute(onSuccess: HttpEntity) = {
+  //    optionalCookie("JWT") {
+  //      case Some(token) =>
+  //        if (isTokenValid(token.value)) {
+  //          if (isTokenExpired(token.value)) {
+  //            complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
+  //          } else {
+  //            complete(onSuccess)
+  //          }
+  //        } else {
+  //          complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid, or has been tampered with."))
+  //        }
+  //      case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
+  //    }
+  //  }
 
+  override def route: Route = (path("webWallet") & get) {
+    //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
+    WebRoute.extractIp(
+      WebRoute.authRoute(
+        onComplete(info) {
+          case Success(info) =>
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
+        }
+      )
+    )
+  }
 
 }
