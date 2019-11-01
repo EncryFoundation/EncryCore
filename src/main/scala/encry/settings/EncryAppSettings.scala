@@ -3,7 +3,7 @@ package encry.settings
 import java.io.File
 import java.net.InetSocketAddress
 import com.typesafe.scalalogging.StrictLogging
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.{ Config, ConfigFactory }
 import encry.EncryApp
 import encry.storage.VersionalStorage.StorageType
 import encry.utils.NetworkTimeProviderSettings
@@ -24,7 +24,8 @@ final case class EncryAppSettings(directory: String,
                                   levelDB: LevelDBSettings,
                                   monitoringSettings: Option[MonitoringSettings],
                                   blackList: BlackListSettings,
-                                  constants: Constants)
+                                  constants: Constants,
+                                  snapshotSettings: SnapshotSettings)
 
 object EncryAppSettings extends SettingsReaders with NodeSettingsReader with StrictLogging {
 
@@ -36,16 +37,16 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     else
       loadConfig("local.conf")
 
-  def loadConfig(configName: String): EncryAppSettings = {
-    ConfigFactory.load(configName)
+  def loadConfig(configName: String): EncryAppSettings =
+    ConfigFactory
+      .load(configName)
       .withFallback(ConfigFactory.load())
       .as[EncryAppSettings](configPath)
-  }
 
   private def readConfigFromPath(userConfigPath: Option[String]): Config = {
     val maybeConfigFile: Option[File] = for {
       maybeFilename <- userConfigPath
-      file = new File(maybeFilename) if file.exists
+      file          = new File(maybeFilename) if file.exists
     } yield file
 
     maybeConfigFile match {
@@ -66,7 +67,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     }
   }
 
-  val allConfig: Config = ConfigFactory.load("local.conf")
+  val allConfig: Config = ConfigFactory
+    .load("local.conf")
     .withFallback(ConfigFactory.load())
 
   def fromConfig(config: Config): EncryAppSettings = {
@@ -84,6 +86,7 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     val monitoringSettings = config.as[Option[MonitoringSettings]](s"$configPath.monitoringSettings")
     val blackList          = config.as[BlackListSettings](s"$configPath.blackList")
     val constants          = config.as[Constants](s"$configPath.constantsClass")
+    val snapshotSettings   = config.as[SnapshotSettings](s"$configPath.snapshotSettings")
 
     EncryAppSettings(
       directory,
@@ -98,7 +101,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
       levelDb,
       monitoringSettings,
       blackList,
-      constants
+      constants,
+      snapshotSettings
     )
   }
 
@@ -106,11 +110,20 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
     EncryApp.forceStopApplication(errorMessage = s"Stop application due to malformed configuration file: $msg")
 }
 
-final case class StorageSettings(history: StorageType, state: StorageType)
+final case class SnapshotSettings(enableSnapshotCreation: Boolean,
+                                  enableFastSynchronization: Boolean,
+                                  newSnapshotCreationHeight: Int,
+                                  chunksNumberPerRequestWhileFastSyncMod: Int,
+                                  responseTimeout: FiniteDuration,
+                                  reRequestAttempts: Int,
+                                  requestsPerTime: Int,
+                                  updateRequestsPerTime: FiniteDuration,
+                                  liveConnectionTimeout: FiniteDuration)
+final case class StorageSettings(history: StorageType, state: StorageType, snapshotHolder: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
 final case class BlackListSettings(banTime: FiniteDuration, cleanupTime: FiniteDuration)
-final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32)
+final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32, keySize: Int = 32)
 final case class MonitoringSettings(kamonEnabled: Boolean)
 final case class RESTApiSettings(enabled: Option[Boolean],
                                  bindAddress: InetSocketAddress,

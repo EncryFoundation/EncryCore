@@ -46,9 +46,7 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
           s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
             s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}", //++
           s"supply,nodeName=$nodeName,height=${fb.height} " +
-            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height],
-              constants.InitialEmissionAmount, constants.EmissionEpochLength,
-              constants.EmissionDecay)}" //++
+            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height], constants)}" //++
         ))
 
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>

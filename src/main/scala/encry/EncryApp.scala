@@ -1,6 +1,7 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
 import akka.http.scaladsl.Http
@@ -18,12 +19,13 @@ import encry.network._
 import encry.settings.EncryAppSettings
 import encry.stats.{StatsSender, Zombie}
 import encry.utils.NetworkTimeProvider
-import encry.view.actors.NodeViewHolder
+import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.{Await, ExecutionContextExecutor}
 import scala.concurrent.duration._
 import scala.io.Source

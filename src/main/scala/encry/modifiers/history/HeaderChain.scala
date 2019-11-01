@@ -1,8 +1,11 @@
 package encry.modifiers.history
 
 import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 case class HeaderChain(headers: IndexedSeq[Header]) {
+
+  ModifierId
 
   headers.indices.foreach(i => if (i > 0) require(headers(i).parentId.sameElements(headers(i - 1).id)))
 

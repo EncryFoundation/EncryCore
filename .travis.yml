@@ -8,7 +8,7 @@ branches:
 jdk:
 - oraclejdk8
 scala:
-- 2.12.6
+- 2.13.0
 dist: trusty
 script:
   - sbt test

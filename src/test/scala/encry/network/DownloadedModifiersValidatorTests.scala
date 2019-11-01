@@ -11,7 +11,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.TestNetSettings
-import encry.view.actors.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
@@ -66,7 +66,8 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         2,
         scala.util.Random.nextLong(),
         testNetSettings.constants.InitialDifficulty,
-        EquihashSolution(Seq(1, 3))
+        EquihashSolution(Seq(1, 3)),
+        Random.randomBytes()
       )
       val header_second: Header = Header(
         1.toByte,
@@ -76,7 +77,8 @@ class DownloadedModifiersValidatorTests extends WordSpecLike
         1,
         scala.util.Random.nextLong(),
         testNetSettings.constants.InitialDifficulty,
-        EquihashSolution(Seq(1, 3))
+        EquihashSolution(Seq(1, 3)),
+        Random.randomBytes()
       )
 
       history.append(header_first)

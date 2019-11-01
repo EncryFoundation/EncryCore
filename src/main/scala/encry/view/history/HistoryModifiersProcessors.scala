@@ -28,13 +28,14 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
-    .flatMap(block =>
-      if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) none
-      else processBlock(block).some
-    )
+    .flatMap{block =>
+      logger.info(s"proc block ${block.header.encodedId}!")
+      processBlock(block).some
+    }
     .getOrElse(putToHistory(payload))
 
   private def processBlock(blockToProcess: Block): ProgressInfo = {
+    logger.info(s"Starting processing block to history ||${blockToProcess.encodedId}||${blockToProcess.header.height}||")
     val bestFullChain: Seq[Block] = calculateBestFullChain(blockToProcess)
     addBlockToCacheIfNecessary(blockToProcess)
     bestFullChain.lastOption.map(_.header) match {
@@ -98,6 +99,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
 
   private def nonBestBlock(fullBlock: Block): ProgressInfo = {
     //Orphaned block or full chain is not initialized yet
+    logger.info(s"Process block to history ${fullBlock.encodedId}||${fullBlock.header.height}||")
     historyStorage.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload))
     ProgressInfo(none, Seq.empty, Seq.empty, none)
   }

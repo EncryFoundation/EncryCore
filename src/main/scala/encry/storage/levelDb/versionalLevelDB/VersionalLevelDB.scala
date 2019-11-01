@@ -65,6 +65,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def insert(newElem: LevelDbDiff): Unit = {
     assert(newElem.version.length == settings.versionKeySize,
       s"Version length is incorrect! Should be: ${settings.versionKeySize}, but get: ${newElem.version.length}")
+    assert(newElem.elemsToInsert.forall(_._1.length == settings.keySize),
+      s"Key length is incorrect! Should be: ${settings.versionKeySize}")
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
@@ -80,7 +82,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       batch.put(versionDeletionsKey(newElem.version), newElem.elemsToDelete.flatten.toArray)
       newElem.elemsToInsert.foreach {
         case (elemKey, elemValue) =>
-
           /**
             * Put elem by key (ACCESSIBLE_KEY_PREFIX +: "version" ++ "elemKey")
             * First check contain db this elem or not. if no: insert elem, and insert init access map
@@ -136,15 +137,22 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   private def rollbackResolver(versionsToResolve: List[LevelDBVersion]): Unit = {
     if (versionsToResolve.nonEmpty) {
       val versionToResolve = versionsToResolve.head
+      logger.info(s"resolvind ver ${Algos.encode(versionToResolve)} in rollback resolver")
       val readOptions = new ReadOptions()
       readOptions.snapshot(db.getSnapshot)
       val writeBatch = db.createWriteBatch()
       try {
         val insertions = splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve), readOptions))
+        logger.info(s"insertions of ver ${Algos.encode(versionToResolve)} " +
+          s"in rollback resolver: ${insertions.map(Algos.encode).mkString(",")}")
         val deletions = splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionDeletionsKey(versionToResolve), readOptions))
+        logger.info(s"deletions of ver ${Algos.encode(versionToResolve)} " +
+          s"in rollback resolver: ${deletions.map(Algos.encode).mkString(",")}")
         insertions.foreach { elemKey =>
           writeBatch.delete(accessableElementKeyForVersion(versionToResolve, VersionalLevelDbKey @@ elemKey))
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
+          logger.info(s"accessMap of key(insert) ${Algos.encode(elemKey)} in rollback resolver is: " +
+            s"${if (accessMap != null) Algos.encode(accessMap) else null}")
           //only one version contains elem with this key, so remove it
           if (accessMap.length == settings.versionKeySize + 1)
             writeBatch.delete(userKey(VersionalLevelDbKey @@ elemKey))
@@ -161,6 +169,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
         deletions.foreach { elemKey =>
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
+          logger.info(s"accessMap of key(delete) ${Algos.encode(elemKey)} in rollback resolver is: " +
+            s"${if (accessMap != null) Algos.encode(accessMap) else null}")
           writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
         }
         db.write(writeBatch)
@@ -190,15 +200,17 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         getInaccessiableKeysInVersion(versionToResolve, readOptions)
       deletionsByThisVersion.foreach { key =>
         val elemMap = db.get(userKey(key), readOptions)
-        val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
-          .map(ver => new ByteArrayWrapper(ver))
-        val elemVersions = wrappedVersions.filter(currentVersions.contains)
-        val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
-        toDeleteElemsVersions.foreach(toDelWrapped =>
-          batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
-        )
-        if (elemVersions.isEmpty) batch.delete(userKey(key))
-        else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+        if (elemMap != null) {
+          val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
+            .map(ver => new ByteArrayWrapper(ver))
+          val elemVersions = wrappedVersions.filter(currentVersions.contains)
+          val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
+          toDeleteElemsVersions.foreach(toDelWrapped =>
+            batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
+          )
+          if (elemVersions.isEmpty) batch.delete(userKey(key))
+          else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+        }
       }
       val insertionsByThisVersion =
         splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
@@ -208,7 +220,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           logger.info(s"NULL at key: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
         }
         val elemFlag = elemInfo.head
-        val elemMap = elemInfo.drop(1)
+        val elemMap = util.Arrays.copyOfRange(elemInfo, 1, elemInfo.length + 1)
+        //val elemMap = elemInfo.drop(1)
         if (elemMap.length > settings.versionKeySize) {
           val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
           elemVersions.dropWhile(_ != wrappedVer).drop(1).foreach {
@@ -296,9 +309,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   def rollbackTo(rollbackPoint: LevelDBVersion): Unit = {
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
+    logger.info(s"LevelDb. Roolback to: ${Algos.encode(rollbackPoint)}. Versions: ${versionsList.map(Algos.encode).mkString(",")}")
     if (versionsList.map(ver => new ByteArrayWrapper(ver)).contains(new ByteArrayWrapper(rollbackPoint))) {
       val batch = db.createWriteBatch()
       try {
+        logger.info(s"Set current version key to ${Algos.encode(rollbackPoint)}")
         batch.put(CURRENT_VERSION_KEY, rollbackPoint)
         val allVerWrapped = versionsList.map(ver => new ByteArrayWrapper(ver))
         val versionUnwrapped = allVerWrapped
@@ -307,6 +322,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           case (acc, ver) => acc ++ ver.data
         }
         val verToDelete = allVerWrapped.takeWhile(_ != new ByteArrayWrapper(rollbackPoint))
+        logger.info(s"new ver list: ${versionUnwrapped.map(ver => Algos.encode(ver.data)).mkString(",")}")
         //Insert new version to versions list
         versionsList = versionUnwrapped.map(el => LevelDBVersion @@ el.data)
         batch.put(VERSIONS_LIST, versionsBeforeRollback)

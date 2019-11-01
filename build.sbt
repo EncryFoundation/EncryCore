@@ -66,11 +66,11 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
-  "org.encry" %% "encry-common" % "0.9.0",
   "com.lihaoyi" %% "scalatags" % "0.7.0",
   // JWT
   "com.pauldijou" %% "jwt-spray-json" % "2.1.0",
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
+  "org.encry" %% "encry-common" % "0.9.2",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",

@@ -140,7 +140,7 @@ class PeerConnectionHandler(connection: ActorRef,
       logger.debug("Failed to execute command : " + cmd + s" in state $stateName cause ${fail.cause}")
       connection ! ResumeReading
 
-    case message => logger.debug(s"Peer connection handler for $remote Got something strange: $message")
+    case message => logger.info(s"Peer connection handler for $remote Got something strange: $message")
   }
 
   def workingCycleWriting: Receive =
@@ -157,7 +157,7 @@ class PeerConnectionHandler(connection: ActorRef,
     case message: NetworkMessage =>
       def sendMessage(): Unit = {
         outMessagesCounter += 1
-        val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
+         val messageToNetwork: Array[Byte] = GeneralizedNetworkMessage.toProto(message).toByteArray
         val bytes: ByteString = ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork)
         logger.debug(s"Sent to $remote msg: ${message.messageName}. outMessagesCounter = $outMessagesCounter. " +
           s"Msg hash: ${Algos.encode(Algos.hash(ByteString(Ints.toByteArray(messageToNetwork.length) ++ messageToNetwork).toArray))}")

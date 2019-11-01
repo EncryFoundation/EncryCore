@@ -45,8 +45,8 @@ trait EncryGenerator extends Settings {
 
   def randomAddress: Address = Pay2PubKeyAddress(PublicKey @@ Random.randomBytes()).address
 
-  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
-    AssetBox(EncryProposition.addressLocked(address), ScRand.nextLong(), amount, tokenIdOpt)
+  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None, nonce: Long = 0L): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), nonce, amount, tokenIdOpt)
 
   def generateDataBox(address: Address, nonce: Long, data: Array[Byte]): DataBox =
     DataBox(EncryProposition.addressLocked(address), nonce, data)
@@ -139,7 +139,8 @@ trait EncryGenerator extends Settings {
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
       settings.constants.InitialDifficulty,
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Random.randomBytes()
     )
   }
 
@@ -153,7 +154,8 @@ trait EncryGenerator extends Settings {
       height,
       random.nextLong(),
       settings.constants.InitialDifficulty,
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Random.randomBytes()
     )
   }
 

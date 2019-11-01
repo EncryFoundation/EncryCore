@@ -45,28 +45,27 @@ object InfoApiRoute {
                    connectWithOnlyKnownPeer: Boolean,
                    header: Option[Header],
                    block: Option[Block],
-                   constants: Constants): Json = {
+                   constants: Constants
+                  ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
-    val prevFullHeaderId: String     = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
+    val stateRoot: Option[String] = readers.s.map(_.tree.rootHash).map(Algos.encode)
+    val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     Map(
-      "name"                 -> nodeName.asJson,
-      "headersHeight"        -> header.map(_.height).getOrElse(0).asJson,
-      "fullHeight"           -> block.map(_.header.height).getOrElse(0).asJson,
-      "bestHeaderId"         -> header.map(_.encodedId).getOrElse("").asJson,
-      "bestFullHeaderId"     -> block.map(_.encodedId).getOrElse("").asJson,
-      "previousFullHeaderId" -> prevFullHeaderId.asJson,
-      "difficulty" -> block
-        .map(_.header.difficulty.toString)
-        .getOrElse(constants.InitialDifficulty.toString)
-        .asJson,
-      "unconfirmedCount" -> mempoolSize.asJson,
-      "stateType"        -> stateType.asJson,
-      "stateVersion"     -> stateVersion.asJson,
-      "isMining"         -> minerInfo.isMining.asJson,
-      "peersCount"       -> connectedPeersLength.asJson,
-      "knownPeers" -> knownPeers.map { x =>
-        x.getHostName + ":" + x.getPort
-      }.asJson,
+      "name"                      -> nodeName.asJson,
+      "headersHeight"             -> header.map(_.height).getOrElse(0).asJson,
+      "fullHeight"                -> block.map(_.header.height).getOrElse(0).asJson,
+      "bestHeaderId"              -> header.map(_.encodedId).getOrElse("").asJson,
+      "bestFullHeaderId"          -> block.map(_.encodedId).getOrElse("").asJson,
+      "previousFullHeaderId"      -> prevFullHeaderId.asJson,
+      "difficulty"                -> block.map(_.header.difficulty.toString)
+        .getOrElse(constants.InitialDifficulty.toString).asJson,
+      "unconfirmedCount"          -> mempoolSize.asJson,
+      "stateRoot"                 -> stateRoot.asJson,
+      "stateType"                 -> stateType.asJson,
+      "stateVersion"              -> stateVersion.asJson,
+      "isMining"                  -> minerInfo.isMining.asJson,
+      "peersCount"                -> connectedPeersLength.asJson,
+      "knownPeers"                -> knownPeers.map { x => x.getHostName + ":" + x.getPort }.asJson,
       "storage"                   -> storage.asJson,
       "uptime"                    -> nodeUptime.asJson,
       "isConnectedWithKnownPeers" -> connectWithOnlyKnownPeer.asJson,

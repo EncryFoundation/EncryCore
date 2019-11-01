@@ -1,5 +1,6 @@
 package encry.modifiers
 
+import encry.consensus.EncrySupplyController
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
@@ -14,7 +15,6 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryPropositio
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
-
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
@@ -142,6 +142,12 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }
   }._1
 
+  def coinbaseAt(height: Int): Transaction = {
+    val supplyTotal: Amount = EncrySupplyController.supplyAt(Height @@ height, settings.constants)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, Scarand.nextLong(), supplyTotal, 0, Height @@ height)
+  }
+
+
   def generateNextBlock(history: History,
                         difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
@@ -153,7 +159,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
       .getOrElse(history.settings.constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
-      Seq(coinbaseTransaction)
+      Seq(coinbaseAt(history.getBestHeaderHeight + 1))
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.getBestHeaderHeight + 1,
