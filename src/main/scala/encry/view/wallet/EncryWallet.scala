@@ -8,7 +8,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import io.iohk.iodb.{LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -20,8 +19,8 @@ import org.iq80.leveldb.{DB, Options}
 
 import scala.util.Try
 
-case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], intrinsicTokenId: ADKey, private val accountStore: Store)
-  extends StrictLogging with AutoCloseable {
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
+  extends StrictLogging with AutoCloseable with Settings {
 
   assert(accountManagers.nonEmpty)
 
@@ -89,6 +88,6 @@ object EncryWallet extends StrictLogging {
       if (restoredAccounts.nonEmpty) restoredAccounts
       else Seq(AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte))
     //init keys
-    EncryWallet(walletStorage, resultingAccounts, settings.constants.IntrinsicTokenId, accountManagerStore)
+    EncryWallet(walletStorage, resultingAccounts, accountManagerStore)
   }
 }
