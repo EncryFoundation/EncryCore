@@ -199,7 +199,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     } shouldBe true
 
     levelDbElems.head.elemsToDelete.forall{key =>
-      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)) == Option.empty[VersionalLevelDbValue]
+      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)).isEmpty
     } shouldBe true
   }
 
