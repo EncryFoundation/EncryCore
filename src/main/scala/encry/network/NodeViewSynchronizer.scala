@@ -19,8 +19,6 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
-import encry.view.actors.NodeViewHolder.DownloadRequest
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._
@@ -34,6 +32,8 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -73,7 +73,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -141,10 +140,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             val modifiers: Map[ModifierId, Array[Byte]] = unrequestedModifiers
               .view
               .map(id => id -> historyStorage.modifierBytesById(id))
-              .collect { case (id, mod) if mod.isDefined => id -> mod.get }
+              .collect { case (id, mod) if mod.isDefined => id -> mod.get}
               .toMap
-            logger.info(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
-            logger.debug(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
+            logger.debug(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
             modifiers
           }
 
@@ -170,6 +168,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         s" peers for first sync info message. Resending $msg to peers keeper.")
       peersKeeper ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
+    case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
@@ -193,10 +192,10 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
     case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
-    case FullBlockChainIsSynced() =>
+    case FullBlockChainIsSynced =>
       chainSynced = true
-      deliveryManager ! FullBlockChainIsSynced()
-      peersKeeper ! FullBlockChainIsSynced()
+      deliveryManager ! FullBlockChainIsSynced
+      peersKeeper ! FullBlockChainIsSynced
     case StopTransactionsValidation =>
       deliveryManager ! StopTransactionsValidation
       canProcessTransactions = false

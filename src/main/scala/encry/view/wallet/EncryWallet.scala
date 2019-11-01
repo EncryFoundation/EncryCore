@@ -2,18 +2,20 @@ package encry.view.wallet
 
 import java.io.File
 
+
 import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import io.iohk.iodb.{LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition}
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
 
 import scala.util.Try
@@ -35,13 +37,14 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def propositions: Set[EncryProposition] = publicKeys.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes))
 
-  def scanPersistent(modifier: PersistentModifier): Unit = modifier match {
+  def scanPersistent(modifier: PersistentModifier): EncryWallet = modifier match {
     case block: Block =>
+      logger.info(s"Keys during sync: $publicKeys")
       val (newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]) =
-        block.payload.txs.foldLeft(Seq.empty[EncryBaseBox], Seq.empty[EncryBaseBox]) {
+        block.payload.txs.foldLeft(Seq[EncryBaseBox](), Seq[EncryBaseBox]()) {
           case ((nBxs, sBxs), tx: Transaction) =>
             val newBxsL: Seq[EncryBaseBox] = tx.newBoxes
-              .foldLeft(Seq.empty[EncryBaseBox]) { case (nBxs2, bx) =>
+              .foldLeft(Seq[EncryBaseBox]()) { case (nBxs2, bx) =>
                 if (propositions.exists(_.contractHash sameElements bx.proposition.contractHash)) nBxs2 :+ bx else nBxs2
               }
             val spendBxsIdsL: Seq[EncryBaseBox] = tx.inputs
@@ -53,9 +56,10 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
               }
             (nBxs ++ newBxsL) -> (sBxs ++ spendBxsIdsL)
         }
-      walletStorage.updateWallet(modifier.id, newBxs, spentBxs, intrinsicTokenId)
+      walletStorage.updateWallet(modifier.id, newBxs, spentBxs, settings.constants.IntrinsicTokenId)
+      this
 
-    case _ => ()
+    case _ => this
   }
 
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))

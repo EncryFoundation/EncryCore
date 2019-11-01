@@ -6,7 +6,7 @@ import encry.EncryApp._
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
-import encry.view.actors.NodeViewHolder.ReceivableMessages._
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
@@ -15,6 +15,7 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
+
 import scala.concurrent.Future
 import scala.util.Try
 

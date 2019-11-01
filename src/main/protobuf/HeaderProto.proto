@@ -10,4 +10,5 @@ message HeaderProtoMessage {
     uint64 nonce = 6;
     uint64 difficulty = 7;
     repeated uint32 ints = 8;
+    bytes stateRoot = 9;
 }

@@ -4,7 +4,7 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus._
 import encry.consensus._
 import encry.modifiers.history._
-import encry.settings.Settings
+import encry.settings.{EncryAppSettings, Settings}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.ValidationError.HistoryApiError
 import io.iohk.iodb.ByteArrayWrapper
@@ -12,11 +12,10 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait HistoryApi extends HistoryDBApi with Settings { //scalastyle:ignore
+trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   val timeProvider: NetworkTimeProvider
 
@@ -304,8 +303,8 @@ trait HistoryApi extends HistoryDBApi with Settings { //scalastyle:ignore
     }
 
   def addBlockToCacheIfNecessary(b: Block): Unit =
-    if (b.header.height >= getBestBlockHeight - settings.constants.MaxRollbackDepth) {
-      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
+    if (!blocksCache.contains(ByteArrayWrapper(b.id)) && (b.header.height >= getBestBlockHeight - settings.constants.MaxRollbackDepth)) {
+      logger.debug(s"Should add ${Algos.encode(b.id)} to block cache")
       val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
       blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
       blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
