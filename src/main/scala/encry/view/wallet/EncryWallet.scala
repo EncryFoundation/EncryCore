@@ -23,6 +23,8 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.iq80.leveldb.{DB, Options}
 import scala.util.{Failure, Success, Try}
 
+import scala.util.Try
+
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
   extends StrictLogging with AutoCloseable with Settings {
 
