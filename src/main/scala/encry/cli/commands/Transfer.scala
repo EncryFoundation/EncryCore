@@ -6,12 +6,15 @@ import akka.util.Timeout
 import cats.Applicative
 import cats.implicits._
 import encry.EncryApp._
-import encry.api.http.DataHolderForApi.GetDataFromWallet
+import encry.api.http.DataHolderForApi.{GetDataFromPresentView}
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
+import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
+import encry.view.state.UtxoState
+import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -36,9 +39,9 @@ object Transfer extends Command {
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
-      GetDataFromWallet[Option[Transaction]] { wallet =>
+      GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
         Try {
-          val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
+          val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
           val recipient: Address      = args.requireArg[Ast.Str]("addr").s
           val fee: Long               = args.requireArg[Ast.Num]("fee").i
           val amount: Long            = args.requireArg[Ast.Num]("amount").i
@@ -49,7 +52,7 @@ object Transfer extends Command {
             case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")
           })
 
-          val boxes: IndexedSeq[MonetaryBox] = wallet.walletStorage
+          val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
             .getAllBoxes()
             .collect {
               case ab: AssetBox if ab.tokenIdOpt.isEmpty ||

@@ -14,14 +14,16 @@ import io.circe.generic.auto._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp.memoryPool
-import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetDataFromWallet, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
+import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetDataFromPresentView, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import encry.storage.levelDb.versionalLevelDB.WalletVersionalLevelDB
 import encry.utils.Mnemonic
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
+import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -55,7 +57,9 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   override val settings: RESTApiSettings = restApiSettings
 
   private def getWallet: Future[EncryWallet] =
-    (dataHolder ? GetDataFromWallet[EncryWallet](identity)).mapTo[EncryWallet]
+    (dataHolder ?
+      GetDataFromCurrentView[History, UtxoState, EncryWallet, EncryWallet](_.vault))
+      .mapTo[EncryWallet]
 
   private def getAddresses: Future[String] = (dataHolder ? GetViewPrintAddress)
     .mapTo[String]
@@ -152,10 +156,10 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   def createTokenR: Route = (path("createToken") & get) {
     parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>
       (dataHolder ?
-        GetDataFromWallet[Option[Transaction]] { wallet =>
+        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
-            val boxes: AssetBox         = wallet.walletStorage
+            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val boxes: AssetBox         = wallet.vault.walletStorage
               .getAllBoxes().collect { case ab: AssetBox => ab }.head
             println(boxes + " boxes")
             TransactionFactory.assetIssuingTransactionScratch(
@@ -163,7 +167,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               fee,
               System.currentTimeMillis(),
               IndexedSeq(boxes).map(_ -> None),
-              PubKeyLockedContract(wallet.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+              PubKeyLockedContract(wallet.vault.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
               amount)
           }.toOption
         }).flatMap {
@@ -179,16 +183,16 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   def dataTransactionR: Route = (path("data") & get) {
     parameters('fee.as[Int], 'data) {(fee, data) =>
       (dataHolder ?
-        GetDataFromWallet[Option[Transaction]] { wallet =>
+        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
-            val boxes: AssetBox         = wallet.walletStorage
+            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val boxes: AssetBox         = wallet.vault.walletStorage
               .getAllBoxes().collect { case ab: AssetBox => ab }.head
             TransactionFactory.dataTransactionScratch(secret,
               fee,
               System.currentTimeMillis(),
               IndexedSeq(boxes).map(_ -> None),
-              PubKeyLockedContract(wallet.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+              PubKeyLockedContract(wallet.vault.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
               data.getBytes)
           }.toOption
         }).flatMap {
@@ -205,10 +209,10 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   def transferR: Route = (path("transfer") & get) {
     parameters('addr, 'fee.as[Int], 'amount.as[Long]) { (addr, fee, amount) =>
       (dataHolder ?
-        GetDataFromWallet[Option[Transaction]] { wallet =>
+        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
-            val boxes: IndexedSeq[AssetBox] = wallet.walletStorage
+            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val boxes: IndexedSeq[AssetBox] = wallet.vault.walletStorage
               .getAllBoxes()
               .filter(_.isInstanceOf[AssetBox])
               .map(_.asInstanceOf[AssetBox])

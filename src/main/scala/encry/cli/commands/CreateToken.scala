@@ -4,12 +4,15 @@ import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp._
-import encry.api.http.DataHolderForApi.{GetDataFromWallet, GetViewCreateKey}
+import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey}
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
+import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
+import encry.view.state.UtxoState
+import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
@@ -30,19 +33,19 @@ object CreateToken extends Command {
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
-      GetDataFromWallet[Option[Transaction]] { wallet =>
+      GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
         Try {
-          val secret: PrivateKey25519 = wallet.accountManager.mandatoryAccount
+          val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
           val fee: Long               = args.requireArg[Ast.Num]("fee").i
           val amount: Long            = args.requireArg[Ast.Num]("amount").i
-          val boxes: AssetBox         =     wallet.walletStorage
+          val boxes: AssetBox         =     wallet.vault.walletStorage
             .getAllBoxes().collect { case ab: AssetBox => ab }.head
           println(boxes + " boxes")
           TransactionFactory.assetIssuingTransactionScratch(secret,
             fee,
             System.currentTimeMillis(),
             IndexedSeq(boxes).map(_ -> None),
-            PubKeyLockedContract(wallet.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+            PubKeyLockedContract(wallet.vault.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
             amount)
         }.toOption
       }).flatMap {

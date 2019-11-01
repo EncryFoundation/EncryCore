@@ -101,36 +101,38 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
       )
 
     case PeerAdd(peer)               => context.system.eventStream.publish(PeerFromCli(peer))
-    case RemovePeerFromBanList(peer) => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
+    case RemovePeerFromBanList(peer) =>
+      nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
+      context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
-      (self ? GetDataFromWallet[String] { wallet =>
-        wallet.publicKeys.foldLeft("") { (str, k) =>
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+        view.vault.publicKeys.foldLeft("") { (str, k) =>
           str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
         }
       }).pipeTo(sender)
 
     case GetViewCreateKey =>
-      (self ? GetDataFromWallet[PrivateKey25519] { wallet =>
-        if (wallet.accountManager.accounts.isEmpty) wallet.accountManager.mandatoryAccount
-        else wallet.accountManager.createAccount(None)
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
+        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
+        else view.vault.accountManager.createAccount(None)
       }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
-      (self ? GetDataFromWallet[List[String]] { wallet =>
-        wallet.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, List[String]] { view =>
+        view.vault.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (self ? GetDataFromWallet[Map[String, Amount]] { wallet =>
-       val balance: Map[String, Amount] = wallet.getBalances.toMap
-//        println(balance +" 123124")
-       if (balance.isEmpty) Map.empty[String, Amount] else balance
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, Amount]] { view =>
+        val balance: Map[String, Amount] = view.vault.getBalances.toMap
+        //        println(balance +" 123124")
+        if (balance.isEmpty) Map.empty[String, Amount] else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
-      (self ? GetDataFromWallet[String] { wallet =>
-        wallet.accountManager.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+        view.vault.accountManager.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 
     case GetLastHeadersHelper(i) =>
@@ -255,7 +257,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case ShutdownNode              =>
       println("stopped")
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
-    case GetDataFromWallet(f) => (nodeViewHolder ? GetDataFromWallet(f)).pipeTo(sender)
+    case GetDataFromPresentView(f) => (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
@@ -289,7 +291,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class PeerAdd(peer: InetSocketAddress)
 
-  final case class GetDataFromWallet[A](f: EncryWallet => A)
+  final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
   final case class GetFullHeaderById(headerId: Either[String, ModifierId])
 
