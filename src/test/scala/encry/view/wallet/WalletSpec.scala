@@ -103,10 +103,10 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val extraAcc = keyManagerTwo.createAccount(Some(alsoSeed))
 
-    val validTxs1: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty, keyManagerOne.mandatoryAccount.publicImage.address.address)
-    val validTxs2: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty - 1, keyManagerTwo.mandatoryAccount.publicImage.address.address)
-    val validTxs3: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty - 2, extraAcc.publicImage.address.address)
-    val validTxstoOther: Seq[Transaction] = genValidPaymentTxsToAddrWithDiffTokens(txsQty - 3, "9fRWpnERVQKzR14qN5EGknx8xk11SU6LoZxcJAc53uAv3HRbL4K")
+    val validTxs1: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty, keyManagerOne.mandatoryAccount.publicImage.address.address)
+    val validTxs2: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 1, keyManagerTwo.mandatoryAccount.publicImage.address.address)
+    val validTxs3: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 2, extraAcc.publicImage.address.address)
+    val validTxstoOther: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 3, "9fRWpnERVQKzR14qN5EGknx8xk11SU6LoZxcJAc53uAv3HRbL4K")
 
     val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs1 ++ validTxs2 ++ validTxs3 ++ validTxstoOther)
 
@@ -114,12 +114,12 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    val contractHash1 = Algos.encode(EncryProposition.addressLocked(keyManagerOne.mandatoryAccount.publicImage.address.address).contractHash)
-    val contractHash2 = Algos.encode(EncryProposition.addressLocked(keyManagerTwo.mandatoryAccount.publicImage.address.address).contractHash)
-    val contractHash3 = Algos.encode(EncryProposition.addressLocked(extraAcc.publicImage.address.address).contractHash)
+    val addr1 = Algos.encode(keyManagerOne.mandatoryAccount.publicKeyBytes)
+    val addr2 = Algos.encode(keyManagerTwo.mandatoryAccount.publicKeyBytes)
+    val addr3 = Algos.encode(extraAcc.publicKeyBytes)
 
-    wallet.getBalances.filter(_._1._1 == contractHash1).map(_._2).sum shouldEqual txsQty * Props.boxValue
-    wallet.getBalances.filter(_._1._1 == contractHash2).map(_._2).sum shouldEqual (txsQty - 1) * Props.boxValue
-    wallet.getBalances.filter(_._1._1 == contractHash3).map(_._2).sum shouldEqual (txsQty - 2) * Props.boxValue
+    wallet.getBalances.filter(_._1._1 == addr1).map(_._2).sum shouldEqual txsQty * Props.boxValue
+    wallet.getBalances.filter(_._1._1 == addr2).map(_._2).sum shouldEqual (txsQty - 1) * Props.boxValue
+    wallet.getBalances.filter(_._1._1 == addr3).map(_._2).sum shouldEqual (txsQty - 2) * Props.boxValue
   }
 }
