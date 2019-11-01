@@ -1,6 +1,9 @@
 package encry.view
 
 import java.io.File
+import java.nio.file.{Path, SimpleFileVisitor}
+
+import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -12,12 +15,25 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.stats.StatsSender._
+import encry.storage.VersionalStorage
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
+import encry.view.fast.sync.SnapshotProcessor
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
+import encry.view.history.History
+import encry.view.mempool.MemoryPool.RolledBackTransactions
+import encry.view.state.{UtxoState, _}
+import encry.view.state.avlTree.AvlTree
+import encry.view.wallet.EncryWallet
+import io.iohk.iodb.LSMStore
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -28,6 +44,8 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+import org.iq80.leveldb.Options
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -44,12 +62,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
-    logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.state.height}")
+    logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.history.getBestBlockHeight} | " +
+      s"${nodeView.state.height}")
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
@@ -67,13 +87,40 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
   }
+  var isHeaderChainSyncedLocal: Boolean = false
 
-  override def receive: Receive = {
+  override def receive: Receive =
+    if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
+      defaultMessages(canProcessPayloads = false)
+    else
+      defaultMessages(canProcessPayloads = true)
+
+  def defaultMessages(canProcessPayloads: Boolean): Receive = {
+    case FastSyncFinished(state) =>
+      //todo implement wallet scanning
+      logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
+      nodeView.state.tree.storage.close()
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
+      if (state.tree.selfInspectionAfterFastSync) {
+        nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
+          logger.info(s"Updated best block in fast sync mod. Updated state height.")
+          nodeView.history.blockDownloadProcessor.updateBestBlock(h)
+          nodeView.history.isHeadersChainSyncedVar = true
+          nodeView.history.isFastSync = false
+          val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
+          updateNodeView(
+            updatedHistory = Some(history),
+            updatedState = Some(state)
+          )
+          nodeViewSynchronizer ! FastSyncDone
+          context.become(defaultMessages(true))
+        }
+      } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
       if (isInHistory || isInCache)
-        logger.debug(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
       else ModifiersCache.put(key(mod.id), mod, nodeView.history)
       computeApplications()
@@ -102,8 +149,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
 
-    case CompareViews(peer, modifierTypeId, modifierIds) =>
-      logger.debug(s"Start processing CompareViews message on NVH.")
+    case CompareViews(peer, modifierTypeId, modifierIds)
+      if (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
+      logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
         case _ => modifierIds
@@ -116,7 +164,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (ids.nonEmpty && (modifierTypeId == Header.modifierTypeId || (nodeView.history.isHeadersChainSynced && modifierTypeId == Payload.modifierTypeId)))
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
-
+    case SemanticallySuccessfulModifier(_) =>
+    case CompareViews(_, _, _) =>
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
@@ -149,7 +198,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach { case (tid, id) =>
-      if (tid != Transaction.modifierTypeId) logger.debug(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
+      if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
       nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
     }
@@ -160,12 +209,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (idx == -1) IndexedSeq() else suffix.drop(idx)
   }
 
+  @scala.annotation.tailrec
   private def updateState(history: History,
                           state: UtxoState,
                           progressInfo: ProgressInfo,
                           suffixApplied: IndexedSeq[PersistentModifier]):
   (History, UtxoState, Seq[PersistentModifier]) = {
-    logger.debug(s"\nStarting updating state in updateState function!")
+    logger.info(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
       case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
@@ -191,12 +241,46 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
+
+              modToApply match {
+                case header: Header =>
+                  val requiredHeight: Int = header.height - settings.levelDB.maxVersions
+                  logger.info(s"NVH NVH MVH ${requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0} " +
+                    s"${newHis.isNewHeader(header)}")
+                  if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
+                    newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
+                      logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
+                        s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
+                        s"\n\n\n header - $h \n\n\n")
+                      nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
+                    }
+                  }
+                case _ =>
+              }
+              if (settings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
+                newHis.getBestBlock.exists { block =>
+                block.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
+                  block.header.height != settings.constants.GenesisHeight }) {
+                val startTime = System.currentTimeMillis()
+                logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
+                import encry.view.state.avlTree.utils.implicits.Instances._
+                newHis.getBestBlock.foreach { b =>
+                  val chunks: List[SnapshotChunk] =
+                    AvlTree.getChunks(stateAfterApply.tree.rootNode, currentChunkHeight = 1, stateAfterApply.tree.storage)
+                  val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
+                  nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
+                }
+                logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
+                logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
+              }
+
               influxRef.foreach(ref =>
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
+              logger.info(s"Application to state failed cause $e")
               val (newHis: History, newProgressInfo: ProgressInfo) =
                 history.reportModifierIsInvalid(modToApply)
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
@@ -222,7 +306,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
-          logger.debug(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+          logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
           logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
           influxRef.foreach { ref =>
             ref ! EndOfApplyingModifier(pmod.id)
@@ -232,12 +316,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             ref ! ModifierAppendedToHistory(isHeader, success = true)
           }
-          logger.debug(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+          logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
           if (progressInfo.toApply.nonEmpty) {
             logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
             val startPoint: Long = System.currentTimeMillis()
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+            influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
+            if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
             influxRef.foreach { ref =>
               logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
               ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)
@@ -267,17 +353,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           } else {
             if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-            logger.debug(s"\nProgress info is empty")
+            logger.info(s"\nProgress info is empty")
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
           }
         case Left(e) =>
-          influxRef.foreach { ref =>
-            val isHeader: Boolean = pmod match {
-              case _: Header => true
-              case _: Payload => false
-            }
-            ref ! ModifierAppendedToHistory(isHeader, success = false)
-          }
           logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
             s" to history caused $e")
           context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
@@ -412,6 +491,9 @@ object NodeViewHolder {
         case otherwise => 1
       })
 
-  def props(memoryPoolRef: ActorRef, influxRef: Option[ActorRef], dataHolder: ActorRef, settings: EncryAppSettings): Props =
+  def props(memoryPoolRef: ActorRef,
+            influxRef: Option[ActorRef],
+            dataHolder: ActorRef,
+            settings: EncryAppSettings): Props =
     Props(new NodeViewHolder(memoryPoolRef, influxRef, dataHolder, settings))
 }

@@ -1,5 +1,7 @@
 syntax = "proto3";
 import "SyntaxMessageProto.proto";
+import "avl/SnapshotManifestProto.proto";
+import "avl/SnapshotChunkProto.proto";
 
 message GeneralizedNetworkProtoMessage {
 
@@ -28,7 +30,8 @@ message GeneralizedNetworkProtoMessage {
         repeated MapFieldEntry map = 2;
     }
 
-    message GetPeersProtoMessage { }
+    message GetPeersProtoMessage {
+    }
 
     message PeersProtoMessage {
         repeated InetSocketAddressProtoMessage peers = 1;
@@ -41,6 +44,19 @@ message GeneralizedNetworkProtoMessage {
         uint64 time = 4;
     }
 
+    message RequestManifestProtoMessage {
+        bytes manifestId =1;
+    }
+    message ResponseManifestProtoMessage {
+        SnapshotManifestProtoMessage manifest = 1;
+    }
+    message RequestChunkProtoMessage {
+        bytes chunkId = 1;
+    }
+    message ResponseChunkProtoMessage {
+        SnapshotChunkMessage chunk = 1;
+    }
+
     bytes magic = 1;
     bytes checksum = 2;
     oneof innerMessage {
@@ -51,5 +67,9 @@ message GeneralizedNetworkProtoMessage {
         GetPeersProtoMessage getPeersProtoMessage = 7;
         PeersProtoMessage peersProtoMessage = 8;
         HandshakeProtoMessage handshakeProtoMessage = 9;
+        RequestManifestProtoMessage requestManifestProtoMessage = 10;
+        ResponseManifestProtoMessage responseManifestProtoMessage = 11;
+        RequestChunkProtoMessage requestChunkProtoMessage = 12;
+        ResponseChunkProtoMessage responseChunkProtoMessage = 13;
     }
 }

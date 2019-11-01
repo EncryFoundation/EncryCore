@@ -1,0 +1,9 @@
+syntax = "proto3";
+import "avl/NodeMsg.proto";
+
+message SnapshotManifestProtoMessage {
+
+    bytes manifestId = 1;
+    repeated bytes chunksIds = 2;
+
+}

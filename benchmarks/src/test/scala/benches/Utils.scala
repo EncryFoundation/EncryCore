@@ -54,6 +54,20 @@ object Utils extends Settings with StrictLogging {
                            valueSize: Int = defaultValueSize): (VersionalLevelDbKey, VersionalLevelDbValue) =
     (generateRandomKey(keySize), generateRandomValue(valueSize))
 
+  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None, nonce: Long = 0L): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), nonce, amount, tokenIdOpt)
+
+  def generateGenesisBlock(genesisHeight: Height): Block = {
+    val txs: Seq[Transaction] = Seq(coinbaseTransaction)
+    val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
+    val header = genHeader.copy(
+      parentId = Header.GenesisParentId,
+      height = genesisHeight,
+      transactionsRoot = txsRoot
+    )
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
+  }
+
   def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbDiff] =
     (0 until qty).foldLeft(List.empty[LevelDbDiff]) {
       case (acc, i) =>
@@ -171,9 +185,6 @@ object Utils extends Settings with StrictLogging {
         now + scala.util.Random.nextInt(5000), useBoxes, randomAddress, 1000000)
     }
   }
-
-  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
-    AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
 
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
