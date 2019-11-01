@@ -108,9 +108,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeView.history.isHeadersChainSyncedVar = true
           nodeView.history.isFastSync = false
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
+          val wallet = nodeView.wallet.scanWalletFromUtxo(state)
           updateNodeView(
             updatedHistory = Some(history),
-            updatedState = Some(state)
+            updatedState = Some(state),
+            updatedVault = Some(wallet)
           )
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))
