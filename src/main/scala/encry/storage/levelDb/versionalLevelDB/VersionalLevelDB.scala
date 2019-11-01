@@ -94,7 +94,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
             val accessMap = util.Arrays.copyOfRange(elemMap, 1, elemMap.length)
             batch.put(userKey(elemKey), ArrayUtils.addAll(ACCESSIBLE_KEY_PREFIX +: newElem.version, accessMap))
           }
-          println(Algos.encode(newElem.version))
           batch.put(accessableElementKeyForVersion(newElem.version, elemKey), elemValue)
       }
       newElem.elemsToDelete.foreach { elemKey =>
