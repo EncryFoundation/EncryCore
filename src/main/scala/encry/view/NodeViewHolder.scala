@@ -96,6 +96,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       defaultMessages(canProcessPayloads = true)
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
+    case CreateAccountManagerFromSeed(seed) =>
+      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get)
+      updateNodeView(updatedVault = newAccount)
+      sender() ! NewAccountManager(newAccount)
     case FastSyncFinished(state) =>
       //todo implement wallet scanning
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
@@ -468,6 +472,9 @@ object NodeViewHolder {
                                suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {
+    case class CreateAccountManagerFromSeed(seed: String)
+
+    case class NewAccountManager(option: Option[EncryWallet])
 
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean)
 
