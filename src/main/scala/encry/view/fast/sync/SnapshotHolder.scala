@@ -54,7 +54,6 @@ class SnapshotHolder(settings: EncryAppSettings,
     }
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     logger.info(s"SnapshotHolder started.")
-    println()
     networkController ! RegisterMessagesHandler(
       Seq(
         RequestManifestMessage.NetworkMessageTypeID  -> "RequestManifest",

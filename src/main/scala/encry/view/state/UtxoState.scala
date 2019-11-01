@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import com.google.common.primitives.{Ints, Longs}
 import com.typesafe.scalalogging.StrictLogging
@@ -24,6 +25,8 @@ import cats.syntax.traverse._
 import cats.instances.list._
 import cats.syntax.either._
 import cats.syntax.validated._
+import encry.view.state.UtxoState.StateChange
+import encry.view.state.avlTree.AvlTree
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -39,6 +42,7 @@ import org.encryfoundation.common.validation.{MalformedModifierError, Validation
 import org.iq80.leveldb.Options
 import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
+import encry.view.state.avlTree.utils.implicits.Instances._
 import scala.concurrent.ExecutionContextExecutor
 import scala.util.Try
 

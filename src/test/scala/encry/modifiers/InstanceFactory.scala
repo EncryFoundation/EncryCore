@@ -1,5 +1,6 @@
 package encry.modifiers
 
+import encry.consensus.EncrySupplyController
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
@@ -14,7 +15,6 @@ import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryPropositio
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, _}
-
 import org.encryfoundation.prismlang.compiler.CompiledContract
 import org.encryfoundation.prismlang.core.Ast.Expr
 import org.encryfoundation.prismlang.core.{Ast, Types}
@@ -142,14 +142,16 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }
   }._1
 
-  def coinbaseAt(height: Int): Transaction =
-    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, timestamp, 10L, 0, Height @@ height)
+  def coinbaseAt(height: Int): Transaction = {
+    val supplyTotal: Amount = EncrySupplyController.supplyAt(Height @@ height, settings.constants)
+    TransactionFactory.coinbaseTransactionScratch(secret.publicImage, Scarand.nextLong(), supplyTotal, 0, Height @@ height)
+  }
 
 
   def generateNextBlock(history: History,
                         difficultyDiff: BigInt = 0,
                         prevId: Option[ModifierId] = None,
-                        txsQty: Int = 0,
+                        txsQty: Int = 100,
                         additionalDifficulty: BigInt = 0): Block = {
     val previousHeaderId: ModifierId =
       prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))

@@ -184,15 +184,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
 
-    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) if
-    (modifierTypeId == Payload.modifierTypeId && history.isHeadersChainSynced) || modifierTypeId != Payload.modifierTypeId =>
+    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>  //todo check this condition
       if (modifierTypeId != Transaction.modifierTypeId)
         logger.info(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
-
-    case DownloadRequest(_, _, _) =>
-      logger.info(s"DownloadRequest but canProcessPayloads = ${history.isHeadersChainSynced}")
 
     case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
