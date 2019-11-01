@@ -32,7 +32,7 @@ class MemoryPool(settings: EncryAppSettings,
   var bloomFilterForTransactionsIds: BloomFilter[String] = initBloomFilter
 
   override def preStart(): Unit = {
-    logger.debug(s"Starting MemoryPool. Initializing all schedulers.")
+    logger.debug(s"Starting MemoryPool. Initializing all schedulers")
     context.system.scheduler.schedule(
       settings.mempool.bloomFilterCleanupInterval,
       settings.mempool.bloomFilterCleanupInterval, self, CleanupBloomFilter)
