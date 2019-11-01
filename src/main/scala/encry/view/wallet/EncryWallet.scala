@@ -17,6 +17,9 @@ import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
@@ -79,7 +82,21 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
-  def getBalances: Seq[((String, String), Long)] = walletStorage.getBalances.toSeq
+  def getBalances: Seq[((String, String), Long)] = {
+    val pubKeys = publicKeys
+    val contractHashToKey = contractHashesToKeys(pubKeys)
+    val positiveBalance = walletStorage.getBalances.map { case ((hash, tokenId), amount) =>
+      (contractHashToKey(hash), tokenId) -> amount
+    }
+    (pubKeys.map(k => Algos.encode(k.pubKeyBytes)) -- positiveBalance.keys.map(_._1))
+      .map(_ -> Algos.encode(settings.constants.IntrinsicTokenId) -> 0L).toSeq ++ positiveBalance
+  }
+
+  def contractHashesToKeys(pubKeys: Set[PublicKey25519]): Map[String, String] = pubKeys
+    .map(key => Algos.encode(key.pubKeyBytes) -> key.address.address)
+    .map { case (key, addr) =>
+      Algos.encode(EncryProposition.addressLocked(addr).contractHash) -> key
+    }.toMap
 
   override def close(): Unit = walletStorage.close()
 }

@@ -22,7 +22,7 @@ object GetBalance extends Command {
           {
             val balance: String =
               view.vault.getBalances.foldLeft("")((str, tokenInfo) =>
-                str.concat(s"TokenID(${tokenInfo._1._2}) for contractHash ${tokenInfo._1._1} : ${tokenInfo._2}\n"))
+                str.concat(s"TokenID(${tokenInfo._1._2}) for key ${tokenInfo._1._1} : ${tokenInfo._2}\n"))
             if (balance.length == 0) "0" else balance
           }
         ))
