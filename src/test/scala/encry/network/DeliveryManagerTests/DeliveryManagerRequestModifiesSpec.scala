@@ -22,6 +22,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoS
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.collection.mutable.WrappedArray

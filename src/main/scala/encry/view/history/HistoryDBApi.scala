@@ -64,6 +64,8 @@ trait HistoryDBApi extends StrictLogging with Settings {
 
   def getBestHeaderIdAtHeightDB(h: Int): Option[ModifierId] = headerIdsAtHeightDB(h).flatMap(_.headOption)
 
+  def getBestHeaderAtHeightDB(h: Int): Option[Header] = getBestHeaderIdAtHeightDB(h).flatMap(getHeaderByIdDB)
+
   def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeightDB(h.height)
     .exists(_.sameElements(h.id))
 

@@ -3,17 +3,29 @@ package encry.view.state.avlTree
 import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
+import NodeMsg.NodeProtoMsg
+import cats.syntax.order._
+import cats.{Monoid, Order}
+import com.google.common.primitives.Ints
+import cats.{Monoid, Order}
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.Height
+import scorex.utils.Random
+import cats.{Monoid, Order}
+import scala.collection.immutable
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging {
@@ -241,7 +253,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       logger.info(s"Before rollback node key: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
       logger.info(s"Before rollback root node: ${rootNode}")
       storage.rollbackTo(to)
-      logger.info(s"Storage success rollbacked")
+      logger.info(s"Storage success rolled back")
       logger.info(s"rootNodeKey: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
       val newRootNode =
         NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
@@ -480,6 +492,53 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
         rightRotation(updatedNode)
     }
 
+  def selfInspectionAfterFastSync(implicit kSer: Serializer[K]): Boolean = {
+    @scala.annotation.tailrec
+    def loop(nodesToProcess: List[Node[K, V]], keysToInspect: List[Array[Byte]]): List[Array[Byte]] =
+      if (nodesToProcess.nonEmpty) nodesToProcess.head match {
+        case _: EmptyNode[K, V] => List.empty
+        case s: ShadowNode[K, V] =>
+          val restoredNode: Node[K, V] = s.restoreFullNode(storage)
+          val removedExcess: List[Node[K, V]] = nodesToProcess.drop(1)
+          val newToProcess: List[Node[K, V]] = restoredNode :: removedExcess
+          loop(newToProcess, keysToInspect)
+        case i: InternalNode[K, V] =>
+          val leftChild: Option[(List[Node[K, V]], Node[K, V])] = getLeftChild(i)
+          val rightChild: Option[(List[Node[K, V]], Node[K, V])] = getRightChild(i)
+          val (next: List[Node[K, V]], current: List[Array[Byte]]) = (leftChild :: rightChild :: Nil)
+            .foldLeft(List.empty[Node[K, V]], List.empty[Array[Byte]]) {
+              case ((nextNodes, thisNodes), Some((nextChildren, thisNode))) =>
+                (nextChildren ::: nextNodes, Algos.hash(kSer.toBytes(thisNode.key).reverse) :: thisNode.hash :: thisNodes)
+              case (result, _) => result
+            }
+          val updatedNodeToProcess: List[Node[K, V]] = nodesToProcess.drop(1)
+          loop(updatedNodeToProcess ::: next, Algos.hash(kSer.toBytes(i.key).reverse) :: i.hash :: current ::: keysToInspect)
+        case l: LeafNode[K, V] => loop(nodesToProcess.drop(1), Algos.hash(kSer.toBytes(l.key).reverse) :: l.hash :: keysToInspect)
+      } else keysToInspect
+    val keys: Set[ByteArrayWrapper] = loop(List(rootNode), List.empty).map(ByteArrayWrapper(_)).toSet
+    val allKeysFromDB: Set[ByteArrayWrapper] = storage.getAllKeys(-1)
+      .map(ByteArrayWrapper(_)).toSet - ByteArrayWrapper(UtxoState.bestHeightKey) - ByteArrayWrapper(AvlTree.rootNodeKey)
+    logger.info(s"${keys.map(l => Algos.encode(l.data))}")
+    (allKeysFromDB -- keys).isEmpty
+  }
+
+  @scala.annotation.tailrec
+  private def handleChild(child: Node[K, V]): (List[Node[K, V]], Node[K, V]) = child match {
+    case s: ShadowNode[K, V] => handleChild(s.restoreFullNode(storage))
+    case i: InternalNode[K, V] => List(i.rightChild, i.leftChild).flatten -> i
+    case l: LeafNode[K, V] => List.empty -> l
+  }
+
+  private def getLeftChild(node: InternalNode[K, V]): Option[(List[Node[K, V]], Node[K, V])] = node.leftChild match {
+    case Some(child) => Some(handleChild(child))
+    case n@None => n
+  }
+
+  private def getRightChild(node: InternalNode[K, V]): Option[(List[Node[K, V]], Node[K, V])] = node.rightChild match {
+    case Some(child) => Some(handleChild(child))
+    case n@None => n
+  }
+
   override def close(): Unit = storage.close()
 
   override def toString: String = rootNode.toString
@@ -505,4 +564,40 @@ object AvlTree {
 
   def apply[K: Monoid: Order: Hashable : Serializer, V: Monoid : Serializer](storage: VersionalStorage): AvlTree[K, V] =
     new AvlTree[K, V](EmptyNode(), storage)
+
+  def getChunks(node: Node[StorageKey, StorageValue],
+                currentChunkHeight: Int,
+                storage: VersionalStorage)
+               (implicit kSer: Serializer[StorageKey],
+                vSer: Serializer[StorageValue],
+                kM: Monoid[StorageKey],
+                vM: Monoid[StorageValue],
+                hashKey: Hashable[StorageKey]): List[SnapshotChunk] = {
+    import cats.implicits._
+
+    def restoreNodesUntilDepthAndReturnLeafs(depth: Int,
+                                             node: Node[StorageKey, StorageValue]): (Node[StorageKey, StorageValue], List[Node[StorageKey, StorageValue]]) = node match {
+      case shadowNode: ShadowNode[StorageKey, StorageValue] =>
+        val newNode = shadowNode.restoreFullNode(storage)
+        restoreNodesUntilDepthAndReturnLeafs(depth, newNode)
+      case internalNode: InternalNode[StorageKey, StorageValue] if depth != 0 =>
+        val (recoveredLeftChild, leftSubTreeChildren) = internalNode.leftChild
+          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
+          .separate.map(_.getOrElse(List.empty))
+        val (recoveredRightChild, rightSubTreeChildren) = internalNode.rightChild
+          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
+          .separate.map(_.getOrElse(List.empty))
+        internalNode.copy(
+          leftChild = recoveredLeftChild,
+          rightChild = recoveredRightChild
+        ) -> (rightSubTreeChildren ++ leftSubTreeChildren)
+      case internalNode: InternalNode[StorageKey, StorageValue] =>
+        internalNode -> List(internalNode.leftChild, internalNode.rightChild).flatten
+      case leaf: LeafNode[StorageKey, StorageValue] => leaf -> List.empty[Node[StorageKey, StorageValue]]
+    }
+
+    val (rootChunk: Node[StorageKey, StorageValue], rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
+    SnapshotChunk(rootChunk, rootChunk.hash) ::
+      rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight, storage))
+  }
 }

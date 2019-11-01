@@ -1,7 +1,6 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable, PoisonPill, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus._
@@ -13,7 +12,6 @@ import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest, SerializedModifierFromNetwork}
 import encry.view.history.History
 import encry.settings.EncryAppSettings
-
 import scala.concurrent.duration._
 import scala.collection.immutable.HashSet
 import scala.collection.{IndexedSeq, mutable}
@@ -25,6 +23,8 @@ import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.fast.sync.SnapshotHolder.FastSyncDone
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
@@ -125,6 +125,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
+      logger.debug(s"receivedModifiers: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
@@ -183,9 +184,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
 
-    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
+    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>  //todo check this condition
       if (modifierTypeId != Transaction.modifierTypeId)
-        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
+        logger.info(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 

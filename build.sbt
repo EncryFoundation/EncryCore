@@ -52,7 +52,7 @@ lazy val monitoringDependencies = Seq(
   "io.kamon" %% "kamon-influxdb" % "1.0.1"
 )
 
-libraryDependencies ++= Seq(
+libraryDependencies ++= (Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
@@ -89,7 +89,8 @@ libraryDependencies ++= Seq(
   "org.typelevel" % "cats-macros_2.12" % "1.0.1",
   "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
   "com.google.guava" % "guava" % "27.1-jre"
-) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies)
+
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",

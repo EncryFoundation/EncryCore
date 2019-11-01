@@ -29,7 +29,9 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
-  private var isHeadersChainSyncedVar: Boolean = false
+  var isHeadersChainSyncedVar: Boolean = false
+
+  var isFastSync: Boolean = settings.snapshotSettings.enableFastSynchronization
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
@@ -67,6 +69,10 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
       .orElse(getHeaderByIdDB(id))
   )
+
+  def getBestHeaderAtHeight(h: Int): Option[Header] = headersCacheIndexes.get(h)
+    .flatMap(_.headOption).flatMap(id => headersCache.get(ByteArrayWrapper(id)))
+    .orElse(getBestHeaderAtHeightDB(h))
 
   def getBlockByPayload(payload: Payload): Option[Block] = headersCache
     .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
@@ -128,16 +134,16 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       bestBlockId             <- getBestBlockId
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-        case _ if !isHeadersChainSynced =>
-          Seq.empty
-        case Some(header) if isInBestChain(header) =>
-          continuation(header.height + 1, Seq.empty)
-        case Some(header) =>
-          lastBestBlockHeightRelevantToBestChain(header.height)
-            .map(height => continuation(height + 1, Seq.empty))
-            .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
-        case None =>
-          continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case _ if !isHeadersChainSynced =>
+        Seq.empty
+      case Some(header) if isInBestChain(header) =>
+        continuation(header.height + 1, Seq.empty)
+      case Some(header) =>
+        lastBestBlockHeightRelevantToBestChain(header.height)
+          .map(height => continuation(height + 1, Seq.empty))
+          .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
+      case None =>
+        continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
@@ -145,7 +151,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
+    else if (!isHeadersChainSynced && isNewHeader(header) && !isFastSync) {
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none
@@ -277,7 +283,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
-  private def isNewHeader(header: Header): Boolean =
+  def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
       settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
 
