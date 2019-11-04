@@ -100,9 +100,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         val possibleMap = db.get(userKey(elemKey), readOptions)
         if (possibleMap != null) {
           val accessMap = util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
-          logger.info(s"trying to delete empty key ${Algos.encode(elemKey)} in ver ${Algos.encode(newElem.version)}")
           batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
-        }
+        } else
+          logger.info(s"trying to delete empty key ${Algos.encode(elemKey)} in ver ${Algos.encode(newElem.version)}")
       }
       db.write(batch)
       clean()
