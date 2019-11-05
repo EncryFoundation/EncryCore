@@ -230,6 +230,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
+      override val settings: EncryAppSettings = settings
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }

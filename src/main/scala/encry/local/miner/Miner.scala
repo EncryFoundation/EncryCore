@@ -213,7 +213,6 @@ class Miner(dataHolder: ActorRef,
   def produceCandidate(): Unit =
     context.actorSelection("/user/nodeViewHolder") ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
-      println("Get data from current view miner to nvh")
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
         val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)

@@ -4,7 +4,7 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus._
 import encry.consensus._
 import encry.modifiers.history._
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.history.ValidationError.HistoryApiError
 import io.iohk.iodb.ByteArrayWrapper
@@ -12,6 +12,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
+
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
@@ -31,7 +32,11 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var isHeadersChainSyncedVar: Boolean = false
 
-  var isFastSync: Boolean = settings.snapshotSettings.enableFastSynchronization
+  final case class FastSyncProcessor(localSettings: EncryAppSettings) {
+    var isFastSync: Boolean = localSettings.snapshotSettings.enableFastSynchronization
+  }
+
+  lazy val isFastSync = FastSyncProcessor(settings)
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
@@ -158,7 +163,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && isNewHeader(header) && !isFastSync) {
+    else if (!isHeadersChainSynced && isNewHeader(header) && !isFastSync.isFastSync) {
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none

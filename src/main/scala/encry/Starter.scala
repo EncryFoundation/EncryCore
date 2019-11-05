@@ -207,8 +207,6 @@ class Starter(settings: EncryAppSettings,
       println("Got accumulated info.")
       Functor[Option].compose[Future].map(initHttpApiServer)(_.unbind())
       AccountManager.init(mnemonic, password, settings)
-      //todo enableFastSynchronization bug?
-      println(fastSync)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings       = settings.network.copy(knownPeers = peers)

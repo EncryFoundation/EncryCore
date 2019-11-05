@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
@@ -9,6 +10,8 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp.{system, timeProvider}
+import encry.api.http.DataHolderForApi
+import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -31,6 +34,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -45,7 +49,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
 
-  var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   system.actorSelection("/user/nodeViewSynchronizer") ! ChangedHistory(nodeView.history)
 
@@ -72,15 +75,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
   }
-  var isHeaderChainSyncedLocal: Boolean = false
 
-  override def receive: Receive =
-    if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
-      defaultMessages(canProcessPayloads = false)
-    else
-      defaultMessages(canProcessPayloads = true)
-
-  def defaultMessages(canProcessPayloads: Boolean): Receive = {
+  override def receive: Receive = {
     case FastSyncFinished(state) =>
       //todo implement wallet scanning
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
@@ -91,14 +87,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
           nodeView.history.blockDownloadProcessor.updateBestBlock(h)
           nodeView.history.isHeadersChainSyncedVar = true
-          nodeView.history.isFastSync = false
+          nodeView.history.isFastSync.isFastSync = false
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
           updateNodeView(
             updatedHistory = Some(history),
             updatedState = Some(state)
           )
           system.actorSelection("/user/nodeViewSynchronizer") ! FastSyncDone
-          context.become(defaultMessages(true))
         }
       } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
@@ -134,8 +129,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
 
-    case CompareViews(peer, modifierTypeId, modifierIds)
-      if (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
+    case CompareViews(peer, modifierTypeId, modifierIds) =>
       logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
@@ -226,7 +220,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
-
+              dataHolder ! DataHolderForApi.BlockAndHeaderInfo(newHis.getBestHeader, newHis.getBestBlock)
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
