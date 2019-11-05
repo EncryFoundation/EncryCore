@@ -98,10 +98,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       }
       newElem.elemsToDelete.foreach { elemKey =>
         val possibleMap = db.get(userKey(elemKey), readOptions)
-        val accessMap =
-          if (possibleMap != null) util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
-          else Array.emptyByteArray
-        batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
+        if (possibleMap != null) {
+          val accessMap = util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
+          batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
+        } else
+          logger.info(s"trying to delete empty key ${Algos.encode(elemKey)} in ver ${Algos.encode(newElem.version)}")
       }
       db.write(batch)
       clean()
@@ -163,7 +164,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
         deletions.foreach { elemKey =>
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
-          writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
+          logger.info(s"accessMap of key(delete) ${Algos.encode(elemKey)} in rollback resolver is: " +
+            s"${if (accessMap != null) Algos.encode(accessMap) else null}")
+          if (accessMap != null)
+            writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
         }
         writeBatch.delete(versionKey(versionToResolve))
         writeBatch.delete(versionDeletionsKey(versionToResolve))

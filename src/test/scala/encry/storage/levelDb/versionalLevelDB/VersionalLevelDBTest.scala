@@ -269,7 +269,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val maxVersions = Random.nextInt(10)
 
-    val levelDbElemsQty = maxVersions + Random.nextInt(5) + 1
+    val levelDbElemsQty = maxVersions + 5
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
