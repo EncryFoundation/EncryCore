@@ -239,7 +239,7 @@ class Starter(settings: EncryAppSettings,
         "nodeViewHolder"
       )
 
-      val nodeViewSynchronizer: ActorRef = context.system.actorOf(
+      context.system.actorOf(
         NodeViewSynchronizer
           .props(influxRef, nodeViewHolder, newSettings, memoryPool, dataHolderForApi)
           .withDispatcher("nvsh-dispatcher"),
