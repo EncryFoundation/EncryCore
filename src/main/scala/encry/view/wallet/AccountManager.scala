@@ -17,6 +17,8 @@ case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) 
 
   import encry.storage.EncryStorage._
 
+  println(s"Walle - my mnemonic is ${walletSettings.map(_.seed)}. My pass is ${walletSettings.map(_.password)}")
+
   lazy val mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)

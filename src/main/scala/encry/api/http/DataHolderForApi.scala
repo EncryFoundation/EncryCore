@@ -2,7 +2,7 @@ package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi._
@@ -11,7 +11,7 @@ import akka.util.Timeout
 import encry.EncryApp
 import encry.api.http.routes.InfoApiRoute
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList, UpdatedHistory}
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.state.{UtxoState, UtxoStateReader}
@@ -41,9 +41,16 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
 
-  override def receive: Receive = workingCycle()
+  override def receive: Receive = awaitNVHRef
 
-  def workingCycle(blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
+  def awaitNVHRef: Receive = {
+    case UpdatedHistory(history) =>
+      println(s"Got nvh ref ${sender()} on dataholder await nvh ref case")
+    context.become(workingCycle(nvhRef = sender(), history = Some(history)))
+  }
+
+  def workingCycle(nvhRef: ActorRef,
+                    blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
                    history: Option[History] = None,
                    state: Option[UtxoStateReader] = None,
@@ -52,11 +59,11 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
                    blockInfo: BlockAndHeaderInfo = BlockAndHeaderInfo(None, None),
                    allPeers: Seq[InetSocketAddress] = Seq.empty): Receive = {
     case UpdatingTransactionsNumberForApi(qty) =>
-      context.become(workingCycle(blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
+      context.become(workingCycle(nvhRef, blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
     case BlockAndHeaderInfo(header, block) =>
       context.become(
-        workingCycle(blackList,
+        workingCycle(nvhRef, blackList,
                      connectedPeers,
                      history,
                      state,
@@ -68,7 +75,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
     case ChangedHistory(reader: History) =>
       context.become(
-        workingCycle(blackList,
+        workingCycle(nvhRef, blackList,
                      connectedPeers,
                      Some(reader),
                      state,
@@ -80,7 +87,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
     case ChangedState(reader: UtxoStateReader) =>
       context.become(
-        workingCycle(blackList,
+        workingCycle(nvhRef, blackList,
                      connectedPeers,
                      history,
                      Some(reader),
@@ -92,17 +99,17 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
     case UpdatingMinerStatus(status) =>
       context.become(
-        workingCycle(blackList, connectedPeers, history, state, transactionsOnMinerActor, status, blockInfo, allPeers)
+        workingCycle(nvhRef, blackList, connectedPeers, history, state, transactionsOnMinerActor, status, blockInfo, allPeers)
       )
 
     case UpdatingPeersInfo(allP, connectedP, bannedP) =>
       context.become(
-        workingCycle(bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus, blockInfo, allP)
+        workingCycle(nvhRef, bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus, blockInfo, allP)
       )
 
     case PeerAdd(peer)               => context.system.eventStream.publish(PeerFromCli(peer))
     case RemovePeerFromBanList(peer) =>
-      nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
+      //nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
       context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
@@ -257,7 +264,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case ShutdownNode              =>
       println("stopped")
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
-    case GetDataFromPresentView(f) => (nodeViewHolder ? GetDataFromCurrentView(f)).pipeTo(sender)
+    case GetDataFromPresentView(f) =>
+      (nvhRef ? GetDataFromCurrentView(f)).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
         connectedPeers,

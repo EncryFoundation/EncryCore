@@ -13,7 +13,7 @@ import io.circe.parser
 import io.circe.generic.auto._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-import encry.EncryApp.memoryPool
+import encry.EncryApp
 import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetDataFromPresentView, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
@@ -172,7 +172,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
-          memoryPool ! NewTransaction(tx)
+          EncryApp.system.eventStream.publish(NewTransaction(tx))
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }
@@ -198,7 +198,8 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
         }).flatMap {
         case Some(tx: Transaction) =>
           println(tx)
-          memoryPool ! NewTransaction(tx)
+          EncryApp.system.eventStream.publish(NewTransaction(tx))
+          //memoryPool !
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }
@@ -231,7 +232,9 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
         }).flatMap {
         case Some(tx: Transaction) =>
           println(tx)
-          memoryPool ! NewTransaction(tx)
+
+          EncryApp.system.eventStream.publish(NewTransaction(tx))
+
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }

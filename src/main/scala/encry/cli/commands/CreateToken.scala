@@ -3,6 +3,7 @@ package encry.cli.commands
 import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
+import encry.EncryApp
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey}
 import encry.cli.{Ast, Response}
@@ -50,7 +51,8 @@ object CreateToken extends Command {
         }.toOption
       }).flatMap {
       case Some(tx: Transaction) =>
-        memoryPool ! NewTransaction(tx)
+        EncryApp.system.eventStream.publish(NewTransaction(tx))
+       // memoryPool ! NewTransaction(tx)
         Future.successful(Some(Response(tx.toString)))
       case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
     }

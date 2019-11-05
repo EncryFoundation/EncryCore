@@ -83,7 +83,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
       self ! StartMining
     case StartMining if syncingDone =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
+        Props(classOf[Worker], i, numberOfWorkers, self).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           logger.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
@@ -105,7 +105,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      nodeViewHolder ! LocallyGeneratedModifier(block)
+      context.actorSelection("/user/nodeViewHolder") ! LocallyGeneratedModifier(block)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
@@ -209,8 +209,9 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
+    context.actorSelection("/user/nodeViewHolder") ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
+      println("Get data from current view miner to nvh")
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
         val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)

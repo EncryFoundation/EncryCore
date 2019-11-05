@@ -5,8 +5,9 @@ import akka.pattern._
 import akka.util.Timeout
 import cats.Applicative
 import cats.implicits._
+import encry.EncryApp
 import encry.EncryApp._
-import encry.api.http.DataHolderForApi.{GetDataFromPresentView}
+import encry.api.http.DataHolderForApi.GetDataFromPresentView
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
@@ -86,7 +87,8 @@ object Transfer extends Command {
         }.toOption
       }).flatMap {
       case Some(tx: Transaction) =>
-        memoryPool ! NewTransaction(tx)
+        EncryApp.system.eventStream.publish(NewTransaction(tx))
+        //memoryPool ! NewTransaction(tx)
         Future.successful(Some(Response(tx.toString)))
       case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
     }

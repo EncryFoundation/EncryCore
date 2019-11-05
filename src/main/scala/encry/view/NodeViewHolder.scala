@@ -10,7 +10,7 @@ import akka.pattern._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
-import encry.EncryApp.{miner, nodeViewSynchronizer, timeProvider}
+import encry.EncryApp.{system, timeProvider}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -62,7 +62,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  nodeViewSynchronizer ! ChangedHistory(nodeView.history)
+  system.actorSelection("/user/nodeViewSynchronizer") ! ChangedHistory(nodeView.history)
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
@@ -112,7 +112,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             updatedHistory = Some(history),
             updatedState = Some(state)
           )
-          nodeViewSynchronizer ! FastSyncDone
+          system.actorSelection("/user/nodeViewSynchronizer") ! FastSyncDone
           context.become(defaultMessages(true))
         }
       } else sys.exit(1234567)
@@ -189,7 +189,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       updatedState.getOrElse(nodeView.state),
       updatedVault.getOrElse(nodeView.wallet))
     if (updatedHistory.nonEmpty) {
-      nodeViewSynchronizer ! ChangedHistory(newNodeView.history)
+      system.actorSelection("/user/nodeViewSynchronizer") ! ChangedHistory(newNodeView.history)
       context.system.eventStream.publish(ChangedHistory(newNodeView.history))
     }
     if (updatedState.nonEmpty) context.system.eventStream.publish(ChangedState(newNodeView.state))
@@ -200,7 +200,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
-      nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
+      system.actorSelection("/user/nodeViewSynchronizer") ! DownloadRequest(tid, id, previousModifier)
     }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
@@ -252,7 +252,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
                         s"\n\n\n header - $h \n\n\n")
-                      nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
+                      system.actorSelection("/user/nodeViewSynchronizer") ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
                     }
                   }
                 case _ =>
@@ -268,7 +268,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   val chunks: List[SnapshotChunk] =
                     AvlTree.getChunks(stateAfterApply.tree.rootNode, currentChunkHeight = 1, stateAfterApply.tree.storage)
                   val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
-                  nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
+                  system.actorSelection("/user/nodeViewSynchronizer") ! TreeChunks(chunks, potentialManifestId)
                 }
                 logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
                 logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
@@ -323,7 +323,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
             influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
-            if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
+            if (newHistory.isHeadersChainSynced) system.actorSelection("/user/nodeViewSynchronizer") ! HeaderChainIsSynced
             influxRef.foreach { ref =>
               logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
               ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)
@@ -347,7 +347,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (newHistory.isFullChainSynced) {
               logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
               ModifiersCache.setChainSynced()
-              Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
+              Seq(
+                system.actorSelection("/user/nodeViewSynchronizer"),
+                system.actorSelection("/user/miner")
+              ).foreach(_ ! FullBlockChainIsSynced)
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
           } else {
