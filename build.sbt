@@ -88,9 +88,9 @@ libraryDependencies ++= Seq(
   "com.sun.jersey" % "jersey-client" % "1.19",
   "commons-net" % "commons-net" % "3.6",
   "org.aspectj" % "aspectjweaver" % "1.9.2",
-  "org.typelevel" % "cats-core_2.12" % "1.0.1",
-  "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
-  "org.typelevel" % "cats-macros_2.12" % "1.0.1",
+  "org.typelevel" % "cats-core_2.12" % "2.0.0",
+  "org.typelevel" % "cats-kernel_2.12" % "2.0.0",
+  "org.typelevel" % "cats-macros_2.12" % "2.0.0",
   "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
   "com.google.guava" % "guava" % "27.1-jre"
 ) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies

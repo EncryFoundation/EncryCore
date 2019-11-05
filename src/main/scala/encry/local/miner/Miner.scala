@@ -37,7 +37,9 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.collection._
 import scala.concurrent.duration._
 
-class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSettings) extends Actor with StrictLogging {
+class Miner(dataHolder: ActorRef,
+            influx: Option[ActorRef],
+            settings: EncryAppSettings) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 

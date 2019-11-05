@@ -1,11 +1,14 @@
 package encry.view.wallet
 
+import java.io.File
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.crypto.encryption.AES
-import encry.settings.WalletSettings
+import encry.settings.EncryAppSettings
 import encry.utils.Mnemonic
-import io.iohk.iodb.{ByteArrayWrapper, Store}
+import encry.view.wallet.EncryWallet.getKeysDir
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Blake2b256
@@ -13,17 +16,15 @@ import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
 import scala.util.Try
 
-case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) extends StrictLogging {
+case class AccountManager(store: Store, password: String) extends StrictLogging {
 
   import encry.storage.EncryStorage._
-
-  println(s"Walle - my mnemonic is ${walletSettings.map(_.seed)}. My pass is ${walletSettings.map(_.password)}")
 
   lazy val mandatoryAccount: PrivateKey25519 = store.get(AccountManager.MandatoryAccountKey).flatMap { res =>
     store.get(AccountManager.AccountPrefix +: res.data).map { secretRes =>
       PrivateKey25519(PrivateKey @@ decrypt(secretRes.data), PublicKey @@ res.data)
     }
-  } getOrElse createMandatory(walletSettings.flatMap(_.seed))
+  }.get
 
   def accounts: Seq[PrivateKey25519] = store.getAll().foldLeft(Seq.empty[PrivateKey25519]) { case (acc, (k, v)) =>
     if (k.data.head == AccountManager.AccountPrefix)
@@ -64,8 +65,7 @@ case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) 
     acc
   }
 
-  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, walletSettings.map(_.password)
-    .getOrElse(throw new RuntimeException("password not specified"))))
+  private def decrypt(data: Array[Byte]): Array[Byte] = Try(AES.decrypt(data, password))
     .fold(e => {
       EncryApp.forceStopApplication(500, s"AccountManager: decryption failed cause ${e.getCause}")
     }, r => r)
@@ -74,16 +74,25 @@ case class AccountManager(store: Store, walletSettings: Option[WalletSettings]) 
     store.update(
       scala.util.Random.nextLong(),
       Seq.empty,
-
       Seq((ByteArrayWrapper(AccountManager.AccountPrefix +: publicKey),
-        ByteArrayWrapper(AES.encrypt(privateKey, walletSettings.map(_.password)
-          .getOrElse(throw new RuntimeException("password not specified"))))))
-
+        ByteArrayWrapper(AES.encrypt(privateKey, password))))
     )
   }
 }
 
 object AccountManager {
+
+  def init(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
+    println("Start account manager initialization")
+    val keysDir: File = getKeysDir(settings)
+    keysDir.mkdirs()
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 33)
+    val account = AccountManager(accountManagerStore, pass)
+    account.createMandatory(Some(mnemonicKey))
+    account.store.close()
+    println("Account manager initialization finished")
+  }
+
   val AccountPrefix: Byte = 0x05
   val MetaInfoPrefix: Byte = 0x15
   val MandatoryAccountKey: ByteArrayWrapper = ByteArrayWrapper(MetaInfoPrefix +: Algos.hash("account"))

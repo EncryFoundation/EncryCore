@@ -1,8 +1,6 @@
 package encry.view
 
 import java.io.File
-import java.nio.file.{Path, SimpleFileVisitor}
-
 import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
@@ -15,28 +13,17 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.{EncryAppSettings, LevelDBSettings}
-import encry.stats.StatsSender._
-import encry.storage.VersionalStorage
-import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotProcessor
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
-import encry.view.history.History
-import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.{UtxoState, _}
 import encry.view.state.avlTree.AvlTree
-import encry.view.wallet.EncryWallet
-import io.iohk.iodb.LSMStore
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state._
 import encry.view.wallet.EncryWallet
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -44,8 +31,6 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-import org.iq80.leveldb.Options
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -347,10 +332,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (newHistory.isFullChainSynced) {
               logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
               ModifiersCache.setChainSynced()
-              Seq(
-                system.actorSelection("/user/nodeViewSynchronizer"),
-                system.actorSelection("/user/miner")
-              ).foreach(_ ! FullBlockChainIsSynced)
+              system.actorSelection("/user/nodeViewSynchronizer") ! FullBlockChainIsSynced
+              system.actorSelection("/user/miner") ! FullBlockChainIsSynced
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
           } else {

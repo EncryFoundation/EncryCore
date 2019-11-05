@@ -45,7 +45,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
-      println(s"Got nvh ref ${sender()} on dataholder await nvh ref case")
     context.become(workingCycle(nvhRef = sender(), history = Some(history)))
   }
 

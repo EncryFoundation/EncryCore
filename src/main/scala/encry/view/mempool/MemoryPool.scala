@@ -194,7 +194,10 @@ object MemoryPool {
 
   }
 
-  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef, influx: Option[ActorRef]): Props =
+  def props(settings: EncryAppSettings,
+            ntp: NetworkTimeProvider,
+            minerRef: ActorRef,
+            influx: Option[ActorRef]): Props =
     Props(new MemoryPool(settings, ntp, minerRef, influx))
 
   class MemoryPoolPriorityQueue(settings: ActorSystem.Settings, config: Config)
