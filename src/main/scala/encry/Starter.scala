@@ -69,7 +69,8 @@ class Starter(settings: EncryAppSettings,
         walletPassword,
         settings.node.offlineGeneration,
         fastSync = false,
-        settings.network.knownPeers.toList
+        settings.network.knownPeers.toList,
+        settings.network.connectOnlyWithKnownPeers.getOrElse(false)
       )
 
   def startEmptyNode: Either[Throwable, InitNodeResult] =
@@ -190,7 +191,11 @@ class Starter(settings: EncryAppSettings,
         readAnswer
       }
       peers <- if (answerPeers) readPeersToConnect else List.empty[InetSocketAddress].asRight[Throwable]
-    } yield InitNodeResult(mnemonicKey, walletPassword, startOwnChain, enableFastSync, peers)
+      connectWithOnlyKnownPeers <- {
+        println("Do you want to connect only with known peers? Yes or no")
+        readAnswer
+      }
+    } yield InitNodeResult(mnemonicKey, walletPassword, startOwnChain, enableFastSync, peers, connectWithOnlyKnownPeers)
   }
 
   def startWithHttpApi: Either[Throwable, InitNodeResult] = {
@@ -203,14 +208,15 @@ class Starter(settings: EncryAppSettings,
   override def preStart(): Unit = startNode()
 
   override def receive: Receive = {
-    case InitNodeResult(mnemonic, password, offlineGeneration, fastSync, peers) =>
+    case InitNodeResult(mnemonic, password, offlineGeneration, fastSync, peers, connectWithOnlyKnownPeers) =>
       println("Got accumulated info.")
       Functor[Option].compose[Future].map(initHttpApiServer)(_.unbind())
       AccountManager.init(mnemonic, password, settings)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
-      val networkSettings: NetworkSettings       = settings.network.copy(knownPeers = peers)
-      val snapshotSettings: SnapshotSettings     = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
+      val networkSettings: NetworkSettings =
+        settings.network.copy(knownPeers = peers, connectOnlyWithKnownPeers = connectWithOnlyKnownPeers.some)
+      val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
       val newSettings = settings.copy(
         wallet = walletSettings,
         node = nodeSettings,
@@ -255,5 +261,6 @@ object Starter {
                                   walletPassword: String,
                                   offlineGeneration: Boolean,
                                   fastSync: Boolean,
-                                  peers: List[InetSocketAddress])
+                                  peers: List[InetSocketAddress],
+                                  connectWithOnlyKnownPeers: Boolean)
 }
