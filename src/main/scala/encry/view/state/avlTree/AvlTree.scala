@@ -77,7 +77,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       } ++
         insertedNodes.map {
           case (key, node) =>
-            logger.info(s"insert node: ${Algos.encode(key)} -> Node[${node}]")
+            logger.info(s"insert node: ${Algos.encode(key)} -> Node[${ShadowNode.childsToShadowNode(node)}]")
             StorageKey @@ key -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
