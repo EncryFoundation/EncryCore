@@ -13,11 +13,13 @@ import org.encryfoundation.common.utils.Algos
 import scala.util.Try
 
 //represent node, that stored in db, without all fields, except hash, height, balance
-case class ShadowNode[K: Serializer: Hashable, V: Serializer](override val hash: Array[Byte], height: Int, balance: Int)
+case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Array[Byte], height: Int, balance: Int)
                                                              (implicit kM: Monoid[K], vM: Monoid[V]) extends Node[K, V] with StrictLogging {
 
   override val key: K = kM.empty
   override val value: V = vM.empty
+
+  override lazy val hash = nodeHash
 
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
     NodeSerilalizer.fromBytes[K, V](
@@ -39,8 +41,8 @@ object ShadowNode {
   def childsToShadowNode[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Node[K, V] = node match {
     case internal: InternalNode[K, V] =>
       internal.copy(
-        leftChild = internal.leftChild.map(node => ShadowNode[K, V](hash = node.hash, height = node.height, balance = node.balance)),
-        rightChild = internal.rightChild.map(node => ShadowNode[K, V](hash = node.hash, height = node.height, balance = node.balance))
+        leftChild = internal.leftChild.map(node => ShadowNode[K, V](nodeHash = node.hash, height = node.height, balance = node.balance)),
+        rightChild = internal.rightChild.map(node => ShadowNode[K, V](nodeHash = node.hash, height = node.height, balance = node.balance))
       )
     case _ => node
   }
@@ -52,7 +54,7 @@ object ShadowNode {
 
   def fromProto[K: Hashable : Monoid : Serializer, V: Monoid : Serializer](protoNode: ShadowNodeProto): Try[ShadowNode[K, V]] = Try {
     ShadowNode(
-      hash = protoNode.hash.toByteArray,
+      nodeHash = protoNode.hash.toByteArray,
       height = protoNode.height,
       balance = protoNode.balance
     )

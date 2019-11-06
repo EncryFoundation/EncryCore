@@ -11,7 +11,7 @@ import scala.util.Try
 final case class LeafNode[K: Serializer: Monoid, V: Serializer: Monoid](key: K, value: V)(implicit hashK: Hashable[K])
     extends Node[K, V] {
 
-  override val hash: Array[Byte] = Algos.hash(
+  override lazy val hash: Array[Byte] = Algos.hash(
     Bytes.concat(
       implicitly[Serializer[K]].toBytes(key),
       implicitly[Serializer[V]].toBytes(value)

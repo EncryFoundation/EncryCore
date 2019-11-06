@@ -19,7 +19,7 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
                                                                                       rightChild: Option[Node[K, V]])
     extends Node[K, V] {
 
-  override val hash: Array[Byte] = {
+  override lazy val hash: Array[Byte] = {
     val serK = implicitly[Serializer[K]]
     val serV = implicitly[Serializer[V]]
     Algos.hash(
