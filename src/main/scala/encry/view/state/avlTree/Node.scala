@@ -14,8 +14,8 @@ abstract class Node[K: Serializer: Monoid, V: Serializer: Monoid] {
   val value: V
   val height: Int
   val balance: Int
-  val hash: Array[Byte] = Algos.hash(NodeSerilalizer.toBytes(this))
-  def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V]
+  lazy val hash: Array[Byte] = Algos.hash(NodeSerilalizer.toBytes(this))
+  def selfInspection: Node[K, V]
 }
 
 object NodeSerilalizer {

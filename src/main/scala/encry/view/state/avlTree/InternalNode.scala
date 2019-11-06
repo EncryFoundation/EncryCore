@@ -33,27 +33,24 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
     )
   }
 
-  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] =
-    if (leftChild.isEmpty & rightChild.isEmpty) {
-      val leaf = LeafNode(key, value)
-      NodeWithOpInfo(leaf, prevOpsInfo.update(ByteArrayWrapper(leaf.hash) -> leaf, ByteArrayWrapper(hash)))
-    } else NodeWithOpInfo(this, prevOpsInfo)
+  override def selfInspection: Node[K, V] =
+    if (leftChild.isEmpty & rightChild.isEmpty) LeafNode(key, value)
+    else this
 
   def updateChilds(newLeftChild: Option[Node[K, V]] = leftChild,
-                   newRightChild: Option[Node[K, V]] = rightChild,
-                   prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = {
+                   newRightChild: Option[Node[K, V]] = rightChild): Node[K, V] = {
     val hashK = implicitly[Hashable[K]]
-    val (newLeftChildAfterInspect, leftInfo) =
+    val newLeftChildAfterInspect =
       newLeftChild.map { node =>
-        val resOp = node.selfInspection(prevOpsInfo)
-        (Some(resOp.node), resOp.opInfo)
-      }.getOrElse(Option.empty[Node[K, V]], prevOpsInfo)
-    val (newRightChildAfterInspect, rightInfo) =
+        val resOp = node.selfInspection
+        Some(resOp)
+      }.getOrElse(Option.empty[Node[K, V]])
+    val newRightChildAfterInspect =
       newRightChild.map { node =>
-        val resOp = node.selfInspection(leftInfo)
-        (Some(resOp.node), resOp.opInfo)
-      }.getOrElse(Option.empty[Node[K, V]], leftInfo)
-    val newNode = this.copy(
+        val resOp = node.selfInspection
+        Some(resOp)
+      }.getOrElse(Option.empty[Node[K, V]])
+    this.copy(
       leftChild = newLeftChildAfterInspect,
       rightChild = newRightChildAfterInspect,
       balance = newLeftChildAfterInspect
@@ -62,10 +59,6 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
       height = Math.max(newLeftChildAfterInspect.map(_.height).getOrElse(-1),
                         newRightChildAfterInspect.map(_.height).getOrElse(0)) + 1
     )
-    val newUpdated =
-      if (newNode.hash sameElements this.hash) rightInfo
-      else rightInfo.update(ByteArrayWrapper(newNode.hash) -> newNode, ByteArrayWrapper(this.hash))
-    NodeWithOpInfo(newNode, newUpdated)
   }
 
   override def toString: String =

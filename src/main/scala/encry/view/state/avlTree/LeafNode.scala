@@ -24,8 +24,7 @@ final case class LeafNode[K: Serializer: Monoid, V: Serializer: Monoid](key: K, 
 
   override def toString: String = s"($key, $value, height: 0, balance: 0, hash: ${Algos.encode(hash)})"
 
-  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] =
-    NodeWithOpInfo(this, prevOpsInfo)
+  override def selfInspection = this
 }
 
 object LeafNode {

@@ -31,7 +31,7 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](override val hash:
 
   override def toString: String = s"ShadowNode(Hash:${Algos.encode(hash)}, height: ${height}, balance: ${balance})"
 
-  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = NodeWithOpInfo(this, prevOpsInfo)
+  override def selfInspection = this
 }
 
 object ShadowNode {

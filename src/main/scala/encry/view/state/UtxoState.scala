@@ -97,13 +97,13 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             val combinedStateChange: UtxoState.StateChange = combineAll(txsToApply.map(UtxoState.tx2StateChange))
             logger.info(s"Time of combining: ${(System.currentTimeMillis() - combineTimeStart) / 1000L} s")
             val insertTimestart = System.currentTimeMillis()
-            logger.info(s"applyModifier -> newTree ${tree.storage.getAllKeys(-1).map(Algos.encode(_))}")
-            logger.info(s"applyModifier -> outputsToDb -> ${combinedStateChange.outputsToDb.map(j => Algos.encode(j._1))}")
-            logger.info(s"applyModifier -> inputsToDb -> ${combinedStateChange.inputsToDb.map(j => Algos.encode(j))}")
-            logger.info(s"jfkdsvkjdfh ${
-              tree.storage
-                .get(StorageKey @@ Algos.decode("99dc04128df7b8f62b0fbf548bb2da7cada120230f833f80f8273c11e6700380").get
-              )}")
+//            logger.info(s"applyModifier -> newTree ${tree.storage.getAllKeys(-1).map(Algos.encode(_))}")
+//            logger.info(s"applyModifier -> outputsToDb -> ${combinedStateChange.outputsToDb.map(j => Algos.encode(j._1))}")
+//            logger.info(s"applyModifier -> inputsToDb -> ${combinedStateChange.inputsToDb.map(j => Algos.encode(j))}")
+//            logger.info(s"jfkdsvkjdfh ${
+//              tree.storage
+//                .get(StorageKey @@ Algos.decode("99dc04128df7b8f62b0fbf548bb2da7cada120230f833f80f8273c11e6700380").get
+//              )}")
             val newTree: AvlTree[StorageKey, StorageValue] = tree.insertAndDeleteMany(
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
