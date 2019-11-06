@@ -77,13 +77,13 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       } ++
         insertedNodes.map {
           case (key, node) =>
-            //logger.info(s"insert node: ${Algos.encode(key.data)}")
+            logger.info(s"insert node: ${Algos.encode(key)} -> Node[${node}]")
             StorageKey @@ key -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
       deletedNodes.map(key => {
-        //logger.info(s"Delete node: ${Algos.encode(key.data)}")
+        logger.info(s"Delete node: ${Algos.encode(key.hash)}")
         StorageKey @@ key.hash
       }) ++ toDelete.map(key => {
         //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
