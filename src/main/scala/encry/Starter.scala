@@ -65,7 +65,7 @@ class Starter(settings: EncryAppSettings,
       }
     } yield
       InitNodeResult(
-        settings.wallet.flatMap(_.seed).getOrElse(""),
+        "",
         walletPassword,
         settings.node.offlineGeneration,
         fastSync = false,
@@ -211,7 +211,7 @@ class Starter(settings: EncryAppSettings,
     case InitNodeResult(mnemonic, password, offlineGeneration, fastSync, peers, connectWithOnlyKnownPeers) =>
       println("Got accumulated info.")
       Functor[Option].compose[Future].map(initHttpApiServer)(_.unbind())
-      AccountManager.init(mnemonic, password, settings)
+      if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings =
