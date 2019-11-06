@@ -59,9 +59,9 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     }
     val (insertedNodesInTree, notChanged) = getNewNodesWithFirstUnchanged(newRoot)
     val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
-    logger.info(s"Inserted nodes: ${insertedNodes.map(node => ShadowNode.childsToShadowNode(node._2)).mkString("\n")}")
+    logger.info(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
     val notChangedKeys  = notChanged.map{node => ByteArrayWrapper(node.hash)}.toSet
-    logger.info(s"Not changed: ${notChanged.map(node => ShadowNode.childsToShadowNode(node)).mkString("\n")}")
+    logger.info(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
     val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
     logger.info(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
     val startInsertTime = System.currentTimeMillis()
@@ -316,6 +316,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       node match {
         case shadowNode: ShadowNode[K, V] =>
           val restoredNode = shadowNode.restoreFullNode(storage)
+          logger.info(s"Insert. Restored node: ${restoredNode}")
           insert(newKey, newValue, restoredNode)
         case _: EmptyNode[K, V] => LeafNode[K, V](newKey, newValue)
         case leafNode: LeafNode[K, V] =>
