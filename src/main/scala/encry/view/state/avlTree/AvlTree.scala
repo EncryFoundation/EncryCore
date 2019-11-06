@@ -59,8 +59,11 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     }
     val (insertedNodesInTree, notChanged) = getNewNodesWithFirstUnchanged(newRoot)
     val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
+    logger.info(s"Inserted nodes: ${insertedNodes.map(node => ShadowNode.childsToShadowNode(node._2))}")
     val notChangedKeys  = notChanged.map{node => ByteArrayWrapper(node.hash)}.toSet
+    logger.info(s"Not changed: ${notChanged.map(node => ShadowNode.childsToShadowNode(node))}")
     val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
+    logger.info(s"Deleted nodes: ${deletedNodes.map(_.toString)}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
     storage.insert(
