@@ -20,6 +20,7 @@ import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
+import encry.storage.VersionalStorage.{StorageValue, StorageVersion}
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
@@ -29,6 +30,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import scorex.utils.Random
 
 import scala.concurrent.Future
 
@@ -42,6 +44,12 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
 
   override def receive: Receive = awaitNVHRef
+
+  val liorl00Dir: LiorL00Storage = LiorL00Storage.init(settings)
+
+  override def postStop(): Unit = liorl00Dir.storage.close()
+
+  final case class PasswordForLiorL00Storage(password: String)
 
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
@@ -59,6 +67,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
                    allPeers: Seq[InetSocketAddress] = Seq.empty): Receive = {
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(nvhRef, blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
+
+    case PasswordForLiorL00Storage(pass) => liorl00Dir.putPassword(pass)
 
     case BlockAndHeaderInfo(header, block) =>
       context.become(
