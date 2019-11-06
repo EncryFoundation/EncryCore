@@ -66,7 +66,8 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
       s" $value," +
       s" height: $height," +
       s" balance $balance, " +
-      s" hash: ${Algos.encode(hash)}) \n-> LeftChildOf($key):${leftChild.map(_.toString)}, \n-> RightChildOf($key): ${rightChild
+      s" hash: ${Algos.encode(hash)}) \n-> LeftChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}):" +
+      s"${leftChild.map(_.toString)}, \n-> RightChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}): ${rightChild
         .map(_.toString)}]"
 }
 
