@@ -43,7 +43,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
       val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
       this.copy(accountManagers = accountManagers :+ newAccount).asRight[String]
     case Right(_) => "Maximum number of accounts exceeded".asLeft[EncryWallet]
-    case Left(reasons) => s"Invalid mnemonic, problems are:\n${reasons.mkString_("\n")}".asLeft[EncryWallet]
+    case Left(reasons) => s"Invalid mnemonic, problems are: ${reasons.mkString_(", ")}".asLeft[EncryWallet]
   }
 
   def publicKeys: Set[PublicKey25519] = accountManagers.flatMap(_.publicAccounts).toSet
