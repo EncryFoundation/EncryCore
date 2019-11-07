@@ -9,6 +9,11 @@ import encry.view.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSee
 
 import scala.concurrent.Future
 
+/**
+  * Command "wallet fromSeed -seed=<seed[String]>"
+  * Example: wallet fromSeed -seed='another accuse index island little scissors insect little absurd island keep little valid'"
+  */
+
 object CreateAccountFromSeed extends Command {
   override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = {
     val seed: String = args.requireArg[Ast.Str]("seed").s
