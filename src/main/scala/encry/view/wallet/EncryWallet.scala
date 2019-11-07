@@ -154,7 +154,7 @@ object EncryWallet extends StrictLogging {
     val keysDir: File = getKeysDir(settings)
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
-    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
     val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
     val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
     val restoredAccounts = AccountManager.restoreAccounts(accountManagerStore, password)

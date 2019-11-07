@@ -85,8 +85,8 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins + tokens) for multiple accounts") {
 
-    val seed = "seed0"
-    val alsoSeed = "seed1"
+    val seed = "another accuse index island little scissors insect little absurd island keep valid"
+    val alsoSeed = "another accuse index island little island absurd little absurd scissors keep valid"
 
     val dir = FileHelper.getRandomTempDir
 
