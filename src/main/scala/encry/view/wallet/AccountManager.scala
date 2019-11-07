@@ -84,7 +84,7 @@ object AccountManager {
       }
     }._1
 
-  def apply(store: Store, password: String, seedOpt: Option[String], number: Byte): AccountManager = {
+  private[wallet] def apply(store: Store, password: String, seedOpt: Option[String], number: Byte): AccountManager = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
       Blake2b256.hash(
         seedOpt
