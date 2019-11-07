@@ -17,7 +17,8 @@ import scala.concurrent.Future
 import scala.util.Random
 
 case class WalletInfoApiRoute(dataHolder: ActorRef,
-                              restApiSettings: RESTApiSettings)(implicit val context: ActorRefFactory)
+                              restApiSettings: RESTApiSettings,
+                              intrinsicTokenId: String)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") { infoR ~ getUtxosR }
@@ -32,7 +33,12 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
     getWallet
       .map { w =>
         Map(
-          "balances" -> w.getBalances.map(i => s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}").asJson,
+          "balances" -> w.getBalances.map{ i =>
+            if (i._1._2 != intrinsicTokenId)
+              s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}"
+            else
+              s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
+          }.asJson,
           "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
         ).asJson
       }
