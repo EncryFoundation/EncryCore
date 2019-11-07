@@ -2,13 +2,21 @@ package encry.view.wallet
 
 import java.io.File
 
-import cats.implicits._
+import cats.data.{ NonEmptyChain, Validated }
+import cats.syntax.either._
+import cats.syntax.option._
+import cats.syntax.apply._
+import cats.syntax.validated._
+import cats.data.NonEmptyChain._
+import cats.syntax.foldable._
+import cats.instances.string._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.Mnemonic
 import io.iohk.iodb.{LSMStore, Store}
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
@@ -21,8 +29,8 @@ import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
-import scala.util.{Failure, Success}
 
+import scala.util.{Failure, Success}
 import scala.util.Try
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
@@ -30,12 +38,12 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   assert(accountManagers.nonEmpty)
 
-  def addAccount(seed: String, password: String): Option[EncryWallet] = if (accountManagers.map(_.number).max < Byte.MaxValue) {
-    val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
-    this.copy(accountManagers = accountManagers :+ newAccount).some
-  } else {
-    logger.warn("Maximum number of accounts exceeded")
-    None
+  def addAccount(seed: String, password: String): Either[String, EncryWallet] = validateMnemonicKey(seed) match {
+    case Right(_) if accountManagers.map(_.number).max < Byte.MaxValue =>
+      val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
+      this.copy(accountManagers = accountManagers :+ newAccount).asRight[String]
+    case Right(_) => "Maximum number of accounts exceeded".asLeft[EncryWallet]
+    case Left(reasons) => s"Invalid mnemonic, problems are:\n${reasons.mkString_("\n")}".asLeft[EncryWallet]
   }
 
   def publicKeys: Set[PublicKey25519] = accountManagers.flatMap(_.publicAccounts).toSet
@@ -87,13 +95,23 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
     }
     (pubKeys.map(k => Algos.encode(k.pubKeyBytes)) -- positiveBalance.keys.map(_._1))
       .map(_ -> Algos.encode(settings.constants.IntrinsicTokenId) -> 0L).toSeq ++ positiveBalance
-  }
+  }.sortBy(_._1._1 != Algos.encode(accountManagers.head.publicAccounts.head.pubKeyBytes))
 
   def contractHashesToKeys(pubKeys: Set[PublicKey25519]): Map[String, String] = pubKeys
     .map(key => Algos.encode(key.pubKeyBytes) -> key.address.address)
     .map { case (key, addr) =>
       Algos.encode(EncryProposition.addressLocked(addr).contractHash) -> key
     }.toMap
+
+  private def validateMnemonicKey(mnemonic: String): Either[NonEmptyChain[String], String] = {
+    val words: Array[String] = mnemonic.split(" ")
+    val isValidSize: Validated[NonEmptyChain[String], String] =
+      if (words.length == 12) mnemonic.validNec else "Wrong words size".invalidNec
+    val isValidWords: Validated[NonEmptyChain[String], String] =
+      if (words.forall(word => Mnemonic.getWords.contains(word))) mnemonic.validNec
+      else "Several words don't contain in available words".invalidNec
+    (isValidSize, isValidWords).mapN { case (_, mnemonic) => mnemonic }
+  }.toEither
 
   override def close(): Unit = walletStorage.close()
 }

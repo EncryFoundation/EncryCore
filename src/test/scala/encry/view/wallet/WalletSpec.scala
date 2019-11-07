@@ -95,7 +95,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val blockHeader: Header = genHeader
 
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
-      .addAccount(seed, settings.wallet.map(_.password).get).get
+      .addAccount(seed, settings.wallet.map(_.password).get).toOption.get
 
     val keyManagerOne = wallet.accountManagers.head
 
