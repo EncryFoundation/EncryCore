@@ -1,5 +1,7 @@
 package encry.api.http.routes
 
+import java.io.File
+import java.security.Security
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorRef, ActorRefFactory, ActorSystem}
@@ -8,10 +10,10 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequ
 import akka.http.scaladsl.server.{Directive, Directive1, HttpApp, Route, StandardRoute, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPermissionedUsers, GetMinerStatus, StartMiner, StopMiner}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPermissionedUsers, GetMinerStatus, GetNodePass, StartMiner, StopMiner}
 import encry.local.miner.Miner.MinerStatus
 import scalatags.Text.all.{div, span, td, _}
-import encry.settings.{NodeSettings, RESTApiSettings}
+import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings, RESTApiSettings}
 import io.circe.Decoder.Result
 import io.circe.Json
 import scalatags.{Text, generic}
@@ -22,8 +24,10 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
 import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
 import akka.http.scaladsl.server.Directives.{complete, optionalCookie}
 import encry.api.http.routes.WebRoute.{isTokenExpired, isTokenValid}
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 
+import scala.collection.immutable.{HashMap, HashSet}
 import scala.concurrent.{Await, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
@@ -46,33 +50,20 @@ case class InfoApi(name: String,
                    knownPeers: Seq[String]
                   )
 
-case class LoginRequest(a: String, b: String)
-
 case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
-// JWT
-  val superSecretPasswordDb = Map(
-    "admin" -> "admin",
-    "daniel" -> "Rockthejvm1!"
-  )
+
+  // Bouncycastle is not included by default. Add it for each test.
+  if (Security.getProvider("BC") == null) {
+    Security.addProvider(new BouncyCastleProvider())
+  }
+
+  def getPass: Future[Either[Throwable, String]] = (dataHolder ? GetNodePass).mapTo[Either[Throwable, String]]
+
 
   val algorithm = JwtAlgorithm.HS256
   val secretKey = "encry"
-
-  def checkPassword(username: String, password: String): Boolean =
-    superSecretPasswordDb.contains(username) && superSecretPasswordDb(username) == password
-
-  def createToken(username: String, expirationPeriodInDays: Int): String = {
-    val claims = JwtClaim(
-      expiration = Some(System.currentTimeMillis() / 1000 + TimeUnit.DAYS.toSeconds(expirationPeriodInDays)),
-      issuedAt = Some(System.currentTimeMillis() / 1000),
-      issuer = Some("rockthejvm.com"),
-      subject = Some(username)
-    )
-
-    JwtSprayJson.encode(claims, secretKey, algorithm) // JWT string
-  }
 
   def isTokenExpired(token: String): Boolean = JwtSprayJson.decode(token, secretKey, Seq(algorithm)) match {
     case Success(claims) => claims.expiration.getOrElse(0L) < System.currentTimeMillis() / 1000
@@ -81,20 +72,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def isTokenValid(token: String): Boolean = JwtSprayJson.isValid(token, secretKey, Seq(algorithm))
 
-def loginForm = html(
-  scalatags.Text.all.head(
-    tag("title")("Login")
-  ),
-  body(
-    form(name := "input", action := "/token", attr("method") := "post", id := "loginForm",
-      label(`for` := "password", "Password:"),
-      input(tpe := "password", value := "", id := "password", name := "password"),
-      div(cls := "error"),
-      input(tpe := "submit", value := "Send")
-    )
-  )
-)
-  
   def sasjf = html(
     scalatags.Text.all.head(
       meta(charset := "utf-8"),
@@ -145,7 +122,7 @@ def loginForm = html(
                     div(cls := "form-group",
                       div(cls := "input-group input-group-alternative",
                         div(cls := "input-group-prepend",
-                          span(cls := "input-group-text",
+                          scalatags.Text.tags.span(cls := "input-group-text",
                             i(cls := "ni ni-lock-circle-open")
                           )
                         ),
@@ -153,7 +130,7 @@ def loginForm = html(
                       )
                     ),
                     div(cls := "text-center",
-                      button(tpe := "button", cls := "btn btn-primary my-4", "Sign in")
+                      button(tpe := "submit", cls := "btn btn-primary my-4", "Sign in")
                     )
                   )
                 )
@@ -206,27 +183,31 @@ def loginForm = html(
     )
   )
 
-  def login = (path("login") ) {
-    complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, sasjf.render))
+  def login = path("login") {
+        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, sasjf.render))
   }
 
   def loginRoute =
     (path("token") & post) {
-      println("111")
-      entity(as[String]) {
-        case x: String if checkPassword("admin", x.substring(9)) =>
-          println("222")
-          val token = createToken(x, 1)
-          respondWithHeader(RawHeader("Access-Token", token)) {
-            setCookie(HttpCookie("JWT", value = token)) {
-              redirect("/web", StatusCodes.PermanentRedirect)
+      onComplete(getPass) {
+        case Success(pass) =>
+        println(pass.right.get)
+        entity(as[String]) {
+          case x: String if pass.right.get == x.substring(9) =>
+            println("222")
+            val token = WebRoute.createToken(x, 1)
+            println(s"token = $token")
+            respondWithHeader(RawHeader("Access-Token", token)) {
+              println("here1")
+              setCookie(HttpCookie("JWT", value = token)) {
+                println("here2")
+                redirect("/web", StatusCodes.PermanentRedirect)
+              }
             }
-          }
-        case hui =>
-          println(s"HUI = $hui")
-          println(hui.substring(10))
-          println("333")
-          complete(StatusCodes.Unauthorized)
+        }
+        case Failure(exception) =>
+          println(exception + " exception")
+          complete(exception)
       }
     }
 
@@ -235,7 +216,11 @@ def loginForm = html(
       WebRoute.extractIp(
           WebRoute.authRoute(
             onComplete(currentInfoF) {
-            case Success(info) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl(info._1, info._2).render))
+            case Success(info) =>
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl(info._1, info._2).render))
+            case Failure(exception) =>
+              println("here exception")
+              complete(exception)
           })
       )
     }
@@ -307,7 +292,7 @@ def loginForm = html(
           div(cls := "container-fluid",
             // Toggler
             button(cls := "navbar-toggler", tpe := "button", data("toggle") := "collapse", data("target") := "#sidenav-collapse-main", aria.controls := "sidenav-main", aria.expanded := "false", aria.label := "Toggle navigation",
-              span(cls := "navbar-toggler-icon")
+              scalatags.Text.tags.span(cls := "navbar-toggler-icon")
             ),
             // Brand
             a(cls := "navbar-brand pt-0", href := "/web",
@@ -327,8 +312,8 @@ def loginForm = html(
                   ),
                   div(cls := "col-6 collapse-close",
                     button(tpe := "button", cls := "navbar-toggler", data("toggle") := "collapse", data("target") := "#sidenav-collapse-main", aria.controls := "sidenav-main", aria.expanded := "false", aria.label := "Toggle sidenav",
-                      span(),
-                      span()
+                      scalatags.Text.tags.span(),
+                      scalatags.Text.tags.span()
                     )
                   )
                 )
@@ -339,7 +324,7 @@ def loginForm = html(
                   input(tpe := "search", cls := "form-control form-control-rounded form-control-prepended", placeholder := "Search", aria.label := "Search"),
                   div(cls := "input-group-prepend",
                     div(cls := "input-group-text",
-                      span(cls := "fa fa-search")
+                      scalatags.Text.tags.span(cls := "fa fa-search")
                     )
                   )
                 )
@@ -395,11 +380,16 @@ def loginForm = html(
                       div(cls := "row",
                         div(cls := "col",
                           h5(cls := "card-title text-uppercase text-muted mb-0", "Node status"),
-                          if(nodeInfo.right.get.headersHeight == nodeInfo.right.get.fullHeight) {
-                            span(cls := "h2 font-weight-bold mb-0", "Synced")
+                          if(nodeInfo.right.get.headersHeight == 0 && nodeInfo.right.get.fullHeight == 0) {
+                            scalatags.Text.tags.span(cls := "h3 font-weight-bold mb-0", "Not Synced (calculating...)")
+                          }
+                          else if (nodeInfo.right.get.headersHeight == nodeInfo.right.get.fullHeight ) {
+                            scalatags.Text.tags.span(cls := "h3 font-weight-bold mb-0", "Synced")
                           }
                           else {
-                            span(cls := "h2 font-weight-bold mb-0", "Sync in progress")
+                            val int = (nodeInfo.right.get.fullHeight.toDouble/nodeInfo.right.get.headersHeight.toDouble)*100
+                            val percentage = BigDecimal(int).setScale(0, BigDecimal.RoundingMode.HALF_UP).toDouble.toInt.toString
+                            scalatags.Text.tags.span(cls := "h5 font-weight-bold mb-0", s"Sync in progress - $percentage%")
                           }
                         ),
                         div(cls := "col-auto",
@@ -417,7 +407,7 @@ def loginForm = html(
                       div(cls := "row",
                         div(cls := "col",
                           h5(cls := "card-title text-uppercase text-muted mb-0", "Blocks in chain"),
-                          span(cls := "h2 font-weight-bold mb-0", nodeInfo.right.get.fullHeight)
+                          scalatags.Text.tags.span(cls := "h2 font-weight-bold mb-0", nodeInfo.right.get.headersHeight)
                         ),
                         div(cls := "col-auto",
                           div(cls := "icon icon-shape bg-warning text-white rounded-circle shadow",
@@ -435,10 +425,10 @@ def loginForm = html(
                         div(cls := "col",
                           h5(cls := "card-title text-uppercase text-muted mb-0", "Mining status"),
                           if(nodeInfo.right.get.isMining) {
-                            span(cls := "text-success mr-2", "Enabled")
+                            scalatags.Text.tags.span(cls := "text-success mr-2", "Enabled")
                           }
                           else {
-                            span(cls := "text-warning mr-2", "Disabled")
+                            scalatags.Text.tags.span(cls := "text-warning mr-2", "Disabled")
                           }
                         ),
                         div(cls := "col-auto",
@@ -456,7 +446,7 @@ def loginForm = html(
                       div(cls := "row",
                         div(cls := "col",
                           h5(cls := "card-title text-uppercase text-muted mb-0", "Node name"),
-                          span(cls := "h3 font-weight-bold mb-0", nodeInfo.right.get.name)
+                          scalatags.Text.tags.span(cls := "h3 font-weight-bold mb-0", nodeInfo.right.get.name)
                         ),
                         div(cls := "col-auto",
                           div(cls := "icon icon-shape bg-info text-white rounded-circle shadow",
@@ -477,7 +467,7 @@ def loginForm = html(
                   button(tpe := "button",  cls := "btn-icon-clipboard", onclick:="stop();", id:="myButtonn", data("clipboard-text") := "button-play", title := "", data("original-title") := "Stop Mining",
                     div(
                       i(cls := "ni ni-button-pause"),
-                      span("Stop Mining")
+                      scalatags.Text.tags.span("Stop Mining")
                     )
                   )
                 ),
@@ -493,7 +483,7 @@ def loginForm = html(
          button(tpe := "button", cls := "btn-icon-clipboard", onclick:="start();", id:="myButton", data("clipboard-text") := "button-play", title := "", data("original-title") := "Start Mining",
            div(
              i(cls := "ni ni-button-play"),
-             span("Start Mining")
+             scalatags.Text.tags.span("Start Mining")
            )
          )
        ),
@@ -510,7 +500,7 @@ def loginForm = html(
        button(tpe := "button", cls := "btn-icon-clipboard", onclick:="shutdown()", id:="aaa", data("clipboard-text") := "button-play", title := "", data("original-title") := "Node Shutdown",
          div(
            i(cls := "ni ni-button-power"),
-           span("Node Shudown")
+           scalatags.Text.tags.span("Node Shudown")
          )
        )
      ),
@@ -692,6 +682,11 @@ object WebRoute  {
   import akka.http.scaladsl.model._
   import akka.http.scaladsl.server.Directives._
   // JWT
+  // Bouncycastle is not included by default. Add it for each test.
+  if (Security.getProvider("BC") == null) {
+    Security.addProvider(new BouncyCastleProvider())
+  }
+
   val superSecretPasswordDb = Map(
     "admin" -> "admin",
     "daniel" -> "Rockthejvm1!"
@@ -704,15 +699,16 @@ object WebRoute  {
     superSecretPasswordDb.contains(username) && superSecretPasswordDb(username) == password
 
   def createToken(username: String, expirationPeriodInDays: Int): String = {
-    val claims = JwtClaim(
-      expiration = Some(System.currentTimeMillis() / 1000 + TimeUnit.DAYS.toSeconds(expirationPeriodInDays)),
-      issuedAt = Some(System.currentTimeMillis() / 1000),
-      issuer = Some("rockthejvm.com"),
-      subject = Some(username)
-    )
+      val claims = JwtClaim(
+        expiration = Some(System.currentTimeMillis() / 1000 + TimeUnit.DAYS.toSeconds(expirationPeriodInDays)),
+        issuedAt = Some(System.currentTimeMillis() / 1000),
+        issuer = Some("rockthejvm.com"),
+        subject = Some(username)
+      )
 
-    JwtSprayJson.encode(claims, secretKey, algorithm) // JWT string
-  }
+      JwtSprayJson.encode(claims, secretKey, algorithm) // JWT string
+    }
+
 
   def isTokenExpired(token: String): Boolean = JwtSprayJson.decode(token, secretKey, Seq(algorithm)) match {
     case Success(claims) => claims.expiration.getOrElse(0L) < System.currentTimeMillis() / 1000

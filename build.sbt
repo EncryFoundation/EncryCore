@@ -10,8 +10,8 @@ val settings: Seq[Def.Setting[String]] = Seq(
 
 val encry = (project in file(".")).settings(settings: _*)
 
-val akkaVersion = "2.5.13"
-val akkaHttpVersion = "10.0.9"
+val akkaVersion = "2.5.23"
+val akkaHttpVersion = "10.1.10"
 val doobieVersion = "0.5.2"
 val logbackVersion = "1.2.3"
 val kamonVersion = "1.1.0"
@@ -61,7 +61,7 @@ libraryDependencies ++= Seq(
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "com.typesafe" % "config" % "1.3.3",
-  "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
+  //"org.bouncycastle" % "bcprov-jdk15on" % "1.60",
   "org.whispersystems" % "curve25519-java" % "0.5.0",
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
@@ -69,6 +69,7 @@ libraryDependencies ++= Seq(
   "com.lihaoyi" %% "scalatags" % "0.7.0",
   // JWT
   "com.pauldijou" %% "jwt-spray-json" % "2.1.0",
+  "org.bouncycastle" % "bcpkix-jdk15on" % "1.60",
   "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
   "org.encry" %% "encry-common" % "0.9.2",
   "org.scalatest" %% "scalatest" % "3.0.5",
@@ -129,7 +130,7 @@ outputStrategy := Some(StdoutOutput)
 
 connectInput in run := true
 
-assemblyJarName in assembly := "EncryCore.jar"
+assemblyJarName in assembly := "Encry.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 

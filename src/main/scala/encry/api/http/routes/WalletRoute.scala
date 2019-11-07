@@ -113,8 +113,9 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                  var a = document.forms["myForm"]["addr"].value;
                  var b = document.forms["myForm"]["fee"].value;
                  var x = document.forms["myForm"]["amount"].value;
+                 var token = document.forms["myForm"]["coinIds"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x);
+                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x+"&token="+token);
                 //    request.setRequestHeader('content-type', 'application/json');
                     request.send();
                      window.alert("Transaction has been sent successfully");
@@ -561,6 +562,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                       div(cls := "form-group",
                                         select(cls := "form-control",
                                           for (coinIds <- balances.keys.toList) yield {
+                                            println(coinIds)
                                             option(value := coinIds, if (coinIds == EttTokenId) "ETT" else coinIds)
                                           }
                                         )

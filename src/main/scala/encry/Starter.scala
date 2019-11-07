@@ -1,7 +1,7 @@
 package encry
 
-import akka.actor.{ Actor, ActorRef }
-import encry.settings.{ EncryAppSettings, NetworkSettings, NodeSettings, SnapshotSettings, WalletSettings }
+import akka.actor.{Actor, ActorRef}
+import encry.settings.{EncryAppSettings, NetworkSettings, NodeSettings, SnapshotSettings, WalletSettings}
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
@@ -9,18 +9,17 @@ import java.nio.file.Files
 import akka.http.scaladsl.Http
 import encry.api.http.DataHolderForApi
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{ prompt, StartListening }
+import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
-import encry.utils.{ Mnemonic, NetworkTimeProvider }
+import encry.utils.{Mnemonic, NetworkTimeProvider}
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
-
 import cats.Functor
 import cats.syntax.option._
 import cats.syntax.either._
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{NonEmptyChain, Validated}
 import cats.syntax.validated._
 import cats.instances.string._
 import cats.syntax.apply._
@@ -29,9 +28,11 @@ import cats.instances.future._
 
 import scala.concurrent.Future
 import encry.Starter.InitNodeResult
+import encry.api.http.DataHolderForApi.PasswordForLiorL00Storage
 import encry.view.wallet.AccountManager
 
 import scala.io.StdIn
+import scala.util.{Failure, Success, Try}
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
@@ -61,6 +62,7 @@ class Starter(settings: EncryAppSettings,
     for {
       walletPassword <- {
         println("Please, enter wallet password:")
+        println(s"${settings.network.declaredAddress.get} / ${settings.network.bindAddress}")
         readAndValidateInput(validatePassword)
       }
     } yield
@@ -70,7 +72,11 @@ class Starter(settings: EncryAppSettings,
         settings.node.offlineGeneration,
         fastSync = false,
         settings.network.knownPeers.toList,
-        settings.network.connectOnlyWithKnownPeers.getOrElse(false)
+        settings.network.connectOnlyWithKnownPeers.getOrElse(false),
+        "",
+        settings.network.nodeName.getOrElse(""),
+        settings.network.declaredAddress.get.getHostName,
+        settings.network.bindAddress.getHostName
       )
 
   def startEmptyNode: Either[Throwable, InitNodeResult] =
@@ -133,7 +139,7 @@ class Starter(settings: EncryAppSettings,
       val isValidWords: Validated[NonEmptyChain[String], String] =
         if (words.forall(word => Mnemonic.getWords.contains(word))) mnemonic.validNec
         else "Several words don't contain in available words".invalidNec
-      (isValidSize, isValidWords).mapN { case (_, mnemonic) => mnemonic }
+      (isValidSize, isValidWords).mapN { case (_, _) => mnemonic }
     }
 
     def readPeersToConnect: Either[Throwable, List[InetSocketAddress]] = {
@@ -195,27 +201,49 @@ class Starter(settings: EncryAppSettings,
         println("Do you want to connect only with known peers? Yes or no")
         readAnswer
       }
-    } yield InitNodeResult(mnemonicKey, walletPassword, startOwnChain, enableFastSync, peers, connectWithOnlyKnownPeers)
+    } yield InitNodeResult(mnemonicKey, walletPassword, startOwnChain, enableFastSync, peers, connectWithOnlyKnownPeers, nodeName = "Default", declaredAddr = "ip", bindAddr = "ip")
   }
 
   def startWithHttpApi: Either[Throwable, InitNodeResult] = {
     println("Empty node will start with HTTP Api.")
     initHttpApiServer = EncryApp.tmpServer(self).some
-    println(s"Server started at: 0.0.0.0:9051/something")
+    println(s"Server started at: http://0.0.0.0:9051/config")
     new Exception("Node started with http api").asLeft[InitNodeResult]
   }
 
   override def preStart(): Unit = startNode()
 
   override def receive: Receive = {
-    case InitNodeResult(mnemonic, password, offlineGeneration, fastSync, peers, connectWithOnlyKnownPeers) =>
+    case InitNodeResult(mnemonic, password, offlineGeneration, fastSync, peers, connectWithOnlyKnownPeers, nodePass, nodeName, declaredAddr, bindAddr) =>
+      import scala.concurrent.duration._
       println("Got accumulated info.")
-      Functor[Option].compose[Future].map(initHttpApiServer)(_.unbind())
+      Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
+     val declared = Try {
+        val declaredSpl = declaredAddr.split(":")
+        (declaredSpl(0), declaredSpl(1).toInt)
+     } match {
+       case Success((host, port)) => new InetSocketAddress(host, port)
+       case Failure(_) =>            new InetSocketAddress("192.168.22.22", 9001)
+     }
+      val bind = Try {
+        val bindSpl = bindAddr.split(":")
+        (bindSpl(0), bindSpl(1).toInt)
+      } match {
+        case Success((host, port)) => new InetSocketAddress(host, port)
+        case Failure(_) =>            new InetSocketAddress("192.168.22.22", 9001)
+      }
+      println(s"${nodeName}/ $declared / $bind")
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings =
-        settings.network.copy(knownPeers = peers, connectOnlyWithKnownPeers = connectWithOnlyKnownPeers.some)
+        settings.network.copy(
+          knownPeers = peers,
+          connectOnlyWithKnownPeers = connectWithOnlyKnownPeers.some,
+          nodeName = nodeName.some,
+          declaredAddress = declared.some,
+          bindAddress = bind)
+      println(s"netword settings = $networkSettings")
       val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
       val newSettings = settings.copy(
         wallet = walletSettings,
@@ -238,6 +266,8 @@ class Starter(settings: EncryAppSettings,
           .withDispatcher("nvh-dispatcher"),
         "nodeViewHolder"
       )
+
+     if(nodePass.nonEmpty) dataHolderForApi ! PasswordForLiorL00Storage(nodePass)
 
       context.system.actorOf(
         NodeViewSynchronizer
@@ -262,5 +292,9 @@ object Starter {
                                   offlineGeneration: Boolean,
                                   fastSync: Boolean,
                                   peers: List[InetSocketAddress],
-                                  connectWithOnlyKnownPeers: Boolean)
+                                  connectWithOnlyKnownPeers: Boolean,
+                                  nodePass: String = "",
+                                  nodeName: String,
+                                  declaredAddr: String,
+                                  bindAddr: String)
 }

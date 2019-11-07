@@ -22,7 +22,7 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.language.postfixOps
 
-object EncryApp extends App with StrictLogging {
+object EncryApp extends App with StrictLogging  {
 
   implicit val system: ActorSystem             = ActorSystem()
   implicit val ec: ExecutionContextExecutor    = system.dispatcher
@@ -64,7 +64,8 @@ object EncryApp extends App with StrictLogging {
     }
 
     val apiRoutes: Seq[ApiRoute] = Seq(
-      WebRoute(settings.restApi, settings.node, starter)
+      ConfigRoute(settings.restApi, starter),
+      ArgonRoute(settings.restApi)
     )
     Http().bindAndHandle(
       CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,

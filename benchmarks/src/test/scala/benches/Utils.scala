@@ -120,7 +120,9 @@ object Utils extends Settings with StrictLogging {
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ BigInt(1),
-      EquihashSolution(Seq(1, 3)))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
+    )
     Block(header, Payload(header.id, transactions))
   }
 
@@ -152,7 +154,8 @@ object Utils extends Settings with StrictLogging {
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ (BigInt(1) + addDiff),
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
     Block(header, Payload(header.id, transactions))
   }
@@ -222,7 +225,8 @@ object Utils extends Settings with StrictLogging {
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
       settings.constants.InitialDifficulty,
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
   }
 
@@ -423,6 +427,7 @@ object Utils extends Settings with StrictLogging {
     new History {
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
+      override val settings: EncryAppSettings = settings
     }
   }
 

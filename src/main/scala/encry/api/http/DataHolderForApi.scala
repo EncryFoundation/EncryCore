@@ -2,7 +2,7 @@ package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props, Stash}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi._
@@ -34,7 +34,8 @@ import scorex.utils.Random
 
 import scala.concurrent.Future
 
-class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging
+with Stash {
 
   implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
@@ -49,11 +50,17 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
 
   override def postStop(): Unit = liorl00Dir.storage.close()
 
-  final case class PasswordForLiorL00Storage(password: String)
-
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
+      unstashAll()
     context.become(workingCycle(nvhRef = sender(), history = Some(history)))
+    case PasswordForLiorL00Storage(pass) =>
+      println(s"stash $PasswordForLiorL00Storage")
+      stash()
+    case GetNodePass =>
+      println("2222 " + liorl00Dir.getPassword)
+      sender() ! liorl00Dir.getPassword
+    case i => println(i)
   }
 
   def workingCycle(nvhRef: ActorRef,
@@ -68,7 +75,13 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(workingCycle(nvhRef, blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
 
-    case PasswordForLiorL00Storage(pass) => liorl00Dir.putPassword(pass)
+    case GetNodePass =>
+      sender() ! liorl00Dir.getPassword
+      println(liorl00Dir.getPassword)
+
+    case PasswordForLiorL00Storage(pass) =>
+      println(s"nodePass is: $pass")
+      liorl00Dir.putPassword(pass)
 
     case BlockAndHeaderInfo(header, block) =>
       context.become(
@@ -179,7 +192,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
         .pipeTo(sender)
 
     case GetAllPermissionedUsers =>
-      println("permissioned users " + permissionedUsers)
       sender() ! permissionedUsers
 
     case GetBannedPeersHelperAPI =>
@@ -260,7 +272,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) ext
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
     case PeerBanHelper(peer, msg)    =>
-      println("aaa")
       println(blackList)
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMiner =>
@@ -320,9 +331,13 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class AddUser(ip: String)
 
+  final case class PasswordForLiorL00Storage(password: String)
+
   case class PeerBanHelper(addr: InetSocketAddress, msg: String)
 
   case object GetViewSendTx
+
+  case object GetNodePass
 
   case object GetAllPermissionedUsers
 

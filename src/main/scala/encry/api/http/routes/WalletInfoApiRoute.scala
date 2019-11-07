@@ -9,6 +9,7 @@ import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import akka.util.Timeout
+import cats.Applicative
 import io.circe.parser
 import io.circe.generic.auto._
 import com.typesafe.scalalogging.StrictLogging
@@ -30,11 +31,10 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 
 import scala.concurrent.duration._
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 
@@ -51,7 +51,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
-     infoR ~ loginRoute ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ createTokenR ~ dataTransactionR
+     infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ createTokenR ~ dataTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -91,67 +91,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   }
 
   case class LoginRequest(a:String, b:String)
-
-  // JWT
-  val superSecretPasswordDb = Map(
-    "admin" -> "admin",
-    "daniel" -> "Rockthejvm1!"
-  )
-
-  val algorithm = JwtAlgorithm.HS256
-  val secretKey = "encry"
-
-  def checkPassword(username: String, password: String): Boolean =
-    superSecretPasswordDb.contains(username) && superSecretPasswordDb(username) == password
-
-  def createToken(username: String, expirationPeriodInDays: Int): String = {
-    val claims = JwtClaim(
-      expiration = Some(System.currentTimeMillis() / 1000 + TimeUnit.DAYS.toSeconds(expirationPeriodInDays)),
-      issuedAt = Some(System.currentTimeMillis() / 1000),
-      issuer = Some("rockthejvm.com"),
-      subject = Some(username)
-    )
-
-    JwtSprayJson.encode(claims, secretKey, algorithm) // JWT string
-  }
-
-  def isTokenExpired(token: String): Boolean = JwtSprayJson.decode(token, secretKey, Seq(algorithm)) match {
-    case Success(claims) => claims.expiration.getOrElse(0L) < System.currentTimeMillis() / 1000
-    case Failure(_) => true
-  }
-
-  def isTokenValid(token: String): Boolean = JwtSprayJson.isValid(token, secretKey, Seq(algorithm))
-
-  def loginRoute =
-    post {
-      entity(as[LoginRequest]) {
-        case LoginRequest(username, password) if checkPassword(username, password) =>
-          val token = createToken(username, 1)
-          respondWithHeader(RawHeader("Access-Token", token)) {
-            complete(StatusCodes.OK)
-          }
-        case _ => complete(StatusCodes.Unauthorized)
-      }
-    }
-
-  val authenticatedRoute =
-    (path("secureEndpoint") & get) {
-      optionalHeaderValueByName("Authorization") {
-        case Some(token) =>
-          if (isTokenValid(token)) {
-            if (isTokenExpired(token)) {
-              complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
-            } else {
-              complete("User accessed authorized endpoint!")
-            }
-          } else {
-            complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid, or has been tampered with."))
-          }
-        case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
-      }
-    }
-
-  //  JWT
 
   def createTokenR: Route = (path("createToken") & get) {
     parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>
@@ -206,28 +145,47 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       complete(s"Tx with data  has been sent!!'")
     }
   }
-
+  import cats.implicits._
   def transferR: Route = (path("transfer") & get) {
-    parameters('addr, 'fee.as[Int], 'amount.as[Long]) { (addr, fee, amount) =>
+    parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) { (addr, fee, amount, token) =>
       (dataHolder ?
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
-            val boxes: IndexedSeq[AssetBox] = wallet.vault.walletStorage
+            val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
+              case Success(value) => ADKey @@ value
+              case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")
+            })
+            val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
               .getAllBoxes()
-              .filter(_.isInstanceOf[AssetBox])
-              .map(_.asInstanceOf[AssetBox])
-              .foldLeft(Seq[AssetBox]()) {
-                case (seq, box) =>
-                  if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
-              }
+              .collect {
+                case ab: AssetBox if ab.tokenIdOpt.isEmpty ||
+                  Applicative[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
+                case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
+              }.foldLeft(Seq[MonetaryBox]()) {
+              case (seq, box) if decodedTokenOpt.isEmpty =>
+                if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
+              case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
+                if (seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.isEmpty).map(_.amount).sum < fee) seq :+ box else seq
+              case (seq, box: AssetBox) =>
+                val totalAmount =
+                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                if (totalAmount < amount) seq :+ box else seq
+              case (seq, box: TokenIssuingBox) =>
+                val totalAmount =
+                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                if (totalAmount < amount) seq :+ box else seq
+            }
               .toIndexedSeq
             TransactionFactory.defaultPaymentTransaction(secret,
               fee,
               System.currentTimeMillis(),
               boxes.map(_ -> None),
               addr,
-              amount)
+              amount,
+              decodedTokenOpt)
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
