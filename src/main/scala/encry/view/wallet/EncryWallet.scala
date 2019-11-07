@@ -12,19 +12,16 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import io.iohk.iodb.{LSMStore, Store}
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 import scala.util.Try
 
