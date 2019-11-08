@@ -1,26 +1,23 @@
 package encry.view.state
 
-import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.StorageKey
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.CoreTaggedTypes.VersionTag
+import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
-import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryBox}
+import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
-import scorex.crypto.hash.Digest32
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
 
 trait UtxoStateReader {
 
   implicit val hf: Algos.HF = Algos.hash
 
-  var height: Height
+  val tree: AvlTree[StorageKey, StorageValue]
 
-  protected val storage: VersionalStorage
+  def version: VersionTag = VersionTag !@@ tree.storage.currentVersion
 
-  def version: VersionTag = VersionTag !@@ storage.currentVersion
-
-  def boxById(boxId: ADKey): Option[EncryBaseBox] = storage.get(StorageKey !@@ boxId)
+  def boxById(boxId: ADKey): Option[EncryBaseBox] = tree.get(StorageKey !@@ boxId)
     .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
 
   def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] = ids.foldLeft(Seq[EncryBaseBox]())((acc, id) =>

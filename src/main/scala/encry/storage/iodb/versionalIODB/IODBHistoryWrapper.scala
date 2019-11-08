@@ -38,4 +38,6 @@ case class IODBHistoryWrapper(store: Store, objectStore: Store) extends Versiona
     iodbWrapper.close()
     objectStore.close()
   }
+
+  override def getAllKeys(maxQty: Int): Iterator[StorageKey] = iodbWrapper.getAllKeys()
 }

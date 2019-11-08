@@ -30,7 +30,7 @@ object DMUtils extends InstanceFactory {
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     else deliveryManager ! DisableMining
-    if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced()
+    if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
     (deliveryManager, history)
   }
 

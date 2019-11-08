@@ -17,6 +17,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
+import supertagged.@@
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
@@ -27,13 +28,13 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, ProgressInfo] = {
+  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header   =>
-        logger.info(s"Process header in history.append at height ${header.height}")
-        processHeader(header)
-      case payload: Payload => processPayload(payload)
+        logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
+        (this, processHeader(header))
+      case payload: Payload => (this, processPayload(payload))
     })
   }
 
@@ -70,7 +71,7 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
             // Modifiers from best header and best full chain are involved, links change required.
             val newBestHeader: Header =
               loopHeightDown(getBestHeaderHeight, id => !invalidatedHeaders.exists(_.id sameElements id))
-                .ensuring(_.isDefined, "Were unable to find new best header, can't invalidate genesis block")
+                .ensuring(_.isDefined, "Where unable to find new best header, can't invalidate genesis block")
                 .get
 
             if (!bestFullIsInvalidated) {
@@ -101,7 +102,7 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
             }
         }
       case None =>
-        logger.info(s"No headers become invalid. Just mark this particular modifier as invalid.")
+        // No headers become invalid. Just mark this particular modifier as invalid.
         historyStorage.insert(
           StorageVersion @@ validityKey(modifier.id).untag(StorageKey),
           List(validityKey(modifier.id) -> StorageValue @@ Array(0.toByte))
@@ -134,6 +135,18 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
         )
         this
     }
+  }
+
+  def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
+    logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
+    val modsRaw: List[(StorageKey, StorageValue)] =
+      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+    val bestBlock = BestBlockKey -> StorageValue @@ headerId
+    historyStorage.insert(
+      StorageVersion @@ validityKey(payloadId).untag(StorageKey),
+      bestBlock :: modsRaw
+    )
+    this
   }
 
   override def close(): Unit = historyStorage.close()

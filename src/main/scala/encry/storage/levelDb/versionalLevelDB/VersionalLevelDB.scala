@@ -98,10 +98,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       }
       newElem.elemsToDelete.foreach { elemKey =>
         val possibleMap = db.get(userKey(elemKey), readOptions)
-        val accessMap =
-          if (possibleMap != null) util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
-          else Array.emptyByteArray
-        batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
+        if (possibleMap != null) {
+          val accessMap = util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
+          batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
+        } else
+          logger.info(s"trying to delete empty key ${Algos.encode(elemKey)} in ver ${Algos.encode(newElem.version)}")
       }
       db.write(batch)
       clean()
@@ -147,9 +148,10 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           writeBatch.delete(accessableElementKeyForVersion(versionToResolve, VersionalLevelDbKey @@ elemKey))
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
           //only one version contains elem with this key, so remove it
-          if (accessMap.length == settings.versionKeySize + 1)
+          if (accessMap.length == settings.versionKeySize + 1) {
             writeBatch.delete(userKey(VersionalLevelDbKey @@ elemKey))
-          else {
+            writeBatch.delete(accessableElementKeyForVersion(versionToResolve, VersionalLevelDbKey @@ elemKey))
+          } else {
             val versions =
               splitValue2elems(settings.versionKeySize, accessMap.drop(1)).map(ver => new ByteArrayWrapper(ver))
                 .dropWhile(_ != new ByteArrayWrapper(versionToResolve))
@@ -162,8 +164,13 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
         deletions.foreach { elemKey =>
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
-          writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
+          logger.info(s"accessMap of key(delete) ${Algos.encode(elemKey)} in rollback resolver is: " +
+            s"${if (accessMap != null) Algos.encode(accessMap) else null}")
+          if (accessMap != null)
+            writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
         }
+        writeBatch.delete(versionKey(versionToResolve))
+        writeBatch.delete(versionDeletionsKey(versionToResolve))
         db.write(writeBatch)
         if (versionsToResolve.nonEmpty) rollbackResolver(versionsToResolve.drop(1))
       } finally {
@@ -191,15 +198,20 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         getInaccessiableKeysInVersion(versionToResolve, readOptions)
       deletionsByThisVersion.foreach { key =>
         val elemMap = db.get(userKey(key), readOptions)
-        val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
-          .map(ver => new ByteArrayWrapper(ver))
-        val elemVersions = wrappedVersions.filter(currentVersions.contains)
-        val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
-        toDeleteElemsVersions.foreach(toDelWrapped =>
-          batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
-        )
-        if (elemVersions.isEmpty) batch.delete(userKey(key))
-        else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+        if (elemMap != null) {
+          val wrappedVersions = splitValue2elems(settings.versionKeySize, elemMap.drop(1))
+            .map(ver => new ByteArrayWrapper(ver))
+          val elemVersions = wrappedVersions.filter(currentVersions.contains)
+          val toDeleteElemsVersions = wrappedVersions.filterNot(currentVersions.contains)
+          toDeleteElemsVersions.foreach(toDelWrapped =>
+            batch.delete(accessableElementKeyForVersion(LevelDBVersion @@ toDelWrapped.data, key))
+          )
+          if (elemVersions.isEmpty) {
+            batch.delete(userKey(key))
+            batch.delete(accessableElementKeyForVersion(versionToResolve, key))
+          }
+          else batch.put(userKey(key), elemMap.head +: elemVersions.foldLeft(Array.emptyByteArray) { case (acc, ver) => acc ++ ver.data })
+        }
       }
       val insertionsByThisVersion =
         splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
@@ -209,7 +221,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
           logger.info(s"NULL at key: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
         }
         val elemFlag = elemInfo.head
-        val elemMap = elemInfo.drop(1)
+        val elemMap = util.Arrays.copyOfRange(elemInfo, 1, elemInfo.length + 1)
+        //val elemMap = elemInfo.drop(1)
         if (elemMap.length > settings.versionKeySize) {
           val elemVersions = splitValue2elems(settings.versionKeySize, elemMap).map(ByteArrayWrapper.apply)
           elemVersions.dropWhile(_ != wrappedVer).drop(1).foreach {
@@ -290,7 +303,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
   }
 
   /**
-    * Rollback to some point, just change current version to rollbackPoint, otherwise throw exeption
+    * Rollback to some point, just change current version to rollbackPoint, otherwise throw exception
     *
     * @param rollbackPoint
     */
@@ -397,8 +410,6 @@ object VersionalLevelDBCompanion {
   val INACCESSIBLE_KEY_PREFIX: Byte = 3
   val USER_KEY_PREFIX: Byte = 4
 
-  val DELETION_PREFIX = Algos.hash("DELETION_SET")
-
   // Initial version id
   def INIT_VERSION(KEY_SIZE: Int = DEFAULT_VERSION_KEY_SIZE): LevelDBVersion = LevelDBVersion @@ Array.fill(KEY_SIZE)(0: Byte)
 
@@ -411,6 +422,8 @@ object VersionalLevelDBCompanion {
   //Key, which set concatenation of fixed length keys, witch contains all acceptable versions
   val VERSIONS_LIST: VersionalLevelDbKey =
     VersionalLevelDbKey @@ (SERVICE_PREFIX +: Algos.hash("VERSIONS"))
+
+  val DELETION_PREFIX = Algos.hash("DELETION_SET")
 
   /**
     * Initial keys

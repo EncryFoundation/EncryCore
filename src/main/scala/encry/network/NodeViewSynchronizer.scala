@@ -1,5 +1,6 @@
 package encry.network
 
+import HeaderProto.HeaderProtoMessage
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
@@ -19,8 +20,6 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
-import encry.view.actors.NodeViewHolder.DownloadRequest
-import encry.view.actors.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._
@@ -31,9 +30,13 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.fast.sync.SnapshotHolder
+import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks, UpdateSnapshot}
+import scala.util.Try
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
                            nodeViewHolderRef: ActorRef,
@@ -47,6 +50,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
+
+  val snapshotHolder: ActorRef = context.system.actorOf(SnapshotHolder.props(settings, networkController, nodeViewHolderRef, self)
+  .withDispatcher("snapshot-holder-dispatcher"), "snapshotHolder")
 
   networkController ! RegisterMessagesHandler(Seq(
     InvNetworkMessage.NetworkMessageTypeID -> "InvNetworkMessage",
@@ -74,16 +80,16 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    context.system.eventStream.subscribe(self, classOf[FullBlockChainIsSynced])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
   override def receive: Receive = awaitingHistoryCycle
 
   def awaitingHistoryCycle: Receive = {
-    case ChangedHistory(reader: History) =>
+    case msg@ChangedHistory(reader: History) =>
       logger.info(s"get history: $reader from $sender")
       deliveryManager ! UpdatedHistory(reader)
+      snapshotHolder ! msg
       downloadedModifiersValidator ! UpdatedHistory(reader)
       context.become(workingCycle(reader))
     case msg@RegisterMessagesHandler(_, _) => networkController ! msg
@@ -130,11 +136,17 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             memoryPoolRef ! RequestModifiersForTransactions(remote, unrequestedModifiers)
           case Payload.modifierTypeId =>
             getModsForRemote(unrequestedModifiers).foreach(_.foreach {
-              case (id, bytes) => remote.handlerRef ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
+              case (id, bytes) =>
+                remote.handlerRef ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
             })
-          case tId => getModsForRemote(unrequestedModifiers).foreach(modifiers =>
+          case tId => getModsForRemote(unrequestedModifiers).foreach { modifiers =>
+            modifiers.foreach(k =>
+              logger.info(s"Response to ${remote.socketAddress} header ${
+                Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(k._2)))
+              }")
+            )
             remote.handlerRef ! ModifiersNetworkMessage(tId -> modifiers)
-          )
+          }
         }
 
         def getModsForRemote(ids: Seq[ModifierId]): Option[Map[ModifierId, Array[Byte]]] = Option(history)
@@ -142,10 +154,9 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             val modifiers: Map[ModifierId, Array[Byte]] = unrequestedModifiers
               .view
               .map(id => id -> historyStorage.modifierBytesById(id))
-              .collect { case (id, mod) if mod.isDefined => id -> mod.get }
+              .collect { case (id, mod) if mod.isDefined => id -> mod.get}
               .toMap
-            logger.info(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
-            logger.debug(s"Sent modifiers are: ${modifiers.map(t => Algos.encode(t._1)).mkString(",")}.")
+            logger.debug(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
             modifiers
           }
 
@@ -171,10 +182,12 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         s" peers for first sync info message. Resending $msg to peers keeper.")
       peersKeeper ! msg
     case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
+    case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
       deliveryManager ! msg
+    case msg@TreeChunks(l, b) => snapshotHolder ! msg
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
@@ -183,6 +196,14 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
     case msg@SendLocalSyncInfo => peersKeeper ! msg
     case msg@RemovePeerFromBlackList(_) => peersKeeper ! msg
+    case msg@RequiredManifestHeightAndId(_, _) => snapshotHolder ! msg
+    case msg@SendToNetwork(_, _) =>
+      logger.info(s"NVSH got SendToNetwork")
+      peersKeeper ! msg
+    case msg@HeaderChainIsSynced =>
+      snapshotHolder ! msg
+    case msg@UpdateSnapshot(_, _) => snapshotHolder ! msg
+    case msg@FastSyncDone => snapshotHolder ! FastSyncDone
     case ChangedHistory(reader: History@unchecked) if reader.isInstanceOf[History] =>
       deliveryManager ! UpdatedHistory(reader)
       downloadedModifiersValidator ! UpdatedHistory(reader)
@@ -194,10 +215,11 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
     case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
-    case FullBlockChainIsSynced() =>
+    case FullBlockChainIsSynced =>
       chainSynced = true
-      deliveryManager ! FullBlockChainIsSynced()
-      peersKeeper ! FullBlockChainIsSynced()
+      deliveryManager ! FullBlockChainIsSynced
+      peersKeeper ! FullBlockChainIsSynced
+      if (!settings.snapshotSettings.enableFastSynchronization) snapshotHolder ! FullBlockChainIsSynced
     case StopTransactionsValidation =>
       deliveryManager ! StopTransactionsValidation
       canProcessTransactions = false
@@ -253,7 +275,7 @@ object NodeViewSynchronizer {
 
     case class ChangedHistory(reader: History) extends NodeViewChange
 
-    case class UpdatedHistory(history: History)
+    final case class UpdatedHistory(history: History) extends AnyVal
 
     case class ChangedState(reader: UtxoState) extends NodeViewChange
 

@@ -34,6 +34,10 @@ case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
     )
   }
 
+  override def getAllKeys(maxQty: Int = -1): Iterator[StorageKey] = {
+    vldb.getCurrentElementsKeys(maxQty).map { key => StorageKey @@ key.untag(VersionalLevelDbKey) }
+  }.toIterator
+
   //by default return all elems
   override def getAll(maxQty: Int = -1): Iterator[(StorageKey, StorageValue)] =
     vldb.getAll(maxQty).map{ case (key, value) =>

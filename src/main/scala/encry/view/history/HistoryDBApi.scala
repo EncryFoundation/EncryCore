@@ -2,7 +2,7 @@ package encry.view.history
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.Settings
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage.StorageKey
 import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -12,7 +12,7 @@ import scorex.crypto.hash.Digest32
 
 import scala.reflect.ClassTag
 
-trait HistoryDBApi extends Settings with StrictLogging {
+trait HistoryDBApi extends StrictLogging with Settings {
 
   val historyStorage: HistoryStorage
 
@@ -63,6 +63,8 @@ trait HistoryDBApi extends Settings with StrictLogging {
     .map(_.grouped(32).map(ModifierId @@ _).toSeq)
 
   def getBestHeaderIdAtHeightDB(h: Int): Option[ModifierId] = headerIdsAtHeightDB(h).flatMap(_.headOption)
+
+  def getBestHeaderAtHeightDB(h: Int): Option[Header] = getBestHeaderIdAtHeightDB(h).flatMap(getHeaderByIdDB)
 
   def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeightDB(h.height)
     .exists(_.sameElements(h.id))

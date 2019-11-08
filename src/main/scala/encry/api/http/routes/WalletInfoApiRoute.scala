@@ -7,11 +7,12 @@ import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp.nodeViewHolder
 import encry.settings.RESTApiSettings
-import encry.view.actors.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
+
 import scala.concurrent.Future
 import scala.util.Random
 
