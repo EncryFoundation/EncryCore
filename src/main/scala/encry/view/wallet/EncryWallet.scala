@@ -2,7 +2,7 @@ package encry.view.wallet
 
 import java.io.File
 
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{NonEmptyChain, Validated}
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.apply._
@@ -18,7 +18,7 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLe
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Mnemonic
 import io.iohk.iodb.{LSMStore, Store}
-import encry.view.state.UtxoState
+import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -38,9 +38,11 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   assert(accountManagers.nonEmpty)
 
-  def addAccount(seed: String, password: String): Either[String, EncryWallet] = validateMnemonicKey(seed) match {
+  def addAccount(seed: String, password: String, state: UtxoStateReader): Either[String, EncryWallet] = validateMnemonicKey(seed) match {
     case Right(_) if accountManagers.map(_.number).max < Byte.MaxValue =>
       val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
+      val newAccPropositions = newAccount.publicAccounts.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes)).toSet
+      scanWalletFromUtxo(state, newAccPropositions)
       this.copy(accountManagers = accountManagers :+ newAccount).asRight[String]
     case Right(_) => "Maximum number of accounts exceeded".asLeft[EncryWallet]
     case Left(reasons) => s"Invalid mnemonic, problems are: ${reasons.mkString_(", ")}".asLeft[EncryWallet]
@@ -75,13 +77,15 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
     case _ => this
   }
 
-  def scanWalletFromUtxo(state: UtxoState): EncryWallet = {
-    val bxsToAdd = EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, propositions)
-    walletStorage.updateWallet(
-      ModifierId !@@ state.tree.storage.currentVersion,
-      bxsToAdd,
-      List.empty,
-      settings.constants.IntrinsicTokenId)
+  def scanWalletFromUtxo(state: UtxoStateReader, props: Set[EncryProposition]): EncryWallet = {
+    val bxsToAdd: Seq[EncryBaseBox] = EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, props)
+    if (bxsToAdd.nonEmpty)
+      walletStorage.updateWallet(
+        ModifierId !@@ state.tree.storage.currentVersion,
+        bxsToAdd,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
     this
   }
 

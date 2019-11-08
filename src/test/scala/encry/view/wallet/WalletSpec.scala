@@ -1,19 +1,25 @@
 package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp
 import encry.modifiers.InstanceFactory
 import encry.settings.{EncryAppSettings, LevelDBSettings, Settings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
+import encry.view.state.avlTree.{AvlTree, LeafNode}
+import encry.view.state.avlTree.utils.implicits.Hashable
+import encry.view.state.{UtxoState, UtxoStateReader}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, DataBox, DataBoxSerializer, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.scalatest.{Matchers, PropSpec}
+import org.mockito.Mockito._
+import org.scalatest.mockito.MockitoSugar
 
-class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging with Settings {
+class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging with Settings with MockitoSugar {
 
   val dummyLevelDBSettings = LevelDBSettings(5)
 
@@ -85,6 +91,17 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
   property("Balance count (intrinsic coins + tokens) for multiple accounts") {
 
+    val dataBox = DataBox(EncryProposition.heightLocked(Height @@ 10), 0L, Array.emptyByteArray)
+
+    import encry.view.state.avlTree.utils.implicits.Instances._
+
+    val rootNode: LeafNode[StorageKey, StorageValue] =
+      LeafNode(StorageKey @@ Array(DataBox.`modifierTypeId`), StorageValue @@ DataBoxSerializer.toBytes(dataBox))
+    val storageMock = mock[VersionalStorage]
+    val tree = AvlTree(rootNode, storageMock)
+    val stateMock = mock[UtxoStateReader](RETURNS_DEEP_STUBS)
+    when(stateMock.tree).thenReturn(tree)
+
     val seed = "another accuse index island little scissors insect little absurd island keep valid"
     val alsoSeed = "another accuse index island little island absurd little absurd scissors keep valid"
 
@@ -95,7 +112,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val blockHeader: Header = genHeader
 
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
-      .addAccount(seed, settings.wallet.map(_.password).get).toOption.get
+      .addAccount(seed, settings.wallet.map(_.password).get, stateMock).toOption.get
 
     val keyManagerOne = wallet.accountManagers.head
 

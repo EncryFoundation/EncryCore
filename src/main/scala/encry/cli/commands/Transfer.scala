@@ -17,7 +17,8 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Try}
+import scala.util.control.NonFatal
 
 object Transfer extends Command {
 
@@ -45,6 +46,10 @@ object Transfer extends Command {
             boxes.map(_ -> None),
             recipient,
             amount)
+        }.recoverWith {
+          case NonFatal(th) =>
+            th.printStackTrace()
+            Failure(th)
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>

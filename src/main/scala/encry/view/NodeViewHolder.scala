@@ -97,7 +97,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   def defaultMessages(canProcessPayloads: Boolean): Receive = {
     case CreateAccountManagerFromSeed(seed) =>
-      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get)
+      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)
       sender() ! newAccount
     case FastSyncFinished(state) =>
@@ -111,7 +111,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeView.history.isHeadersChainSyncedVar = true
           nodeView.history.isFastSync = false
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
-          val wallet = nodeView.wallet.scanWalletFromUtxo(state)
+          val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
           updateNodeView(
             updatedHistory = Some(history),
             updatedState = Some(state),
