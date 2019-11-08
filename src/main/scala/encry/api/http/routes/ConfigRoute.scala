@@ -22,6 +22,7 @@ import io.circe.parser
 import io.circe.generic.auto._
 
 import scala.language.implicitConversions
+import scala.util.{Failure, Success, Try}
 
 case class ConfigRoute(override val settings: RESTApiSettings, starter: ActorRef)(
   implicit val context: ActorRefFactory
@@ -88,7 +89,7 @@ val phrase: String =
                 };
 
     if (mnem == "") {
-       alert("${phrase}");
+       alert("Please, save it and don't show to anyone! : ${phrase}");
       var request = new XMLHttpRequest();
       request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&peer="+peer+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
       request.send();
@@ -157,11 +158,8 @@ val phrase: String =
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
-                                  span(cls := "input-group-text",
-                                    i(cls := "ni ni-lock-circle-open")
-                                  )
                                 ),
-                                input(cls := "form-control", placeholder := "Node name", id:="nodename", name:="nodename")
+                                input(cls := "form-control", placeholder := " Node name", id:="nodename", name:="nodename")
                               )
                             ),
                               //
@@ -170,11 +168,8 @@ val phrase: String =
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
-                                  span(cls := "input-group-text",
-                                    i(cls := "ni ni-lock-circle-open")
-                                  )
                                 ),
-                                input(cls := "form-control", placeholder := "Declared address", id:="declared", name:="declared")
+                                input(cls := "form-control", placeholder := " Declared address", id:="declared", name:="declared")
                               )
                             ),
                             //
@@ -183,11 +178,8 @@ val phrase: String =
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
-                                  span(cls := "input-group-text",
-                                    i(cls := "ni ni-lock-circle-open")
-                                  )
                                 ),
-                                input(cls := "form-control", placeholder := "Bind address", id:="bind", name:="bind")
+                                input(cls := "form-control", placeholder := " Bind address", id:="bind", name:="bind")
                               )
                             ),
                             //
@@ -260,21 +252,15 @@ val phrase: String =
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative mb-3",
                                   div(cls := "input-group-prepend",
-                                    span(cls := "input-group-text",
-                                      i(cls := "ni ni-money-coins")
-                                    )
                                   ),
-                                  input(cls := "form-control", id:="bibo", name:="host", placeholder := "Address", tpe := "text"),
+                                  input(cls := "form-control", id:="bibo", name:="host", placeholder := " Address", tpe := "text"),
                                 )
                               ),
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative",
                                   div(cls := "input-group-prepend",
-                                    span(cls := "input-group-text",
-                                      i(cls := "ni ni-credit-card")
-                                    )
                                   ),
-                                  input(cls := "form-control", id:="bobo", name:="port", placeholder := "Port"),
+                                  input(cls := "form-control", id:="bobo", name:="port", placeholder := " Port"),
                                   script(
                                     raw(
                                       """
@@ -301,15 +287,12 @@ val phrase: String =
                                 )
                               ),
                             // 10.
-                            h3("9. Set up max connections"),
+                            h3("10. Set up max connections"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
-                                  span(cls := "input-group-text",
-                                    i(cls := "ni ni-credit-card")
-                                  )
                                 ),
-                                input(cls := "form-control", id:="maxconnect", name:="maxconnect", placeholder := "Max connections (max = 30)"),
+                                input(cls := "form-control", id:="maxconnect", name:="maxconnect", placeholder := " Max connections (max = 30)"),
                                 script(
                                   raw(
                                     """
@@ -336,15 +319,12 @@ val phrase: String =
                               )
                             ),
                             //
-                            h3("10. Set up amount of workers"),
+                            h3("11. Set up amount of workers"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
-                                  span(cls := "input-group-text",
-                                    i(cls := "ni ni-credit-card")
-                                  )
                                 ),
-                                input(cls := "form-control", id:="worker", name:="worker", placeholder := "Workers (max = 10)"),
+                                input(cls := "form-control", id:="worker", name:="worker", placeholder := " Workers (max = 10)"),
                                 script(
                                   raw(
                                     """
@@ -470,8 +450,22 @@ val phrase: String =
       }
         val nodePassR = nodePass
 
-    println(passwordR + " " + mnemonicR + " " + chainR + " " + syncR + " " + peerR + " " + cwpR + " " + nodePassR)
-      starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePassR, nodeName, declaredAddr, bindAddr)
+        val declared = Try {
+          val declaredSpl = declaredAddr.split(":")
+          (declaredSpl(0), declaredSpl(1).toInt)
+        } match {
+          case Success((host, port)) => Some(new InetSocketAddress(host, port))
+          case Failure(_) =>             None
+        }
+        val bind = Try {
+          val bindSpl = bindAddr.split(":")
+          (bindSpl(0), bindSpl(1).toInt)
+        } match {
+          case Success((host, port)) => new InetSocketAddress(host, port)
+          case Failure(_) =>            new InetSocketAddress("0.0.0.0", 9001)
+        }
+
+      starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePassR, nodeName, declared, bind)
       complete("OK")
     }
   }

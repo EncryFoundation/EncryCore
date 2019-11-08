@@ -297,7 +297,6 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
                           th(attr("scope") := "row", "Ban type")
                         )
                       ),
-                      println("peers " + peers),
                       tbody(
 
                         (for (p <- peers) yield {

@@ -30,8 +30,6 @@ class MemoryPool(settings: EncryAppSettings,
 
   var memoryPool: MemoryPoolStorage = MemoryPoolStorage.empty(settings, networkTimeProvider)
 
-  var nvss = ActorRef
-
   var bloomFilterForTransactionsIds: BloomFilter[String] = initBloomFilter
 
   override def preStart(): Unit = {

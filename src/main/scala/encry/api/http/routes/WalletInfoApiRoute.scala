@@ -100,7 +100,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
             val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
             val boxes: AssetBox         = wallet.vault.walletStorage
               .getAllBoxes().collect { case ab: AssetBox => ab }.head
-            println(boxes + " boxes")
             TransactionFactory.assetIssuingTransactionScratch(
               secret,
               fee,
@@ -136,7 +135,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
-          println(tx)
           EncryApp.system.eventStream.publish(NewTransaction(tx))
           //memoryPool !
           Future.successful(Some(Response(tx.toString)))
@@ -152,6 +150,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+//           val token1 = if (token.contains("487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab")) Some("") else token
             val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
               case Success(value) => ADKey @@ value
               case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")
@@ -189,8 +188,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
-          println(tx)
-
           EncryApp.system.eventStream.publish(NewTransaction(tx))
 
           Future.successful(Some(Response(tx.toString)))

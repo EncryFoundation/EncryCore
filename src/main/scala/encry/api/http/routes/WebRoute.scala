@@ -191,22 +191,16 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     (path("token") & post) {
       onComplete(getPass) {
         case Success(pass) =>
-        println(pass.right.get)
         entity(as[String]) {
           case x: String if pass.right.get == x.substring(9) =>
-            println("222")
             val token = WebRoute.createToken(x, 1)
-            println(s"token = $token")
             respondWithHeader(RawHeader("Access-Token", token)) {
-              println("here1")
               setCookie(HttpCookie("JWT", value = token)) {
-                println("here2")
                 redirect("/web", StatusCodes.PermanentRedirect)
               }
             }
         }
         case Failure(exception) =>
-          println(exception + " exception")
           complete(exception)
       }
     }
@@ -246,6 +240,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
         script(
           raw("""function shutdown(){
     var input1 = document.getElementById("input1");
+    window.alert("The node was disconnected...");
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/shutdown");
 //    request.setRequestHeader('content-type', 'application/json');
@@ -450,7 +445,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                         ),
                         div(cls := "col-auto",
                           div(cls := "icon icon-shape bg-info text-white rounded-circle shadow",
-                            i(cls := "fas fa-percent")
+                            i(cls := "ni ni-circle-08")
                           )
                         )
                       )

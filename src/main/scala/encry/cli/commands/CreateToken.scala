@@ -41,7 +41,6 @@ object CreateToken extends Command {
           val amount: Long            = args.requireArg[Ast.Num]("amount").i
           val boxes: AssetBox         =     wallet.vault.walletStorage
             .getAllBoxes().collect { case ab: AssetBox => ab }.head
-          println(boxes + " boxes")
           TransactionFactory.assetIssuingTransactionScratch(secret,
             fee,
             System.currentTimeMillis(),

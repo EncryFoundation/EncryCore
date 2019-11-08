@@ -113,9 +113,13 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                  var a = document.forms["myForm"]["addr"].value;
                  var b = document.forms["myForm"]["fee"].value;
                  var x = document.forms["myForm"]["amount"].value;
-                 var token = document.forms["myForm"]["coinIds"].value;
+                 var e = document.forms["myForm"]["coin"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x+"&token="+token);
+                    if (e == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
+                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x);
+                    } else {
+                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x+"&token="+e);
+                    }
                 //    request.setRequestHeader('content-type', 'application/json');
                     request.send();
                      window.alert("Transaction has been sent successfully");
@@ -343,30 +347,6 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                             )
                                           ),
                                           input(cls := "form-control", id := "bobo2", name := "data", placeholder := "Data"),
-                                          script(
-                                            raw(
-                                              """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("bobo2"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
-              });
-            """.stripMargin)
-                                          ),
                                         )
                                       ),
 
@@ -560,9 +540,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                         )
                                       ),
                                       div(cls := "form-group",
-                                        select(cls := "form-control",
+                                        select(cls := "form-control", id :="coin", name:="coin",
                                           for (coinIds <- balances.keys.toList) yield {
-                                            println(coinIds)
                                             option(value := coinIds, if (coinIds == EttTokenId) "ETT" else coinIds)
                                           }
                                         )
@@ -704,13 +683,15 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
   //    }
   //  }
 
-  override def route: Route = (path("webWallet") & get) {
+  override def route: Route = path("webWallet") {
     //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
     WebRoute.extractIp(
       WebRoute.authRoute(
         onComplete(info) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
+          case Failure(_) =>
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(Map.empty[String, Amount], List.empty[String]).render))
         }
       )
     )

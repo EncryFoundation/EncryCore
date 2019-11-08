@@ -55,10 +55,8 @@ with Stash {
       unstashAll()
     context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PasswordForLiorL00Storage(pass) =>
-      println(s"stash $PasswordForLiorL00Storage")
       stash()
     case GetNodePass =>
-      println("2222 " + liorl00Dir.getPassword)
       sender() ! liorl00Dir.getPassword
     case i => println(i)
   }
@@ -77,10 +75,8 @@ with Stash {
 
     case GetNodePass =>
       sender() ! liorl00Dir.getPassword
-      println(liorl00Dir.getPassword)
 
     case PasswordForLiorL00Storage(pass) =>
-      println(s"nodePass is: $pass")
       liorl00Dir.putPassword(pass)
 
     case BlockAndHeaderInfo(header, block) =>
@@ -272,17 +268,13 @@ with Stash {
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
     case PeerBanHelper(peer, msg)    =>
-      println(blackList)
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMiner =>
-      println("Able")
       context.system.eventStream.publish(EnableMining)
       context.system.eventStream.publish(StartMining)
     case StopMiner                 =>
-      println("DISABLE")
       context.system.eventStream.publish(DisableMining)
     case ShutdownNode              =>
-      println("stopped")
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
     case GetDataFromPresentView(f) =>
       (nvhRef ? GetDataFromCurrentView(f)).pipeTo(sender)

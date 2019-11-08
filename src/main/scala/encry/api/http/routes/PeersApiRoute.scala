@@ -46,7 +46,6 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
 
   def connectPeer: Route = path("add") {
     post(entity(as[String]) { str =>
-      println(str)
       complete {
         Try {
           val split = str.split(':')
