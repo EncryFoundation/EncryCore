@@ -115,7 +115,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case OtherNodeSyncingStatus(remote, status, extOpt) =>
       status match {
-        case Unknown => logger.info("Peer status is still unknown.")
         case Younger | Fork if isBlockChainSynced => sendInvData(remote, status, extOpt)
         case _ =>
       }
