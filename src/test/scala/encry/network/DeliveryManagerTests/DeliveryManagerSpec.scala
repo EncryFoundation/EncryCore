@@ -86,6 +86,7 @@ class DeliveryManagerSpec extends TestKit(ActorSystem("RequestModifiersSpec"))
       nvs ! RequestFromLocal(cp, Header.modifierTypeId, idsForLocalRequest)
 
       handler.expectMsg(RequestModifiersNetworkMessage(Header.modifierTypeId -> idsForLocalRequest))
+      nvs.stop()
     }
 
     "not process transactions if number of transactions in mempool exceeds limit" in {
@@ -111,6 +112,7 @@ class DeliveryManagerSpec extends TestKit(ActorSystem("RequestModifiersSpec"))
 
       deliveryManager ! DataFromPeer(msg, cp)
       downloadedModifiersValidator.expectNoMsg()
+      deliveryManager.stop()
     }
   }
 
