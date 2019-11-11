@@ -5,16 +5,18 @@ import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
-import org.encryfoundation.common.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, TransferDirective}
+import org.encryfoundation.common.modifiers.mempool.directive.{AssetIssuingDirective, DataDirective, Directive, ScriptedAssetDirective, TransferDirective}
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
-import org.encryfoundation.prismlang.compiler.CompiledContract
+import org.encryfoundation.prismlang.compiler.{CompiledContract, CompiledContractSerializer, PCompiler}
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import scorex.crypto.hash.{Blake2b256, Digest32}
+
+import scala.util.{Failure, Success, Try}
 
 object TransactionFactory extends StrictLogging {
 
@@ -120,6 +122,26 @@ object TransactionFactory extends StrictLogging {
     val change: Long = howMuchCanTransfer - amount
     val directives: IndexedSeq[TransferDirective] =
       IndexedSeq(TransferDirective(recipient, amount, tokenIdOpt))
+    prepareTransaction(privKey, fee, timestamp, useOutputs, directives, change, tokenIdOpt)
+  }
+
+  def defaultContractTransaction(privKey: PrivateKey25519,
+                                fee: Long,
+                                timestamp: Long,
+                                useOutputs: Seq[(MonetaryBox, Option[(CompiledContract, Seq[Proof])])],
+                                 contract: String,
+                                amount: Long,
+                                tokenIdOpt: Option[ADKey] = None): Transaction = {
+    val compiledContract = PCompiler.compile(contract).get.hash
+    val howMuchCanTransfer: Long =
+      if (tokenIdOpt.isEmpty) useOutputs.map(_._1.amount).sum - fee
+      else useOutputs.map(_._1).collect {
+        case ab: AssetBox if Applicative[Option].map2(ab.tokenIdOpt, tokenIdOpt)(_.sameElements(_)).getOrElse(false) => ab
+        case tib: TokenIssuingBox if tokenIdOpt.exists(_.sameElements(tib.tokenId)) => tib
+      }.map(_.amount).sum
+    val change: Long = howMuchCanTransfer - amount
+    val directives: IndexedSeq[ScriptedAssetDirective] =
+      IndexedSeq(ScriptedAssetDirective(compiledContract, amount, tokenIdOpt))
     prepareTransaction(privKey, fee, timestamp, useOutputs, directives, change, tokenIdOpt)
   }
 

@@ -1,11 +1,12 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.UpdatingPeersInfo
+import encry.api.http.DataHolderForApi.{ConnectedPeersConnectionHelper, UpdatingPeersInfo}
 import encry.consensus.HistoryConsensus.HistoryComparisonResult
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
@@ -21,6 +22,7 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.{HighPriority, InitialPriority}
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
+
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
@@ -52,6 +54,10 @@ class PeersKeeper(settings: EncryAppSettings,
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
     context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime){blackList = blackList.cleanupBlackList}
+    context.system.scheduler.schedule(10.seconds, 5.seconds) {
+//      println(connectedPeers)
+      dataHolder ! ConnectedPeersConnectionHelper(connectedPeers)
+    }
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )

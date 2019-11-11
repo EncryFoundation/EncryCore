@@ -1,8 +1,8 @@
 package encry.api.http
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.{ InetAddress, InetSocketAddress }
 
-import akka.actor.{Actor, ActorRef, Props, Stash}
+import akka.actor.{ Actor, ActorRef, Props, Stash }
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi._
@@ -11,22 +11,30 @@ import akka.util.Timeout
 import encry.EncryApp
 import encry.api.http.routes.InfoApiRoute
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList, UpdatedHistory}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{
+  ChangedHistory,
+  ChangedState,
+  NodeViewChange,
+  PeerFromCli,
+  RemovePeerFromBlackList,
+  UpdatedHistory
+}
 import encry.settings.EncryAppSettings
-import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.state.{UtxoState, UtxoStateReader}
-import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
+import encry.utils.{ NetworkTime, NetworkTimeProvider }
+import encry.view.state.{ UtxoState, UtxoStateReader }
+import encry.local.miner.Miner.{ DisableMining, EnableMining, MinerStatus, StartMining }
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
-import encry.network.BlackList.{BanReason, BanTime, BanType}
+import encry.network.BlackList.{ BanReason, BanTime, BanType }
+import encry.network.ConnectedPeersCollection
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
-import encry.storage.VersionalStorage.{StorageValue, StorageVersion}
+import encry.network.PeersKeeper.{ BanPeer, BanPeerFromAPI }
+import encry.storage.VersionalStorage.{ StorageValue, StorageVersion }
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -34,8 +42,10 @@ import scorex.utils.Random
 
 import scala.concurrent.Future
 
-class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging
-with Stash {
+class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
+    extends Actor
+    with StrictLogging
+    with Stash {
 
   implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
@@ -48,12 +58,14 @@ with Stash {
 
   val liorl00Dir: LiorL00Storage = LiorL00Storage.init(settings)
 
+  var connectedPeersCollection = ConnectedPeersCollection()
+
   override def postStop(): Unit = liorl00Dir.storage.close()
 
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
       unstashAll()
-    context.become(workingCycle(nvhRef = sender(), history = Some(history)))
+      context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PasswordForLiorL00Storage(pass) =>
       stash()
     case GetNodePass =>
@@ -62,16 +74,29 @@ with Stash {
   }
 
   def workingCycle(nvhRef: ActorRef,
-                    blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
+                   blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
                    history: Option[History] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
                    blockInfo: BlockAndHeaderInfo = BlockAndHeaderInfo(None, None),
-                   allPeers: Seq[InetSocketAddress] = Seq.empty): Receive = {
+                   allPeers: Seq[InetSocketAddress] = Seq.empty,
+                   connectedPeersCollection: ConnectedPeersCollection = ConnectedPeersCollection()): Receive = {
+
     case UpdatingTransactionsNumberForApi(qty) =>
-      context.become(workingCycle(nvhRef, blackList, connectedPeers, history, state, qty, minerStatus, blockInfo, allPeers))
+      context.become(
+        workingCycle(nvhRef,
+                     blackList,
+                     connectedPeers,
+                     history,
+                     state,
+                     qty,
+                     minerStatus,
+                     blockInfo,
+                     allPeers,
+                     connectedPeersCollection)
+      )
 
     case GetNodePass =>
       sender() ! liorl00Dir.getPassword
@@ -79,50 +104,91 @@ with Stash {
     case PasswordForLiorL00Storage(pass) =>
       liorl00Dir.putPassword(pass)
 
+    case ConnectedPeersConnectionHelper(info) =>
+      println("info = " + info)
+      context.become(
+        workingCycle(
+          nvhRef,
+          blackList,
+          connectedPeers,
+          history,
+          state,
+          transactionsOnMinerActor,
+          minerStatus,
+          blockInfo,
+          allPeers,
+          info
+        )
+      )
+
     case BlockAndHeaderInfo(header, block) =>
       context.become(
-        workingCycle(nvhRef, blackList,
+        workingCycle(nvhRef,
+                     blackList,
                      connectedPeers,
                      history,
                      state,
                      transactionsOnMinerActor,
                      minerStatus,
                      BlockAndHeaderInfo(header, block),
-                     allPeers)
+                     allPeers,
+                     connectedPeersCollection)
       )
 
     case ChangedHistory(reader: History) =>
       context.become(
-        workingCycle(nvhRef, blackList,
+        workingCycle(nvhRef,
+                     blackList,
                      connectedPeers,
                      Some(reader),
                      state,
                      transactionsOnMinerActor,
                      minerStatus,
                      blockInfo,
-                     allPeers)
+                     allPeers,
+                     connectedPeersCollection)
       )
 
     case ChangedState(reader: UtxoStateReader) =>
       context.become(
-        workingCycle(nvhRef, blackList,
+        workingCycle(nvhRef,
+                     blackList,
                      connectedPeers,
                      history,
                      Some(reader),
                      transactionsOnMinerActor,
                      minerStatus,
                      blockInfo,
-                     allPeers)
+                     allPeers,
+                     connectedPeersCollection)
       )
 
     case UpdatingMinerStatus(status) =>
       context.become(
-        workingCycle(nvhRef, blackList, connectedPeers, history, state, transactionsOnMinerActor, status, blockInfo, allPeers)
+        workingCycle(nvhRef,
+                     blackList,
+                     connectedPeers,
+                     history,
+                     state,
+                     transactionsOnMinerActor,
+                     status,
+                     blockInfo,
+                     allPeers,
+                     connectedPeersCollection)
       )
 
     case UpdatingPeersInfo(allP, connectedP, bannedP) =>
       context.become(
-        workingCycle(nvhRef, bannedP, connectedP, history, state, transactionsOnMinerActor, minerStatus, blockInfo, allP)
+        workingCycle(nvhRef,
+                     bannedP,
+                     connectedP,
+                     history,
+                     state,
+                     transactionsOnMinerActor,
+                     minerStatus,
+                     blockInfo,
+                     allP,
+                     connectedPeersCollection)
       )
 
     case PeerAdd(peer)               => context.system.eventStream.publish(PeerFromCli(peer))
@@ -267,14 +333,17 @@ with Stash {
     case GetBlockInfo          => sender() ! blockInfo
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
-    case PeerBanHelper(peer, msg)    =>
+    case GetConnections =>
+      println("bbb = " + connectedPeersCollection)
+      sender() ! connectedPeersCollection
+    case PeerBanHelper(peer, msg) =>
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMiner =>
       context.system.eventStream.publish(EnableMining)
       context.system.eventStream.publish(StartMining)
-    case StopMiner                 =>
+    case StopMiner =>
       context.system.eventStream.publish(DisableMining)
-    case ShutdownNode              =>
+    case ShutdownNode =>
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
     case GetDataFromPresentView(f) =>
       (nvhRef ? GetDataFromCurrentView(f)).pipeTo(sender)
@@ -325,7 +394,9 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class PasswordForLiorL00Storage(password: String)
 
-  case class PeerBanHelper(addr: InetSocketAddress, msg: String)
+  final case class PeerBanHelper(addr: InetSocketAddress, msg: String)
+
+  final case class ConnectedPeersConnectionHelper(c: ConnectedPeersCollection)
 
   case object GetViewSendTx
 
@@ -378,6 +449,8 @@ object DataHolderForApi { //scalastyle:ignore
   case object GetBannedPeersHelperAPI
 
   case object GetAllInfo
+
+  case object GetConnections
 
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider): Props = Props(new DataHolderForApi(settings, ntp))
 }

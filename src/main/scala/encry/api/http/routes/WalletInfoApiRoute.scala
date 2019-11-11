@@ -7,6 +7,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers
 import akka.pattern._
 import akka.util.Timeout
 import cats.Applicative
@@ -28,7 +29,7 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
-
+import PredefinedFromEntityUnmarshallers._
 import scala.concurrent.duration._
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox, TokenIssuingBox}
@@ -51,7 +52,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
-     infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ createTokenR ~ dataTransactionR
+     infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ transferContractR ~ createTokenR ~ dataTransactionR
   }
 
   override val settings: RESTApiSettings = restApiSettings
@@ -194,6 +195,60 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }
       complete(s"Tx with $addr, $fee and $amount has been sent!!'")
+    }
+  }
+
+
+  def transferContractR: Route = (path("transferContract") & get) {
+    parameters('contract, 'fee.as[Int], 'amount.as[Long], 'token.?) { (contract, fee, amount, token) =>
+      (dataHolder ?
+        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+          Try {
+            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
+              case Success(value) => ADKey @@ value
+              case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")
+            })
+            val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
+              .getAllBoxes()
+              .collect {
+                case ab: AssetBox if ab.tokenIdOpt.isEmpty ||
+                  Applicative[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
+                case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
+              }.foldLeft(Seq[MonetaryBox]()) {
+              case (seq, box) if decodedTokenOpt.isEmpty =>
+                if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
+              case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
+                if (seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.isEmpty).map(_.amount).sum < fee) seq :+ box else seq
+              case (seq, box: AssetBox) =>
+                val totalAmount =
+                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                if (totalAmount < amount) seq :+ box else seq
+              case (seq, box: TokenIssuingBox) =>
+                val totalAmount =
+                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                if (totalAmount < amount) seq :+ box else seq
+            }
+              .toIndexedSeq
+            TransactionFactory.defaultContractTransaction(secret,
+              fee,
+              System.currentTimeMillis(),
+              boxes.map(_ -> None),
+              contract,
+              amount,
+              decodedTokenOpt)
+          }.toOption
+        }).flatMap {
+        case Some(tx: Transaction) =>
+          print(tx)
+          EncryApp.system.eventStream.publish(NewTransaction(tx))
+
+          Future.successful(Some(Response(tx.toString)))
+        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+      }
+      complete(s"Tx with $contract, $fee and $amount has been sent!!'")
     }
   }
 

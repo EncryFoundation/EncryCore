@@ -351,7 +351,7 @@ val phrase: String =
                               )
                             ),
                             // 8. Would you like to connect with only known peers?
-                            h3("10. Would you like to connect with only known peers?"),
+                            h3("12. Would you like to connect with only known peers?"),
                             Seq(
                               div(cls := "custom-control custom-radio mb-3",
                                 input(name := "custom-radio-3", value:="true", cls := "custom-control-input", id := "customRadio5", tpe := "radio"),

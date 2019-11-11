@@ -283,7 +283,7 @@ class Starter(settings: EncryAppSettings,
       import scala.concurrent.duration._
       println(s"declared -> $declaredAddr, bind -> $bindAddr, fastSync -> $fastSync, peers -> $peers")
       println("Got accumulated info.")
-      Functor[Option].compose[Future].map(initHttpApiServer)(_.unbind())
+      Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
 //     val declared = Try {
 //        val declaredSpl = declaredAddr.split(":")
@@ -304,10 +304,9 @@ class Starter(settings: EncryAppSettings,
       val networkSettings: NetworkSettings =
         settings.network.copy(knownPeers = peers,
                               connectOnlyWithKnownPeers = connectWithOnlyKnownPeers.some,
-                              //nodeName = nodeName.some,
-                              //declaredAddress = declaredAddr,
-                              //bindAddress = bindAddr)
-        )
+                              nodeName = nodeName.some,
+                              declaredAddress = declaredAddr,
+                              bindAddress = bindAddr)
       println(s"netword settings = $networkSettings")
       val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
       val newSettings = settings.copy(
@@ -332,7 +331,6 @@ class Starter(settings: EncryAppSettings,
         "nodeViewHolder"
       )
 
-      //Thread.sleep(10000)
       if (nodePass.nonEmpty) dataHolderForApi ! PasswordForLiorL00Storage(nodePass)
 
       context.system.actorOf(

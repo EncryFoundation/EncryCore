@@ -129,6 +129,38 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         ),
         script(
           raw(
+            """
+               function contractF(){
+                 var a = document.forms["myForm4"]["contract"].value;
+                 var b = document.forms["myForm4"]["fee"].value;
+                 var x = document.forms["myForm4"]["amount"].value;
+                 var coin = document.forms["myForm4"]["coin"].value;
+                    var request = new XMLHttpRequest();
+                    if (coin == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
+                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+a+"&fee="+b+"&amount="+x);
+                    } else {
+                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+a+"&fee="+b+"&amount="+x+"&token="+coin);
+                    }
+                //    request.setRequestHeader('content-type', 'application/json');
+                    request.onreadystatechange = function (oEvent) {
+                  if (request.readyState === 4) {
+                  alert(request.status)
+                      if (request.status === 200) {
+                        alert(request.responseText)
+                      } else {
+                         alert("Error", request.statusText);
+                      }
+                  }
+              };
+
+                    request.send();
+                     window.alert("Transaction has been sent successfully");
+                    setTimeout(location.reload.bind(location), 3000);
+
+                  }""")
+        ),
+        script(
+          raw(
             """function token(){
                  var b = document.forms["myForm1"]["fee"].value;
                  var x = document.forms["myForm1"]["amount"].value;
@@ -292,9 +324,118 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                           ),
                           div(cls := "col",
                             button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form3", "Create data tx")
+                          ),
+                          div(cls := "col",
+                            button(tpe := "button", cls := "btn btn-block btn-primary mb-3", data("toggle") := "modal", data("target") := "#modal-form4", "Create contract tx")
                           )
                         ),
 
+                        // Create contract form
+                        div(cls := "modal fade", id := "modal-form4", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
+                          div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",
+                            div(cls := "modal-content",
+                              div(cls := "modal-body p-0",
+                                div(cls := "card bg-secondary shadow border-0",
+                                  div(cls := "card-body px-lg-5 py-lg-5",
+                                    form(role := "form", onsubmit := "return validateForm()", id := "myForm4",
+
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-email-83")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id := "babo", name := "contract", placeholder := "Contract", tpe := "text")
+                                        )
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative mb-3",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-money-coins")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id := "bibo", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bibo"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          )
+                                        )
+
+                                      ),
+                                      div(cls := "form-group",
+                                        div(cls := "input-group input-group-alternative",
+                                          div(cls := "input-group-prepend",
+                                            span(cls := "input-group-text",
+                                              i(cls := "ni ni-credit-card")
+                                            )
+                                          ),
+                                          input(cls := "form-control", id := "bobo", name := "amount", placeholder := "Amount"),
+                                          script(
+                                            raw(
+                                              """
+                                                 function setInputFilter(textbox, inputFilter) {
+      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+        textbox.oldValue = "";
+         textbox.addEventListener(event, function() {
+       if (inputFilter(this.value)) {
+         this.oldValue = this.value;
+         this.oldSelectionStart = this.selectionStart;
+         this.oldSelectionEnd = this.selectionEnd;
+       } else if (this.hasOwnProperty("oldValue")) {
+         this.value = this.oldValue;
+         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+       }
+     });
+   });
+ }
+              setInputFilter(document.getElementById("bobo"), function(value) {
+              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              });
+            """.stripMargin)
+                                          ),
+                                        )
+                                      ),
+                                      div(cls := "form-group",
+                                        select(cls := "form-control", id :="coin", name:="coin",
+                                          for (coinIds <- balances.keys.toList) yield {
+                                            option(value := coinIds, if (coinIds == EttTokenId) "ETT" else coinIds)
+                                          }
+                                        )
+                                      ),
+                                      div(cls := "text-center",
+                                        button(tpe := "button", onclick := "contractF()", cls := "btn btn-primary mt-4", "Send tx")
+                                      )
+                                    )
+                                  )
+                                )
+                              )
+                            )
+                          )
+                        ),
+                        //
                         //Create Data Tx Form
                         div(cls := "modal fade", id := "modal-form3", tabindex := "-1", role := "dialog", aria.labelledby := "modal-form", aria.hidden := "true",
                           div(cls := "modal-dialog modal- modal-dialog-centered modal-sm", role := "document",

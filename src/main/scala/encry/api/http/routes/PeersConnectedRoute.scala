@@ -7,9 +7,11 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetConnectedPeersHelper, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
+import encry.api.http.DataHolderForApi.{ConnectedPeersConnectionHelper, GetAllInfoHelper, GetAllPeers, GetConnectedPeersHelper, GetConnections, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
 import encry.local.miner.Miner.MinerStatus
+import encry.network.ConnectedPeersCollection
+import encry.network.ConnectedPeersCollection.PeerInfo
 import scalatags.Text.all.{div, span, td, _}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.Json
@@ -34,15 +36,19 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
 
   def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
-  def peersAllF: Future[Seq[PeerInfoResponse]] = (dataHolder ? GetConnectedPeersHelper).mapTo[Seq[PeerInfoResponse]]
+  def connectedPeers = (dataHolder ? GetConnections).mapTo[ConnectedPeersCollection]
 
-  def info: Future[Seq[PeerInfoResponse]] = for {
-    peerAll <- peersAllF
+  def info: Future[ConnectedPeersCollection] = for {
+    peerAll <- connectedPeers
   } yield peerAll
+
+  def infoU = for {
+    peerAll <- connectedPeers
+  } yield println("AAA = " + peerAll)
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def peerScript(peers: Seq[PeerInfoResponse] ): Text.TypedTag[String] = {
+  def peerScript(peersR: ConnectedPeersCollection): Text.TypedTag[String] = {
 
     html(
       scalatags.Text.all.head(
@@ -291,19 +297,28 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                       thead(cls := "thead-light",
                         tr(
                           th(attr("scope") := "row", "Name"),
-                          th(attr("scope") := "row", "Address"),
-                          th(attr("scope") := "row", "Connection type")
+                          th(attr("scope") := "row", "Ip"),
+                          th(attr("scope") := "row", "Connection type"),
+                          th(attr("scope") := "row", "History comparison"),
+                          th(attr("scope") := "row", "Last uptime"),
+                          th(attr("scope") := "row", "Priority status")
                         )
                       ),
                       tbody(
 
-                        (for (p <- peers) yield {
+                        (for (p <- peersR.peers) yield {
                           tr(
-                            th(p.name.getOrElse("").toString
+                            th(p._1.getHostName
                             ),
-                            th(p.address
+                            th(p._2.connectedPeer.socketAddress.getAddress.getHostAddress
                             ),
-                            th(p.connectionType.getOrElse("").toString
+                            th(p._2.connectionType.toString
+                            ),
+                            th(p._2.historyComparisonResult.toString
+                            ),
+                            th(p._2.lastUptime.time
+                            ),
+                            th(p._2.peerPriorityStatus.toString
                             )
                           )
                         }).toSeq: _*
@@ -366,7 +381,9 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
         //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
         onComplete(info) {
           case Success(info) =>
+            println(info)
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+          case Failure(e) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
         }
       } else reject(ValidationRejection("Restricted!"))
     }

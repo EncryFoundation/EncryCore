@@ -8,7 +8,7 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, ConnectionType, Outgo
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 
-final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddress, PeerInfo]) extends StrictLogging {
+final case class ConnectedPeersCollection(peers: Map[InetSocketAddress, PeerInfo]) extends StrictLogging {
 
   val size: Int = peers.size
 
