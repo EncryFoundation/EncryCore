@@ -50,7 +50,7 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
   }
 
   "RequestModifies" should {
-    "handle uniq modifiers from RequestFromLocal message correctly" in {
+    "handle unique modifiers from RequestFromLocal message correctly" in {
       val (deliveryManager, cp1, _, _, _, headersIds, headersAsKey) = initialiseState()
       val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
         Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
