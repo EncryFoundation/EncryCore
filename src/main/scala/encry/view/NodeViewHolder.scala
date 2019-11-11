@@ -69,7 +69,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
     logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.history.getBestBlockHeight} | " +
-      s"${nodeView.state.height}")
+      s"${nodeView.state.height} -> best header id ${nodeView.history.getBestHeader.map(_.encodedId)} ->" +
+      s" best block id ${nodeView.history.getBestBlock.map(_.encodedId)}" +
+      s" Best header at best block height ${nodeView.history.getBestBlock.flatMap(b =>
+        nodeView.history.getBestHeaderAtHeight(b.header.height)
+      ).map(l => l.encodedId -> Algos.encode(l.payloadId))}")
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
@@ -119,13 +123,15 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
       } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
-      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
-      if (isInHistory || isInCache)
-        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
-          s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
-      computeApplications()
+      if (!nodeView.history.isFullChainSynced) {
+        val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
+        val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+        if (isInHistory || isInCache)
+          logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+            s"can't be placed into cache cause of: inCache: ${!isInCache}.")
+        else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+        computeApplications()
+      }
 
     case lm: LocallyGeneratedModifier =>
       logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
