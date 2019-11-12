@@ -17,7 +17,8 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
 
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Try}
+import scala.util.control.NonFatal
 
 object Transfer extends Command {
 
@@ -30,7 +31,7 @@ object Transfer extends Command {
     (nodeViewHolder ?
       GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
         Try {
-          val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
+          val secret: PrivateKey25519 = view.vault.accountManagers.head.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
           val fee: Long = args.requireArg[Ast.Num]("fee").i
           val amount: Long = args.requireArg[Ast.Num]("amount").i
@@ -45,6 +46,10 @@ object Transfer extends Command {
             boxes.map(_ -> None),
             recipient,
             amount)
+        }.recoverWith {
+          case NonFatal(th) =>
+            th.printStackTrace()
+            Failure(th)
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>
