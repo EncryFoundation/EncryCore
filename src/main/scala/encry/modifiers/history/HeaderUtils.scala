@@ -18,7 +18,7 @@ object HeaderUtils {
               s"TransactionsRoot's size should be $TransactionsRootSize bytes")
       .result
 
-  def preSemanticValidation(header: Header, history: History, settings: EncryAppSettings): Either[IllegalHeight, Unit] =
+  def preSemanticValidation(header: Header, history: History, settings: EncryAppSettings): Either[PreSemanticValidationException, Unit] =
     for {
       _ <- Either.cond(
             history.getBestHeaderHeight - settings.levelDB.maxVersions <= header.height,
