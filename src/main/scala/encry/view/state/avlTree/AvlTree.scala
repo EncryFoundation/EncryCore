@@ -48,12 +48,10 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
                          vM: Monoid[V]): AvlTree[K, V] = {
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDeleteKey) =>
-        //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(toDeleteKey))}")
         deleteKey(toDeleteKey, prevRoot)
     }
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
-        //println(s"to insert: ${keyToInsert}")
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
