@@ -219,7 +219,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     }._2
   }
 
-  def generateDummyHistory(settings: EncryAppSettings): History = {
+  def generateDummyHistory(settingsEncry: EncryAppSettings): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
@@ -230,7 +230,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override val settings: EncryAppSettings = settings
+      override  val settings: EncryAppSettings = settingsEncry
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }
