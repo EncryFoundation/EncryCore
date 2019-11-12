@@ -33,7 +33,7 @@ import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.{UtxoState, _}
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.LSMStore
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -250,7 +250,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
-
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
@@ -285,6 +284,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+              if (newHis.getBestHeaderId.exists(bestHeaderId =>
+                  newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
+                  )) newHis.isFullChainSynced = true
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
               logger.info(s"Application to state failed cause $e")

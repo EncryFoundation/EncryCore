@@ -24,7 +24,7 @@ import supertagged.@@
   **/
 trait History extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
-  def isFullChainSynced: Boolean = getBestHeaderId
+  var isFullChainSynced: Boolean = getBestHeaderId
     .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
 
   /** Appends modifier to the history if it is applicable. */
