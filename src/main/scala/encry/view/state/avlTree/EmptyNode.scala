@@ -10,7 +10,7 @@ import scala.util.Try
 
 final case class EmptyNode[K: Serializer: Monoid, V: Serializer: Monoid] private (key: K, value: V, height: Int, balance: Int) extends Node[K, V] {
 
-  override def selfInspection(prevOpsInfo: OperationInfo[K, V]): NodeWithOpInfo[K, V] = NodeWithOpInfo(this, prevOpsInfo)
+  override def selfInspection = this
 }
 
 object EmptyNode {

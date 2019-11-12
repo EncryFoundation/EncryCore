@@ -69,7 +69,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
     logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.history.getBestBlockHeight} | " +
-      s"${nodeView.state.height}")
+      s"${nodeView.state.height} -> best header id ${nodeView.history.getBestHeader.map(_.encodedId)} ->" +
+      s" best block id ${nodeView.history.getBestBlock.map(_.encodedId)}" +
+      s" Best header at best block height ${nodeView.history.getBestBlock.flatMap(b =>
+        nodeView.history.getBestHeaderAtHeight(b.header.height)
+      ).map(l => l.encodedId -> Algos.encode(l.payloadId))}")
     ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
@@ -249,8 +253,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
-                  logger.info(s"NVH NVH MVH ${requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0} " +
-                    s"${newHis.isNewHeader(header)}")
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
