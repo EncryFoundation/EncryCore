@@ -48,6 +48,7 @@ object BlackList {
     case object ExpiredNumberOfReRequestAttempts extends BanReason
     case object ExpiredNumberOfRequests extends BanReason
     final case class InvalidStateAfterFastSync(error: String) extends BanReason
+    final case class PreSemanticInvalidModifier(error: String) extends BanReason
   }
 
   sealed trait BanType
