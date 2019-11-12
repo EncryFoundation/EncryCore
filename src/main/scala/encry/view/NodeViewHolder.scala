@@ -126,15 +126,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
       } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
-      if (!nodeView.history.isFullChainSynced) {
-        val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-        val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
-        if (isInHistory || isInCache)
-          logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
-            s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-        else ModifiersCache.put(key(mod.id), mod, nodeView.history)
-        computeApplications()
-      }
+      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
+      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+      if (isInHistory || isInCache)
+        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+          s"can't be placed into cache cause of: inCache: ${!isInCache}.")
+      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      computeApplications()
 
     case lm: LocallyGeneratedModifier =>
       logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
@@ -256,8 +254,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
-                  logger.info(s"NVH NVH MVH ${requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0} " +
-                    s"${newHis.isNewHeader(header)}")
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
                     newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
