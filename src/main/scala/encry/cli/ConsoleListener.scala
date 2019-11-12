@@ -60,7 +60,8 @@ object ConsoleListener {
     "pubKeys"   -> PrintPubKeys,
     "balance"   -> GetBalance,
     "transfer"  -> Transfer,
-    "privKeys"  -> PrintPrivKeys //Todo delete
+    "privKeys"  -> PrintPrivKeys, //Todo delete
+    "fromSeed"  -> CreateAccountFromSeed
   ))
 
   val cmdDictionary: Map[String, Map[String, Command]] =
