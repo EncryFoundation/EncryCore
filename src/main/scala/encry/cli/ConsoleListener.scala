@@ -81,7 +81,8 @@ object ConsoleListener {
       "balance"     -> GetBalance,  // table
       "transfer"    -> Transfer, // add
       "privKeys"    -> PrintPrivKeys, //Todo delete
-      "createToken" -> CreateToken
+      "createToken" -> CreateToken,
+      "fromSeed"  -> CreateAccountFromSeed
     )
   )
 

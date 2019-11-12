@@ -124,7 +124,7 @@ class MemoryPool(settings: EncryAppSettings,
         memoryPool.getTransactionsForMiner
       memoryPool = newMemoryPool
       minerReference ! TransactionsForMiner(transactionsForMiner)
-      logger.debug(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
+      logger.info(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
         s" New pool size is ${memoryPool.size}. Ids ${transactionsForMiner.map(_.encodedId)}")
 
     case RemoveExpiredFromPool =>

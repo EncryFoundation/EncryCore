@@ -45,11 +45,9 @@ import scala.util.{Failure, Random, Success, Try}
 
 case class WalletInfoApiRoute(dataHolder: ActorRef,
                               restApiSettings: RESTApiSettings,
-                              settingsApp: EncryAppSettings)(
-  implicit val context: ActorRefFactory
-) extends EncryBaseApiRoute
-  with FailFastCirceSupport
-  with StrictLogging {
+                              intrinsicTokenId: String,
+                              settingsApp: EncryAppSettings)(implicit val context: ActorRefFactory)
+  extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
      infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ transferContractR ~ createTokenR ~ dataTransactionR
@@ -118,6 +116,22 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       complete("Token was created")
     }
     }
+
+//  def infoR: Route = (path("info") & get) {
+  //    getWallet
+  //      .map { w =>
+  //        Map(
+  //          "balances" -> w.getBalances.map{ i =>
+  //            if (i._1._2 != intrinsicTokenId)
+  //              s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}"
+  //            else
+  //              s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
+  //          }.asJson,
+  //          "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
+  //        ).asJson
+  //      }
+  //      .okJson()
+  //  }
 
   def dataTransactionR: Route = (path("data") & get) {
     parameters('fee.as[Int], 'data) {(fee, data) =>

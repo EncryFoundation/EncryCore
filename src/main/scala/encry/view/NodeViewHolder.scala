@@ -77,8 +77,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
+    case CreateAccountManagerFromSeed(seed) =>
+      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
+      updateNodeView(updatedVault = newAccount.toOption)
+      sender() ! newAccount
     case FastSyncFinished(state) =>
-      //todo implement wallet scanning
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
@@ -89,7 +92,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeView.history.isHeadersChainSyncedVar = true
           nodeView.history.isFastSync.isFastSync = false
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
-          val wallet = nodeView.wallet.scanWalletFromUtxo(state)
+          val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
           updateNodeView(
             updatedHistory = Some(history),
             updatedState = Some(state),
@@ -448,6 +451,7 @@ object NodeViewHolder {
                                suffix: IndexedSeq[PersistentModifier])
 
   object ReceivableMessages {
+    case class CreateAccountManagerFromSeed(seed: String)
 
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean)
 
