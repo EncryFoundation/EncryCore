@@ -20,6 +20,6 @@ object CreateKey extends Command {
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519]
-    Future(Some(Response("OK"))))
+    Future(Some(Response("OK")))
   }
 }

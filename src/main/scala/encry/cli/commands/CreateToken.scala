@@ -36,7 +36,7 @@ object CreateToken extends Command {
     (dataHolder ?
       GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
         Try {
-          val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+          val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
           val fee: Long               = args.requireArg[Ast.Num]("fee").i
           val amount: Long            = args.requireArg[Ast.Num]("amount").i
           val boxes: AssetBox         =     wallet.vault.walletStorage
@@ -45,7 +45,7 @@ object CreateToken extends Command {
             fee,
             System.currentTimeMillis(),
             IndexedSeq(boxes).map(_ -> None),
-            PubKeyLockedContract(wallet.vault.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+            PubKeyLockedContract(wallet.vault.accountManagers.head.mandatoryAccount.publicImage.pubKeyBytes).contract,
             amount)
         }.toOption
       }).flatMap {

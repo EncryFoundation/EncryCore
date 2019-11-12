@@ -33,7 +33,7 @@ import org.iq80.leveldb.{DB, Options}
 import scala.util.{Failure, Success}
 import scala.util.Try
 
-case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
+case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], accountStore: Store)
   extends StrictLogging with AutoCloseable with Settings {
 
   assert(accountManagers.nonEmpty)
@@ -162,9 +162,7 @@ object EncryWallet extends StrictLogging {
     val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
     val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
     val restoredAccounts = AccountManager.restoreAccounts(accountManagerStore, password)
-    val resultingAccounts =
-      if (restoredAccounts.nonEmpty) restoredAccounts
-      else Seq(AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte))
+    val resultingAccounts = restoredAccounts
     //init keys
     EncryWallet(walletStorage, resultingAccounts, accountManagerStore)
   }

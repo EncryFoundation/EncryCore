@@ -75,7 +75,12 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   def infoR: Route = (path("info") & get) {
     getWallet.map { w =>
       Map(
-        "balances" -> w.getBalances.map(i => i._1 -> i._2.toString).toMap.asJson,
+        "balances" -> w.getBalances.map{ i =>
+          if (i._1._2 != intrinsicTokenId)
+            s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}"
+          else
+            s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
+        }.asJson,
         "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
       ).asJson
     }.okJson()
@@ -96,7 +101,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       (dataHolder ?
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val boxes: AssetBox         = wallet.vault.walletStorage
               .getAllBoxes().collect { case ab: AssetBox => ab }.head
             TransactionFactory.assetIssuingTransactionScratch(
@@ -104,7 +109,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               fee,
               System.currentTimeMillis(),
               IndexedSeq(boxes).map(_ -> None),
-              PubKeyLockedContract(wallet.vault.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+              PubKeyLockedContract(wallet.vault.accountManagers.head.mandatoryAccount.publicImage.pubKeyBytes).contract,
               amount)
           }.toOption
         }).flatMap {
@@ -138,14 +143,14 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       (dataHolder ?
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val boxes: AssetBox         = wallet.vault.walletStorage
               .getAllBoxes().collect { case ab: AssetBox => ab }.head
             TransactionFactory.dataTransactionScratch(secret,
               fee,
               System.currentTimeMillis(),
               IndexedSeq(boxes).map(_ -> None),
-              PubKeyLockedContract(wallet.vault.accountManager.mandatoryAccount.publicImage.pubKeyBytes).contract,
+              PubKeyLockedContract(wallet.vault.accountManagers.head.mandatoryAccount.publicImage.pubKeyBytes).contract,
               data.getBytes)
           }.toOption
         }).flatMap {
@@ -164,7 +169,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       (dataHolder ?
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
 //           val token1 = if (token.contains("487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab")) Some("") else token
             val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
               case Success(value) => ADKey @@ value
@@ -218,7 +223,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       (dataHolder ?
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
-            val secret: PrivateKey25519 = wallet.vault.accountManager.mandatoryAccount
+            val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
               case Success(value) => ADKey @@ value
               case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")

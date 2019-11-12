@@ -205,8 +205,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
     case GetViewCreateKey =>
       (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
-        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
-        else view.vault.accountManager.createAccount(None)
+        if (view.vault.accountManagers.head.accounts.isEmpty) view.vault.accountManagers.head.mandatoryAccount
+        else view.vault.accountManagers.head.createAccount(None)
       }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
@@ -214,16 +214,16 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         view.vault.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
       }).pipeTo(sender)
 
-    case GetViewGetBalance =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, Amount]] { view =>
-        val balance: Map[String, Amount] = view.vault.getBalances.toMap
-        //        println(balance +" 123124")
-        if (balance.isEmpty) Map.empty[String, Amount] else balance
-      }).pipeTo(sender)
+//    case GetViewGetBalance =>
+//      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, Amount]] { view =>
+//        val balance: Map[String, Amount] = view.vault.getBalances.toMap
+//        //        println(balance +" 123124")
+//        if (balance.isEmpty) Map.empty[String, Amount] else balance
+//      }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
       (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
-        view.vault.accountManager.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
+        view.vault.accountManagers.head.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 
     case GetLastHeadersHelper(i) =>
