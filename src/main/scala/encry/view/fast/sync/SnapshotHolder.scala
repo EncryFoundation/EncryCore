@@ -2,12 +2,12 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{ Actor, ActorRef, Cancellable, Props }
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
-import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
 import encry.settings.EncryAppSettings
 import SnapshotHolder._
 import encry.view.state.UtxoState
@@ -15,19 +15,17 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.option._
-import encry.network.BlackList.BanReason.{
-  ExpiredNumberOfReRequestAttempts,
-  ExpiredNumberOfRequests,
-  InvalidChunkMessage,
-  InvalidResponseManifestMessage,
-  InvalidStateAfterFastSync
-}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException }
+import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
+
+import scala.concurrent.duration._
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
 import encry.view.history.History
-import encry.view.state.avlTree.{ Node, NodeSerilalizer }
+import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import cats.syntax.either._
+import encry.view.NodeViewHolder.ReceivableMessages.GetInfoFromSnapshotHolder
+
 import scala.util.Try
 import encry.view.state.avlTree.utils.implicits.Instances._
 
@@ -53,6 +51,9 @@ class SnapshotHolder(settings: EncryAppSettings,
       context.stop(self)
     }
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+    context.system.scheduler.schedule(5.seconds, 2.seconds){
+      nodeViewHolder ! GetInfoFromSnapshotHolder(snapshotDownloadController.notYetRequested.size)
+    }
     logger.info(s"SnapshotHolder started.")
     networkController ! RegisterMessagesHandler(
       Seq(

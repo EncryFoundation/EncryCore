@@ -68,13 +68,11 @@ case class AccountManager private(store: Store, password: String, mandatoryAccou
 object AccountManager {
 
   def init(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
-    println("Start account manager initialization")
     val keysDir: File = getKeysDir(settings)
     keysDir.mkdirs()
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
     val account = AccountManager(accountManagerStore, pass, Some(mnemonicKey), 0.toByte)
     account.store.close()
-    println("Account manager initialization finished")
   }
 
   val AccountPrefix: Byte = 0x05

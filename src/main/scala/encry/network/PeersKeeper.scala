@@ -54,10 +54,7 @@ class PeersKeeper(settings: EncryAppSettings,
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
     context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime){blackList = blackList.cleanupBlackList}
-    context.system.scheduler.schedule(10.seconds, 5.seconds) {
-//      println(connectedPeers)
-      dataHolder ! ConnectedPeersConnectionHelper(connectedPeers)
-    }
+    context.system.scheduler.schedule(10.seconds, 5.seconds) (dataHolder ! ConnectedPeersConnectionHelper(connectedPeers))
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )

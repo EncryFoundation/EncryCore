@@ -1,36 +1,25 @@
 package encry.api.http.routes
 
-import java.io.File
 import java.security.Security
 import java.util.concurrent.TimeUnit
-
-import akka.actor.{ActorRef, ActorRefFactory, ActorSystem}
-import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpMethods, HttpRequest, HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.{Directive, Directive1, HttpApp, Route, StandardRoute, ValidationRejection}
+import akka.actor.{ActorRef, ActorRefFactory}
+import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPermissionedUsers, GetMinerStatus, GetNodePass, StartMiner, StopMiner}
+import encry.api.http.DataHolderForApi.{GetAllChunks, GetAllInfoHelper, GetMinerStatus, GetNodePass}
 import encry.local.miner.Miner.MinerStatus
-import scalatags.Text.all.{div, span, td, _}
-import encry.settings.{EncryAppSettings, LevelDBSettings, NodeSettings, RESTApiSettings}
-import io.circe.Decoder.Result
-import io.circe.Json
-import scalatags.{Text, generic}
-import io.circe.parser
+import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
-import spray.json._
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
-import akka.http.scaladsl.server.Directives.{complete, optionalCookie}
-import encry.api.http.routes.WebRoute.{isTokenExpired, isTokenValid}
+import io.circe.{Json, parser}
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
-
-import scala.collection.immutable.{HashMap, HashSet}
-import scala.concurrent.{Await, Future}
+import scalatags.Text
+import scalatags.Text.all.{div, td, _}
+import scala.concurrent.Future
 import scala.language.implicitConversions
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 case class InfoApi(name: String,
                    stateType: String,
@@ -54,25 +43,9 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
-  // Bouncycastle is not included by default. Add it for each test.
-  if (Security.getProvider("BC") == null) {
-    Security.addProvider(new BouncyCastleProvider())
-  }
-
   def getPass: Future[Either[Throwable, String]] = (dataHolder ? GetNodePass).mapTo[Either[Throwable, String]]
 
-
-  val algorithm = JwtAlgorithm.HS256
-  val secretKey = "encry"
-
-  def isTokenExpired(token: String): Boolean = JwtSprayJson.decode(token, secretKey, Seq(algorithm)) match {
-    case Success(claims) => claims.expiration.getOrElse(0L) < System.currentTimeMillis() / 1000
-    case Failure(_) => true
-  }
-
-  def isTokenValid(token: String): Boolean = JwtSprayJson.isValid(token, secretKey, Seq(algorithm))
-
-  def sasjf = html(
+  def signUp: Text.TypedTag[String] = html(
     scalatags.Text.all.head(
       meta(charset := "utf-8"),
       meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
@@ -153,15 +126,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                 li(cls := "nav-item",
                   a(href := "https://www.encry.com", cls := "nav-link", target := "_blank", "Encry Foundation")
                 )
-//                li(cls := "nav-item",
-//                  a(href := "https://www.creative-tim.com/presentation", cls := "nav-link", target := "_blank", "About Us")
-//                ),
-//                li(cls := "nav-item",
-//                  a(href := "http://blog.creative-tim.com", cls := "nav-link", target := "_blank", "Blog")
-//                ),
-//                li(cls := "nav-item",
-//                  a(href := "https://github.com/creativetimofficial/argon-dashboard/blob/master/LICENSE.md", cls := "nav-link", target := "_blank", "MIT License")
-//                )
               )
             )
           )
@@ -183,11 +147,11 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     )
   )
 
-  def login = path("login") {
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, sasjf.render))
+  def login: Route = path("login") {
+        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, signUp.render))
   }
 
-  def loginRoute =
+  def loginRoute: Route =
     (path("token") & post) {
       onComplete(getPass) {
         case Success(pass) =>
@@ -211,7 +175,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
           WebRoute.authRoute(
             onComplete(currentInfoF) {
             case Success(info) =>
-              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, woqdl(info._1, info._2).render))
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2, info._3).render))
             case Failure(exception) =>
               println("here exception")
               complete(exception)
@@ -224,12 +188,15 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def currentInfoF: Future[(Json, MinerStatus)] = for {
+  def getAllChunks: Future[Int] = (dataHolder ? GetAllChunks).mapTo[Int]
+
+  def currentInfoF: Future[(Json, MinerStatus, Int)] = for {
     info <- infoHelper
     status <- statusF
-  } yield (info, status)
+    allChunks <- getAllChunks
+  } yield (info, status, allChunks)
 
-  def woqdl(json: Json, minerStatus: MinerStatus): Text.TypedTag[String] = {
+  def webResponse(json: Json, minerStatus: MinerStatus, size: Int): Text.TypedTag[String] = {
     val nodeInfo = parser.decode[InfoApi](json.toString())
     html(
       scalatags.Text.all.head(
@@ -466,11 +433,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                     )
                   )
                 ),
-//                script(tpe := "text/javascript",
-//                  raw("""document.getElementById("myButton").onclick = function () {
-//        document.getElementById("myButton").disabled = true;
-//    };""")
-//                )
               )
    } else {
      Seq(
@@ -482,12 +444,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
            )
          )
        ),
-//       script(tpe := "text/javascript",
-//         raw(
-//           """document.getElementById("myButton").onclick = function () {
-//        location.href = "/node/startMining";
-//    };""")
-//       )
      )
    },
      Seq(
@@ -499,12 +455,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
          )
        )
      ),
-//     script(tpe := "text/javascript",
-//       raw(
-//         """document.getElementById("aaa").onclick = function () {
-//        location.href = "/node/shutdown";
-//    };""")
-//     )
    )
     )
             )
@@ -525,10 +475,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                     // Projects table
                     table(cls := "table align-items-center table-flush", id :="myTable",
                       thead(cls := "thead-light",
-
-//                        tr(th(attr("scope") := "row", "State Type"),
-//                          td(attr("scope") := "row", nodeInfo.right.get.stateType)
-//                        ),
                         tr(th(attr("scope") := "row", "Difficulty"),
                           td(attr("scope") := "row", nodeInfo.right.get.difficulty)
                         ),
@@ -540,83 +486,26 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                         ),
                         tr(th(attr("scope") := "row", "peersCount"),
                           td(attr("scope") := "row", nodeInfo.right.get.peersCount)
-                        ), // print above
+                        ),
                         tr(th(attr("scope") := "row", "Transactions in mempool"),
                           td(attr("scope") := "row", nodeInfo.right.get.unconfirmedCount)
                         ),
                         tr(th(attr("scope") := "row", "previousFullHeaderId"),
                           td(attr("scope") := "row", nodeInfo.right.get.previousFullHeaderId)
-                        )
-                        ,
-//                        tr(th(attr("scope") := "row", "fullHeight"),
-//                          td(attr("scope") := "row", nodeInfo.right.get.fullHeight)
-//                        ),
-//                        tr(th(attr("scope") := "row", "headersHeight"),
-//                          td(attr("scope") := "row", nodeInfo.right.get.headersHeight)
-//                        ),
+                        ),
                         tr(th(attr("scope") := "row", "stateVersion"),
                           td(attr("scope") := "row", nodeInfo.right.get.stateVersion)
                         ),
                         tr(th(attr("scope") := "row", "uptime"),
                           td(attr("scope") := "row", nodeInfo.right.get.uptime)
                         ),
-//                        tr(th(attr("scope") := "row", "storage"),
-//                          td(attr("scope") := "row", nodeInfo.right.get.storage)
-//                        ),
                         tr(th(attr("scope") := "row", "isConnectedWithKnownPeers"),
                           td(attr("scope") := "row", nodeInfo.right.get.isConnectedWithKnownPeers.toString())
                         ),
                         tr(th(attr("scope") := "row", "isMining"),
                           td(attr("scope") := "row", nodeInfo.right.get.isMining.toString())
                         ),
-//                        tr(th(attr("scope") := "row", "knownPeers"),
-//                          td(attr("scope") := "row", nodeInfo.right.get.knownPeers)
-//                        )
-                        //                        th(attr("scope") := "row", "Unique users"),
-                        //                        th(attr("scope") := "row", "Bounce rate"))
                       )
-                      //                    tbody(
-                      //                      tr(
-                      //                        th(attr("scope") := "col", "/argon/"),
-                      //                        td(currentInfo.findAllByKey("name").head.toString()),
-                      //                        td("340"),
-                      //                        td(
-                      //                          i(cls := "fas fa-arrow-up text-success mr-3"), "46,53%"
-                      //                        )
-                      //                      ),
-                      //                      tr(
-                      //                        th(attr("scope") := "col", "/argon/index.html"),
-                      //                        td("3,985"),
-                      //                        td("319"),
-                      //                        td(
-                      //                          i(cls := "fas fa-arrow-down text-warning mr-3"), "46,53%"
-                      //                        )
-                      //                      )
-                      ////                      tr(
-                      ////                        th(attr("scope") := "col", "/argon/charts.html"),
-                      ////                        td("3,513"),
-                      ////                        td("294"),
-                      ////                        td(
-                      ////                          i(cls := "fas fa-arrow-down text-warning mr-3"), "36,49%"
-                      ////                        )
-                      ////                      ),
-                      ////                      tr(
-                      ////                        th(attr("scope") := "col", "/argon/tables.html"),
-                      ////                        td("2,050"),
-                      ////                        td("147"),
-                      ////                        td(
-                      ////                          i(cls := "fas fa-arrow-up text-success mr-3"), "50,87%"
-                      ////                        )
-                      ////                      ),
-                      ////                      tr(
-                      ////                        th(attr("scope") := "col", "/argon/profile.html"),
-                      ////                        td("1,795"),
-                      ////                        td("190"),
-                      ////                        td(
-                      ////                          i(cls := "fas fa-arrow-down text-danger mr-3"), "46,53%"
-                      ////                        )
-                      ////                      )
-                      //                    )
                     )
                   )
                 )
@@ -673,7 +562,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 }
 
 object WebRoute  {
-  import akka.http.scaladsl.Http
   import akka.http.scaladsl.model._
   import akka.http.scaladsl.server.Directives._
   // JWT
@@ -682,16 +570,8 @@ object WebRoute  {
     Security.addProvider(new BouncyCastleProvider())
   }
 
-  val superSecretPasswordDb = Map(
-    "admin" -> "admin",
-    "daniel" -> "Rockthejvm1!"
-  )
-
   val algorithm = JwtAlgorithm.HS256
   val secretKey = "encry"
-
-  def checkPassword(username: String, password: String): Boolean =
-    superSecretPasswordDb.contains(username) && superSecretPasswordDb(username) == password
 
   def createToken(username: String, expirationPeriodInDays: Int): String = {
       val claims = JwtClaim(
@@ -712,7 +592,7 @@ object WebRoute  {
 
   def isTokenValid(token: String): Boolean = JwtSprayJson.isValid(token, secretKey, Seq(algorithm))
 
-  def authRoute(onSuccess: Route) = {
+  def authRoute(onSuccess: Route): Route = {
     optionalCookie("JWT") {
       case Some(token) =>
         if (isTokenValid(token.value)) {
@@ -722,13 +602,13 @@ object WebRoute  {
             onSuccess
           }
         } else {
-          complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid, or has been tampered with."))
+          complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid."))
         }
       case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
     }
   }
 
-  def extractIp(pingedRoute: Route) = extractClientIP { ip =>
+  def extractIp(pingedRoute: Route): Route = extractClientIP { ip =>
     if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
       pingedRoute
   } else reject(ValidationRejection("Access denied"))

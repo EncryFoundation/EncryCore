@@ -1,8 +1,8 @@
 package encry.api.http
 
-import java.net.{ InetAddress, InetSocketAddress }
+import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{ Actor, ActorRef, Props, Stash }
+import akka.actor.{Actor, ActorRef, Props, Stash}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi._
@@ -11,45 +11,44 @@ import akka.util.Timeout
 import encry.EncryApp
 import encry.api.http.routes.InfoApiRoute
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{
-  ChangedHistory,
-  ChangedState,
-  NodeViewChange,
-  PeerFromCli,
-  RemovePeerFromBlackList,
-  UpdatedHistory
-}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList, UpdatedHistory}
+import cats.syntax.semigroup._
+import cats.instances.map._
+import cats.instances.string._
+import cats.instances.long._
+import cats.instances.tuple._
+import cats.instances.list._
 import encry.settings.EncryAppSettings
-import encry.utils.{ NetworkTime, NetworkTimeProvider }
-import encry.view.state.{ UtxoState, UtxoStateReader }
-import encry.local.miner.Miner.{ DisableMining, EnableMining, MinerStatus, StartMining }
+import encry.utils.{NetworkTime, NetworkTimeProvider}
+import encry.view.state.{UtxoState, UtxoStateReader}
+import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
-import encry.network.BlackList.{ BanReason, BanTime, BanType }
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeersKeeper.{ BanPeer, BanPeerFromAPI }
-import encry.storage.VersionalStorage.{ StorageValue, StorageVersion }
+import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
+import encry.storage.VersionalStorage.{StorageValue, StorageVersion}
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.history.{ Block, Header }
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scorex.utils.Random
 
 import scala.concurrent.Future
+import scala.concurrent.duration.FiniteDuration
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     extends Actor
     with StrictLogging
     with Stash {
 
-  implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
-  var permissionedUsers: Seq[String] = Seq("127.0.0.1")
+  implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
   override def preStart(): Unit =
     context.system.eventStream.subscribe(self, classOf[NodeViewChange])
@@ -59,6 +58,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   val liorl00Dir: LiorL00Storage = LiorL00Storage.init(settings)
 
   var connectedPeersCollection = ConnectedPeersCollection()
+
+  var allChunks: Int = 0
 
   override def postStop(): Unit = liorl00Dir.storage.close()
 
@@ -105,7 +106,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       liorl00Dir.putPassword(pass)
 
     case ConnectedPeersConnectionHelper(info) =>
-      println("info = " + info)
       context.become(
         workingCycle(
           nvhRef,
@@ -192,6 +192,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       )
 
     case PeerAdd(peer)               => context.system.eventStream.publish(PeerFromCli(peer))
+    case GetSnapshotInfoFromNVH(size) =>
+      allChunks = size
+      println(s"allchunks = $allChunks")
     case RemovePeerFromBanList(peer) =>
       //nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
       context.system.eventStream.publish(RemovePeerFromBlackList(peer))
@@ -214,12 +217,15 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         view.vault.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
       }).pipeTo(sender)
 
-//    case GetViewGetBalance =>
-//      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, Amount]] { view =>
-//        val balance: Map[String, Amount] = view.vault.getBalances.toMap
-//        //        println(balance +" 123124")
-//        if (balance.isEmpty) Map.empty[String, Amount] else balance
-//      }).pipeTo(sender)
+    case GetViewGetBalance =>
+      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, List[(String, Amount)]]] { view =>
+        val balance: Map[String, List[(String, Amount)]] = view.vault.getBalances.map{
+          case ((key, token), amount) => Map(key -> List((token, amount)))
+        }.foldLeft(Map.empty[String, List[(String, Amount)]]){case (el1, el2) => el1 |+| el2}
+//          view.vault.getBalances.toMap
+        //        println(balance +" 123124")
+        if (balance.isEmpty) Map.empty[String, List[(String, Amount)]] else balance
+      }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
       (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
@@ -253,9 +259,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         .map(_.map(_.toString))
         .pipeTo(sender)
 
-    case GetAllPermissionedUsers =>
-      sender() ! permissionedUsers
-
     case GetBannedPeersHelperAPI =>
       (self ? GetBannedPeers)
         .mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
@@ -281,8 +284,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
           _.headerIdsAtHeight(i).map(Algos.encode)
         }
         .pipeTo(sender)
-
-    case AddUser(ip) => permissionedUsers = permissionedUsers :+ ip
 
     case GetAllInfoHelper => {
 
@@ -333,9 +334,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case GetBlockInfo          => sender() ! blockInfo
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
-    case GetConnections =>
-      println("bbb = " + connectedPeersCollection)
-      sender() ! connectedPeersCollection
+    case GetConnections        => sender() ! connectedPeersCollection
+    case GetAllChunks          => sender() ! allChunks
     case PeerBanHelper(peer, msg) =>
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMiner =>
@@ -398,6 +398,8 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class ConnectedPeersConnectionHelper(c: ConnectedPeersCollection)
 
+  final case class GetSnapshotInfoFromNVH(size: Int)
+
   case object GetViewSendTx
 
   case object GetNodePass
@@ -449,6 +451,8 @@ object DataHolderForApi { //scalastyle:ignore
   case object GetBannedPeersHelperAPI
 
   case object GetAllInfo
+
+  case object GetAllChunks
 
   case object GetConnections
 

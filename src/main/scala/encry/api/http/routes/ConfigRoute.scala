@@ -55,20 +55,20 @@ val phrase: String =
         ),
         script(
           raw(s"""function configure(){
-                  var words = "${words}";
+                  var words = "$words";
                   var str = words.split(",");
-                 var pass = document.getElementById("password").value;
-                 var mnem = document.getElementById("mnemonic").value;
-                 var check1 = document.querySelector('input[name="custom-radio-1"]:checked').value;
-                 var check2 = document.querySelector('input[name="custom-radio-2"]:checked').value;
-                 var check3 = document.querySelector('input[name="custom-radio-3"]:checked').value;
-                 var host = document.forms["myForm"]["host"].value;
-                 var peer = document.forms["myForm"]["port"].value;
-                 var node = document.getElementById("nodepass").value;
-                 var nodeName= document.getElementById("nodename").value;
-                 var declared= document.getElementById("declared").value;
-                 var bind= document.getElementById("bind").value;
-                 var mnemToList = mnem.split(" ");
+                  var pass = document.getElementById("password").value;
+                  var mnem = document.getElementById("mnemonic").value;
+                  var check1 = document.querySelector('input[name="custom-radio-1"]:checked').value;
+                  var check2 = document.querySelector('input[name="custom-radio-2"]:checked').value;
+                  var check3 = document.querySelector('input[name="custom-radio-3"]:checked').value;
+                  var host = document.forms["myForm"]["host"].value;
+                  var peer = document.forms["myForm"]["port"].value;
+                  var node = document.getElementById("nodepass").value;
+                  var nodeName= document.getElementById("nodename").value;
+                  var declared= document.getElementById("declared").value;
+                  var bind= document.getElementById("bind").value;
+                  var mnemToList = mnem.split(" ");
 
                  function arrayContainsArray (superset, subset) {
                    if (0 === subset.length) {

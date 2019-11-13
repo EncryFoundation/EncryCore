@@ -285,20 +285,6 @@ class Starter(settings: EncryAppSettings,
       println("Got accumulated info.")
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
-//     val declared = Try {
-//        val declaredSpl = declaredAddr.split(":")
-//        (declaredSpl(0), declaredSpl(1).toInt)
-//     } match {
-//       case Success((host, port)) => new InetSocketAddress(host, port)
-//       case Failure(_) =>            new InetSocketAddress("192.168.22.22", 9001)
-//     }
-//      val bind = Try {
-//        val bindSpl = bindAddr.split(":")
-//        (bindSpl(0), bindSpl(1).toInt)
-//      } match {
-//        case Success((host, port)) => new InetSocketAddress(host, port)
-//        case Failure(_) =>            new InetSocketAddress("192.168.22.22", 9001)
-//      }
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings =

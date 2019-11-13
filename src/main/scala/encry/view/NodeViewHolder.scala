@@ -11,7 +11,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp.{system, timeProvider}
 import encry.api.http.DataHolderForApi
-import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
+import encry.api.http.DataHolderForApi.{BlockAndHeaderInfo, GetSnapshotInfoFromNVH}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -50,7 +50,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
-  system.actorSelection("/user/nodeViewSynchronizer") ! ChangedHistory(nodeView.history)
+  context.system.actorSelection("/user/nodeViewSynchronizer") ! ChangedHistory(nodeView.history)
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
@@ -77,6 +77,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
+    case GetInfoFromSnapshotHolder(size) =>
+      println(s"Size $size was sent")
+      dataHolder ! GetSnapshotInfoFromNVH(size)
     case CreateAccountManagerFromSeed(seed) =>
       val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)
@@ -456,6 +459,8 @@ object NodeViewHolder {
     case class GetNodeViewChanges(history: Boolean, state: Boolean, vault: Boolean)
 
     case class GetDataFromCurrentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
+
+    case class GetInfoFromSnapshotHolder(size: Int)
 
     case object GetWallet
 

@@ -35,8 +35,8 @@ object GetTxById extends Command {
           .flatMap(decoded => history.getHeaderById(ModifierId @@ decoded))
           .flatMap(history.getBlockByHeader)
       }
-    val num = args.requireArg[Ast.Str]("modifier").s
-    getFullBlockByHeaderId(num).map(_.flatMap(x => Some(Response(x.payload.txs.asJson.toString))))
+    val mod = args.requireArg[Ast.Str]("modifier").s
+    getFullBlockByHeaderId(mod).map(_.flatMap(x => Some(Response(x.payload.txs.asJson.toString))))
   }
 
 }

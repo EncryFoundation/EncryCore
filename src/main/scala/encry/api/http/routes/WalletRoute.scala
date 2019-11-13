@@ -29,37 +29,36 @@ import scala.util.{Failure, Success}
 
 
 case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
-  implicit val context: ActorRefFactory
+   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
 
-  def walletF: Future[Map[String, Amount]] = (dataHolder ? GetViewGetBalance).mapTo[Map[String, Amount]]
+ def walletF = (dataHolder ? GetViewGetBalance).mapTo[Map[String, List[(String, Amount)]]]
 
-  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
+ def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
-  def info: Future[(Map[String, Amount], List[String])] = for {
-    wallet <- walletF
-    pubKeys <- pubKeysF
-  } yield (wallet, pubKeys)
+ def info = for {
+   wallet <- walletF
+   pubKeys <- pubKeysF
+ } yield (wallet, pubKeys)
 
-  def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
+ def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def walletScript(balances: Map[String, Amount], pubKeysList: List[String]): Text.TypedTag[String] = {
+ def walletScript(balances: Map[String, List[(String, Amount)]], pubKeysList: List[String]): Text.TypedTag[String] = {
 
-    val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
+   val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
 
-    val EttTokenId: String = Algos.encode(IntrinsicTokenId)
+   val EttTokenId: String = Algos.encode(IntrinsicTokenId)
 
-    val aaa = balances.values.head.toString
-    html(
-      scalatags.Text.all.head(
-        meta(charset := "utf-8"),
-        meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
-        meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
-        meta(name := "author", content := "Creative Tim"),
-        script(
-          raw(
-            """function validateForm2() {
+   html(
+     scalatags.Text.all.head(
+       meta(charset := "utf-8"),
+       meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
+       meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
+       meta(name := "author", content := "Creative Tim"),
+       script(
+         raw(
+           """function validateForm2() {
   var y = document.forms["myForm2"]["fee"].value;
   var z = document.forms["myForm2"]["data`"].value;
   if (y == "") {
@@ -71,10 +70,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     return false;
   }
 }""")
-        ),
-        script(
-          raw(
-            """function validateForm() {
+       ),
+       script(
+         raw(
+           """function validateForm() {
   var x = document.forms["myForm"]["addr"].value;
   var y = document.forms["myForm"]["fee"].value;
   var z = document.forms["myForm"]["amount"].value;
@@ -91,10 +90,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     return false;
   }
 }""")
-        ),
-        script(
-          raw(
-            """function validateForm1() {
+       ),
+       script(
+         raw(
+           """function validateForm1() {
   var y = document.forms["myForm1"]["fee"].value;
   var z = document.forms["myForm1"]["amount"].value;
   if (y == "") {
@@ -106,10 +105,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     return false;
   }
 }""")
-        ),
-        script(
-          raw(
-            """function wallet(){
+       ),
+       script(
+         raw(
+           """function wallet(){
                  var a = document.forms["myForm"]["addr"].value;
                  var b = document.forms["myForm"]["fee"].value;
                  var x = document.forms["myForm"]["amount"].value;
@@ -126,10 +125,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     setTimeout(location.reload.bind(location), 3000);
 
                   }""")
-        ),
-        script(
-          raw(
-            """
+       ),
+       script(
+         raw(
+           """
                function contractF(){
                  var a = document.forms["myForm4"]["contract"].value;
                  var b = document.forms["myForm4"]["fee"].value;
@@ -142,26 +141,26 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+a+"&fee="+b+"&amount="+x+"&token="+coin);
                     }
                 //    request.setRequestHeader('content-type', 'application/json');
-                    request.onreadystatechange = function (oEvent) {
-                  if (request.readyState === 4) {
-                  alert(request.status)
-                      if (request.status === 200) {
-                        alert(request.responseText)
-                      } else {
-                         alert("Error", request.statusText);
-                      }
-                  }
-              };
+//                    request.onreadystatechange = function (oEvent) {
+//                  if (request.readyState === 4) {
+//                  alert(request.status)
+//                      if (request.status === 200) {
+//                        alert(request.responseText)
+//                      } else {
+//                         alert("Error", request.statusText);
+//                      }
+//                  }
+//              };
 
                     request.send();
                      window.alert("Transaction has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
 
                   }""")
-        ),
-        script(
-          raw(
-            """function token(){
+       ),
+       script(
+         raw(
+           """function token(){
                  var b = document.forms["myForm1"]["fee"].value;
                  var x = document.forms["myForm1"]["amount"].value;
                     var request = new XMLHttpRequest();
@@ -186,10 +185,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     setTimeout(location.reload.bind(location), 3000);
 
                   }""")
-        ),
-        script(
-          raw(
-            """function keyCreate() {
+       ),
+       script(
+         raw(
+           """function keyCreate() {
                    var request = new XMLHttpRequest();
                      request.open('GET', "http://localhost:9051/wallet/createKey");
                  //    request.setRequestHeader('content-type', 'application/json');
@@ -346,7 +345,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-email-83")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "babo", name := "contract", placeholder := "Contract", tpe := "text")
+                                          input(cls := "form-control", id := "contract", name := "contract", placeholder := "Contract", tpe := "text")
                                         )
                                       ),
                                       div(cls := "form-group",
@@ -356,7 +355,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bibo", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "contractfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
                                           script(
                                             raw(
                                               """
@@ -375,9 +374,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
      });
    });
  }
-              setInputFilter(document.getElementById("bibo"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              setInputFilter(document.getElementById("contractfee"), function(value) {
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) >= 0);
               });
             """.stripMargin)
                                           )
@@ -391,7 +389,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bobo", name := "amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "contractamount", name := "amount", placeholder := "Amount"),
                                           script(
                                             raw(
                                               """
@@ -410,9 +408,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
      });
    });
  }
-              setInputFilter(document.getElementById("bobo"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              setInputFilter(document.getElementById("contractamount"), function(value) {
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
               });
             """.stripMargin)
                                           ),
@@ -420,8 +417,11 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                       ),
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
-                                          for (coinIds <- balances.keys.toList) yield {
-                                            option(value := coinIds, if (coinIds == EttTokenId) "ETT" else coinIds)
+                                          for {
+                                            coinI <- balances.toList
+                                            coinIds <- coinI._2
+                                          } yield {
+                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) "ETT" else coinIds._1)
                                           }
                                         )
                                       ),
@@ -452,7 +452,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bibo2", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "datafee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
                                           script(
                                             raw(
                                               """
@@ -471,9 +471,8 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
      });
    });
  }
-              setInputFilter(document.getElementById("bibo2"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+              setInputFilter(document.getElementById("datafee"), function(value) {
+                return /^\d*$/.test(value) && (value === "");
               });
             """.stripMargin)
                                           )
@@ -487,7 +486,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bobo2", name := "data", placeholder := "Data"),
+                                          input(cls := "form-control", id := "data", name := "data", placeholder := "Data"),
                                         )
                                       ),
 
@@ -518,30 +517,29 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bibo1", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "tokenfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
                                           script(
                                             raw(
                                               """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("bibo1"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
-              });
-            """.stripMargin)
+                                                function setInputFilter(textbox, inputFilter) {
+     ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+       textbox.oldValue = "";
+        textbox.addEventListener(event, function() {
+      if (inputFilter(this.value)) {
+        this.oldValue = this.value;
+        this.oldSelectionStart = this.selectionStart;
+        this.oldSelectionEnd = this.selectionEnd;
+      } else if (this.hasOwnProperty("oldValue")) {
+        this.value = this.oldValue;
+        this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+      }
+    });
+  });
+}
+             setInputFilter(document.getElementById("tokenfee"), function(value) {
+               return /^\d*$/.test(value) && (value === "");
+             });
+           """.stripMargin)
                                           )
                                         )
 
@@ -553,30 +551,29 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bobo1", name := "amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "tokenamount", name := "amount", placeholder := "Amount"),
                                           script(
                                             raw(
                                               """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("bobo1"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
-              });
-            """.stripMargin)
+                                                function setInputFilter(textbox, inputFilter) {
+     ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+       textbox.oldValue = "";
+        textbox.addEventListener(event, function() {
+      if (inputFilter(this.value)) {
+        this.oldValue = this.value;
+        this.oldSelectionStart = this.selectionStart;
+        this.oldSelectionEnd = this.selectionEnd;
+      } else if (this.hasOwnProperty("oldValue")) {
+        this.value = this.oldValue;
+        this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+      }
+    });
+  });
+}
+             setInputFilter(document.getElementById("tokenamount"), function(value) {
+               return /^\d*$/.test(value) && (value === "");
+             });
+           """.stripMargin)
                                           ),
                                         )
                                       ),
@@ -608,7 +605,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-email-83")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "babo", name := "addr", placeholder := "Address", tpe := "text")
+                                          input(cls := "form-control", id := "transfer", name := "addr", placeholder := "Address", tpe := "text")
                                         )
                                       ),
                                       div(cls := "form-group",
@@ -618,7 +615,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bibo", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "transferfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
                                           script(
                                             raw(
                                               """
@@ -637,8 +634,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
      });
    });
  }
-              setInputFilter(document.getElementById("bibo"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+              setInputFilter(document.getElementById("transferfee"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
               });
             """.stripMargin)
@@ -653,7 +649,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "bobo", name := "amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "transferamount", name := "amount", placeholder := "Amount"),
                                           script(
                                             raw(
                                               """
@@ -672,8 +668,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
      });
    });
  }
-              setInputFilter(document.getElementById("bobo"), function(value) {
-              var x = document.getElementById("myTable").rows[1].cells[1].innerHTML;
+              setInputFilter(document.getElementById("transferamount"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
               });
             """.stripMargin)
@@ -682,8 +677,12 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                       ),
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
-                                          for (coinIds <- balances.keys.toList) yield {
-                                            option(value := coinIds, if (coinIds == EttTokenId) "ETT" else coinIds)
+                                          for {
+                                            coinI <- balances.values.toList
+                                            coinIds <- coinI
+                                          }
+                                            yield {
+                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) "ETT" else coinIds._1)
                                           }
                                         )
                                       ),
@@ -706,21 +705,27 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     table(cls := "table align-items-center table-flush", id := "myTable",
                       thead(cls := "thead-light",
                         tr(
+                          th(attr("scope") := "row", "Account"),
                           th(attr("scope") := "row", "TokenId"),
                           th(attr("scope") := "row", "Balance")
                         )
                       ),
                       tbody(
 
-                        (for (b <- balances) yield {
-                          val tknStr = b._1 match {
-                            case encry if b._1 == EttTokenId => "ETT"
-                            case _ => b._1
+                        (for {
+                          bal <- balances.toList
+                          tup2 <- bal._2
+                        } yield {
+                          val tknStr = tup2._1 match {
+                            case encry if tup2._1 == EttTokenId => "ETT"
+                            case _ => tup2._1
                           }
                           tr(
+                            th(bal._1
+                            ),
                             th(tknStr
                             ),
-                            th(b._2
+                            th(tup2._2
                             )
                           )
                         }).toSeq: _*
@@ -831,8 +836,6 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         onComplete(info) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
-          case Failure(_) =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(Map.empty[String, Amount], List.empty[String]).render))
         }
       )
     )
