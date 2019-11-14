@@ -60,7 +60,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
 
-  var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
@@ -91,7 +90,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
   }
-  var isHeaderChainSyncedLocal: Boolean = false
+
+  var validateByStateWhileFastSYnc: Boolean =
+    settings.snapshotSettings.enableFastSynchronization && !settings.snapshotSettings.enableFastSynchronization
 
   override def receive: Receive =
     if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
@@ -113,7 +114,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.info(s"Updated best block in fast sync mod. Updated state height")
         nodeView.history.blockDownloadProcessor.updateBestBlock(bestHeader)
         nodeView.history.isHeadersChainSyncedVar = true
-        nodeView.history.enablePayloadsDownloading = false
+        nodeView.history.enablePayloadsDownloading = true
         val history = nodeView.history.reportModifierIsValidFastSync(bestHeader.id, bestHeader.payloadId)
         logger.info(s"Wallet scanning started")
         val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
@@ -318,6 +319,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         .actorSelection("user/statsSender") !
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
+        case Right((historyBeforeStUpdate, progressInfo)) if !validateByState =>
+
         case Right((historyBeforeStUpdate, progressInfo)) =>
           logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
           logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
