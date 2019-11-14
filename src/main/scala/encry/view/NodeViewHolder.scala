@@ -105,24 +105,27 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       updateNodeView(updatedVault = newAccount.toOption)
       sender() ! newAccount
     case FastSyncFinished(state) =>
-      logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
+      logger.info(s"Fast sync is finished. Start updating node view inside node view holder")
       nodeView.state.tree.storage.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
-        nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
-          logger.info(s"Updated best block in fast sync mod. Updated state height.")
-          nodeView.history.blockDownloadProcessor.updateBestBlock(h)
-          nodeView.history.isHeadersChainSyncedVar = true
-          nodeView.history.isFastSync = false
-          val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
-          val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
-          updateNodeView(
-            updatedHistory = Some(history),
-            updatedState = Some(state),
-            updatedVault = Some(wallet)
-          )
-          nodeViewSynchronizer ! FastSyncDone
-          context.become(defaultMessages(true))
-        }
+      logger.info(s"Removed temporary state dir.")
+      nodeView.history.getBestHeaderAtHeight(state.height).foreach { bestHeader =>
+        logger.info(s"Updated best block in fast sync mod. Updated state height")
+        nodeView.history.blockDownloadProcessor.updateBestBlock(bestHeader)
+        nodeView.history.isHeadersChainSyncedVar = true
+        nodeView.history.enablePayloadsDownloading = false
+        val history = nodeView.history.reportModifierIsValidFastSync(bestHeader.id, bestHeader.payloadId)
+        logger.info(s"Wallet scanning started")
+        val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
+        logger.info(s"Wallet scanning finished")
+        updateNodeView(
+          updatedHistory = Some(history),
+          updatedState = Some(state),
+          updatedVault = Some(wallet)
+        )
+        nodeViewSynchronizer ! FastSyncDone
+        context.become(defaultMessages(true))
+      }
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -250,6 +253,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
+
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions

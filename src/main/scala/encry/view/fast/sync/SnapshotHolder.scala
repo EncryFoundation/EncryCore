@@ -283,7 +283,6 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def commonMessages: Receive = {
-
     case HeaderChainIsSynced               =>
     case SemanticallySuccessfulModifier(_) =>
     case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
