@@ -52,13 +52,13 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function validateForm() {
-  var y = document.forms["myForm"]["fee"].value;
-  var z = document.forms["myForm"]["amount"].value;
-  if (y == "") {
+  var fee = document.forms["myForm"]["fee"].value;
+  var amount = document.forms["myForm"]["amount"].value;
+  if (fee == "") {
      alert("Address must be filled out");
      return false;
    }
- if (z == "") {
+ if (amount == "") {
     alert("Port must be filled out");
     return false;
   }
@@ -66,12 +66,12 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
         ),
         script(
           raw("""function wallet(){
-                 var b = document.forms["myForm"]["fee"].value;
-                 var x = document.forms["myForm"]["amount"].value;
+                 var fee = document.forms["myForm"]["fee"].value;
+                 var amount = document.forms["myForm"]["amount"].value;
                     var request = new XMLHttpRequest();
                     request.open('POST', "http://localhost:9051/peers/add", true);
                 //    request.setRequestHeader('content-type', 'application/json');
-                    request.send(b.toString() + ':' + x.toString());
+                    request.send(fee.toString() + ':' + amount.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
 
@@ -213,29 +213,7 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
                                             )
                                           ),
                                           input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Address", tpe := "text"),
-                                          //                                          script(
-                                          //                                            raw(
-                                          //                                              """
-                                          //                                                 function setInputFilter(textbox, inputFilter) {
-                                          //      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-                                          //        textbox.oldValue = "";
-                                          //         textbox.addEventListener(event, function() {
-                                          //       if (inputFilter(this.value)) {
-                                          //         this.oldValue = this.value;
-                                          //         this.oldSelectionStart = this.selectionStart;
-                                          //         this.oldSelectionEnd = this.selectionEnd;
-                                          //       } else if (this.hasOwnProperty("oldValue")) {
-                                          //         this.value = this.oldValue;
-                                          //         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-                                          //       }
-                                          //     });
-                                          //   });
-                                          // }
-                                          //              setInputFilter(document.getElementById("bibo"), function(value) {
-                                          //                return /^-?\d*[.,]?\d*$/.test(value);
-                                          //              });
-                                          //            """.stripMargin)
-                                          //                                          )
+
                                         )
 
                                       ),
@@ -246,7 +224,7 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bobo", name:="amount", placeholder := "Port"),
+                                          input(cls := "form-control", id:="amount", name:="amount", placeholder := "Port"),
                                           script(
                                             raw(
                                               """
@@ -265,7 +243,7 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
      });
    });
  }
-              setInputFilter(document.getElementById("bobo"), function(value) {
+              setInputFilter(document.getElementById("amount"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
               });
             """.stripMargin)

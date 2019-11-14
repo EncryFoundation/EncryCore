@@ -175,10 +175,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
           WebRoute.authRoute(
             onComplete(currentInfoF) {
             case Success(info) =>
-              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2, info._3).render))
-            case Failure(exception) =>
-              println("here exception")
-              complete(exception)
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2).render))
+            case Failure(exception) => complete(exception)
           })
       )
     }
@@ -188,15 +186,12 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def getAllChunks: Future[Int] = (dataHolder ? GetAllChunks).mapTo[Int]
-
-  def currentInfoF: Future[(Json, MinerStatus, Int)] = for {
+  def currentInfoF: Future[(Json, MinerStatus)] = for {
     info <- infoHelper
     status <- statusF
-    allChunks <- getAllChunks
-  } yield (info, status, allChunks)
+  } yield (info, status)
 
-  def webResponse(json: Json, minerStatus: MinerStatus, size: Int): Text.TypedTag[String] = {
+  def webResponse(json: Json, minerStatus: MinerStatus): Text.TypedTag[String] = {
     val nodeInfo = parser.decode[InfoApi](json.toString())
     html(
       scalatags.Text.all.head(
@@ -210,7 +205,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     window.alert("The node was disconnected...");
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/shutdown");
-//    request.setRequestHeader('content-type', 'application/json');
     request.send();
   }""")
         ),
@@ -218,7 +212,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
           raw("""function start(){
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/startMining");
-//    request.setRequestHeader('content-type', 'application/json');
     request.send();
     setTimeout(location.reload.bind(location), 5000);
     window.alert("Start mining... \n Reloading page in 5s.");
@@ -228,7 +221,6 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
           raw("""function stop(){
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/stopMining");
-//    request.setRequestHeader('content-type', 'application/json');
     request.send();
     setTimeout(location.reload.bind(location), 5000);
     window.alert("Stop mining... \n Reloading page in 5s.");
@@ -565,10 +557,6 @@ object WebRoute  {
   import akka.http.scaladsl.model._
   import akka.http.scaladsl.server.Directives._
   // JWT
-  // Bouncycastle is not included by default. Add it for each test.
-  if (Security.getProvider("BC") == null) {
-    Security.addProvider(new BouncyCastleProvider())
-  }
 
   val algorithm = JwtAlgorithm.HS256
   val secretKey = "encry"
@@ -577,7 +565,7 @@ object WebRoute  {
       val claims = JwtClaim(
         expiration = Some(System.currentTimeMillis() / 1000 + TimeUnit.DAYS.toSeconds(expirationPeriodInDays)),
         issuedAt = Some(System.currentTimeMillis() / 1000),
-        issuer = Some("rockthejvm.com"),
+        issuer = Some("encry.com"),
         subject = Some(username)
       )
 

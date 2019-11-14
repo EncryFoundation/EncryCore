@@ -84,7 +84,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V], storage:
       })
     )
     logger.info(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
-    //println(newRoot.node)
     AvlTree(shadowedRoot, storage)
   }
 

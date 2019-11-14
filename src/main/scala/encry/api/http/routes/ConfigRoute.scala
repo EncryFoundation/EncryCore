@@ -28,10 +28,9 @@ case class ConfigRoute(override val settings: RESTApiSettings, starter: ActorRef
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
-val phrase: String =
-  Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+  val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
 
-  val words = Mnemonic.getWords.toList.mkString(",")
+  val words: String = Mnemonic.getWords.toList.mkString(",")
 
   def peerScript(): Text.TypedTag[String] = {
 
@@ -54,7 +53,8 @@ val phrase: String =
             """.stripMargin)
         ),
         script(
-          raw(s"""function configure(){
+          raw(
+            s"""function configure(){
                   var words = "$words";
                   var str = words.split(",");
                   var pass = document.getElementById("password").value;
@@ -80,31 +80,30 @@ val phrase: String =
                  }
 
                  if (pass == "") {
-      alert("Password must be filled out");
-      return false;
-    }
+                    alert("Password must be filled out");
+                    return false;
+                  }
 
-                if (!(ValidateIPaddress(host))){
-                return false;
-                };
+                 if (!(ValidateIPaddress(host))){
+                    return false;
+                  };
 
-    if (mnem == "") {
-       alert("Please, save it and don't show to anyone! : ${phrase}");
-      var request = new XMLHttpRequest();
-      request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&peer="+peer+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
-      request.send();
-      window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
-      //                    setTimeout(location.reload.bind(location), 3000);
-     } else {
+                if (mnem == "") {
+                    alert("Please, save it and don't show to anyone! : ${phrase}");
+                    var request = new XMLHttpRequest();
+                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&peer="+peer+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
+                    request.send();
+                    window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
+                } else {
                  if ((mnemToList.length == 12) && arrayContainsArray(str, mnemToList)) {
                     var request = new XMLHttpRequest();
                     request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+mnem+"&chain="+check1+"&sync="+check2+"&host="+host+"&peer="+peer+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
                     request.send();
                     window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
-} else {
+                    } else {
                  window.alert("Invalid mnemonic");
-}
-}
+                       }
+                    }
                   }""".stripMargin)
         ),
 
@@ -253,33 +252,33 @@ val phrase: String =
                                 div(cls := "input-group input-group-alternative mb-3",
                                   div(cls := "input-group-prepend",
                                   ),
-                                  input(cls := "form-control", id:="bibo", name:="host", placeholder := " Address", tpe := "text"),
+                                  input(cls := "form-control", id:="host", name:="host", placeholder := " Address", tpe := "text"),
                                 )
                               ),
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative",
                                   div(cls := "input-group-prepend",
                                   ),
-                                  input(cls := "form-control", id:="bobo", name:="port", placeholder := " Port"),
+                                  input(cls := "form-control", id:="port", name:="port", placeholder := " Port"),
                                   script(
                                     raw(
                                       """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("bobo"), function(value) {
+                  function setInputFilter(textbox, inputFilter) {
+                      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+                        textbox.oldValue = "";
+                         textbox.addEventListener(event, function() {
+                       if (inputFilter(this.value)) {
+                         this.oldValue = this.value;
+                         this.oldSelectionStart = this.selectionStart;
+                         this.oldSelectionEnd = this.selectionEnd;
+                       } else if (this.hasOwnProperty("oldValue")) {
+                         this.value = this.oldValue;
+                         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+                       }
+                    });
+                  });
+                }
+              setInputFilter(document.getElementById("port"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
               });
             """.stripMargin)
@@ -296,21 +295,21 @@ val phrase: String =
                                 script(
                                   raw(
                                     """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
+                  function setInputFilter(textbox, inputFilter) {
+                     ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+                       textbox.oldValue = "";
+                        textbox.addEventListener(event, function() {
+                      if (inputFilter(this.value)) {
+                        this.oldValue = this.value;
+                        this.oldSelectionStart = this.selectionStart;
+                        this.oldSelectionEnd = this.selectionEnd;
+                      } else if (this.hasOwnProperty("oldValue")) {
+                        this.value = this.oldValue;
+                        this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+                      }
+                    });
+                  });
+                }
               setInputFilter(document.getElementById("maxconnect"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) < 31);
               });
@@ -327,22 +326,21 @@ val phrase: String =
                                 input(cls := "form-control", id:="worker", name:="worker", placeholder := " Workers (max = 10)"),
                                 script(
                                   raw(
-                                    """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
+                                    """function setInputFilter(textbox, inputFilter) {
+                    ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+                      textbox.oldValue = "";
+                       textbox.addEventListener(event, function() {
+                     if (inputFilter(this.value)) {
+                       this.oldValue = this.value;
+                       this.oldSelectionStart = this.selectionStart;
+                       this.oldSelectionEnd = this.selectionEnd;
+                     } else if (this.hasOwnProperty("oldValue")) {
+                       this.value = this.oldValue;
+                       this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+                     }
+                   });
+                });
+               }
               setInputFilter(document.getElementById("worker"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) < 11);
               });
@@ -421,62 +419,51 @@ val phrase: String =
     )
   }
 
-//  def validateInfo = (path("validatate") & get) {
-//    parameters('mnem, 'host, 'peer) { (mnemonic, host, peer) =>
-//
-//    }
-//  }
-
-  def sendAllInfo: Route = (path("collect") & get){
+  def sendAllInfo: Route = (path("collect") & get) {
     parameters('password, 'mnem, 'chain, 'sync, 'host, 'peer, 'cwp, 'nodePass, 'nodeName, 'declared, 'bind) {
       (password, mnemonic, chain, sync, host, peer, cwp, nodePass, nodeName, declaredAddr, bindAddr) =>
 
-      val passwordR: String = password
-      val mnemonicR: String = mnemonic match {
-        case x: String => x
-      }
-      val chainR: Boolean = chain match {
-        case "Yes" => true
-        case "No"  => false
-      }
-      val syncR: Boolean = sync match {
-        case "Fast"   => true
-        case "Normal" => false
-      }
-      val peerR: InetSocketAddress = new InetSocketAddress(host, peer.toInt)
-      val cwpR: Boolean = cwp match {
-        case "true" => true
-        case "false" => false
-      }
+        val passwordR: String = password
+        val mnemonicR: String = mnemonic match {
+          case x: String => x
+        }
+        val chainR: Boolean = chain match {
+          case "Yes" => true
+          case "No" => false
+        }
+        val syncR: Boolean = sync match {
+          case "Fast" => true
+          case "Normal" => false
+        }
+        val peerR: InetSocketAddress = new InetSocketAddress(host, peer.toInt)
+        val cwpR: Boolean = cwp match {
+          case "true" => true
+          case "false" => false
+        }
         val nodePassR = nodePass
 
         val declared = Try {
           val declaredSpl = declaredAddr.split(":")
           (declaredSpl(0), declaredSpl(1).toInt)
         } match {
-          case Success((host, port)) => Some(new InetSocketAddress(host, port))
-          case Failure(_) =>             None
+          case Success((hostS, port)) => Some(new InetSocketAddress(hostS, port))
+          case Failure(_) => None
         }
         val bind = Try {
           val bindSpl = bindAddr.split(":")
           (bindSpl(0), bindSpl(1).toInt)
         } match {
-          case Success((host, port)) => new InetSocketAddress(host, port)
-          case Failure(_) =>            new InetSocketAddress("0.0.0.0", 9001)
+          case Success((hostS, port)) => new InetSocketAddress(hostS, port)
+          case Failure(_) => new InetSocketAddress("0.0.0.0", 9001)
         }
 
-      starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePassR, nodeName, declared, bind)
-      complete("OK")
+        starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePassR, nodeName, declared, bind)
+        complete("OK")
     }
   }
 
   def configR: Route = (path("config") & get) {
-    extractClientIP { ip =>
-      if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript().render))
-
-      } else reject(ValidationRejection("Restricted!"))
-    }
+    WebRoute.extractIp(complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript().render)))
   }
 
   override def route: Route = configR ~ sendAllInfo

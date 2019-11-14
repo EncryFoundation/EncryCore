@@ -1,52 +1,43 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorRef, Props, Stash}
-import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp._
-import encry.api.http.DataHolderForApi._
 import akka.pattern._
 import akka.util.Timeout
+import cats.instances.list._
+import cats.instances.map._
+import cats.syntax.semigroup._
+import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
+import encry.EncryApp._
+import encry.api.http.DataHolderForApi._
 import encry.api.http.routes.InfoApiRoute
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, ChangedState, NodeViewChange, PeerFromCli, RemovePeerFromBlackList, UpdatedHistory}
-import cats.syntax.semigroup._
-import cats.instances.map._
-import cats.instances.string._
-import cats.instances.long._
-import cats.instances.tuple._
-import cats.instances.list._
-import encry.settings.EncryAppSettings
-import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartMining}
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
-import encry.storage.VersionalStorage.{StorageValue, StorageVersion}
+import encry.network.PeersKeeper.BanPeerFromAPI
+import encry.settings.EncryAppSettings
+import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
+import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import scorex.utils.Random
-
 import scala.concurrent.Future
-import scala.concurrent.duration.FiniteDuration
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     extends Actor
     with StrictLogging
     with Stash {
-
 
   implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
@@ -55,23 +46,19 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
   override def receive: Receive = awaitNVHRef
 
-  val liorl00Dir: LiorL00Storage = LiorL00Storage.init(settings)
+  val storageL: AccStorage = AccStorage.init(settings)
 
   var connectedPeersCollection = ConnectedPeersCollection()
 
-  var allChunks: Int = 0
-
-  override def postStop(): Unit = liorl00Dir.storage.close()
+  override def postStop(): Unit = storageL.storage.close()
 
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
       unstashAll()
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
-    case PasswordForLiorL00Storage(pass) =>
+    case PassForStorage(_) =>
       stash()
-    case GetNodePass =>
-      sender() ! liorl00Dir.getPassword
-    case i => println(i)
+    case GetNodePass => sender() ! storageL.getPassword
   }
 
   def workingCycle(nvhRef: ActorRef,
@@ -99,11 +86,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case GetNodePass =>
-      sender() ! liorl00Dir.getPassword
+    case GetNodePass => sender() ! storageL.getPassword
 
-    case PasswordForLiorL00Storage(pass) =>
-      liorl00Dir.putPassword(pass)
+    case PassForStorage(pass) => storageL.putPassword(pass)
 
     case ConnectedPeersConnectionHelper(info) =>
       context.become(
@@ -191,12 +176,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case PeerAdd(peer)               => context.system.eventStream.publish(PeerFromCli(peer))
-    case GetSnapshotInfoFromNVH(size) =>
-      allChunks = size
-      println(s"allchunks = $allChunks")
+    case PeerAdd(peer) => context.system.eventStream.publish(PeerFromCli(peer))
+
     case RemovePeerFromBanList(peer) =>
-      //nodeViewSynchronizer ! RemovePeerFromBlackList(peer)
       context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
@@ -219,11 +201,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
     case GetViewGetBalance =>
       (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, List[(String, Amount)]]] { view =>
-        val balance: Map[String, List[(String, Amount)]] = view.vault.getBalances.map{
+        val balance: Map[String, List[(String, Amount)]] = view.vault.getBalances.map {
           case ((key, token), amount) => Map(key -> List((token, amount)))
-        }.foldLeft(Map.empty[String, List[(String, Amount)]]){case (el1, el2) => el1 |+| el2}
-//          view.vault.getBalances.toMap
-        //        println(balance +" 123124")
+        }.foldLeft(Map.empty[String, List[(String, Amount)]]) { case (el1, el2) => el1 |+| el2 }
         if (balance.isEmpty) Map.empty[String, List[(String, Amount)]] else balance
       }).pipeTo(sender)
 
@@ -335,7 +315,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
     case GetConnections        => sender() ! connectedPeersCollection
-    case GetAllChunks          => sender() ! allChunks
     case PeerBanHelper(peer, msg) =>
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMiner =>
@@ -392,7 +371,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class AddUser(ip: String)
 
-  final case class PasswordForLiorL00Storage(password: String)
+  final case class PassForStorage(password: String)
 
   final case class PeerBanHelper(addr: InetSocketAddress, msg: String)
 

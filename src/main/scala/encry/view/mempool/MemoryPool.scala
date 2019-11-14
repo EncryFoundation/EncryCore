@@ -37,7 +37,6 @@ class MemoryPool(settings: EncryAppSettings,
   override def preStart(): Unit = {
     logger.debug(s"Starting MemoryPool. Initializing all schedulers")
     context.system.eventStream.subscribe(self, classOf[NewTransaction])
-    context.system.scheduler.schedule(5.seconds, 10.seconds)(println(memoryPool.settings.mempool))
     context.system.scheduler.schedule(
       settings.mempool.bloomFilterCleanupInterval,
       settings.mempool.bloomFilterCleanupInterval, self, CleanupBloomFilter)
@@ -86,13 +85,6 @@ class MemoryPool(settings: EncryAppSettings,
           s" Not yet requested ids size is ${notYetRequestedTransactions.size}.")
       } else logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
         s" There are no not yet requested ids.")
-
-    case ChangeMempoolSettings(cleanupIntervalR, maxCapacityR, txLimitR) =>
-      println("Got new msg")
-      val memSettings: MemoryPoolSettings = settings.mempool.copy(maxCapacity = maxCapacityR, transactionsLimit = txLimitR)
-      val newSettings  = settings.copy(mempool = memSettings)
-      memoryPool = memoryPool.copy(settings = newSettings)
-      println(memoryPool.settings.mempool)
 
     case RolledBackTransactions(transactions) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransactions: Seq[Transaction]) =

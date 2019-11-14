@@ -33,7 +33,7 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
 
   def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
-  def peersAllF = (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]]
+  def peersAllF: Future[Seq[InetSocketAddress]] = (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]]
 
   def info: Future[Seq[InetSocketAddress]] = for {
     peerAll <- peersAllF
@@ -43,59 +43,12 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
 
   def peerScript(peers: Seq[InetSocketAddress] ): Text.TypedTag[String] = {
 
-    val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
-
-    val EttTokenId: String = Algos.encode(IntrinsicTokenId)
-
     html(
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
         meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
         meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
         meta(name := "author", content := "Creative Tim"),
-        script(
-          raw("""function validateForm() {
-  var x = document.forms["myForm"]["addr"].value;
-  var y = document.forms["myForm"]["fee"].value;
-  var z = document.forms["myForm"]["amount"].value;
-  if (x == "") {
-    alert("Address must be filled out");
-    return false;
-  }
-  if (y == "") {
-     alert("Fee must be filled out");
-     return false;
-   }
- if (z == "") {
-    alert("Amount must be filled out");
-    return false;
-  }
-}""")
-        ),
-        script(
-          raw("""function wallet(){
-                 var a = document.forms["myForm"]["addr"].value;
-                 var b = document.forms["myForm"]["fee"].value;
-                 var x = document.forms["myForm"]["amount"].value;
-                    var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x);
-                //    request.setRequestHeader('content-type', 'application/json');
-                    request.send();
-                     window.alert("Transaction has been sent successfully");
-                    setTimeout(location.reload.bind(location), 3000);
-
-                  }""")
-        ),
-        script(
-          raw("""function keyCreate() {
-                   var request = new XMLHttpRequest();
-                     request.open('GET', "http://localhost:9051/wallet/createKey");
-                 //    request.setRequestHeader('content-type', 'application/json');
-                     request.send();
-                      window.alert("Key created successfully");
-                     setTimeout(location.reload.bind(location), 1500);
-}""")
-        ),
 
         tag("title")(
           "Argon Dashboard - Free Dashboard for Bootstrap 4"

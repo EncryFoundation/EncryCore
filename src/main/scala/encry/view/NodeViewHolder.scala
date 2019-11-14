@@ -77,9 +77,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   override def receive: Receive = {
-    case GetInfoFromSnapshotHolder(size) =>
-      println(s"Size $size was sent")
-      dataHolder ! GetSnapshotInfoFromNVH(size)
     case CreateAccountManagerFromSeed(seed) =>
       val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)

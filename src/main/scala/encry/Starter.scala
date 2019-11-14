@@ -28,7 +28,7 @@ import cats.instances.future._
 
 import scala.concurrent.Future
 import encry.Starter.InitNodeResult
-import encry.api.http.DataHolderForApi.PasswordForLiorL00Storage
+import encry.api.http.DataHolderForApi.PassForStorage
 import encry.view.wallet.AccountManager
 
 import scala.io.StdIn
@@ -185,13 +185,7 @@ class Starter(settings: EncryAppSettings,
           loop(peers)
         }
         def handleResult: InetSocketAddress => Either[Throwable, List[InetSocketAddress]] =
-          (peer: InetSocketAddress) => {
-//            println("Would you like to enter one more peer?")
-
-//              case Left(_)               => List.empty.asRight[Throwable]
-            (peers :+ peer).asRight[Throwable]
-//              case Right(_)              => (peers :+ peer).asRight[Throwable]
-
+          (peer: InetSocketAddress) => {(peers :+ peer).asRight[Throwable]
           }
         Either.catchNonFatal {
           println("Enter port:")
@@ -281,7 +275,6 @@ class Starter(settings: EncryAppSettings,
                         declaredAddr,
                         bindAddr) =>
       import scala.concurrent.duration._
-      println(s"declared -> $declaredAddr, bind -> $bindAddr, fastSync -> $fastSync, peers -> $peers")
       println("Got accumulated info.")
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
@@ -293,7 +286,6 @@ class Starter(settings: EncryAppSettings,
                               nodeName = nodeName.some,
                               declaredAddress = declaredAddr,
                               bindAddress = bindAddr)
-      println(s"netword settings = $networkSettings")
       val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
       val newSettings = settings.copy(
         wallet = walletSettings,
@@ -317,7 +309,7 @@ class Starter(settings: EncryAppSettings,
         "nodeViewHolder"
       )
 
-      if (nodePass.nonEmpty) dataHolderForApi ! PasswordForLiorL00Storage(nodePass)
+      if (nodePass.nonEmpty) dataHolderForApi ! PassForStorage(nodePass)
 
       context.system.actorOf(
         NodeViewSynchronizer

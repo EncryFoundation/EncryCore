@@ -33,7 +33,9 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 ) extends EncryBaseApiRoute with StrictLogging {
 
 
- def walletF = (dataHolder ? GetViewGetBalance).mapTo[Map[String, List[(String, Amount)]]]
+ def walletF: Future[Map[String, List[(String, Amount)]]] =
+   (dataHolder ? GetViewGetBalance)
+     .mapTo[Map[String, List[(String, Amount)]]]
 
  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
@@ -59,13 +61,13 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function validateForm2() {
-  var y = document.forms["myForm2"]["fee"].value;
-  var z = document.forms["myForm2"]["data`"].value;
-  if (y == "") {
+        var fee = document.forms["myForm2"]["fee"].value;
+        var data = document.forms["myForm2"]["data"].value;
+  if (fee == "") {
      alert("Fee must be filled out");
      return false;
    }
- if (z == "") {
+ if (data == "") {
     alert("Data must be filled out");
     return false;
   }
@@ -74,18 +76,18 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function validateForm() {
-  var x = document.forms["myForm"]["addr"].value;
-  var y = document.forms["myForm"]["fee"].value;
-  var z = document.forms["myForm"]["amount"].value;
-  if (x == "") {
+  var addr = document.forms["myForm"]["addr"].value;
+  var fee = document.forms["myForm"]["fee"].value;
+  var amount = document.forms["myForm"]["amount"].value;
+  if (addr == "") {
     alert("Address must be filled out");
     return false;
   }
-  if (y == "") {
+  if (fee == "") {
      alert("Fee must be filled out");
      return false;
    }
- if (z == "") {
+ if (amount == "") {
     alert("Amount must be filled out");
     return false;
   }
@@ -94,13 +96,13 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function validateForm1() {
-  var y = document.forms["myForm1"]["fee"].value;
-  var z = document.forms["myForm1"]["amount"].value;
-  if (y == "") {
+  var fee = document.forms["myForm1"]["fee"].value;
+  var amount = document.forms["myForm1"]["amount"].value;
+  if (fee == "") {
      alert("Fee must be filled out");
      return false;
    }
- if (z == "") {
+ if (amount == "") {
     alert("Amount must be filled out");
     return false;
   }
@@ -109,17 +111,16 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function wallet(){
-                 var a = document.forms["myForm"]["addr"].value;
-                 var b = document.forms["myForm"]["fee"].value;
-                 var x = document.forms["myForm"]["amount"].value;
-                 var e = document.forms["myForm"]["coin"].value;
+                 var addr = document.forms["myForm"]["addr"].value;
+                 var fee = document.forms["myForm"]["fee"].value;
+                 var amount = document.forms["myForm"]["amount"].value;
+                 var coin = document.forms["myForm"]["coin"].value;
                     var request = new XMLHttpRequest();
-                    if (e == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x);
+                    if (coin == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
+                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount);
                     } else {
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+a+"&fee="+b+"&amount="+x+"&token="+e);
+                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount+"&token="+coin);
                     }
-                //    request.setRequestHeader('content-type', 'application/json');
                     request.send();
                      window.alert("Transaction has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
@@ -130,28 +131,16 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
          raw(
            """
                function contractF(){
-                 var a = document.forms["myForm4"]["contract"].value;
-                 var b = document.forms["myForm4"]["fee"].value;
-                 var x = document.forms["myForm4"]["amount"].value;
+                 var contract = document.forms["myForm4"]["contract"].value;
+                 var fee = document.forms["myForm4"]["fee"].value;
+                 var amount = document.forms["myForm4"]["amount"].value;
                  var coin = document.forms["myForm4"]["coin"].value;
                     var request = new XMLHttpRequest();
                     if (coin == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
-                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+a+"&fee="+b+"&amount="+x);
+                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount);
                     } else {
-                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+a+"&fee="+b+"&amount="+x+"&token="+coin);
+                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount+"&token="+coin);
                     }
-                //    request.setRequestHeader('content-type', 'application/json');
-//                    request.onreadystatechange = function (oEvent) {
-//                  if (request.readyState === 4) {
-//                  alert(request.status)
-//                      if (request.status === 200) {
-//                        alert(request.responseText)
-//                      } else {
-//                         alert("Error", request.statusText);
-//                      }
-//                  }
-//              };
-
                     request.send();
                      window.alert("Transaction has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
@@ -161,13 +150,12 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function token(){
-                 var b = document.forms["myForm1"]["fee"].value;
-                 var x = document.forms["myForm1"]["amount"].value;
+                 var fee = document.forms["myForm1"]["fee"].value;
+                 var amount = document.forms["myForm1"]["amount"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/createToken?fee="+b+"&amount="+x);
-                //    request.setRequestHeader('content-type', 'application/json');
+                    request.open('GET', "http://localhost:9051/wallet/createToken?fee="+fee+"&amount="+amount);
                     request.send();
-                     window.alert("Token has been created successfully");
+                     window.alert("Transaction with token creation has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
 
                   }""")
@@ -175,11 +163,10 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
         script(
           raw(
             """function dataTx(){
-                 var b = document.forms["myForm2"]["fee"].value;
-                 var x = document.forms["myForm2"]["data"].value;
+                 var fee = document.forms["myForm2"]["fee"].value;
+                 var data = document.forms["myForm2"]["data"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/data?fee="+b+"&data="+x);
-                //    request.setRequestHeader('content-type', 'application/json');
+                    request.open('GET', "http://localhost:9051/wallet/data?fee="+fee+"&data="+data);
                     request.send();
                      window.alert("Data has been created successfully");
                     setTimeout(location.reload.bind(location), 3000);
@@ -191,7 +178,6 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
            """function keyCreate() {
                    var request = new XMLHttpRequest();
                      request.open('GET', "http://localhost:9051/wallet/createKey");
-                 //    request.setRequestHeader('content-type', 'application/json');
                      request.send();
                       window.alert("Key created successfully");
                      setTimeout(location.reload.bind(location), 1500);
@@ -472,7 +458,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
    });
  }
               setInputFilter(document.getElementById("datafee"), function(value) {
-                return /^\d*$/.test(value) && (value === "");
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
               });
             """.stripMargin)
                                           )
@@ -537,7 +523,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
   });
 }
              setInputFilter(document.getElementById("tokenfee"), function(value) {
-               return /^\d*$/.test(value) && (value === "");
+               return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
              });
            """.stripMargin)
                                           )
@@ -571,7 +557,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
   });
 }
              setInputFilter(document.getElementById("tokenamount"), function(value) {
-               return /^\d*$/.test(value) && (value === "");
+               return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
              });
            """.stripMargin)
                                           ),
@@ -635,7 +621,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
    });
  }
               setInputFilter(document.getElementById("transferfee"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) >= 0);
               });
             """.stripMargin)
                                           )
@@ -669,7 +655,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
    });
  }
               setInputFilter(document.getElementById("transferamount"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= x);
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) >= 0);
               });
             """.stripMargin)
                                           ),
@@ -813,24 +799,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
     )
   }
 
-  //  def authRoute(onSuccess: HttpEntity) = {
-  //    optionalCookie("JWT") {
-  //      case Some(token) =>
-  //        if (isTokenValid(token.value)) {
-  //          if (isTokenExpired(token.value)) {
-  //            complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
-  //          } else {
-  //            complete(onSuccess)
-  //          }
-  //        } else {
-  //          complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid, or has been tampered with."))
-  //        }
-  //      case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
-  //    }
-  //  }
-
   override def route: Route = path("webWallet") {
-    //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
     WebRoute.extractIp(
       WebRoute.authRoute(
         onComplete(info) {

@@ -78,7 +78,7 @@ object ConsoleListener {
       "addrs"       -> PrintAddresses, //table
       "createKey"   -> CreateKey, //button
       "pubKeys"     -> PrintPubKeys, // table
-//      "balance"     -> GetBalance,  // table
+      "balance"     -> GetBalance,  // table
       "transfer"    -> Transfer, // add
       "privKeys"    -> PrintPrivKeys, //Todo delete
       "createToken" -> CreateToken

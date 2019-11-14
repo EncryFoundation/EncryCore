@@ -36,15 +36,11 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
 
   def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
-  def connectedPeers = (dataHolder ? GetConnections).mapTo[ConnectedPeersCollection]
+  def connectedPeers: Future[ConnectedPeersCollection] = (dataHolder ? GetConnections).mapTo[ConnectedPeersCollection]
 
   def info: Future[ConnectedPeersCollection] = for {
     peerAll <- connectedPeers
   } yield peerAll
-
-  def infoU = for {
-    peerAll <- connectedPeers
-  } yield println("AAA = " + peerAll)
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
@@ -58,13 +54,13 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function validateForm() {
-  var y = document.forms["myForm"]["fee"].value;
-  var z = document.forms["myForm"]["amount"].value;
-  if (y == "") {
+  var fee = document.forms["myForm"]["fee"].value;
+  var amount = document.forms["myForm"]["amount"].value;
+  if (fee == "") {
      alert("Address must be filled out");
      return false;
    }
- if (z == "") {
+ if (amount == "") {
     alert("Port must be filled out");
     return false;
   }
@@ -72,12 +68,12 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
         ),
         script(
           raw("""function wallet(){
-                 var b = document.forms["myForm"]["fee"].value;
-                 var x = document.forms["myForm"]["amount"].value;
+                 var fee = document.forms["myForm"]["fee"].value;
+                 var amount = document.forms["myForm"]["amount"].value;
                     var request = new XMLHttpRequest();
                     request.open('POST', "http://localhost:9051/peers/add", true);
                 //    request.setRequestHeader('content-type', 'application/json');
-                    request.send(b.toString() + ':' + x.toString());
+                    request.send(fee.toString() + ':' + amount.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
 
@@ -217,30 +213,8 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Address", tpe := "text"),
-//                                          script(
-//                                            raw(
-//                                              """
-//                                                 function setInputFilter(textbox, inputFilter) {
-//      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-//        textbox.oldValue = "";
-//         textbox.addEventListener(event, function() {
-//       if (inputFilter(this.value)) {
-//         this.oldValue = this.value;
-//         this.oldSelectionStart = this.selectionStart;
-//         this.oldSelectionEnd = this.selectionEnd;
-//       } else if (this.hasOwnProperty("oldValue")) {
-//         this.value = this.oldValue;
-//         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-//       }
-//     });
-//   });
-// }
-//              setInputFilter(document.getElementById("bibo"), function(value) {
-//                return /^-?\d*[.,]?\d*$/.test(value);
-//              });
-//            """.stripMargin)
-//                                          )
+                                          input(cls := "form-control", id:="fee", name:="fee", placeholder := "Address", tpe := "text"),
+//
                                         )
 
                                       ),
@@ -251,7 +225,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bobo", name:="amount", placeholder := "Port"),
+                                          input(cls := "form-control", id:="amount", name:="amount", placeholder := "Port"),
                                           script(
                                             raw(
                                               """
@@ -270,7 +244,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
      });
    });
  }
-              setInputFilter(document.getElementById("bobo"), function(value) {
+              setInputFilter(document.getElementById("amount"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
               });
             """.stripMargin)
@@ -378,12 +352,9 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
   override def route: Route = (path("connectedPeers") & get) {
     extractClientIP { ip =>
       if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
-        //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
         onComplete(info) {
-          case Success(info) =>
-            println(info)
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
-          case Failure(e) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
+          case Success(info) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+          case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
         }
       } else reject(ValidationRejection("Restricted!"))
     }

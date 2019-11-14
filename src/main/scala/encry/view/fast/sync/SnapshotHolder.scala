@@ -51,9 +51,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       context.stop(self)
     }
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
-    context.system.scheduler.schedule(5.seconds, 2.seconds){
-      nodeViewHolder ! GetInfoFromSnapshotHolder(snapshotDownloadController.notYetRequested.size)
-    }
     logger.info(s"SnapshotHolder started.")
     networkController ! RegisterMessagesHandler(
       Seq(

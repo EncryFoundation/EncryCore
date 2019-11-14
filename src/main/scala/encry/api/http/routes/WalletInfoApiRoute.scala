@@ -122,21 +122,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
     }
     }
 
-//  def infoR: Route = (path("info") & get) {
-  //    getWallet
-  //      .map { w =>
-  //        Map(
-  //          "balances" -> w.getBalances.map{ i =>
-  //            if (i._1._2 != intrinsicTokenId)
-  //              s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}"
-  //            else
-  //              s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
-  //          }.asJson,
-  //          "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
-  //        ).asJson
-  //      }
-  //      .okJson()
-  //  }
 
   def dataTransactionR: Route = (path("data") & get) {
     parameters('fee.as[Int], 'data) {(fee, data) =>
@@ -285,27 +270,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
     getBalance.map(_.asJson).okJson()
   }
 
-
-  //  def connectPeer: Route = path("add") {
-  //    post(entity(as[String]) { str =>
-  //      println(str)
-  //      complete {
-  //        Try {
-  //          val split = str.split(':')
-  //          val a = (split(0), split(1).toInt)
-  //          println(split)
-  //          println(a)
-  //          a
-  //        } match {
-  //          case Success((host, port)) =>
-  //            dataHolder ! PeerAdd(new InetSocketAddress(host, port))
-  //            StatusCodes.OK
-  //          case Failure(_) =>
-  //            StatusCodes.BadRequest
-  //        }
-  //      }
-  //    })
-  //  }
   def getUtxosR: Route = (path("utxos") & get) {
     getWallet.map { w =>
       Random.shuffle(w.walletStorage.getAllBoxes(1000)).asJson
