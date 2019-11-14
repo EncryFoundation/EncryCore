@@ -182,6 +182,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     kSer: Serializer[K],
     vSer: Serializer[V]
   ): (Option[Node[K, V]]) = node match {
+    case _: EmptyNode[K, V] => None
     case shadowNode: ShadowNode[K, V] =>
       val restoredNode = shadowNode.restoreFullNode(storage)
       delete(restoredNode, key)

@@ -4,12 +4,17 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.utils.implicits.UTXO.combineAll
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
+import encry.view.state.UtxoState
+import encry.view.state.avlTree.AvlTree
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Transaction}
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
@@ -168,6 +173,58 @@ trait InstanceFactory extends Keys with EncryGenerator {
     )
 
     Block(header, Payload(header.id, txs))
+  }
+
+  def generateNextBlockAndInsert(history: History,
+                                 tree: AvlTree[StorageKey, StorageValue],
+                                 insert: Boolean,
+                                 difficultyDiff: BigInt = 0,
+                                 prevId: Option[ModifierId] = None,
+                                 txsQty: Int = 100,
+                                 additionalDifficulty: BigInt = 0,
+                                 addressOpt: Option[Address] = None): (Block, AvlTree[StorageKey, StorageValue])  = {
+
+    import encry.utils.implicits.UTXO._
+    import encry.view.state.avlTree.utils.implicits.Instances._
+
+    val previousHeaderId: ModifierId =
+      prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
+    val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
+      history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
+      .getOrElse(history.settings.constants.InitialDifficulty)
+
+    val txs = { addressOpt match {
+      case Some(address) => if (txsQty != 0) genValidPaymentTxsToAddr(Scarand.nextInt(txsQty), address) else Seq.empty
+      case None => if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty
+    }
+
+    } ++ Seq(coinbaseAt(history.getBestHeaderHeight + 1))
+
+    val combinedStateChange: UtxoState.StateChange = combineAll(txs.map(UtxoState.tx2StateChange).toList)
+    val newStateRoot = tree.getOperationsRootHash(
+      combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
+    ).get
+
+    val header = genHeader.copy(
+      parentId = previousHeaderId,
+      height = history.getBestHeaderHeight + 1,
+      difficulty = Difficulty @@ (requiredDifficulty + difficultyDiff + additionalDifficulty),
+      transactionsRoot = Payload.rootHash(txs.map(_.id)),
+      stateRoot = newStateRoot
+    )
+
+    val block = Block(header, Payload(header.id, txs))
+
+    val newTree: AvlTree[StorageKey, StorageValue] = if (insert)
+      tree.insertAndDeleteMany(
+        StorageVersion !@@ block.id,
+        combinedStateChange.outputsToDb.toList,
+        combinedStateChange.inputsToDb.toList,
+        Height @@ block.header.height
+      ) else tree
+
+    (block, newTree)
+
   }
 
   def genForkOn(qty: Int,
