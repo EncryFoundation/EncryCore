@@ -58,13 +58,13 @@ class Miner(dataHolder: ActorRef,
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[Mining])
+    context.system.eventStream.subscribe(self, classOf[ClIMiner])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
       influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
-      logger.info(s"data holder: ${dataHolder}. Context: ${context}")
+      logger.info(s"data holder: $dataHolder. Context: $context")
       dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
     }
@@ -237,13 +237,13 @@ class Miner(dataHolder: ActorRef,
 
 object Miner {
 
-   trait Mining
+  sealed trait ClIMiner
 
-  case object DisableMining extends Mining
+  case object DisableMining extends ClIMiner
 
-  case object EnableMining extends Mining
+  case object EnableMining extends ClIMiner
 
-  case object StartMining extends Mining
+  case object StartMining extends ClIMiner
 
   case class MinedBlock(block: Block, workerIdx: Int)
 

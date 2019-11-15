@@ -68,18 +68,18 @@ object ConsoleListener {
 //link peer
   private val settingsCmds = Map(
     "settings" -> Map(
-      "addPeer"             -> AddPeer, //form
-      "removeFromBlackList" -> RemoveFromBlackList //form
+      "addPeer"             -> AddPeer,
+      "removeFromBlackList" -> RemoveFromBlackList
     )
   )
 // link "wallet"
   private val walletCmds = Map(
     "wallet" -> Map(
-      "addrs"       -> PrintAddresses, //table
-      "createKey"   -> CreateKey, //button
-      "pubKeys"     -> PrintPubKeys, // table
-      "balance"     -> GetBalance,  // table
-      "transfer"    -> Transfer, // add
+      "addrs"       -> PrintAddresses,
+      "createKey"   -> CreateKey,
+      "pubKeys"     -> PrintPubKeys,
+      "balance"     -> GetBalance,
+      "transfer"    -> Transfer,
       "privKeys"    -> PrintPrivKeys, //Todo delete
       "createToken" -> CreateToken
 //      "fromSeed"  -> CreateAccountFromSeed
@@ -105,9 +105,9 @@ object ConsoleListener {
 //link peer
   private val peerCmds = Map(
     "peer" -> Map(
-      "all"       -> GetPeers, // table
-      "banned"    -> GetBannedPeers, //table
-      "connected" -> GetConnectedPeers, //table
+      "all"       -> GetPeers,
+      "banned"    -> GetBannedPeers,
+      "connected" -> GetConnectedPeers,
       "ban"       -> GetBan
     )
   )

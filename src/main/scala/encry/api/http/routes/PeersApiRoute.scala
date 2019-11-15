@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.directives.Credentials
 import akka.http.scaladsl.server.{Directive, RejectionHandler, Route}
 import akka.http.scaladsl.server.directives.Credentials._
 import akka.pattern.ask
-import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeersHelper, GetConnectedPeersHelper, PeerAdd, RemovePeerFromBanList}
+import encry.api.http.DataHolderForApi.{GetAllPeers, GetBannedPeersHelper, GetConnectedPeersHelper, ClIAddPeer, RemovePeerFromBanList}
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.settings.RESTApiSettings
@@ -52,7 +52,7 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
           (split(0), split(1).toInt)
         } match {
           case Success((host, port)) =>
-            dataHolder ! PeerAdd(new InetSocketAddress(host, port))
+            dataHolder ! ClIAddPeer(new InetSocketAddress(host, port))
             StatusCodes.OK
           case Failure(_) =>
             StatusCodes.BadRequest

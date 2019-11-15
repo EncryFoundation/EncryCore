@@ -2,7 +2,7 @@ package encry.cli.commands.peer
 
 import java.net.InetSocketAddress
 
-import encry.api.http.DataHolderForApi.{AddUser, PeerAdd}
+import encry.api.http.DataHolderForApi.{AddUser, ClIAddPeer}
 import akka.actor.ActorRef
 import encry.cli.commands.Command
 

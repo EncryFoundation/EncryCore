@@ -65,14 +65,14 @@ class MemoryPool(settings: EncryAppSettings,
       validatedTransaction.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
       logger.debug(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}.")
       if (currentNumberOfProcessedTransactions > settings.mempool.transactionsLimit) {
-        logger.info(s"MemoryPool has its limit of processed transactions. " +
+        logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
         Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + 1
-        logger.info(s"Current number of processed transactions is OK. Continue to process them..." +
+        logger.debug(s"Current number of processed transactions is OK. Continue to process them..." +
           s" Current number is $currentTransactionsNumber.")
         context.become(continueProcessing(currentTransactionsNumber))
       }
@@ -126,7 +126,7 @@ class MemoryPool(settings: EncryAppSettings,
         memoryPool.getTransactionsForMiner
       memoryPool = newMemoryPool
       minerReference ! TransactionsForMiner(transactionsForMiner)
-      logger.info(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
+      logger.debug(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
         s" New pool size is ${memoryPool.size}. Ids ${transactionsForMiner.map(_.encodedId)}")
 
     case RemoveExpiredFromPool =>
@@ -175,10 +175,6 @@ object MemoryPool {
   final case class RequestForTransactions(source: ConnectedPeer,
                                           modifierTypeId: ModifierTypeId,
                                           modifierIds: Seq[ModifierId])
-
-  final case class ChangeMempoolSettings(cleanupInterval: FiniteDuration,
-                                         maxCapacity: Int,
-                                         txLimit: Int)
 
   case object SendTransactionsToMiner
 

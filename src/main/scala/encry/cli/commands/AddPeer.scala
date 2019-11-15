@@ -2,7 +2,7 @@ package encry.cli.commands
 
 import java.net.InetSocketAddress
 
-import encry.api.http.DataHolderForApi.PeerAdd
+import encry.api.http.DataHolderForApi.ClIAddPeer
 import akka.actor.ActorRef
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -25,7 +25,7 @@ object AddPeer extends Command {
     val host: String            = args.requireArg[Ast.Str]("host").s
     val port: Long              = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
-    dataHolder ! PeerAdd(peer)
+    dataHolder ! ClIAddPeer(peer)
     Future(Some(Response("Peer added!")))
   }
 }

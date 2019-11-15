@@ -29,6 +29,6 @@ object GetBan extends Command {
     val port: Long              = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
     dataHolder ! PeerBanHelper(peer, "Banned by the user")
-    Future(None)
+    Future(Some(Response(s"Peer $peer was banned by the user")))
   }
 }

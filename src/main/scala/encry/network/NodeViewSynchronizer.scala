@@ -8,7 +8,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus._
-import encry.local.miner.Miner.{DisableMining, Mining, StartMining}
+import encry.local.miner.Miner.{DisableMining, ClIMiner, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
@@ -80,7 +80,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
-    context.system.eventStream.subscribe(self, classOf[Mining])
+    context.system.eventStream.subscribe(self, classOf[ClIMiner])
     context.system.eventStream.subscribe(self, classOf[Peer])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }

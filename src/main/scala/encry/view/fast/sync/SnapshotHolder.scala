@@ -15,17 +15,18 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.option._
-import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
-
-import scala.concurrent.duration._
+import encry.network.BlackList.BanReason.{
+  ExpiredNumberOfReRequestAttempts,
+  ExpiredNumberOfRequests,
+  InvalidChunkMessage,
+  InvalidResponseManifestMessage,
+  InvalidStateAfterFastSync}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
 import encry.view.history.History
 import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import cats.syntax.either._
-import encry.view.NodeViewHolder.ReceivableMessages.GetInfoFromSnapshotHolder
-
 import scala.util.Try
 import encry.view.state.avlTree.utils.implicits.Instances._
 

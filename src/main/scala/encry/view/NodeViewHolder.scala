@@ -457,8 +457,6 @@ object NodeViewHolder {
 
     case class GetDataFromCurrentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
-    case class GetInfoFromSnapshotHolder(size: Int)
-
     case object GetWallet
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
