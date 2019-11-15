@@ -108,7 +108,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
-      if (state.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
           nodeView.history.blockDownloadProcessor.updateBestBlock(h)
@@ -124,7 +123,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))
         }
-      } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
