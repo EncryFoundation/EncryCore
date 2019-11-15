@@ -136,7 +136,10 @@ class SnapshotHolder(settings: EncryAppSettings,
                 if controller.requestedChunks.isEmpty &&
                    controller.notYetRequested.isEmpty &&
                    (processor.chunksCache.nonEmpty || processor.applicableChunks.nonEmpty) =>
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
+              if (processor.chunksCache.nonEmpty)
+                nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("Requested and notYetRequested chunks are empty while chunks cache non empty"))
+              else if (processor.applicableChunks.nonEmpty)
+                nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("Requested and notYetRequested chunks are empty while applicable chunks non empty"))
               restartFastSync(history)
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>

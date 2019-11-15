@@ -24,7 +24,8 @@ object FastSyncTestsUtils extends InstanceFactory with TestNetSettings {
 
   def initializeTestState(initialBlocksQty: Int = 90,
                           additionalBlocksQty: Int = 10,
-                          addressOpt: Option[Address] = None
+                          addressOpt: Option[Address] = None,
+                          chunkHeight: Int = 1
   ): (AvlTree[StorageKey, StorageValue],
       SnapshotProcessor,
       SnapshotDownloadController,
@@ -65,7 +66,7 @@ object FastSyncTestsUtils extends InstanceFactory with TestNetSettings {
         (proc.processNewBlock(block, history).right.get, resultingTree)
       } else if (block.header.height % sn.snapshotSettings.newSnapshotCreationHeight == 0) {
         val chunks: List[SnapshotChunk] =
-          AvlTree.getChunks(resultingTree.rootNode, currentChunkHeight = 1, resultingTree.storage)
+          AvlTree.getChunks(resultingTree.rootNode, chunkHeight, resultingTree.storage)
         val potentialManifestId: Array[Byte] = Algos.hash(resultingTree.rootHash ++ block.id)
         (snapshotProcessor.createNewSnapshot(potentialManifestId, chunks).right.get, resultingTree)
       } else (proc, resultingTree)

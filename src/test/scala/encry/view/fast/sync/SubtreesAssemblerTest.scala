@@ -25,7 +25,7 @@ class SubtreesAssemblerTest
 
     "check tree assembly(with correct nodes)" in {
 
-      val (_, processor, _, _, manifest, history) = initializeTestState()
+      val (_, processor, _, _, manifest, history) = initializeTestState(chunkHeight = 3)
 
       val sn = settings
         .copy(
@@ -53,7 +53,7 @@ class SubtreesAssemblerTest
     }
 
     "check tree assembly(with incorrect nodes)" in {
-      val (_, processor, _, _, manifest, history) = initializeTestState()
+      val (_, processor, _, _, manifest, history) = initializeTestState(chunkHeight = 3)
 
       val sn = settings
         .copy(
