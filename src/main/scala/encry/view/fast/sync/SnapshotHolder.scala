@@ -2,12 +2,12 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{ Actor, ActorRef, Cancellable, Props }
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
-import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
 import encry.settings.EncryAppSettings
 import SnapshotHolder._
 import encry.view.state.UtxoState
@@ -15,19 +15,14 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.option._
-import encry.network.BlackList.BanReason.{
-  ExpiredNumberOfReRequestAttempts,
-  ExpiredNumberOfRequests,
-  InvalidChunkMessage,
-  InvalidResponseManifestMessage,
-  InvalidStateAfterFastSync
-}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException }
+import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync, NotAllChunksSentMessage, UnrequestedChunksSentMessage}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
 import encry.view.history.History
-import encry.view.state.avlTree.{ Node, NodeSerilalizer }
+import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import cats.syntax.either._
+
 import scala.util.Try
 import encry.view.state.avlTree.utils.implicits.Instances._
 
@@ -137,9 +132,9 @@ class SnapshotHolder(settings: EncryAppSettings,
                    controller.notYetRequested.isEmpty &&
                    (processor.chunksCache.nonEmpty || processor.applicableChunks.nonEmpty) =>
               if (processor.chunksCache.nonEmpty)
-                nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("Requested and notYetRequested chunks are empty while chunks cache non empty"))
-              else if (processor.applicableChunks.nonEmpty)
-                nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("Requested and notYetRequested chunks are empty while applicable chunks non empty"))
+                nodeViewSynchronizer ! BanPeer(remote, UnrequestedChunksSentMessage)
+              else
+                nodeViewSynchronizer ! BanPeer(remote, NotAllChunksSentMessage)
               restartFastSync(history)
             case Right((processor, controller))
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
