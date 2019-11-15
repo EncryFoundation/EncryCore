@@ -124,16 +124,18 @@ class SnapshotHolder(settings: EncryAppSettings,
             (controller, chunk) = controllerAndChunk
             validChunk          <- snapshotProcessor.validateChunkId(chunk)
             processor           = snapshotProcessor.updateCache(validChunk)
-            newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
-                             case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
-                             case t                          => t.asLeft[SnapshotProcessor]
-                           }
+            newProcessor        <- processor.processNextApplicableChunk(processor).leftFlatMap {
+                                    case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
+                                    case t                          => t.asLeft[SnapshotProcessor]
+                                  }
           } yield (newProcessor, controller)) match {
             case Left(error) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
               restartFastSync(history)
             case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty && processor.chunksCache.nonEmpty =>
+                if controller.requestedChunks.isEmpty &&
+                   controller.notYetRequested.isEmpty &&
+                   (processor.chunksCache.nonEmpty || processor.applicableChunks.nonEmpty) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
               restartFastSync(history)
             case Right((processor, controller))
@@ -233,10 +235,11 @@ class SnapshotHolder(settings: EncryAppSettings,
   def workMod(history: History): Receive = {
     case TreeChunks(chunks, id) =>
       //todo add collection with potentialManifestsIds to NVH
-      val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
-      if (!manifestIds.exists(_.sameElements(id))) {
-        snapshotProcessor.createNewSnapshot(id, manifestIds, chunks)
-      } else logger.info(s"Doesn't need to create snapshot")
+
+      snapshotProcessor.createNewSnapshot(id, chunks).fold( err =>
+        logger.warn(s"Failed to create new snapshot due to ${err.error}"),
+        newProc => snapshotProcessor = newProc
+      )
 
     case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")

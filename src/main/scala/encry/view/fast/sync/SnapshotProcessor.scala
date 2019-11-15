@@ -193,28 +193,30 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 
   def createNewSnapshot(
     id: Array[Byte],
-    manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
-  ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
-    //todo add only exists chunks
-    val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
-    val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
-      val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
-      StorageKey @@ elem.id -> StorageValue @@ bytes
+  ): Either[ProcessNewSnapshotError, SnapshotProcessor] =
+    if (potentialManifestsIds.exists(_.sameElements(id)))
+      ProcessNewSnapshotError(s"Potential manifest with id ${Algos.encode(id)} already exists").asLeft[SnapshotProcessor]
+    else {
+      //todo add only exists chunks
+      val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
+      val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
+        val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
+        StorageKey @@ elem.id -> StorageValue @@ bytes
+      }
+      val manifestToDB: (StorageKey, StorageValue) =
+        StorageKey @@ manifest.manifestId -> StorageValue @@ SnapshotManifestSerializer
+          .toProto(manifest)
+          .toByteArray
+      val updateList: (StorageKey, StorageValue) =
+        PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: potentialManifestsIds.toList).flatten.toArray
+      val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
+      logger.info(s"A new snapshot created successfully. Insertion started.")
+      Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
+        case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
+        case Right(_)    => this.asRight[ProcessNewSnapshotError]
+      }
     }
-    val manifestToDB: (StorageKey, StorageValue) =
-      StorageKey @@ manifest.manifestId -> StorageValue @@ SnapshotManifestSerializer
-        .toProto(manifest)
-        .toByteArray
-    val updateList: (StorageKey, StorageValue) =
-      PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
-    val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
-    logger.info(s"A new snapshot created successfully. Insertion started.")
-    Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
-      case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
-      case Right(_)    => this.asRight[ProcessNewSnapshotError]
-    }
-  }
 
   private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] =
     for {

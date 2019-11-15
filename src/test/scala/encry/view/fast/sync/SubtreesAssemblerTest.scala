@@ -1,24 +1,17 @@
 package encry.view.fast.sync
 
-import java.io.File
-import SnapshotChunkProto.SnapshotChunkMessage
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
 import encry.settings.TestNetSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
-import encry.utils.FileHelper
 import SnapshotHolder.SnapshotChunkSerializer
-import encry.view.state.UtxoState
-import encry.view.state.avlTree.{AvlTree, InternalNode, NodeSerilalizer }
-import org.iq80.leveldb.Options
+import encry.view.state.avlTree.InternalNode
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
 import encry.view.state.avlTree.utils.implicits.Instances._
-import org.encryfoundation.common.modifiers.history.Block
-import org.encryfoundation.common.utils.TaggedTypes.Height
-import scorex.utils.Random
-import scala.util.{ Random => random }
+
 import cats.syntax.either._
+import scala.util.{ Random => random }
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
+import encry.view.fast.sync.FastSyncTestsUtils._
 
 class SubtreesAssemblerTest
     extends WordSpecLike
@@ -28,101 +21,70 @@ class SubtreesAssemblerTest
     with TestNetSettings
     with StrictLogging {
 
-//  "Trees validator" should {
-//    "check tree assembly(with correct nodes)" in {
-//      val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
-//      val avl1: AvlTree[StorageKey, StorageValue] =
-//        createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 0, 1000)
-//      val block1: Block = generateGenesisBlock(Height @@ 1)
-//
-//      val processor1: SnapshotProcessor =
-//        snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
-//      val manifest: SnapshotHolder.SnapshotManifest = processor1.bestPotentialManifest.get
-//
-//      val newTree: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](
-//        manifest,
-//        VLDBWrapper(
-//          VersionalLevelDBCompanion(LevelDbFactory.factory.open(tmpDir, new Options), settings.levelDB, keySize = 32)
-//        )
-//      )
-//
-//      val newTree1: AvlTree[StorageKey, StorageValue] = manifest.chunksKeys.foldLeft(newTree) {
-//        case (tree, key) =>
-//          val chunk: SnapshotChunkMessage         = processor1.getChunkById(key).get
-//          val nodes: SnapshotHolder.SnapshotChunk = SnapshotChunkSerializer.fromProto(chunk).get
-//          val treeNew: AvlTree[StorageKey, StorageValue] =
-//            tree.assembleTree(nodes.nodesList.map { n =>
-//              val a = NodeSerilalizer.fromProto[StorageKey, StorageValue](n)
-//              a
-//            })
-//          treeNew
-//      }
-//
-//      val state = UtxoState(newTree1, Height @@ 0, settings.constants)
-//
-//      state.validateTreeAfterFastSync() shouldBe true
-//    }
-//    "check tree assembly(with incorrect nodes)" in {
-//      val snapshotProcessor: SnapshotProcessor = SnapshotProcessor.create(settings, tmpDir)
-//      val avl1: AvlTree[StorageKey, StorageValue] =
-//        createAvl("9gKDVmfsA6J4b78jDBx6JmS86Zph98NnjnUqTJBkW7zitQMReia", 0, 1000)
-//      val block1: Block = generateGenesisBlock(Height @@ 1)
-//
-//      val processor1: SnapshotProcessor =
-//        snapshotProcessor.processNewSnapshot(UtxoState(avl1, Height @@ 0, settings.constants), block1)
-//      val manifest: SnapshotHolder.SnapshotManifest = processor1.bestPotentialManifest.get
-//
-//      val newTree: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](
-//        manifest,
-//        VLDBWrapper(
-//          VersionalLevelDBCompanion(LevelDbFactory.factory.open(tmpDir, new Options), settings.levelDB, keySize = 32)
-//        )
-//      )
-//
-//      val newTree1: AvlTree[StorageKey, StorageValue] = manifest.chunksKeys.foldLeft(newTree) {
-//        case (tree, key) =>
-//          val chunk: SnapshotChunkMessage         = processor1.getChunkById(key).get
-//          val nodes: SnapshotHolder.SnapshotChunk = SnapshotChunkSerializer.fromProto(chunk).get
-//          val treeNew: AvlTree[StorageKey, StorageValue] =
-//            tree.assembleTree(nodes.nodesList.map { n =>
-//              val a = NodeSerilalizer.fromProto[StorageKey, StorageValue](n)
-//              a match {
-//                case l@InternalNode(_, _, _, _, _, _) =>
-//                  l.copy(height = random.nextInt())
-//                case l => l
-//              }
-//            })
-//          treeNew
-//      }
-//
-//      val state = UtxoState(newTree1, Height @@ 0, settings.constants)
-//
-//      Either.catchNonFatal(state.validateTreeAfterFastSync()).isLeft shouldBe true
-//    }
-//    "check chunk validity" in {}
-//  }
+  "Trees validator" should {
 
-  def createAvl(address: String, from: Int, to: Int): AvlTree[StorageKey, StorageValue] = {
-    val firstDir: File = FileHelper.getRandomTempDir
-    val firstStorage: VLDBWrapper = {
-      VLDBWrapper(
-        VersionalLevelDBCompanion(LevelDbFactory.factory.open(firstDir, new Options), settings.levelDB, keySize = 32)
-      )
+    "check tree assembly(with correct nodes)" in {
+
+      val (_, processor, _, _, manifest, history) = initializeTestState()
+
+      val sn = settings
+        .copy(
+          levelDB = settings.levelDB.copy(maxVersions = 5),
+          snapshotSettings = settings.snapshotSettings.copy(newSnapshotCreationHeight = 10)
+        )
+
+      val chunks = manifest
+        .chunksKeys
+        .flatMap(processor.getChunkById)
+        .flatMap(SnapshotChunkSerializer.fromProto(_).toOption)
+
+      val secondProcessor: SnapshotProcessor =
+        SnapshotProcessor
+          .create(sn, tmpDir)
+          .initializeApplicableChunksCache(history, 80).right.get
+
+      chunks.foldLeft(secondProcessor) { case (proc, nextChunk) =>
+        val wUpdatedCache = proc.updateCache(nextChunk)
+        wUpdatedCache.processNextApplicableChunk(wUpdatedCache).leftFlatMap {
+            case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
+            case t                          => t.asLeft[SnapshotProcessor]
+        }.right.get
+      }.assembleUTXOState.right.get.tree.selfInspectionAfterFastSync shouldBe true
     }
-    val boxes: IndexedSeq[(StorageKey, StorageValue)] = (from until to)
-      .map(i => genAssetBox(address, i, nonce = i))
-      .map { bx =>
-        (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)
-      }
 
-    val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage)
-    firstAvl
-      .insertAndDeleteMany(
-        StorageVersion @@ Random.randomBytes(),
-        boxes.toList,
-        List.empty
-      )
+    "check tree assembly(with incorrect nodes)" in {
+      val (_, processor, _, _, manifest, history) = initializeTestState()
+
+      val sn = settings
+        .copy(
+          levelDB = settings.levelDB.copy(maxVersions = 5),
+          snapshotSettings = settings.snapshotSettings.copy(newSnapshotCreationHeight = 10)
+        )
+
+      val chunks = manifest
+        .chunksKeys
+        .flatMap(processor.getChunkById)
+        .flatMap(SnapshotChunkSerializer.fromProto(_).toOption)
+
+      val secondProcessor: SnapshotProcessor =
+        SnapshotProcessor
+          .create(sn, tmpDir)
+          .initializeApplicableChunksCache(history, 80).right.get
+
+      chunks.foldLeft(secondProcessor) { case (proc, nextChunk) =>
+        val node = nextChunk.node match {
+          case l@InternalNode(_, _, _, _, _, _) =>
+            l.copy(height = random.nextInt())
+          case l => l
+        }
+        val wUpdatedCache = proc.updateCache(nextChunk.copy(node = node))
+        wUpdatedCache.processNextApplicableChunk(wUpdatedCache).leftFlatMap {
+          case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
+          case t                          => t.asLeft[SnapshotProcessor]
+        }.right.get
+      }.assembleUTXOState.isLeft shouldBe true
+    }
+
   }
 
-  def tmpDir: File = FileHelper.getRandomTempDir
 }

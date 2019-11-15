@@ -27,33 +27,25 @@ class SnapshotProcessorTest
 
       "correctly create new snapshot if such doesn't exist" in {
 
-        val (avl1, processor1, _, blocks1, _, _) = initializeTestState()
-        val (avl2, processor2, _, blocks2, _, _) = initializeTestState()
-        val (avl3, processor3, _, blocks3, _, _) = initializeTestState()
+        val (_, processor1, _, _, _, _) = initializeTestState()
+        val (_, processor2, _, _, _, _) = initializeTestState()
+        val (_, processor3, _, _, _, _) = initializeTestState()
 
-        val id1 = Algos.hash(avl1.rootHash ++ blocks1(89).id)
-        val id2 = Algos.hash(avl2.rootHash ++ blocks2(89).id)
-        val id3 = Algos.hash(avl3.rootHash ++ blocks3(89).id)
-
-        val listIds = id1 :: id2 :: id3 :: Nil
+        val listIds = processor1.actualManifestId.get :: processor2.actualManifestId.get :: processor3.actualManifestId.get :: Nil
 
         processor3.potentialManifestsIds.forall { id =>
           listIds.exists(_.sameElements(id))
         } shouldBe true
 
-        val ids1 = processor1.manifestById(StorageKey @@ id1).get.chunksKeys
-        val ids2 = processor2.manifestById(StorageKey @@ id2).get.chunksKeys
-        val ids3 = processor3.manifestById(StorageKey @@ id3).get.chunksKeys
-
-        ids1.forall { id =>
+        processor1.actualManifest.get.chunksKeys.forall { id =>
           processor1.getChunkById(id).nonEmpty
         } shouldBe true
 
-        ids2.forall { id =>
+        processor2.actualManifest.get.chunksKeys.forall { id =>
           processor2.getChunkById(id).nonEmpty
         } shouldBe true
 
-        ids3.forall { id =>
+        processor3.actualManifest.get.chunksKeys.forall { id =>
           processor3.getChunkById(id).nonEmpty
         } shouldBe true
 
@@ -70,20 +62,19 @@ class SnapshotProcessorTest
         val block2: Block = generateGenesisBlock(Height @@ 1)
 
         val processor1 = snapshotProcessor
-          .createNewSnapshot(Algos.hash(avl1.rootHash ++ block1.header.id), snapshotProcessor.potentialManifestsIds, List(SnapshotChunk(avl1.rootNode, avl1.rootHash))).right.get
+          .createNewSnapshot(Algos.hash(avl1.rootHash ++ block1.header.id), List(SnapshotChunk(avl1.rootNode, avl1.rootHash))).right.get
 
         val processor2 = processor1
-          .createNewSnapshot(Algos.hash(avl2.rootHash ++ block2.header.id), processor1.potentialManifestsIds, List(SnapshotChunk(avl2.rootNode, avl2.rootHash))).right.get
+          .createNewSnapshot(Algos.hash(avl2.rootHash ++ block2.header.id), List(SnapshotChunk(avl2.rootNode, avl2.rootHash))).right.get
 
-        val processor3 = processor2
-          .createNewSnapshot(Algos.hash(avl1.rootHash ++ block1.header.id), processor2.potentialManifestsIds, List(SnapshotChunk(avl1.rootNode, avl1.rootHash))).right.get
+        processor2.createNewSnapshot(Algos.hash(avl1.rootHash ++ block1.header.id), List(SnapshotChunk(avl1.rootNode, avl1.rootHash))).isLeft shouldBe true
 
         val id1 = Algos.hash(avl1.rootHash ++ block1.id)
         val id2 = Algos.hash(avl2.rootHash ++ block2.id)
 
-        processor3.potentialManifestsIds.toSet.map(Algos.encode).size == 2 shouldBe true
+        processor2.potentialManifestsIds.size == 2 shouldBe true
 
-        processor3.potentialManifestsIds.forall { id =>
+        processor2.potentialManifestsIds.forall { id =>
           id.sameElements(id1) || id.sameElements(id2)
         } shouldBe true
       }
@@ -119,10 +110,10 @@ class SnapshotProcessorTest
         }
 
         val processor1 = snapshotProcessor
-          .createNewSnapshot(Algos.hash(avl1.rootHash ++ block1.header.id), snapshotProcessor.potentialManifestsIds, List(SnapshotChunk(avl1.rootNode, avl1.rootHash))).right.get
+          .createNewSnapshot(Algos.hash(avl1.rootHash ++ block1.header.id), List(SnapshotChunk(avl1.rootNode, avl1.rootHash))).right.get
 
         val processor2 = processor1
-          .createNewSnapshot(Algos.hash(avl2.rootHash ++ newBlocks.last.id), snapshotProcessor.potentialManifestsIds, List(SnapshotChunk(avl2.rootNode, avl2.rootHash))).right.get
+          .createNewSnapshot(Algos.hash(avl2.rootHash ++ newBlocks.last.id), List(SnapshotChunk(avl2.rootNode, avl2.rootHash))).right.get
 
         val id1 = Algos.hash(avl1.rootHash ++ block1.id)
         val ids1 = processor2.manifestById(StorageKey @@ id1).get.chunksKeys
