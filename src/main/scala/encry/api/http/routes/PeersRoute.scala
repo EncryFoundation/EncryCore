@@ -1,28 +1,21 @@
 package encry.api.http.routes
 
 import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
-import encry.local.miner.Miner.MinerStatus
-import scalatags.Text.all.{div, span, td, _}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetViewGetBalance, GetViewPrintPubKeys}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.Json
-import scalatags.{Text, generic}
-import io.circe.parser
 import io.circe.generic.auto._
-import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-
-import scala.concurrent.{Await, Future}
+import scalatags.Text
+import scalatags.Text.all.{div, span, _}
+import scala.concurrent.Future
 import scala.language.implicitConversions
-import scala.util.{Failure, Success}
-
+import scala.util.Success
 
 case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
@@ -173,13 +166,12 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
                         )
                       ),
                       tbody(
-
-                        (for (p <- peers) yield {
+                        for (p <- peers) yield {
                           tr(
                             th(p.getHostName
                             )
                           )
-                        }).toSeq: _*
+                        }
                       )
                     )
                   )
@@ -234,15 +226,12 @@ case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: Node
   }
 
   override def route: Route = (path("allPeers") & get) {
-    extractClientIP { ip =>
-      if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
-        //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
+    WebRoute.extractIp(
         onComplete(info) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
         }
-      } else reject(ValidationRejection("Restricted!"))
-    }
+    )
   }
 
 }

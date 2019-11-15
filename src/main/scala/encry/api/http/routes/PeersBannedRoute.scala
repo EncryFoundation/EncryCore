@@ -1,31 +1,22 @@
 package encry.api.http.routes
 
-import java.net.{InetAddress, InetSocketAddress}
-
+import java.net.InetAddress
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetBannedPeersHelper, GetBannedPeersHelperAPI, GetConnectedPeersHelper, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
-import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.local.miner.Miner.MinerStatus
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetBannedPeersHelperAPI, GetViewGetBalance, GetViewPrintPubKeys}
 import encry.network.BlackList.{BanReason, BanTime, BanType}
-import scalatags.Text.all.{div, span, td, _}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.Json
-import scalatags.{Text, generic}
-import io.circe.parser
 import io.circe.generic.auto._
-import kamon.system
-import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-
-import scala.concurrent.{Await, Future}
+import scalatags.Text
+import scalatags.Text.all.{div, span, _}
+import scala.concurrent.Future
 import scala.language.implicitConversions
-import scala.util.{Failure, Success}
-
+import scala.util.Success
 
 case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
@@ -42,7 +33,7 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def peerScript(peers: Seq[(InetAddress, (BanReason, BanTime, BanType))] ) = {
+  def peerScript(peers: Seq[(InetAddress, (BanReason, BanTime, BanType))] ): Text.TypedTag[String] = {
 
     html(
       scalatags.Text.all.head(
@@ -276,8 +267,7 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
                         )
                       ),
                       tbody(
-
-                        (for (p <- peers) yield {
+                        for (p <- peers) yield {
                           tr(
                             th(p._1.getHostAddress
                             ),
@@ -288,7 +278,7 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
                             th(p._2._3.toString
                             ),
                           )
-                        }).toSeq: _*
+                        }
                       )
                     )
                   )
@@ -343,15 +333,12 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
   }
 
   override def route: Route = (path("bannedPeers") & get) {
-    extractClientIP { ip =>
-      if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
-        //        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript.render))
+   WebRoute.extractIp(
         onComplete(peersAllF) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
         }
-      } else reject(ValidationRejection("Restricted!"))
-    }
+   )
   }
 }
 

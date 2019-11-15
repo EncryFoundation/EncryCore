@@ -350,14 +350,12 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
   }
 
   override def route: Route = (path("connectedPeers") & get) {
-    extractClientIP { ip =>
-      if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
+    WebRoute.extractIp(
         onComplete(info) {
           case Success(info) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
           case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
         }
-      } else reject(ValidationRejection("Restricted!"))
-    }
+    )
   }
 
 }

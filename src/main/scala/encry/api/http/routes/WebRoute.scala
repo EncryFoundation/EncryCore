@@ -583,24 +583,15 @@ object WebRoute  {
   def authRoute(onSuccess: Route): Route = {
     optionalCookie("JWT") {
       case Some(token) =>
-        if (isTokenValid(token.value)) {
-          if (isTokenExpired(token.value)) {
-            complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
-          } else {
-            onSuccess
-          }
-        } else {
-          complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid."))
-        }
+        if (isTokenValid(token.value) && !isTokenExpired(token.value)) onSuccess
+        else complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
       case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
     }
   }
 
   def extractIp(pingedRoute: Route): Route = extractClientIP { ip =>
-    if (ip.toOption.map(x => x.getHostAddress).getOrElse("unknown") == "127.0.0.1") {
-      pingedRoute
-  } else reject(ValidationRejection("Access denied"))
-
+    if (ip.toOption.exists(_.getHostAddress sameElements "127.0.0.1")) pingedRoute
+    else reject(ValidationRejection("Access denied"))
   }
 
 }

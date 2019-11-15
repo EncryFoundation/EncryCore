@@ -8,7 +8,7 @@ import encry.settings.RESTApiSettings
 import encry.view.mempool.MemoryPool.NewTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 
-case class TransactionsApiRoute(dataHolder: ActorRef, memoryPoolRef: ActorRef, restApiSettings: RESTApiSettings)(
+case class TransactionsApiRoute(dataHolder: ActorRef, memoryPoolRef: ActorRef, settings: RESTApiSettings)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute
     with FailFastCirceSupport {
@@ -16,8 +16,6 @@ case class TransactionsApiRoute(dataHolder: ActorRef, memoryPoolRef: ActorRef, r
   override val route: Route = pathPrefix("transactions") {
     defaultTransferTransactionR
   }
-
-  override val settings: RESTApiSettings = restApiSettings
 
   def defaultTransferTransactionR: Route = path("send") {
     post(entity(as[Transaction]) { tx =>

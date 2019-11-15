@@ -1,27 +1,16 @@
 package encry.api.http.routes
 
-import java.net.{InetAddress, InetSocketAddress}
-import java.util.concurrent.TimeUnit
-
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
-import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.server.{Route, ValidationRejection}
-import akka.http.scaladsl.unmarshalling.PredefinedFromEntityUnmarshallers
 import akka.pattern._
-import akka.util.Timeout
-import cats.Applicative
-import io.circe.parser
-import io.circe.generic.auto._
+import cats.Apply
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp
-import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetDataFromPresentView, GetViewCreateKey, GetViewGetBalance, GetViewPrintAddress, GetViewPrintPubKeys}
-import encry.cli.{Ast, Response}
+import encry.api.http.DataHolderForApi._
+import encry.cli.Response
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, RESTApiSettings}
-import encry.storage.levelDb.versionalLevelDB.WalletVersionalLevelDB
-import encry.utils.Mnemonic
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
@@ -29,31 +18,32 @@ import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
-import PredefinedFromEntityUnmarshallers._
-import scala.concurrent.duration._
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition, MonetaryBox, TokenIssuingBox}
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-import scorex.crypto.hash.Blake2b256
-import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-
-import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Random, Success, Try}
-
+import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
+import cats.instances.option._
 
 case class WalletInfoApiRoute(dataHolder: ActorRef,
-                              restApiSettings: RESTApiSettings,
+                              settings: RESTApiSettings,
                               intrinsicTokenId: String,
                               settingsApp: EncryAppSettings)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
-     infoR ~ getUtxosR ~ printAddressR ~ createKeyR ~ printPubKeysR ~ getBalanceR ~ transferR ~ transferContractR ~ createTokenR ~ dataTransactionR
+    infoR ~
+      getUtxosR ~
+      printAddressR ~
+      createKeyR ~
+      printPubKeysR ~
+      getBalanceR ~
+      transferR ~
+      transferContractR ~
+      createTokenR ~
+      dataTransactionR
   }
-
-  override val settings: RESTApiSettings = restApiSettings
 
   private def getWallet: Future[EncryWallet] =
     (dataHolder ?
@@ -81,7 +71,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           else
             s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
         }.asJson,
-        "utxosQty" -> Random.shuffle(w.walletStorage.getAllBoxes(1000)).length.asJson
+        "utxosQty" -> w.walletStorage.getAllBoxes(1000).length.asJson
       ).asJson
     }.okJson()
   }
@@ -141,21 +131,19 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
         }).flatMap {
         case Some(tx: Transaction) =>
           EncryApp.system.eventStream.publish(NewTransaction(tx))
-          //memoryPool !
           Future.successful(Some(Response(tx.toString)))
         case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
       }
       complete(s"Tx with data  has been sent!!'")
     }
   }
-  import cats.implicits._
+
   def transferR: Route = (path("transfer") & get) {
     parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) { (addr, fee, amount, token) =>
       (dataHolder ?
         GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
-//           val token1 = if (token.contains("487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab")) Some("") else token
             val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
               case Success(value) => ADKey @@ value
               case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")
@@ -164,9 +152,9 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               .getAllBoxes()
               .collect {
                 case ab: AssetBox if ab.tokenIdOpt.isEmpty ||
-                  Applicative[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
+                  Apply[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
                 case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
-              }.foldLeft(Seq[MonetaryBox]()) {
+              }.foldLeft(List.empty[MonetaryBox]) {
               case (seq, box) if decodedTokenOpt.isEmpty =>
                 if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
@@ -194,9 +182,8 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
         }).flatMap {
         case Some(tx: Transaction) =>
           EncryApp.system.eventStream.publish(NewTransaction(tx))
-
-          Future.successful(Some(Response(tx.toString)))
-        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+          Future.unit
+        case _ => Future.unit
       }
       complete(s"Tx with $addr, $fee and $amount has been sent!!'")
     }
@@ -217,16 +204,16 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               .getAllBoxes()
               .collect {
                 case ab: AssetBox if ab.tokenIdOpt.isEmpty ||
-                  Applicative[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
+                  Apply[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
                 case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
-              }.foldLeft(Seq[MonetaryBox]()) {
+              }.foldLeft(List.empty[MonetaryBox]) {
               case (seq, box) if decodedTokenOpt.isEmpty =>
                 if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
                 if (seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.isEmpty).map(_.amount).sum < fee) seq :+ box else seq
               case (seq, box: AssetBox) =>
                 val totalAmount =
-                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
+                  seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
                     seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
                 if (totalAmount < amount) seq :+ box else seq
               case (seq, box: TokenIssuingBox) =>
@@ -246,20 +233,16 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
-          print(tx)
           EncryApp.system.eventStream.publish(NewTransaction(tx))
-
-          Future.successful(Some(Response(tx.toString)))
-        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+          Future.unit
+        case _ => Future.unit
       }
       complete(s"Tx with $contract, $fee and $amount has been sent!!'")
     }
   }
 
   def createKeyR: Route = (path("createKey") & get) {
-    createKey.map { x =>
-      Algos.encode(x.privKeyBytes).asJson
-    }.okJson()
+    createKey.map(key => Algos.encode(key.privKeyBytes).asJson).okJson()
   }
 
   def printPubKeysR: Route = (path("pubKeys") & get) {
@@ -271,8 +254,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   }
 
   def getUtxosR: Route = (path("utxos") & get) {
-    getWallet.map { w =>
-      Random.shuffle(w.walletStorage.getAllBoxes(1000)).asJson
-    }.okJson()
+    getWallet.map(wallet => wallet.walletStorage.getAllBoxes(1000).asJson).okJson()
   }
 }

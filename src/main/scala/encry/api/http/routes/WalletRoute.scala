@@ -1,31 +1,20 @@
 package encry.api.http.routes
 
-import java.util.concurrent.TimeUnit
-
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport
-import akka.http.scaladsl.model.headers.RawHeader
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
-import encry.local.miner.Miner.MinerStatus
-import scalatags.Text.all.{div, span, td, _}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewGetBalance, GetViewPrintPubKeys}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.Json
-import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
-import scalatags.{Text, generic}
-import spray.json.DefaultJsonProtocol
-//import io.circe.parser
-//import io.circe.generic.auto._
-import org.encryfoundation.common.crypto.PrivateKey25519
+import scalatags.Text
+import scalatags.Text.all.{div, span, _}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
-
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.language.implicitConversions
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 
 case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
@@ -96,27 +85,27 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function validateForm1() {
-  var fee = document.forms["myForm1"]["fee"].value;
-  var amount = document.forms["myForm1"]["amount"].value;
-  if (fee == "") {
-     alert("Fee must be filled out");
-     return false;
-   }
- if (amount == "") {
-    alert("Amount must be filled out");
-    return false;
-  }
-}""")
+                var fee = document.forms["myForm1"]["fee"].value;
+                var amount = document.forms["myForm1"]["amount"].value;
+              if (fee == "") {
+              alert("Fee must be filled out");
+              return false;
+              }
+              if (amount == "") {
+                 alert("Amount must be filled out");
+                 return false;
+               }
+              }""")
        ),
        script(
          raw(
-           """function wallet(){
+           s"""function wallet(){
                  var addr = document.forms["myForm"]["addr"].value;
                  var fee = document.forms["myForm"]["fee"].value;
                  var amount = document.forms["myForm"]["amount"].value;
                  var coin = document.forms["myForm"]["coin"].value;
                     var request = new XMLHttpRequest();
-                    if (coin == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
+                    if (coin == "$EttTokenId") {
                     request.open('GET', "http://localhost:9051/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount);
                     } else {
                     request.open('GET', "http://localhost:9051/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount+"&token="+coin);
@@ -129,14 +118,14 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        ),
        script(
          raw(
-           """
+           s"""
                function contractF(){
                  var contract = document.forms["myForm4"]["contract"].value;
                  var fee = document.forms["myForm4"]["fee"].value;
                  var amount = document.forms["myForm4"]["amount"].value;
                  var coin = document.forms["myForm4"]["coin"].value;
                     var request = new XMLHttpRequest();
-                    if (coin == "487291c237b68dd2ab213be6b5d1174666074a5afab772b600ea14e8285affab") {
+                    if (coin == "$EttTokenId") {
                     request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount);
                     } else {
                     request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount+"&token="+coin);
@@ -168,7 +157,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                     var request = new XMLHttpRequest();
                     request.open('GET', "http://localhost:9051/wallet/data?fee="+fee+"&data="+data);
                     request.send();
-                     window.alert("Data has been created successfully");
+                     window.alert("Data transaction has been created successfully");
                     setTimeout(location.reload.bind(location), 3000);
 
                   }""")
@@ -379,25 +368,25 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                                           script(
                                             raw(
                                               """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("contractamount"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
-              });
-            """.stripMargin)
+                                   function setInputFilter(textbox, inputFilter) {
+                              ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+                                textbox.oldValue = "";
+                                 textbox.addEventListener(event, function() {
+                               if (inputFilter(this.value)) {
+                                 this.oldValue = this.value;
+                                 this.oldSelectionStart = this.selectionStart;
+                                 this.oldSelectionEnd = this.selectionEnd;
+                               } else if (this.hasOwnProperty("oldValue")) {
+                                 this.value = this.oldValue;
+                                 this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+                               }
+                              });
+                            });
+                          }
+                               setInputFilter(document.getElementById("contractamount"), function(value) {
+                                 return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
+                               });
+                             """.stripMargin)
                                           ),
                                         )
                                       ),
@@ -697,24 +686,20 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                         )
                       ),
                       tbody(
-
                         (for {
-                          bal <- balances.toList
-                          tup2 <- bal._2
+                          mapKeyValue <- balances
+                          tokenAmount <- mapKeyValue._2
                         } yield {
-                          val tknStr = tup2._1 match {
-                            case encry if tup2._1 == EttTokenId => "ETT"
-                            case _ => tup2._1
+                          val tknStr = tokenAmount._1 match {
+                            case tokenId if tokenId == EttTokenId => "ETT"
+                            case tokenId => tokenId
                           }
                           tr(
-                            th(bal._1
-                            ),
-                            th(tknStr
-                            ),
-                            th(tup2._2
-                            )
+                            th(mapKeyValue._1),
+                            th(tknStr),
+                            th(tokenAmount._2)
                           )
-                        }).toSeq: _*
+                        }).toList
                       )
                     )
                   )
