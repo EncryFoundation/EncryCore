@@ -583,8 +583,11 @@ object WebRoute  {
   def authRoute(onSuccess: Route): Route = {
     optionalCookie("JWT") {
       case Some(token) =>
-        if (isTokenValid(token.value) && !isTokenExpired(token.value)) onSuccess
-        else complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
+        val tokenValidity: Boolean = isTokenValid(token.value)
+        val tokenExpiration: Boolean = isTokenExpired(token.value)
+        if (tokenValidity && !tokenExpiration) onSuccess
+        else if (tokenExpiration) complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token expired."))
+        else complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "Token is invalid."))
       case _ => complete(HttpResponse(status = StatusCodes.Unauthorized, entity = "No token provided!"))
     }
   }

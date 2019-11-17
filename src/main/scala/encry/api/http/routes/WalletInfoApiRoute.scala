@@ -254,6 +254,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   }
 
   def getUtxosR: Route = (path("utxos") & get) {
-    getWallet.map(wallet => wallet.walletStorage.getAllBoxes(1000).asJson).okJson()
+    getWallet.map(wallet => wallet.walletStorage.getAllBoxes().asJson).okJson()
   }
 }
