@@ -70,7 +70,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   val downloadedModifiersValidator: ActorRef = context.system
     .actorOf(DownloadedModifiersValidator.props(settings.constants.ModifierIdSize, nodeViewHolderRef,
-      peersKeeper, self, memoryPoolRef, influxRef)
+      peersKeeper, self, memoryPoolRef, influxRef, settings)
       .withDispatcher("Downloaded-Modifiers-Validator-dispatcher"), "DownloadedModifiersValidator")
 
   val deliveryManager: ActorRef = context.actorOf(
