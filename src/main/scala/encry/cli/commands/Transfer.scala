@@ -88,7 +88,6 @@ object Transfer extends Command {
       }).flatMap {
       case Some(tx: Transaction) =>
         EncryApp.system.eventStream.publish(NewTransaction(tx))
-        //memoryPool ! NewTransaction(tx)
         Future.successful(Some(Response(tx.toString)))
       case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
     }

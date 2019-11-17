@@ -58,7 +58,7 @@ class PeersKeeper(settings: EncryAppSettings,
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
-    context.system.eventStream.subscribe(self, classOf[PeerKeeper])
+    context.system.eventStream.subscribe(self, classOf[PeerCommandHelper])
     context.system.scheduler.schedule(5.seconds, 5.seconds){
       dataHolder ! UpdatingPeersInfo(
         knownPeers.keys.toSeq,
@@ -290,7 +290,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
 object PeersKeeper {
 
-  sealed trait PeerKeeper
+  sealed trait PeerCommandHelper
 
   final case class VerifyConnection(peer: InetSocketAddress,
                                     remoteConnection: ActorRef)
@@ -320,7 +320,7 @@ object PeersKeeper {
 
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
 
-  final case class BanPeerFromAPI(peer: InetSocketAddress, reason: BanReason) extends PeerKeeper
+  final case class BanPeerFromAPI(peer: InetSocketAddress, reason: BanReason) extends PeerCommandHelper
 
   case object GetKnownPeers
 

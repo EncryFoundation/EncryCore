@@ -17,6 +17,6 @@ object StopMining extends Command {
                        nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     dataHolder ! StopMiner
-    Future(Some(Response("Mining is stopped.")))
+    Future.successful(Some(Response("Mining is stopped.")))
   }
 }

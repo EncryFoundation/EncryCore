@@ -26,6 +26,6 @@ object RemoveFromBlackList extends Command {
     val port: Long              = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
     dataHolder ! RemovePeerFromBanList(peer)
-    Future(Some(Response("Peer removed from black list")))
+    Future.successful(Some(Response(s"Peer $peer was removed from black list")))
   }
 }

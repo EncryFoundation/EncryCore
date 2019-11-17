@@ -2,7 +2,7 @@ package encry.cli.commands.history
 
 import akka.actor.ActorRef
 import akka.util.Timeout
-import encry.api.http.DataHolderForApi.GetFullBlockById
+import encry.api.http.DataHolderForApi.GetFullBlockByIdCommand
 import encry.cli.{ Ast, Response }
 import encry.cli.commands.Command
 import encry.settings.EncryAppSettings
@@ -23,6 +23,6 @@ object GetFullBlockById extends Command {
 
     val num = args.requireArg[Ast.Str]("modifier").s
 
-    (dataHolder ? GetFullBlockById(Left(num))).mapTo[Option[Block]].map(x => Some(Response(x.asJson.toString())))
+    (dataHolder ? GetFullBlockByIdCommand(Left(num))).mapTo[Option[Block]].map(x => Some(Response(x.asJson.toString())))
   }
 }

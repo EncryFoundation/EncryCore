@@ -26,6 +26,6 @@ object AddPeer extends Command {
     val port: Long              = args.requireArg[Ast.Num]("port").i
     val peer: InetSocketAddress = new InetSocketAddress(host, port.toInt)
     dataHolder ! UserAddPeer(peer)
-    Future(Some(Response("Peer added!")))
+    Future.successful(Some(Response("Peer added!")))
   }
 }

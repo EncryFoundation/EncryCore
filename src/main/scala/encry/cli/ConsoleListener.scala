@@ -2,7 +2,13 @@ package encry.cli
 
 import akka.actor.{Actor, ActorRef, Props}
 import encry.cli.commands._
-import encry.cli.commands.history.{GetCandidate, GetFullBlockById, GetHeaderById, GetLastHeaderIdsAtHeight, GetLastHeaders, GetTxById}
+import encry.cli.commands.history.{
+  GetCandidate,
+  GetFullBlockById,
+  GetHeaderById,
+  GetLastHeaderIdsAtHeight,
+  GetLastHeaders,
+  GetTxById}
 import encry.cli.commands.info.GetInfo
 import encry.cli.commands.peer.{GetBan, GetBannedPeers, GetConnectedPeers, GetPeers}
 import encry.settings.EncryAppSettings

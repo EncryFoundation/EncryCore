@@ -18,6 +18,6 @@ object StartMining extends Command {
                        nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     dataHolder ! StartMiner
-    Future(Some(Response("Mining is started.")))
+    Future.successful(Some(Response("Mining is started.")))
   }
 }

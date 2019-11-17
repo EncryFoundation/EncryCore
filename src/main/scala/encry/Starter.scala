@@ -60,8 +60,8 @@ class Starter(settings: EncryAppSettings,
                else
                  startNonEmptyNode
     } yield result) match {
-      case Left(ex) =>
-        println(s"Node start with http api. $ex")
+      case Left(_) =>
+        println(s"Node start with http api.")
       case Right(res) =>
         println("Node config read successfully!")
         self ! res
@@ -91,7 +91,7 @@ class Starter(settings: EncryAppSettings,
     for {
       answer <- {
         println(preview)
-        println("Would you like to start your node with http api help or with cli? Enter yes or no:")
+        println("Would you like to start your node with http api help or with cli? Enter 'yes' for http api or 'no' for CLI:")
         readAnswer
       }
       result <- if (answer) startWithHttpApi else startWithCli
@@ -275,7 +275,6 @@ class Starter(settings: EncryAppSettings,
                         declaredAddr,
                         bindAddr) =>
       import scala.concurrent.duration._
-      println("Got accumulated info.")
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))

@@ -29,7 +29,7 @@ trait AccStorage extends StrictLogging with AutoCloseable {
 object AccStorage extends StrictLogging {
   val PasswordKey: Array[Byte] = Algos.hash("Password_Key")
 
-  def getDirStorage(settings: EncryAppSettings): File = new File(s"${settings.directory}/ackstorage")
+  def getDirStorage(settings: EncryAppSettings): File = new File(s"${settings.directory}/userKeys")
 
   def init(settings: EncryAppSettings): AccStorage = new AccStorage {
     override val storage: DB = {

@@ -217,7 +217,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         }
         .pipeTo(sender)
 
-    case GetFullBlockById(id) =>
+    case GetFullBlockByIdCommand(id) =>
       sender() ! history.flatMap { history =>
         id match {
           case Left(value) =>
@@ -350,7 +350,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
-  final case class GetFullBlockById(headerId: Either[String, ModifierId])
+  final case class GetFullBlockByIdCommand(headerId: Either[String, ModifierId])
 
   final case class GetLastHeadersHelper(i: Int)
 

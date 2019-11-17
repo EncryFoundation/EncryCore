@@ -86,9 +86,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
-    logger.debug(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
-    //logger.info("newRoot:" + newRoot)
-    logger.debug("shadow root: " + shadowedRoot)
 
     AvlTree(shadowedRoot, storage)
   }

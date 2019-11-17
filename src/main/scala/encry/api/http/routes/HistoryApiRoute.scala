@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.DataHolderForApi.{
   GetDataFromHistory,
-  GetFullBlockById,
+  GetFullBlockByIdCommand,
   GetLastHeaderIdAtHeightHelper,
   GetLastHeadersHelper,
   GetMinerStatus
@@ -54,11 +54,11 @@ case class HistoryApiRoute(dataHolder: ActorRef, appSettings: EncryAppSettings, 
   }
 
   def getBlockHeaderByHeaderIdR: Route = (modifierId & pathPrefix("header") & get) { id =>
-    (dataHolder ? GetFullBlockById(Right(id))).mapTo[Option[Block]].map(_.map(x => x.header.asJson)).okJson()
+    (dataHolder ? GetFullBlockByIdCommand(Right(id))).mapTo[Option[Block]].map(_.map(x => x.header.asJson)).okJson()
   }
 
   def getBlockTransactionsByHeaderIdR: Route = (modifierId & pathPrefix("transactions") & get) { id =>
-    (dataHolder ? GetFullBlockById(Right(id))).mapTo[Option[Block]].map(_.map(_.payload.txs.asJson)).okJson()
+    (dataHolder ? GetFullBlockByIdCommand(Right(id))).mapTo[Option[Block]].map(_.map(_.payload.txs.asJson)).okJson()
   }
 
   def candidateBlockR: Route = (path("candidateBlock") & pathEndOrSingleSlash & get) {
@@ -66,6 +66,6 @@ case class HistoryApiRoute(dataHolder: ActorRef, appSettings: EncryAppSettings, 
   }
 
   def getFullBlockByHeaderIdR: Route = (modifierId & get) { id =>
-    (dataHolder ? GetFullBlockById(Right(id))).mapTo[Option[Block]].map(_.asJson).okJson()
+    (dataHolder ? GetFullBlockByIdCommand(Right(id))).mapTo[Option[Block]].map(_.asJson).okJson()
   }
 }

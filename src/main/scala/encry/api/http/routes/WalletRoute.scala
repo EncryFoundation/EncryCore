@@ -25,6 +25,9 @@ case class WalletRoute(override val settings: RESTApiSettings,
    implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
+  val IntrinsicTokenId: ADKey = encrySettings.constants.IntrinsicTokenId
+
+  val EttTokenId: String = Algos.encode(IntrinsicTokenId)
 
  def walletF: Future[Map[String, List[(String, Amount)]]] =
    (dataHolder ? GetViewGetBalance)
@@ -32,7 +35,7 @@ case class WalletRoute(override val settings: RESTApiSettings,
 
  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
- def info = for {
+ def info: Future[(Map[String, List[(String, Amount)]], List[String])] = for {
    wallet <- walletF
    pubKeys <- pubKeysF
  } yield (wallet, pubKeys)
@@ -40,10 +43,6 @@ case class WalletRoute(override val settings: RESTApiSettings,
  def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
  def walletScript(balances: Map[String, List[(String, Amount)]], pubKeysList: List[String]): Text.TypedTag[String] = {
-
-   val IntrinsicTokenId: ADKey = encrySettings.constants.IntrinsicTokenId
-
-   val EttTokenId: String = Algos.encode(IntrinsicTokenId)
 
    html(
      scalatags.Text.all.head(
@@ -684,7 +683,7 @@ case class WalletRoute(override val settings: RESTApiSettings,
                     table(cls := "table align-items-center table-flush", id := "myTable",
                       thead(cls := "thead-light",
                         tr(
-                          th(attr("scope") := "row", "Account"),
+                          th(attr("scope") := "row", "Public keys"),
                           th(attr("scope") := "row", "TokenId"),
                           th(attr("scope") := "row", "Balance")
                         )
