@@ -5,7 +5,7 @@ import encry.EncryApp.forceStopApplication
 import encry.consensus.ConsensusSchemeReaders
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.modifiers.history.HeaderChain
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
@@ -30,11 +30,29 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
-    .flatMap{block =>
+    .flatMap{ block =>
       logger.info(s"proc block ${block.header.encodedId}!")
       processBlock(block).some
     }
     .getOrElse(putToHistory(payload))
+
+  def processPayloadFastSync(payload: Payload): Unit = {
+    val startTime: Long = System.currentTimeMillis()
+    getBlockByPayload(payload).foreach { block =>
+      //logger.info(s"Start processing payload ${payload.encodedId} with header id ${Algos.encode(payload.headerId)}")
+      historyStorage.bulkInsert(payload.id, Seq(BestBlockKey -> block.header.id), Seq(payload))
+      //logger.info(s"Inserted new payload ${payload.encodedId} into storage. Start best full block height updating")
+      blockDownloadProcessor.updateBestBlock(block.header)
+      logger.info(s"BlockDownloadProcessor updated block at height ${block.header.height} successfully")
+      historyStorage.insert(
+        StorageVersion @@ validityKey(block.header.id).untag(StorageKey),
+        List(block.header.id, block.payload.id).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+      )
+      //logger.info(s"Block ${block.encodedId} at height ${block.header.height} marked as valid")
+      logger.info(s"Finished processing block ${block.encodedId}. " +
+        s"Processing time is ${(System.currentTimeMillis() - startTime) / 1000} s")
+    }
+  }
 
   private def processBlock(blockToProcess: Block): ProgressInfo = {
     logger.info(s"Starting processing block to history ||${blockToProcess.encodedId}||${blockToProcess.header.height}||")

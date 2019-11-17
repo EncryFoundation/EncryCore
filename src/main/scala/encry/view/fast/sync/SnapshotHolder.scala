@@ -162,6 +162,20 @@ class SnapshotHolder(settings: EncryAppSettings,
         case _ =>
       }
 
+    case StartFastSync =>
+      println("StartFastSync")
+      //todo add re-broadcast this message
+      logger.info(
+        s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
+          s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
+      )
+      nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
+        Broadcast)
+      context.become(
+        fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
+      )
+      //self ! RequestNextChunks
+
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
       logger.info(s"Current notYetRequested queue ${snapshotDownloadController.notYetRequested.size}.")
@@ -175,7 +189,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       val timer: Option[Cancellable] =
         context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
       context.become(
-        fastSyncMod(history, processHeaderSyncedMsg, timer, reRequestsNumber = 0)
+        fastSyncMod(history, processHeaderSyncedMsg, timer, reRequestsNumber = 0).orElse(commonMessages)
       )
 
     case RequiredManifestHeightAndId(height, manifestId) =>
@@ -188,15 +202,15 @@ class SnapshotHolder(settings: EncryAppSettings,
       restartFastSync(history)
 
     case HeaderChainIsSynced if processHeaderSyncedMsg =>
-      logger.info(
-        s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
-          s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
-      )
-      nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
-                                           Broadcast)
-      context.become(
-        fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
-      )
+//      logger.info(
+//        s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
+//          s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
+//      )
+//      nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
+//                                           Broadcast)
+//      context.become(
+//        fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
+//      )
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
       snapshotDownloadController.requestedChunks.map { id =>
@@ -207,7 +221,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       val timer: Option[Cancellable] =
         context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
       context.become(
-        fastSyncMod(history, processHeaderSyncedMsg, timer, reRequestsNumber + 1)
+        fastSyncMod(history, processHeaderSyncedMsg, timer, reRequestsNumber + 1).orElse(commonMessages)
       )
 
     case CheckDelivery =>
@@ -306,6 +320,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 }
 
 object SnapshotHolder {
+
+  final case object StartFastSync
 
   final case class FastSyncFinished(state: UtxoState) extends AnyVal
 
