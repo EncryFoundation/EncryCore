@@ -1,30 +1,20 @@
 package encry.api.http.routes
 
 import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, ActorRefFactory}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import akka.http.scaladsl.server.{Route, StandardRoute, ValidationRejection}
-import cats.syntax.validated._
-import cats.syntax.apply._
-import cats.data.{NonEmptyChain, Validated}
-import cats.effect.IO
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
+import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.StrictLogging
 import encry.Starter.InitNodeResult
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
-import encry.local.miner.Miner.MinerStatus
-import scalatags.Text.all.{div, form, h3, span, td, _}
-import encry.settings.{NodeSettings, RESTApiSettings}
+import encry.settings.RESTApiSettings
 import encry.utils.Mnemonic
-import io.circe.Json
-import scalatags.{Text, generic}
-import io.circe.parser
 import io.circe.generic.auto._
-
+import scalatags.Text
+import scalatags.Text.all.{div, form, h3, span, _}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success, Try}
 
-case class ConfigRoute(override val settings: RESTApiSettings, starter: ActorRef)(
+case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
@@ -38,7 +28,7 @@ case class ConfigRoute(override val settings: RESTApiSettings, starter: ActorRef
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
         meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
-        meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
+        meta(name := "description", content := "Encry Core"),
         meta(name := "author", content := "Creative Tim"),
         script(
           raw(
@@ -440,7 +430,6 @@ case class ConfigRoute(override val settings: RESTApiSettings, starter: ActorRef
           case "true" => true
           case "false" => false
         }
-        val nodePassR = nodePass
 
         val declared = Try {
           val declaredSpl = declaredAddr.split(":")
@@ -457,7 +446,7 @@ case class ConfigRoute(override val settings: RESTApiSettings, starter: ActorRef
           case Failure(_) => new InetSocketAddress("0.0.0.0", 9001)
         }
 
-        starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePassR, nodeName, declared, bind)
+        starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePass, nodeName, declared, bind)
         complete("OK")
     }
   }

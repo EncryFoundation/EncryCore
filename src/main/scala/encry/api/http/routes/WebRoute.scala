@@ -2,13 +2,15 @@ package encry.api.http.routes
 
 import java.security.Security
 import java.util.concurrent.TimeUnit
+
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
+import akka.http.scaladsl.server.Directives.complete
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllChunks, GetAllInfoHelper, GetMinerStatus, GetNodePass}
+import encry.api.http.DataHolderForApi.{ GetAllInfoHelper, GetMinerStatus, GetNodePass}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._

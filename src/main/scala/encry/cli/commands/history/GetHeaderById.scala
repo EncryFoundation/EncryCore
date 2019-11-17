@@ -8,7 +8,7 @@ import encry.settings.EncryAppSettings
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.pattern._
-import encry.api.http.DataHolderForApi.{ GetDataFromHistory, GetFullHeaderById }
+import encry.api.http.DataHolderForApi.{ GetDataFromHistory, GetFullBlockById }
 import encry.utils.NetworkTimeProvider
 import encry.view.history.History
 import io.circe.syntax._
@@ -29,7 +29,7 @@ object GetHeaderById extends Command {
 
     val num = args.requireArg[Ast.Str]("modifier").s
 
-    (dataHolder ? GetFullHeaderById(Left(num)))
+    (dataHolder ? GetFullBlockById(Left(num)))
       .mapTo[Option[Block]]
       .map(x => Some(Response(x.map(_.header).asJson.toString())))
   }

@@ -56,6 +56,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
+  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "org.iq80.leveldb" % "leveldb" % "0.9",
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
@@ -70,7 +71,6 @@ libraryDependencies ++= Seq(
   // JWT
   "com.pauldijou" %% "jwt-spray-json" % "2.1.0",
   "org.bouncycastle" % "bcpkix-jdk15on" % "1.60",
-  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
   "org.encry" %% "encry-common" % "0.9.2",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",

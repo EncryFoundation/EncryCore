@@ -18,12 +18,9 @@ import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
 
-case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
-
-
-  def walletF: Future[Map[String, Amount]] = (dataHolder ? GetViewGetBalance).mapTo[Map[String, Amount]]
 
   def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
@@ -46,11 +43,11 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
   var fee = document.forms["myForm"]["fee"].value;
   var amount = document.forms["myForm"]["amount"].value;
   if (fee == "") {
-     alert("Address must be filled out");
+     alert("Fee must be filled out");
      return false;
    }
  if (amount == "") {
-    alert("Port must be filled out");
+    alert("Amount must be filled out");
     return false;
   }
 }""")
@@ -61,11 +58,9 @@ case class PeersBannedRoute(override val settings: RESTApiSettings, nodeSettings
                  var amount = document.forms["myForm"]["amount"].value;
                     var request = new XMLHttpRequest();
                     request.open('POST', "http://localhost:9051/peers/add", true);
-                //    request.setRequestHeader('content-type', 'application/json');
                     request.send(fee.toString() + ':' + amount.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
-
                   }""")
         ),
 

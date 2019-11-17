@@ -92,7 +92,7 @@ object EncryApp extends App with StrictLogging  {
         WalletRoute(settings.restApi, settings.node, dataHolderForApi, settings),
         PeersRoute(settings.restApi, settings.node, dataHolderForApi),
         PeersConnectedRoute(settings.restApi, settings.node, dataHolderForApi),
-        PeersBannedRoute(settings.restApi, settings.node, dataHolderForApi),
+        BanPeersRoute(settings.restApi, dataHolderForApi),
         ArgonRoute(settings.restApi),
         PeersApiRoute(settings.restApi, dataHolderForApi),
         InfoApiRoute(dataHolderForApi, settings, nodeId, timeProvider),

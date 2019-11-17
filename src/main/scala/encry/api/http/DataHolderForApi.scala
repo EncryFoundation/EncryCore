@@ -46,11 +46,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
   override def receive: Receive = awaitNVHRef
 
-  val storageL: AccStorage = AccStorage.init(settings)
+  val storage: AccStorage = AccStorage.init(settings)
 
-  var connectedPeersCollection = ConnectedPeersCollection()
-
-  override def postStop(): Unit = storageL.storage.close()
+  override def postStop(): Unit = storage.storage.close()
 
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
@@ -58,7 +56,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PassForStorage(_) =>
       stash()
-    case GetNodePass => sender() ! storageL.getPassword
+    case GetNodePass => sender() ! storage.getPassword
   }
 
   def workingCycle(nvhRef: ActorRef,
@@ -86,9 +84,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case GetNodePass => sender() ! storageL.getPassword
+    case GetNodePass => sender() ! storage.getPassword
 
-    case PassForStorage(pass) => storageL.putPassword(pass)
+    case PassForStorage(pass) => storage.putPassword(pass)
 
     case ConnectedPeersConnectionHelper(info) =>
       context.become(
@@ -176,31 +174,30 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case ClIAddPeer(peer) => context.system.eventStream.publish(PeerFromCli(peer))
+    case UserAddPeer(peer) => context.system.eventStream.publish(PeerFromCli(peer))
 
     case RemovePeerFromBanList(peer) =>
       context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, String] { view =>
         view.vault.publicKeys.foldLeft("") { (str, k) =>
           str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
         }
       }).pipeTo(sender)
 
     case GetViewCreateKey =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
-        if (view.vault.accountManagers.head.accounts.isEmpty) view.vault.accountManagers.head.mandatoryAccount
-        else view.vault.accountManagers.head.createAccount(None)
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
+         view.vault.accountManagers.head.createAccount(None)
       }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, List[String]] { view =>
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, List[String]] { view =>
         view.vault.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, Map[String, List[(String, Amount)]]] { view =>
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[String, List[(String, Amount)]]] { view =>
         val balance: Map[String, List[(String, Amount)]] = view.vault.getBalances.map {
           case ((key, token), amount) => Map(key -> List((token, amount)))
         }.foldLeft(Map.empty[String, List[(String, Amount)]]) { case (el1, el2) => el1 |+| el2 }
@@ -208,7 +205,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
-      (self ? GetDataFromPresentView[History, UtxoState, EncryWallet, String] { view =>
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, String] { view =>
         view.vault.accountManagers.head.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 
@@ -220,7 +217,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         }
         .pipeTo(sender)
 
-    case GetFullHeaderById(id) =>
+    case GetFullBlockById(id) =>
       sender() ! history.flatMap { history =>
         id match {
           case Left(value) =>
@@ -308,10 +305,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case GetConnectedPeers     => sender() ! connectedPeers
     case GetDataFromHistory    => history.foreach(sender() ! _)
     case GetMinerStatus        => sender() ! minerStatus
-    case GetReaders            => sender() ! Readers(history, state)
-    case GetTransactionsNumber => sender() ! transactionsOnMinerActor
-    case GetTimeProvider       => sender() ! ntp
-    case GetBlockInfo          => sender() ! blockInfo
     case GetAllPeers           => sender() ! allPeers
     case GetBannedPeers        => sender() ! blackList
     case GetConnections        => sender() ! connectedPeersCollection
@@ -341,10 +334,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
 object DataHolderForApi { //scalastyle:ignore
 
-  final case class UpdatingBlackListForApi(blackList: Seq[InetAddress]) extends AnyVal
-
-  final case class UpdatingConnectedListForApi(connectedPeers: Seq[InetSocketAddress]) extends AnyVal
-
   final case class UpdatingTransactionsNumberForApi(number: Int) extends AnyVal
 
   final case class UpdatingMinerStatus(minerStatus: MinerStatus) extends AnyVal
@@ -357,11 +346,11 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class RemovePeerFromBanList(peer: InetSocketAddress)
 
-  final case class ClIAddPeer(peer: InetSocketAddress)
+  final case class UserAddPeer(peer: InetSocketAddress)
 
   final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
-  final case class GetFullHeaderById(headerId: Either[String, ModifierId])
+  final case class GetFullBlockById(headerId: Either[String, ModifierId])
 
   final case class GetLastHeadersHelper(i: Int)
 
@@ -369,23 +358,13 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class Readers(h: Option[History], s: Option[UtxoStateReader])
 
-  final case class AddUser(ip: String)
-
   final case class PassForStorage(password: String)
 
   final case class PeerBanHelper(addr: InetSocketAddress, msg: String)
 
   final case class ConnectedPeersConnectionHelper(c: ConnectedPeersCollection)
 
-  final case class GetSnapshotInfoFromNVH(size: Int)
-
-  case object GetViewSendTx
-
   case object GetNodePass
-
-  case object GetAllPermissionedUsers
-
-  case object GetInfoHelper
 
   case object GetViewPrintAddress
 
@@ -399,8 +378,6 @@ object DataHolderForApi { //scalastyle:ignore
 
   case object GetViewPrintPrivKeys
 
-  case object GetTimeProvider
-
   case object GetAllInfoHelper
 
   case object GetBannedPeers
@@ -411,10 +388,6 @@ object DataHolderForApi { //scalastyle:ignore
 
   case object ShutdownNode
 
-  case object GetTransactionsNumber
-
-  case object GetReaders
-
   case object GetConnectedPeers
 
   case object GetDataFromHistory
@@ -423,15 +396,11 @@ object DataHolderForApi { //scalastyle:ignore
 
   case object GetAllPeers
 
-  case object GetBlockInfo
-
   case object GetBannedPeersHelper
 
   case object GetBannedPeersHelperAPI
 
   case object GetAllInfo
-
-  case object GetAllChunks
 
   case object GetConnections
 

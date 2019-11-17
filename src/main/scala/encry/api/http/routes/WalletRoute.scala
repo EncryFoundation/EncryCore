@@ -13,7 +13,6 @@ import scalatags.Text.all.{div, span, _}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success

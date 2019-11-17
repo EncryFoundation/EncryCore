@@ -1,28 +1,19 @@
 package encry.api.http.routes
 
-import java.net.InetSocketAddress
-
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
-import akka.http.scaladsl.server.{Route, ValidationRejection}
+import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{ConnectedPeersConnectionHelper, GetAllInfoHelper, GetAllPeers, GetConnectedPeersHelper, GetConnections, GetViewCreateKey, GetViewGetBalance, GetViewPrintPubKeys, StartMiner, StopMiner}
-import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
-import encry.local.miner.Miner.MinerStatus
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetConnections, GetViewGetBalance, GetViewPrintPubKeys}
 import encry.network.ConnectedPeersCollection
-import encry.network.ConnectedPeersCollection.PeerInfo
-import scalatags.Text.all.{div, span, td, _}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.Json
-import scalatags.{Text, generic}
-import io.circe.parser
 import io.circe.generic.auto._
-import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.utils.Algos
-
-import scala.concurrent.{Await, Future}
+import scalatags.Text
+import scalatags.Text.all.{div, span, _}
+import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
@@ -37,10 +28,6 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
   def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
   def connectedPeers: Future[ConnectedPeersCollection] = (dataHolder ? GetConnections).mapTo[ConnectedPeersCollection]
-
-  def info: Future[ConnectedPeersCollection] = for {
-    peerAll <- connectedPeers
-  } yield peerAll
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
@@ -57,11 +44,11 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
   var fee = document.forms["myForm"]["fee"].value;
   var amount = document.forms["myForm"]["amount"].value;
   if (fee == "") {
-     alert("Address must be filled out");
+     alert("Fee must be filled out");
      return false;
    }
  if (amount == "") {
-    alert("Port must be filled out");
+    alert("Amount must be filled out");
     return false;
   }
 }""")
@@ -350,7 +337,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
 
   override def route: Route = (path("connectedPeers") & get) {
     WebRoute.extractIp(
-        onComplete(info) {
+        onComplete(connectedPeers) {
           case Success(info) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
           case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
         }

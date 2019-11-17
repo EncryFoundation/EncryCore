@@ -11,7 +11,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp.{system, timeProvider}
 import encry.api.http.DataHolderForApi
-import encry.api.http.DataHolderForApi.{BlockAndHeaderInfo, GetSnapshotInfoFromNVH}
+import encry.api.http.DataHolderForApi.{BlockAndHeaderInfo}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._

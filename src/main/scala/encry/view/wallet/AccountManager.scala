@@ -7,7 +7,7 @@ import encry.EncryApp
 import encry.crypto.encryption.AES
 import encry.settings.EncryAppSettings
 import encry.utils.Mnemonic
-import encry.view.wallet.EncryWallet.getKeysDir
+import encry.view.wallet.EncryWallet.{getKeysDir, getWalletDir}
 import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.utils.Algos
