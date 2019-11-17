@@ -33,7 +33,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   var isHeadersChainSyncedVar: Boolean = false
 
   final case class FastSyncProcessor(localSettings: EncryAppSettings) {
-    var isFastSync: Boolean = localSettings.snapshotSettings.enableFastSynchronization
+    var fastSyncVal: Boolean = localSettings.snapshotSettings.enableFastSynchronization
   }
 
   lazy val isFastSync = FastSyncProcessor(settings)
@@ -163,7 +163,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && isNewHeader(header) && !isFastSync.isFastSync) {
+    else if (!isHeadersChainSynced && isNewHeader(header) && !isFastSync.fastSyncVal) {
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none

@@ -9,7 +9,7 @@ import encry.utils.NetworkTimeProvider
 
 import scala.concurrent.Future
 
-object StopMine extends Command {
+object StopMining extends Command {
 
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,

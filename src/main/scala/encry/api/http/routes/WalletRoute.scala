@@ -6,18 +6,23 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewGetBalance, GetViewPrintPubKeys}
-import encry.settings.{NodeSettings, RESTApiSettings}
+import encry.settings.{EncryAppSettings, NodeSettings, RESTApiSettings}
 import io.circe.Json
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ADKey
+
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
 
 
-case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class WalletRoute(override val settings: RESTApiSettings,
+                       nodeSettings: NodeSettings,
+                       dataHolder: ActorRef,
+                       encrySettings: EncryAppSettings)(
    implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
@@ -37,7 +42,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
 
  def walletScript(balances: Map[String, List[(String, Amount)]], pubKeysList: List[String]): Text.TypedTag[String] = {
 
-   val IntrinsicTokenId: Array[Byte] = Algos.hash("intrinsic_token")
+   val IntrinsicTokenId: ADKey = encrySettings.constants.IntrinsicTokenId
 
    val EttTokenId: String = Algos.encode(IntrinsicTokenId)
 
@@ -50,37 +55,37 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
        script(
          raw(
            """function validateForm2() {
-        var fee = document.forms["myForm2"]["fee"].value;
-        var data = document.forms["myForm2"]["data"].value;
-  if (fee == "") {
-     alert("Fee must be filled out");
-     return false;
-   }
- if (data == "") {
-    alert("Data must be filled out");
-    return false;
-  }
-}""")
+                var fee = document.forms["myForm2"]["fee"].value;
+                var data = document.forms["myForm2"]["data"].value;
+                  if (fee == "") {
+                     alert("Fee must be filled out");
+                     return false;
+                   }
+                  if (data == "") {
+                     alert("Data must be filled out");
+                     return false;
+                   }
+                  }""")
        ),
        script(
          raw(
            """function validateForm() {
-  var addr = document.forms["myForm"]["addr"].value;
-  var fee = document.forms["myForm"]["fee"].value;
-  var amount = document.forms["myForm"]["amount"].value;
-  if (addr == "") {
-    alert("Address must be filled out");
-    return false;
-  }
-  if (fee == "") {
-     alert("Fee must be filled out");
-     return false;
-   }
- if (amount == "") {
-    alert("Amount must be filled out");
-    return false;
-  }
-}""")
+                var addr = document.forms["myForm"]["addr"].value;
+                var fee = document.forms["myForm"]["fee"].value;
+                var amount = document.forms["myForm"]["amount"].value;
+                  if (addr == "") {
+                alert("Address must be filled out");
+                return false;
+                  }
+                  if (fee == "") {
+                alert("Fee must be filled out");
+                return false;
+                  }
+                  if (amount == "") {
+                alert("Amount must be filled out");
+                return false;
+                  }
+                }""")
        ),
        script(
          raw(
@@ -727,9 +732,7 @@ case class WalletRoute(override val settings: RESTApiSettings, nodeSettings: Nod
                       ),
                       tbody(
                         for (p <- pubKeysList) yield {
-                          tr(
-                            th(attr("scope") := "row", p)
-                          )
+                          tr(th(attr("scope") := "row", p))
                         }
                       )
                     )

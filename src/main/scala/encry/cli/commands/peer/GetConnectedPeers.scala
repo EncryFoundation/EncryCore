@@ -20,7 +20,6 @@ object GetConnectedPeers extends Command {
                        nodeId: Array[Byte],
                        ntp: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    (dataHolder ? GetConnectedPeersHelper).mapTo[Seq[PeerInfoResponse]].foreach(println)
-    Future(None)
+    (dataHolder ? GetConnectedPeersHelper).mapTo[Seq[PeerInfoResponse]].map(x => Some(Response(x.toString())))
   }
 }

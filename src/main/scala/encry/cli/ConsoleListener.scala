@@ -55,8 +55,8 @@ object ConsoleListener {
   private val nodeCmds = Map(
     "node" -> Map(
       "shutdown"    -> NodeShutdown,
-      "stopMining"  -> StopMine,
-      "startMining" -> StartMine,
+      "stopMining"  -> StopMining,
+      "startMining" -> StartMining,
     )
   )
 

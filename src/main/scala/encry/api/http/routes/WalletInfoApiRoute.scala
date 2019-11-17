@@ -158,16 +158,16 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               case (seq, box) if decodedTokenOpt.isEmpty =>
                 if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
-                if (seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.isEmpty).map(_.amount).sum < fee) seq :+ box else seq
+                if (seq.collect{ case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < fee) seq :+ box else seq
               case (seq, box: AssetBox) =>
                 val totalAmount =
-                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
-                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                  seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib.amount }.sum
                 if (totalAmount < amount) seq :+ box else seq
               case (seq, box: TokenIssuingBox) =>
                 val totalAmount =
-                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
-                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                  seq.collect{ case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount}.sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib.amount }.sum
                 if (totalAmount < amount) seq :+ box else seq
             }
               .toIndexedSeq
@@ -210,16 +210,16 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               case (seq, box) if decodedTokenOpt.isEmpty =>
                 if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
               case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
-                if (seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.isEmpty).map(_.amount).sum < fee) seq :+ box else seq
+                if (seq.collect{ case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < fee) seq :+ box else seq
               case (seq, box: AssetBox) =>
                 val totalAmount =
                   seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
-                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                    seq.collect{ case tib: TokenIssuingBox => tib.amount }.sum
                 if (totalAmount < amount) seq :+ box else seq
               case (seq, box: TokenIssuingBox) =>
                 val totalAmount =
-                  seq.collect{ case ab: AssetBox => ab }.filter(_.tokenIdOpt.nonEmpty).map(_.amount).sum +
-                    seq.collect{ case tib: TokenIssuingBox => tib }.map(_.amount).sum
+                  seq.collect{ case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount}.sum +
+                    seq.collect{ case tib: TokenIssuingBox => tib.amount }.sum
                 if (totalAmount < amount) seq :+ box else seq
             }
               .toIndexedSeq

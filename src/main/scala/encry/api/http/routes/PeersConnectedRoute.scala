@@ -72,7 +72,6 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                  var amount = document.forms["myForm"]["amount"].value;
                     var request = new XMLHttpRequest();
                     request.open('POST', "http://localhost:9051/peers/add", true);
-                //    request.setRequestHeader('content-type', 'application/json');
                     request.send(fee.toString() + ':' + amount.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
@@ -280,7 +279,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                       ),
                       tbody(
 
-                        (for (p <- peersR.peers) yield {
+                        (for (p <- peersR.getAll) yield {
                           tr(
                             th(p._1.getHostName
                             ),

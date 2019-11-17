@@ -90,7 +90,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
           nodeView.history.blockDownloadProcessor.updateBestBlock(h)
           nodeView.history.isHeadersChainSyncedVar = true
-          nodeView.history.isFastSync.isFastSync = false
+          nodeView.history.isFastSync.fastSyncVal = false
           val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
           val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
           updateNodeView(

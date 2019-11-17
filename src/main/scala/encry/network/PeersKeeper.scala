@@ -290,7 +290,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
 object PeersKeeper {
 
-  trait PeerKeeper
+  sealed trait PeerKeeper
 
   final case class VerifyConnection(peer: InetSocketAddress,
                                     remoteConnection: ActorRef)

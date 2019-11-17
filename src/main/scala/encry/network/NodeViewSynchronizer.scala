@@ -81,7 +81,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
     context.system.eventStream.subscribe(self, classOf[ClIMiner])
-    context.system.eventStream.subscribe(self, classOf[Peer])
+    context.system.eventStream.subscribe(self, classOf[CLIPeer])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -270,11 +270,11 @@ object NodeViewSynchronizer {
     final case class RequestFromLocal(source: ConnectedPeer,
                                       modifierTypeId: ModifierTypeId,
                                       modifierIds: Seq[ModifierId])
-    sealed trait Peer
+    sealed trait CLIPeer
 
-    final case class PeerFromCli(address: InetSocketAddress) extends Peer
+    final case class PeerFromCli(address: InetSocketAddress) extends CLIPeer
 
-    final case class RemovePeerFromBlackList(address: InetSocketAddress) extends Peer
+    final case class RemovePeerFromBlackList(address: InetSocketAddress) extends CLIPeer
 
     trait NodeViewHolderEvent
 

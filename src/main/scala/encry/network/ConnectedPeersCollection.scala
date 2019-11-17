@@ -8,7 +8,7 @@ import encry.network.PeerConnectionHandler.{ConnectedPeer, ConnectionType, Outgo
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 
-final case class ConnectedPeersCollection(peers: Map[InetSocketAddress, PeerInfo]) extends StrictLogging {
+final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddress, PeerInfo]) extends StrictLogging {
 
   val size: Int = peers.size
 
@@ -33,6 +33,8 @@ final case class ConnectedPeersCollection(peers: Map[InetSocketAddress, PeerInfo
                  f: (InetSocketAddress, PeerInfo) => T): Seq[T] = peers
     .collect { case (peer, info) if p(peer, info) => f(peer, info) }
     .toSeq
+
+  def getAll: Map[InetSocketAddress, PeerInfo] = peers
 
   private def updateK[T](elems: Map[InetSocketAddress, T], f: (PeerInfo, T) => PeerInfo): Map[InetSocketAddress, PeerInfo] = {
     val newValue: Map[InetSocketAddress, PeerInfo] = for {
