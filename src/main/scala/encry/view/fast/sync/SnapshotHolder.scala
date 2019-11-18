@@ -3,28 +3,28 @@ package encry.view.fast.sync
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import cats.syntax.either._
+import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.BlackList.BanReason._
 import encry.network.Broadcast
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
 import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
 import encry.settings.EncryAppSettings
-import SnapshotHolder._
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
+import encry.view.fast.sync.SnapshotHolder._
+import encry.view.history.History
 import encry.view.state.UtxoState
+import encry.view.state.avlTree.utils.implicits.Instances._
+import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
-import cats.syntax.option._
-import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync, NotAllChunksSentMessage, UnrequestedChunksSentMessage}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
-import encry.view.history.History
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
-import cats.syntax.either._
 
 import scala.util.Try
-import encry.view.state.avlTree.utils.implicits.Instances._
 
 class SnapshotHolder(settings: EncryAppSettings,
                      networkController: ActorRef,
@@ -233,7 +233,6 @@ class SnapshotHolder(settings: EncryAppSettings,
   def workMod(history: History): Receive = {
     case TreeChunks(chunks, id) =>
       //todo add collection with potentialManifestsIds to NVH
-
       snapshotProcessor.createNewSnapshot(id, chunks).fold( err =>
         logger.warn(s"Failed to create new snapshot due to ${err.error}"),
         newProc => snapshotProcessor = newProc
