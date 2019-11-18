@@ -217,8 +217,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   (History, UtxoState, Seq[PersistentModifier]) = {
     logger.info(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
-      case header: Header => requestDownloads(progressInfo, Some(header.id))
-      case _ => requestDownloads(progressInfo, None)
+      case header: Header if !history.workWithFastSync => requestDownloads(progressInfo, Some(header.id))
+      case _ if !history.workWithFastSync => requestDownloads(progressInfo, None)
+      case _ =>
     }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
@@ -252,7 +253,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                         s"\n\n\n header - $h \n\n\n")
                       nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
                       newHis.heightOfLastAvailablePayloadForRequest = requiredHeight
-                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
+                      println(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
                     }
                   }
                 case _ =>
@@ -317,8 +318,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             nodeView.history.processPayloadFastSync(p, rawBytes)
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
             if (nodeView.history.getBestBlockHeight >= nodeView.history.heightOfLastAvailablePayloadForRequest) {
-              logger.info(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
-              logger.info(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
+              println(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
+              println(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
               nodeViewSynchronizer ! StartProcessingChunks
             }
             influxRef.foreach { ref =>
@@ -377,7 +378,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
           } else {
-            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
+            if (!isLocallyGenerated && !historyBeforeStUpdate.workWithFastSync) requestDownloads(progressInfo, Some(pmod.id))
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
             logger.info(s"\nProgress info is empty")
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))

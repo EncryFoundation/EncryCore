@@ -117,13 +117,16 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else if (height > heightOfLastAvailablePayloadForRequest && workWithFastSync) acc
-      else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
-        case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
-          continuation(height + 1, acc :+ h.payloadId)
-        case Some(_) =>
-          continuation(height + 1, acc)
-        case None =>
-          acc
+      else {
+        println(s"fngvj ${heightOfLastAvailablePayloadForRequest} -> ${height}")
+        getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
+          case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
+            continuation(height + 1, acc :+ h.payloadId)
+          case Some(_) =>
+            continuation(height + 1, acc)
+          case None =>
+            acc
+        }
       }
 
     (for {

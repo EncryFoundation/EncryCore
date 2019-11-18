@@ -153,16 +153,13 @@ class SnapshotHolder(settings: EncryAppSettings,
 
         case ResponseChunkMessage(_) =>
           logger.info(s"Received chunk from unexpected peer ${remote.socketAddress}")
-          nodeViewSynchronizer ! BanPeer(
-            remote,
-            InvalidChunkMessage(s"Received chunk from unexpected peer ${remote.socketAddress}")
-          )
+          //todo add ban only after several unrequested chunks
 
         case _ =>
       }
 
     case StartProcessingChunks =>
-      logger.info(
+      println(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
       )
@@ -184,6 +181,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       }
 
     case RequestNextChunks =>
+      Thread.sleep(1000)
       responseTimeout.foreach(_.cancel())
       logger.info(s"Current notYetRequested queue ${snapshotDownloadController.notYetRequested.size}.")
       val (newController, toDownload) = snapshotDownloadController.chunksIdsToDownload
@@ -200,10 +198,11 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
 
     case RequiredManifestHeightAndId(height, manifestId) =>
-      logger.info(
+      println(
         s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
           s"New required manifest id is ${Algos.encode(manifestId)}."
       )
+      requestManifestScheduler = none
       snapshotDownloadController =
         snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
       restartFastSync(history)
@@ -255,7 +254,9 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.info(s"condition = $condition")
       if (condition == 0) snapshotProcessor.processNewBlock(block, history) match {
         case Left(value)         =>
-        case Right(newProcessor) => snapshotProcessor = newProcessor
+        case Right(newProcessor) =>
+          snapshotProcessor = newProcessor
+          connectionsHandler = IncomingConnectionsHandler.empty(settings)
       }
 
     case DataFromPeer(message, remote) =>
