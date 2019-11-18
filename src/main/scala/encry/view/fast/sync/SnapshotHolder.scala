@@ -181,7 +181,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       }
 
     case RequestNextChunks =>
-      Thread.sleep(1000)
       responseTimeout.foreach(_.cancel())
       logger.info(s"Current notYetRequested queue ${snapshotDownloadController.notYetRequested.size}.")
       val (newController, toDownload) = snapshotDownloadController.chunksIdsToDownload
