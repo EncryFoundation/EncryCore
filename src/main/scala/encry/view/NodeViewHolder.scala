@@ -319,7 +319,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (nodeView.history.getBestBlockHeight >= nodeView.history.heightOfLastAvailablePayloadForRequest) {
               logger.info(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
               logger.info(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
-              nodeViewSynchronizer ! StartFastSync
+              nodeViewSynchronizer ! StartProcessingChunks
             }
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)

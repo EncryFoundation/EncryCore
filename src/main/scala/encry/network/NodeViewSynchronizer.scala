@@ -39,7 +39,7 @@ import encry.view.fast.sync.SnapshotHolder.{
   FastSyncDone,
   HeaderChainIsSynced,
   RequiredManifestHeightAndId,
-  StartFastSync,
+  StartProcessingChunks,
   TreeChunks,
   UpdateSnapshot
 }
@@ -200,7 +200,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
-    case msg@StartFastSync => snapshotHolder ! msg
+    case msg@StartProcessingChunks => snapshotHolder ! msg
     case msg@DisableMining => deliveryManager ! msg
     case msg@BanPeer(_, _) => peersKeeper ! msg
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg
