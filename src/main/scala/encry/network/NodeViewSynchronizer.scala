@@ -113,20 +113,21 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case SyncInfoNetworkMessage(syncInfo) => Option(history) match {
         case Some(historyReader) =>
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, None)
-
-          comparison match {
+          val extOpt = comparison match {
             case Younger | Fork =>
               val ext: Seq[ModifierId] = historyReader.continuationIds(syncInfo, settings.network.syncPacketLength)
               logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
                 s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
               if (ext.isEmpty && comparison == Younger) logger.warn("Extension is empty while comparison is younger")
-              deliveryManager ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
-            case Unknown => logger.info(s"Peer $remote status is still unknown.")
-            case _ =>
+              Some(ext.map(h => Header.modifierTypeId -> h))
+            case _ => None
           }
-        case _ =>
+
+          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, None)
+          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, extOpt)
+
       }
+
       case RequestModifiersNetworkMessage((typeId, requestedIds)) if chainSynced || settings.node.offlineGeneration =>
         val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
           .flatMap(id => modifiersRequestCache
