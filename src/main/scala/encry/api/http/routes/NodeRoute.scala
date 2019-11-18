@@ -1,10 +1,10 @@
 package encry.api.http.routes
 
-import akka.actor.{ ActorRef, ActorRefFactory }
+import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import encry.api.http.DataHolderForApi._
-import encry.settings.{ EncryAppSettings, RESTApiSettings }
+import encry.settings.RESTApiSettings
 
 case class NodeRoute(dataHolder: ActorRef, settings: RESTApiSettings)(implicit val context: ActorRefFactory)
     extends EncryBaseApiRoute {

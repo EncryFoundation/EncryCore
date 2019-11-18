@@ -12,6 +12,9 @@ import scala.concurrent.Future
 
 object PrintAddresses extends Command {
 
+  /**
+    * Command "wallet addrs"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

@@ -15,6 +15,10 @@ import scala.concurrent.Future
 import io.circe.syntax._
 
 object GetCandidate extends Command {
+
+  /**
+    * Command "history getCandidate"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

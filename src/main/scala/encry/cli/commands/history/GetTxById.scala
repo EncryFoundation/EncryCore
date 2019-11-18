@@ -19,6 +19,11 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.concurrent.Future
 
 object GetTxById extends Command {
+
+  /**
+    * Command "history getTxById -modifier=<Id[String]>"
+    * Example "history getTxById -modifier='5a770264e69cb097049d38196d2d0213a69604130e4bb822aaaa931bd8859ea5'"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

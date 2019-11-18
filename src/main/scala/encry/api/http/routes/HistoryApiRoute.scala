@@ -26,17 +26,16 @@ case class HistoryApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, node
   override val route: Route = pathPrefix("history") {
     getHeaderIdsR ~
       getLastHeadersR ~
-      getBlockIdsAtHeightR ~
+      getHeadersIdsAtHeightR ~
       getBlockHeaderByHeaderIdR ~
       getBlockTransactionsByHeaderIdR ~
       getFullBlockByHeaderIdR ~
       candidateBlockR
   }
 
-  private def getHistory: Future[History] = (dataHolder ? GetDataFromHistory).mapTo[History]
-
   def getHeaderIdsR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
-    getHistory.map {
+    (dataHolder ? GetDataFromHistory).mapTo[History]
+      .map {
       _.getHeaderIds(offset, limit).map(Algos.encode).asJson
     }.okJson()
   }
@@ -45,7 +44,7 @@ case class HistoryApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, node
     (dataHolder ? GetLastHeadersHelper(qty)).mapTo[IndexedSeq[Header]].map(_.asJson).okJson()
   }
 
-  def getBlockIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { height =>
+  def getHeadersIdsAtHeightR: Route = (pathPrefix("at" / IntNumber) & get) { height =>
     (dataHolder ? GetLastHeaderIdAtHeightHelper(height))
       .mapTo[Seq[String]]
       .map(_.asJson).okJson()

@@ -51,7 +51,7 @@ object EncryApp extends App with StrictLogging  {
     SystemMetrics.startCollecting()
   }
 
-  def tmpServer(starter: ActorRef): Future[Http.ServerBinding] = {
+  def configServer(starter: ActorRef): Future[Http.ServerBinding] = {
     import akka.http.scaladsl.model.StatusCodes._
     import akka.http.scaladsl.server.Directives._
 

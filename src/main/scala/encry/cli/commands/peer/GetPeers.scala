@@ -13,6 +13,10 @@ import scala.concurrent.Future
 import encry.api.http.DataHolderForApi.GetAllPeers
 
 object GetPeers extends Command {
+
+  /**
+    * Command "peer all"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

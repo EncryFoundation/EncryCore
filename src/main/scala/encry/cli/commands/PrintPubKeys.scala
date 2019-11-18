@@ -12,6 +12,9 @@ import scala.concurrent.Future
 
 object PrintPubKeys extends Command {
 
+  /**
+    * Command "wallet pubKeys"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

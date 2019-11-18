@@ -10,6 +10,7 @@ import encry.settings._
 import encry.utils.NetworkTimeProvider
 import io.circe.Json
 import io.circe.syntax._
+import io.circe.generic.auto._
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.constants.Constants
@@ -47,25 +48,26 @@ object InfoApiRoute {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
     val stateRoot: Option[String] = readers.s.map(_.tree.rootHash).map(Algos.encode)
     val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
-    Map(
-      "name"                      -> nodeName.asJson,
-      "headersHeight"             -> header.map(_.height).getOrElse(0).asJson,
-      "fullHeight"                -> block.map(_.header.height).getOrElse(0).asJson,
-      "bestHeaderId"              -> header.map(_.encodedId).getOrElse("").asJson,
-      "bestFullHeaderId"          -> block.map(_.encodedId).getOrElse("").asJson,
-      "previousFullHeaderId"      -> prevFullHeaderId.asJson,
-      "difficulty"                -> block.map(_.header.difficulty.toString)
-        .getOrElse(constants.InitialDifficulty.toString).asJson,
-      "unconfirmedCount"          -> mempoolSize.asJson,
-      "stateRoot"                 -> stateRoot.asJson,
-      "stateType"                 -> stateType.asJson,
-      "stateVersion"              -> stateVersion.asJson,
-      "isMining"                  -> minerInfo.isMining.asJson,
-      "peersCount"                -> connectedPeersLength.asJson,
-      "knownPeers"                -> knownPeers.map { x => x.getHostName + ":" + x.getPort }.asJson,
-      "storage"                   -> storage.asJson,
-      "uptime"                    -> nodeUptime.asJson,
-      "isConnectedWithKnownPeers" -> connectWithOnlyKnownPeer.asJson,
+    InfoApi(
+      nodeName,
+      stateType,
+      block.map(_.header.difficulty.toString).getOrElse(constants.InitialDifficulty.toString),
+      block.map(_.encodedId).getOrElse(""),
+      header.map(_.encodedId).getOrElse(""),
+      connectedPeersLength,
+      mempoolSize,
+      prevFullHeaderId,
+      block.map(_.header.height).getOrElse(0),
+      header.map(_.height).getOrElse(0),
+      stateVersion.getOrElse(""),
+      nodeUptime,
+      storage,
+      connectWithOnlyKnownPeer,
+      minerInfo.isMining,
+      knownPeers.map { x =>
+        x.getHostName + ":" + x.getPort
+      },
+      stateRoot.getOrElse("")
     ).asJson
   }
 }

@@ -256,7 +256,7 @@ class Starter(settings: EncryAppSettings,
 
   def startWithHttpApi: Either[Throwable, InitNodeResult] = {
     println("Empty node will start with HTTP Api.")
-    initHttpApiServer = EncryApp.tmpServer(self).some
+    initHttpApiServer = EncryApp.configServer(self).some
     println(s"Server started at: http://0.0.0.0:9051/config")
     new Exception("Node started with http api").asLeft[InitNodeResult]
   }

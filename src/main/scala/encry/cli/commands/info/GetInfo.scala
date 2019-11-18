@@ -13,6 +13,10 @@ import io.circe._
 import scala.concurrent._
 
 object GetInfo extends Command {
+
+  /**
+    * Command "info get"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

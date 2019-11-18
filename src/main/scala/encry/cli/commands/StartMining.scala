@@ -12,6 +12,9 @@ import scala.concurrent.Future
 
 object StartMining extends Command {
 
+  /**
+    * Command "node startMining"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

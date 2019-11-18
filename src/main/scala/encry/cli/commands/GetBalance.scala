@@ -15,8 +15,11 @@ import org.encryfoundation.common.utils.Algos
 import scala.concurrent.Future
 
 object GetBalance extends Command {
-  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef, nodeId: Array[Byte], ntp: NetworkTimeProvider): Future[Option[Response]] = {
 
+  /**
+    * Command "wallet balance"
+    */
+  override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef, nodeId: Array[Byte], ntp: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
       GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Response]] { view =>

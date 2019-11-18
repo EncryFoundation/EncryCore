@@ -19,6 +19,10 @@ import scala.concurrent.Future
 
 object GetBan extends Command {
 
+  /**
+    * Command "peer ban -host=<addr[String]> -port=<addr[String]>"
+    * Example: peer ban -host='172.16.10.57' -port=9020
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

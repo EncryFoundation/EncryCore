@@ -11,7 +11,8 @@ import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
-import scala.concurrent.Future
+import io.circe.syntax._
+import io.circe.Json._
 import scala.util.{Failure, Success, Try}
 
 case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: ActorRef)(
@@ -23,21 +24,18 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
   }
 
   def allPeers: Route = (path("all") & get) {
-    val result: Future[Seq[String]] = (dataHolder ? GetAllPeers)
+    (dataHolder ? GetAllPeers)
       .mapTo[Seq[InetSocketAddress]]
-      .map(_.map(_.toString))
-    onSuccess(result)(r => complete(r))
+      .map(_.map(_.toString).asJson).okJson()
   }
 
   def connectedPeers: Route = (path("connected") & get) {
-    val res = (dataHolder ? GetConnectedPeersHelper)
-      .mapTo[Seq[PeerInfoResponse]]
-    onSuccess(res)(r => complete(r))
+    (dataHolder ? GetConnectedPeersHelper)
+      .mapTo[Seq[PeerInfoResponse]].map(_.asJson).okJson()
   }
 
   def bannedList: Route = (path("banned") & get) {
-    val result = (dataHolder ? GetBannedPeersHelper).mapTo[Seq[String]].map(_.map(_.toString))
-    onSuccess(result)(r => complete(r))
+    (dataHolder ? GetBannedPeersHelper).mapTo[Seq[String]].map(_.map(_.toString).asJson).okJson()
   }
 
   def connectPeer: Route = path("add") {

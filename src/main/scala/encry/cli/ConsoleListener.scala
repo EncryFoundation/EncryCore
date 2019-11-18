@@ -108,7 +108,7 @@ object ConsoleListener {
       "get" -> GetInfo
     )
   )
-//link peer
+
   private val peerCmds = Map(
     "peer" -> Map(
       "all"       -> GetPeers,

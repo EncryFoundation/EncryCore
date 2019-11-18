@@ -13,6 +13,11 @@ import scala.concurrent.Future
 import io.circe.syntax._
 
 object GetLastHeaderIdsAtHeight extends Command {
+
+  /**
+    * Command "history getLastHeaderIds -at=<height[Num]>"
+    * Example "history getLastHeaderIds -at=5"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

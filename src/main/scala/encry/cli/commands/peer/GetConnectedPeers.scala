@@ -14,6 +14,9 @@ import scala.concurrent.Future
 
 object GetConnectedPeers extends Command {
 
+  /**
+    * Command "peer connected"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

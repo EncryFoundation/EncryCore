@@ -11,6 +11,9 @@ import scala.concurrent.Future
 
 object StopMining extends Command {
 
+  /**
+    * Command "node stopMining"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

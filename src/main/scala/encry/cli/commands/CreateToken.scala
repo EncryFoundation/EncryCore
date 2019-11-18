@@ -24,9 +24,12 @@ import scala.concurrent.{Await, Future}
 import scala.util.Try
 
 
-// wallet createToken -fee=100 -amount=50000
 object CreateToken extends Command {
 
+  /**
+    * Command "wallet createKey -fee=<fee[Num]> -amount=<amount[Num]>"
+    * Example: wallet createToken -fee=100 -amount=50000
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

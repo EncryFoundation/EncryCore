@@ -13,6 +13,9 @@ import scala.concurrent.Future
 //TODO This cmd is unsafe.
 object PrintPrivKeys extends Command {
 
+  /**
+    * Command "wallet privKeys"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

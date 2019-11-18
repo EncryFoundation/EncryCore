@@ -1,7 +1,6 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
-
 import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.pattern._
 import akka.util.Timeout
@@ -33,7 +32,6 @@ import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
@@ -178,8 +176,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
     case UserAddPeer(peer) => context.system.eventStream.publish(PeerFromCli(peer))
 
-    case RemovePeerFromBanList(peer) =>
-      context.system.eventStream.publish(RemovePeerFromBlackList(peer))
+    case RemovePeerFromBanList(peer) => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
       (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, String] { view =>
@@ -211,14 +208,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         view.vault.accountManagers.head.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 
-   case GetLastHeadersHelper(i) =>
-       (self ? GetDataFromHistory)
-         .mapTo[History]
-         .map {
-           _.lastHeaders(i).headers
-         }
-         .pipeTo(sender)
-//      history.flatMap( => Some(hist.lastHeaders(i).headers))
+   case GetLastHeadersHelper(i) => sender() ! history.toList.flatMap(_.lastHeaders(i).headers)
 
     case GetFullBlockByIdCommand(id) =>
       sender() ! history.flatMap { history =>
@@ -233,23 +223,20 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         }
       }
 
-    case GetBannedPeersHelper =>
-      sender() ! blackList.map(_.toString)
+    case GetBannedPeersHelper => sender() ! blackList.map(_.toString)
 
-    case GetBannedPeersHelperAPI =>
-      sender() ! blackList
+    case GetBannedPeersHelperAPI => sender() ! blackList
 
-    case GetConnectedPeersHelper =>
-      sender() !  connectedPeers.map(
-            peer =>
+    case GetConnectedPeersHelper => sender() ! connectedPeers
+      .map(
+        peer =>
               PeerInfoResponse(peer.socketAddress.toString,
                                Some(peer.handshake.nodeName),
-                               Some(peer.direction.toString))
-          )
+                               Some(peer.direction.toString)))
 
 
     case GetLastHeaderIdAtHeightHelper(i) =>
-      sender() ! history.flatMap(_.headerIdsAtHeight(i).map(Algos.encode)).toSeq
+      sender() ! history.toList.flatMap(_.headerIdsAtHeight(i).map(Algos.encode))
 
     case CreateAccountManagerFromSeedHelper(seed) =>
       (nvhRef ? CreateAccountManagerFromSeed(seed)).mapTo[Either[String, EncryWallet]].pipeTo(sender())
@@ -297,11 +284,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
           settings.constants
         )).pipeTo(sender())
 
-    case GetConnectedPeers     => sender() ! connectedPeers
     case GetDataFromHistory    => history.foreach(sender() ! _)
     case GetMinerStatus        => sender() ! minerStatus
     case GetAllPeers           => sender() ! allPeers
-    case GetBannedPeers        => sender() ! blackList
     case GetConnections        => sender() ! connectedPeersCollection
     case PeerBanHelper(peer, msg) =>
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
@@ -377,15 +362,11 @@ object DataHolderForApi { //scalastyle:ignore
 
   case object GetAllInfoHelper
 
-  case object GetBannedPeers
-
   case object StartMiner
 
   case object StopMiner
 
   case object ShutdownNode
-
-  case object GetConnectedPeers
 
   case object GetDataFromHistory
 

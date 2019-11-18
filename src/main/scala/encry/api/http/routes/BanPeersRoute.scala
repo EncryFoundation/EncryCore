@@ -7,6 +7,7 @@ import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.GetBannedPeersHelperAPI
+import encry.api.http.ScriptHelper
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.settings.RESTApiSettings
 import io.circe.generic.auto._
@@ -48,6 +49,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
         ),
         script(
           raw("""function wallet(){
+                 if(validateForm()) {
                  var addr = document.forms["myForm"]["addr"].value;
                  var port = document.forms["myForm"]["port"].value;
                     var request = new XMLHttpRequest();
@@ -55,6 +57,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                     request.send(addr.toString() + ':' + port.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
+                    } else false;
                   }""")
         ),
 
@@ -206,27 +209,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                                           ),
                                           input(cls := "form-control", id:="port", name:="port", placeholder := "Port"),
                                           script(
-                                            raw(
-                                              """
-                                                 function setInputFilter(textbox, inputFilter) {
-      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-        textbox.oldValue = "";
-         textbox.addEventListener(event, function() {
-       if (inputFilter(this.value)) {
-         this.oldValue = this.value;
-         this.oldSelectionStart = this.selectionStart;
-         this.oldSelectionEnd = this.selectionEnd;
-       } else if (this.hasOwnProperty("oldValue")) {
-         this.value = this.oldValue;
-         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-       }
-     });
-   });
- }
-              setInputFilter(document.getElementById("port"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
-              });
-            """.stripMargin)
+                                            raw(ScriptHelper.setInputFilter("port"))
                                           ),
                                         )
                                       ),

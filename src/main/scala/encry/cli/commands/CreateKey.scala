@@ -13,6 +13,9 @@ import scala.concurrent.Future
 
 object CreateKey extends Command {
 
+  /**
+    * Command "wallet createKey"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

@@ -11,6 +11,9 @@ import scala.concurrent.Future
 
 object NodeShutdown extends Command {
 
+  /**
+    * Command "node shutdown"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

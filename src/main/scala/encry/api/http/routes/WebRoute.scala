@@ -1,7 +1,6 @@
 package encry.api.http.routes
 
 import java.util.concurrent.TimeUnit
-
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
@@ -17,7 +16,6 @@ import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scalatags.Text
 import scalatags.Text.all.{div, td, _}
 import scorex.utils.Random
-
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
@@ -33,11 +31,12 @@ case class InfoApi(name: String,
                    fullHeight: Int,
                    headersHeight: Int,
                    stateVersion: String,
-                   uptime: Int,
+                   uptime: Long,
                    storage: String,
                    isConnectedWithKnownPeers: Boolean,
                    isMining: Boolean,
-                   knownPeers: Seq[String])
+                   knownPeers: Seq[String],
+                   stateRoot: String)
 
 case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory

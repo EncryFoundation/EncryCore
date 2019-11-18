@@ -14,6 +14,11 @@ import scala.concurrent.Future
 import io.circe.syntax._
 
 object GetFullBlockById extends Command {
+
+  /**
+    * Command "history getFullBlock -modifier=<addr[String]>"
+    * Example "history getFullBlock -modifier='5a770264e69cb097049d38196d2d0213a69604130e4bb822aaaa931bd8859ea5'"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

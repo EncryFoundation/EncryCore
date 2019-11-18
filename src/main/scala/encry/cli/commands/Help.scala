@@ -10,6 +10,9 @@ import scala.concurrent.Future
 
 object Help extends Command {
 
+  /**
+    * Command "app help"
+    */
   override def execute(args: Command.Args, settings: EncryAppSettings, dataHolder: ActorRef,nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] =
     Future(Some(Response(

@@ -14,6 +14,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 object GetBannedPeers extends Command {
 
+  /**
+    * Command "peer banned"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

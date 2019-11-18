@@ -14,7 +14,7 @@ trait AccStorage extends StrictLogging with AutoCloseable {
 
   def getPassword: Either[Throwable, String] =
     Either.catchNonFatal {
-      storage.get(AccStorage.PasswordKey).map(_.toChar).mkString
+      new String(storage.get(AccStorage.PasswordKey)).mkString
     }
 
   def putPassword(pass: String): Either[Throwable, Unit] =

@@ -180,7 +180,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
     }
   }
 
-
   def transferContractR: Route = (path("transferContract") & get) {
     parameters('contract, 'fee.as[Int], 'amount.as[Long], 'token.?) {
       (contract, fee, amount, token) =>

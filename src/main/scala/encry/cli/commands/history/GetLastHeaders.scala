@@ -15,6 +15,10 @@ import io.circe.syntax._
 
 object GetLastHeaders extends Command {
 
+  /**
+    * Command "history getLastHeaders -count=<height[Num]>"
+    * Example "history getLastHeaders -count=5"
+    */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,
                        dataHolder: ActorRef,

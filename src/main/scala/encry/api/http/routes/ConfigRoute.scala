@@ -416,8 +416,6 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
     parameters('password, 'mnem, 'chain, 'sync, 'host, 'peer, 'cwp, 'nodePass, 'nodeName, 'declared, 'bind) {
       (password, mnemonic, chain, sync, host, peer, cwp, nodePass, nodeName, declaredAddr, bindAddr) =>
 
-        val passwordR: String = password
-
         val chainR: Boolean = chain match {
           case "Yes" => true
           case "No" => false
@@ -427,6 +425,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           case "Normal" => false
         }
         val peerR: InetSocketAddress = new InetSocketAddress(host, peer.toInt)
+
         val cwpR: Boolean = cwp match {
           case "true" => true
           case "false" => false
@@ -447,7 +446,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           case Failure(_) => new InetSocketAddress("0.0.0.0", 9001)
         }
 
-        starter ! InitNodeResult(mnemonic, passwordR, chainR, syncR, List(peerR), cwpR, nodePass, nodeName, declared, bind)
+        starter ! InitNodeResult(mnemonic, password, chainR, syncR, List(peerR), cwpR, nodePass, nodeName, declared, bind)
         complete("OK")
     }
   }
