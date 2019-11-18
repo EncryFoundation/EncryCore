@@ -168,12 +168,12 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
       nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
         Broadcast)
-      val newScheduler = context.system.scheduler.scheduleOnce(10.seconds) {
+      val newScheduler = context.system.scheduler.scheduleOnce(settings.snapshotSettings.manifestReAskTimeout) {
         logger.info(s"Trigger scheduler for re-request manifest")
         self ! StartFastSync
       }
       val currentRequestsNumber = requestManifestScheduler.map(_._2).getOrElse(0)
-      if (currentRequestsNumber < 5) {
+      if (currentRequestsNumber < settings.snapshotSettings.manifestReAskQty) {
         requestManifestScheduler = Some(newScheduler -> (currentRequestsNumber + 1))
         context.become(
           fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
@@ -207,8 +207,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       snapshotDownloadController =
         snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
       restartFastSync(history)
-
-    case HeaderChainIsSynced if processHeaderSyncedMsg =>
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
       snapshotDownloadController.requestedChunks.map { id =>

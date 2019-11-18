@@ -266,7 +266,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 import encry.view.state.avlTree.utils.implicits.Instances._
                 newHis.getBestBlock.foreach { b =>
                   val chunks: List[SnapshotChunk] =
-                    AvlTree.getChunks(stateAfterApply.tree.rootNode, currentChunkHeight = 6, stateAfterApply.tree.storage)
+                    AvlTree.getChunks(
+                      stateAfterApply.tree.rootNode,
+                      currentChunkHeight = settings.snapshotSettings.chunkDepth,
+                      stateAfterApply.tree.storage
+                    )
                   val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
                   nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
                 }
