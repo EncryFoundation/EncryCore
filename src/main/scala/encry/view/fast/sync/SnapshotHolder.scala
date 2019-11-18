@@ -3,30 +3,28 @@ package encry.view.fast.sync
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import cats.syntax.either._
+import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.BlackList.BanReason._
 import encry.network.Broadcast
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
 import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
 import encry.settings.EncryAppSettings
-import SnapshotHolder._
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
+import encry.view.fast.sync.SnapshotHolder._
+import encry.view.history.History
 import encry.view.state.UtxoState
+import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
-import cats.syntax.option._
-import encry.network.BlackList.BanReason.{ExpiredNumberOfReRequestAttempts, ExpiredNumberOfRequests, InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException}
-import encry.view.history.History
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
-import cats.syntax.either._
-import encry.EncryApp
 
-import scala.util.Try
 import scala.concurrent.duration._
-import encry.view.state.avlTree.utils.implicits.Instances._
+import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
                      networkController: ActorRef,
@@ -62,7 +60,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     )
   }
 
-  var tmpScheduler: Option[(Cancellable, Int)] = Option.empty
+  var requestManifestScheduler: Option[(Cancellable, Int)] = Option.empty
 
   override def receive: Receive = awaitingHistory
 
@@ -106,10 +104,11 @@ class SnapshotHolder(settings: EncryAppSettings,
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
               case Right((controller, processor)) =>
                 logger.info(s"Request manifest message successfully processed.")
-                tmpScheduler.foreach(_._1.cancel())
+                requestManifestScheduler.foreach(_._1.cancel())
                 snapshotDownloadController = controller
                 snapshotProcessor = processor
                 self ! RequestNextChunks
+                logger.info("Manifest processed")
             }
           } else if (!isValidManifest) {
             logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
@@ -140,7 +139,7 @@ class SnapshotHolder(settings: EncryAppSettings,
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) =>
-                  println(s"Tree is valid on Snapshot holder!")
+                  logger.info(s"Tree is valid on Snapshot holder!")
                   (nodeViewHolder ! FastSyncFinished(state)).asRight[FastSyncException]
                 case _ =>
                   nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
@@ -163,26 +162,24 @@ class SnapshotHolder(settings: EncryAppSettings,
       }
 
     case StartFastSync =>
-      println("StartFastSync")
       logger.info(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
       )
       nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
         Broadcast)
-      val a = context.system.scheduler.scheduleOnce(10.seconds) {
-        println(s"Trigger scheduler for re-request manifest")
+      val newScheduler = context.system.scheduler.scheduleOnce(10.seconds) {
+        logger.info(s"Trigger scheduler for re-request manifest")
         self ! StartFastSync
       }
-      val curNumber = tmpScheduler.map(_._2).getOrElse(0)
-      if (curNumber < 5) {
-        tmpScheduler = Some(a -> (curNumber + 1))
+      val currentRequestsNumber = requestManifestScheduler.map(_._2).getOrElse(0)
+      if (currentRequestsNumber < 5) {
+        requestManifestScheduler = Some(newScheduler -> (currentRequestsNumber + 1))
         context.become(
           fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
         )
-      }
-      else {
-        println("Fast sync is unavailable, there are no nods with manifest")
+      } else {
+        logger.info("Fast sync is unavailable, there are no nods with manifest")
         sys.exit(159)
       }
 

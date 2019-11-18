@@ -103,9 +103,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         nodeView.history.workWithFastSync = false
         ModifiersCache.finishFastSync()
         val history = nodeView.history.reportModifierIsValidFastSync(bestHeader.id, bestHeader.payloadId)
-        println(s"Wallet scanning started")
+        logger.info(s"Wallet scanning started")
         val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
-        println(s"Wallet scanning finished")
+        logger.info(s"Wallet scanning finished")
         updateNodeView(
           updatedHistory = Some(history),
           updatedState = Some(state),
@@ -252,7 +252,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                         s"\n\n\n header - $h \n\n\n")
                       nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
                       newHis.heightOfLastAvailablePayloadForRequest = requiredHeight
-                      println(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
+                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
                     }
                   }
                 case _ =>
@@ -313,8 +313,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             nodeView.history.processPayloadFastSync(p, rawBytes)
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
             if (nodeView.history.getBestBlockHeight >= nodeView.history.heightOfLastAvailablePayloadForRequest) {
-              println(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
-              println(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
+              logger.info(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
+              logger.info(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
               nodeViewSynchronizer ! StartFastSync
             }
             influxRef.foreach { ref =>
