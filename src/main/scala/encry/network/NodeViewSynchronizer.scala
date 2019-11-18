@@ -30,14 +30,19 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fast.sync.SnapshotHolder
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, StartFastSync, TreeChunks, UpdateSnapshot}
-
+import encry.view.fast.sync.SnapshotHolder.{
+  FastSyncDone,
+  HeaderChainIsSynced,
+  RequiredManifestHeightAndId,
+  StartFastSync,
+  TreeChunks,
+  UpdateSnapshot
+}
 import scala.util.Try
 
 class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -195,7 +200,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case msg@ConnectionStopped(_) => deliveryManager ! msg
     case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
-    case StartFastSync => snapshotHolder ! StartFastSync
+    case msg@StartFastSync => snapshotHolder ! msg
     case msg@DisableMining => deliveryManager ! msg
     case msg@BanPeer(_, _) => peersKeeper ! msg
     case msg@AccumulatedPeersStatistic(_) => peersKeeper ! msg

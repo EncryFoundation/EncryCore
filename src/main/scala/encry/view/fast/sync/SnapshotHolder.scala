@@ -140,7 +140,7 @@ class SnapshotHolder(settings: EncryAppSettings,
                 if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) =>
-                  logger.info(s"Tree is valid on Snapshot holder!")
+                  println(s"Tree is valid on Snapshot holder!")
                   (nodeViewHolder ! FastSyncFinished(state)).asRight[FastSyncException]
                 case _ =>
                   nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
@@ -164,14 +164,13 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case StartFastSync =>
       println("StartFastSync")
-      //todo add re-broadcast this message
       logger.info(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
       )
       nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
         Broadcast)
-      val a = context.system.scheduler.scheduleOnce(60.seconds) {
+      val a = context.system.scheduler.scheduleOnce(10.seconds) {
         println(s"Trigger scheduler for re-request manifest")
         self ! StartFastSync
       }
@@ -186,7 +185,6 @@ class SnapshotHolder(settings: EncryAppSettings,
         println("Fast sync is unavailable, there are no nods with manifest")
         sys.exit(159)
       }
-      //self ! RequestNextChunks
 
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
@@ -214,15 +212,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       restartFastSync(history)
 
     case HeaderChainIsSynced if processHeaderSyncedMsg =>
-//      logger.info(
-//        s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
-//          s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
-//      )
-//      nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
-//                                           Broadcast)
-//      context.become(
-//        fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
-//      )
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
       snapshotDownloadController.requestedChunks.map { id =>

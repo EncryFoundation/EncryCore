@@ -30,11 +30,6 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var isHeadersChainSyncedVar: Boolean = false
 
-  var enablePayloadsProcessing: Boolean =
-    (settings.snapshotSettings.enableFastSynchronization && settings.snapshotSettings.enableFullBlocksSynchronization) ||
-      settings.node.offlineGeneration ||
-      !settings.snapshotSettings.enableFastSynchronization
-
   var heightOfLastAvailablePayloadForRequest: Int = 0
 
   var workWithFastSync: Boolean = settings.snapshotSettings.enableFastSynchronization
@@ -152,7 +147,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && isNewHeader(header) && enablePayloadsProcessing) {
+    else if (!isHeadersChainSynced && isNewHeader(header)) {
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none

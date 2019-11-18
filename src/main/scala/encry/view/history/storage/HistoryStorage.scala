@@ -2,21 +2,18 @@ package encry.view.history.storage
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
+import encry.storage.iodb.versionalIODB.{IODBHistoryWrapper, IODBWrapper}
 import encry.storage.levelDb.versionalLevelDB.VLDBWrapper
 import encry.storage.VersionalStorage
 import scorex.utils.{Random => ScorexRandom}
 import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Header, HistoryModifiersProtoSerializer}
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.modifiers.history.{HistoryModifiersProtoSerializer, Payload}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.util.{Failure, Random, Success}
 import cats.syntax.option._
-import org.encryfoundation.common.utils.{Algos, TaggedTypes}
-import org.encryfoundation.common.utils.constants.TestNetConstants
-import supertagged.@@
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 
@@ -54,6 +51,31 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
           StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
         ).toList,
       )
+  }
+
+  def inserFastSync(version: Array[Byte],
+                    indexesToInsert: Seq[(Array[Byte], Array[Byte])],
+                    bytesToInsert: Seq[(Array[Byte], Array[Byte])]): Unit = {
+    store match {
+      case ioDb: IODBHistoryWrapper =>
+        ioDb.objectStore.update(
+          Random.nextLong(),
+          Seq.empty,
+          bytesToInsert.map(o => ByteArrayWrapper(o._1) -> ByteArrayWrapper(o._2))
+        )
+        insert(
+          StorageVersion @@ version,
+          indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
+        )
+      case _: VLDBWrapper =>
+        insert(
+          StorageVersion @@ version,
+          (indexesToInsert.map { case (key, value) =>
+            StorageKey @@ key -> StorageValue @@ value
+          } ++ bytesToInsert.map(o => StorageKey @@ o._1 -> StorageValue @@ (Payload.modifierTypeId +: o._2))
+        ).toList
+        )
+    }
   }
 
   def bulkInsert(version: Array[Byte],

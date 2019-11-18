@@ -36,19 +36,16 @@ trait HistoryModifiersProcessors extends HistoryApi {
     }
     .getOrElse(putToHistory(payload))
 
-  def processPayloadFastSync(payload: Payload): Unit = {
+  def processPayloadFastSync(payload: Payload, raw: Array[Byte]): Unit = {
     val startTime: Long = System.currentTimeMillis()
     getBlockByPayload(payload).foreach { block =>
-      //logger.info(s"Start processing payload ${payload.encodedId} with header id ${Algos.encode(payload.headerId)}")
-      historyStorage.bulkInsert(payload.id, Seq(BestBlockKey -> block.header.id), Seq(payload))
-      //logger.info(s"Inserted new payload ${payload.encodedId} into storage. Start best full block height updating")
+      historyStorage.inserFastSync(payload.id, Seq(BestBlockKey -> payload.headerId), Seq(payload.id -> raw))
       blockDownloadProcessor.updateBestBlock(block.header)
       logger.info(s"BlockDownloadProcessor updated block at height ${block.header.height} successfully")
       historyStorage.insert(
         StorageVersion @@ validityKey(block.header.id).untag(StorageKey),
         List(block.header.id, block.payload.id).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
       )
-      //logger.info(s"Block ${block.encodedId} at height ${block.header.height} marked as valid")
       logger.info(s"Finished processing block ${block.encodedId}. " +
         s"Processing time is ${(System.currentTimeMillis() - startTime) / 1000} s")
     }

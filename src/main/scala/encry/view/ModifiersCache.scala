@@ -17,12 +17,16 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-  val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
+  val cache: TrieMap[Key, (PersistentModifier, Array[Byte])] = TrieMap.empty[Key, (PersistentModifier, Array[Byte])]
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
 
   private var isChainSynced = false
 
+  private var isFastSync = settings.snapshotSettings.enableFastSynchronization
+
   def setChainSynced(): Unit = isChainSynced = true
+
+  def finishFastSync(): Unit = isFastSync = false
 
   def size: Int = cache.size
 
@@ -30,10 +34,10 @@ object ModifiersCache extends StrictLogging {
 
   def contains(key: Key): Boolean = cache.contains(key)
 
-  def put(key: Key, value: PersistentModifier, history: History): Unit = if (!contains(key)) {
-    logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
+  def put(key: Key, value: (PersistentModifier, Array[Byte]), history: History): Unit = if (!contains(key)) {
+    logger.debug(s"Put ${value._1.encodedId} of type ${value._1.modifierTypeId} to cache.")
     cache.put(key, value)
-    value match {
+    value._1 match {
       case header: Header =>
         val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(header.height, List())
         logger.debug(s"possibleHeadersAtCurrentHeight(${header.height}): ${possibleHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
@@ -44,19 +48,19 @@ object ModifiersCache extends StrictLogging {
     }
 
     if (size > history.settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
-      history.testApplicable(modifier) match {
+      history.testApplicable(modifier._1) match {
         case Right(_) | Left(_: NonFatalValidationError) => false
         case _ => true
       }
     }.map(mod => remove(mod._1))
   }
 
-  def remove(key: Key): Option[PersistentModifier] = {
+  def remove(key: Key): Option[(PersistentModifier, Array[Byte])] = {
     logger.debug(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
     cache.remove(key)
   }
 
-  def popCandidate(history: History): List[PersistentModifier] = synchronized {
+  def popCandidate(history: History): List[(PersistentModifier, Array[Byte])] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
 
@@ -64,7 +68,7 @@ object ModifiersCache extends StrictLogging {
 
   def findCandidateKey(history: History): List[Key] = {
 
-    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
+    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier._1) match {
       case Left(_: FatalValidationError) => remove(key); false
       case Right(_)                      => true
       case Left(_)                       => false
@@ -90,8 +94,8 @@ object ModifiersCache extends StrictLogging {
       }.toList
 
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
-      v match {
-        case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
+      v._1 match {
+        case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v._1.parentId) => true
         case _ =>
           val isApplicableMod: Boolean = isApplicable(k)
           logger.debug(s"Try to apply: ${Algos.encode(k.toArray)} and result is: $isApplicableMod")
@@ -113,7 +117,7 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
           logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
-            case Some(v: Header)
+            case Some((v: Header, _))
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
                 (history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
@@ -139,10 +143,8 @@ object ModifiersCache extends StrictLogging {
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isFullChainSynced => exhaustiveSearch
         case _ if history.isHeadersChainSynced =>
-//          if (settings.snapshotSettings.enableFastSynchronization && settings.snapshotSettings.enableFullBlocksSynchronization)
-//          if (settings.snapshotSettings.enableFastSynchronization) exhaustiveSearch
-//          else
-            List.empty[Key]
+          if (isFastSync) List.empty[Key]
+          else exhaustiveSearch
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>
