@@ -5,12 +5,10 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetConnections, GetViewGetBalance, GetViewPrintPubKeys}
+import encry.api.http.DataHolderForApi.GetConnections
 import encry.network.ConnectedPeersCollection
-import encry.settings.{NodeSettings, RESTApiSettings}
-import io.circe.Json
+import encry.settings.RESTApiSettings
 import io.circe.generic.auto._
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
 import scala.concurrent.Future
@@ -18,18 +16,11 @@ import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
 
-case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
-
-  def walletF: Future[Map[String, Amount]] = (dataHolder ? GetViewGetBalance).mapTo[Map[String, Amount]]
-
-  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
-
   def connectedPeers: Future[ConnectedPeersCollection] = (dataHolder ? GetConnections).mapTo[ConnectedPeersCollection]
-
-  def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
   def peerScript(peersR: ConnectedPeersCollection): Text.TypedTag[String] = {
 
@@ -41,25 +32,25 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function validateForm() {
-  var fee = document.forms["myForm"]["fee"].value;
-  var amount = document.forms["myForm"]["amount"].value;
-  if (fee == "") {
-     alert("Fee must be filled out");
+  var addr = document.forms["myForm"]["addr"].value;
+  var port = document.forms["myForm"]["port"].value;
+  if (addr == "") {
+     alert("Address must be filled out");
      return false;
    }
- if (amount == "") {
-    alert("Amount must be filled out");
+ if (port == "") {
+    alert("Port must be filled out");
     return false;
   }
 }""")
         ),
         script(
           raw("""function wallet(){
-                 var fee = document.forms["myForm"]["fee"].value;
-                 var amount = document.forms["myForm"]["amount"].value;
+                 var addr = document.forms["myForm"]["addr"].value;
+                 var port = document.forms["myForm"]["port"].value;
                     var request = new XMLHttpRequest();
                     request.open('POST', "http://localhost:9051/peers/add", true);
-                    request.send(fee.toString() + ':' + amount.toString());
+                    request.send(addr.toString() + ':' + port.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
 
@@ -199,7 +190,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="fee", name:="fee", placeholder := "Address", tpe := "text"),
+                                          input(cls := "form-control", id:="addr", name:="addr", placeholder := "Address", tpe := "text"),
 //
                                         )
 
@@ -211,7 +202,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="amount", name:="amount", placeholder := "Port"),
+                                          input(cls := "form-control", id:="port", name:="port", placeholder := "Port"),
                                           script(
                                             raw(
                                               """
@@ -230,7 +221,7 @@ case class PeersConnectedRoute(override val settings: RESTApiSettings, nodeSetti
      });
    });
  }
-              setInputFilter(document.getElementById("amount"), function(value) {
+              setInputFilter(document.getElementById("port"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
               });
             """.stripMargin)

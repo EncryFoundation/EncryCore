@@ -40,7 +40,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def addAccount(seed: String, password: String, state: UtxoStateReader): Either[String, EncryWallet] = validateMnemonicKey(seed) match {
     case Right(_) if accountManagers.map(_.number).max < Byte.MaxValue =>
-      val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
+      val newAccount = AccountManager(accountStore, password, seed, (accountManagers.map(_.number).max + 1).toByte)
       val newAccPropositions = newAccount.publicAccounts.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes)).toSet
       scanWalletFromUtxo(state, newAccPropositions)
       this.copy(accountManagers = accountManagers :+ newAccount).asRight[String]
@@ -159,12 +159,10 @@ object EncryWallet extends StrictLogging {
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
-    val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
+    val walletStorage: WalletVersionalLevelDB = WalletVersionalLevelDBCompanion(db, settings.levelDB)
     val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
-    val restoredAccounts = AccountManager.restoreAccounts(accountManagerStore, password)
-    val resultingAccounts = if (restoredAccounts.nonEmpty) restoredAccounts
-    else Seq(AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte))
+    val restoredAccounts: Seq[AccountManager] = AccountManager.restoreAccounts(accountManagerStore, password)
     //init keys
-    EncryWallet(walletStorage, resultingAccounts, accountManagerStore)
+    EncryWallet(walletStorage, restoredAccounts, accountManagerStore)
   }
 }

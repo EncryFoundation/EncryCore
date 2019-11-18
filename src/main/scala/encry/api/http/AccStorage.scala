@@ -32,9 +32,7 @@ object AccStorage extends StrictLogging {
   def getDirStorage(settings: EncryAppSettings): File = new File(s"${settings.directory}/userKeys")
 
   def init(settings: EncryAppSettings): AccStorage = new AccStorage {
-    override val storage: DB = {
-      LevelDbFactory.factory.open(getDirStorage(settings), new Options)
-    }
+    override val storage: DB = LevelDbFactory.factory.open(getDirStorage(settings), new Options)
   }
 
 }

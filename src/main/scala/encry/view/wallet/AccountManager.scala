@@ -71,7 +71,7 @@ object AccountManager {
     val keysDir: File = getKeysDir(settings)
     keysDir.mkdirs()
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
-    val account = AccountManager.apply(accountManagerStore, pass, Some(mnemonicKey), 0.toByte)
+    val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
     account.store.close()
   }
 
@@ -97,19 +97,9 @@ object AccountManager {
       }
     }._1
 
-  private[wallet] def apply(store: Store, password: String, seedOpt: Option[String], number: Byte): AccountManager = {
+  private[wallet] def apply(store: Store, password: String, seed: String, number: Byte): AccountManager = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
-      Blake2b256.hash(
-        seedOpt
-          .map {
-            Mnemonic.seedFromMnemonic(_)
-          }
-          .getOrElse {
-            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-            println(s"\nMnemonic code is:\n$phrase")
-            Mnemonic.seedFromMnemonic(phrase)
-          }
-      )
+      Blake2b256.hash(Mnemonic.seedFromMnemonic(seed))
     )
     saveAccount(store, password, number, privateKey, publicKey)
     this(store, password, PrivateKey25519(privateKey, publicKey), number)

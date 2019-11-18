@@ -28,8 +28,7 @@ import cats.instances.option._
 
 case class WalletInfoApiRoute(dataHolder: ActorRef,
                               settings: RESTApiSettings,
-                              intrinsicTokenId: String,
-                              settingsApp: EncryAppSettings)(implicit val context: ActorRefFactory)
+                              intrinsicTokenId: String)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
 
   override val route: Route = pathPrefix("wallet") {
@@ -50,18 +49,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       GetDataFromCurrentView[History, UtxoState, EncryWallet, EncryWallet](_.vault))
       .mapTo[EncryWallet]
 
-  private def getAddresses: Future[String] = (dataHolder ? GetViewPrintAddress)
-    .mapTo[String]
-
-  private def createKey: Future[PrivateKey25519] = (dataHolder ? GetViewCreateKey)
-    .mapTo[PrivateKey25519]
-
-  private def pubKeys: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys)
-    .mapTo[List[String]]
-
-  private def getBalance: Future[String] = (dataHolder ? GetViewGetBalance)
-    .mapTo[String]
-
   def infoR: Route = (path("info") & get) {
     getWallet.map { w =>
       Map(
@@ -71,13 +58,14 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           else
             s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
         }.asJson,
-        "utxosQty" -> w.walletStorage.getAllBoxes(1000).length.asJson
+        "utxosQty" -> w.walletStorage.getAllBoxes().length.asJson
       ).asJson
     }.okJson()
   }
 
   def printAddressR: Route = (path("addr") & get) {
-    getAddresses.map(_.asJson).okJson()
+    (dataHolder ? GetViewPrintAddress)
+      .mapTo[String].map(_.asJson).okJson()
   }
 
   def errorR: Route = path("restricted") {
@@ -87,26 +75,27 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   case class LoginRequest(a:String, b:String)
 
   def createTokenR: Route = (path("createToken") & get) {
-    parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>
-      (dataHolder ?
-        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+    parameters('fee.as[Int], 'amount.as[Long]) {
+      (fee, amount) =>
+      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+        wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
-            val boxes: AssetBox         = wallet.vault.walletStorage
-              .getAllBoxes().collect { case ab: AssetBox => ab }.head
+            val boxes = wallet.vault.walletStorage
+              .getAllBoxes().collect { case ab: AssetBox => ab }.take(1)
             TransactionFactory.assetIssuingTransactionScratch(
               secret,
               fee,
               System.currentTimeMillis(),
-              IndexedSeq(boxes).map(_ -> None),
+              boxes.map(_ -> None),
               PubKeyLockedContract(wallet.vault.accountManagers.head.mandatoryAccount.publicImage.pubKeyBytes).contract,
               amount)
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
           EncryApp.system.eventStream.publish(NewTransaction(tx))
-          Future.successful(Some(Response(tx.toString)))
-        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+          Future.unit
+        case _ => Future.unit
       }
       complete("Token was created")
     }
@@ -114,39 +103,41 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
 
   def dataTransactionR: Route = (path("data") & get) {
-    parameters('fee.as[Int], 'data) {(fee, data) =>
-      (dataHolder ?
-        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+    parameters('fee.as[Int], 'data) {
+      (fee, data) =>
+      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+        wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
-            val boxes: AssetBox         = wallet.vault.walletStorage
-              .getAllBoxes().collect { case ab: AssetBox => ab }.head
+            val boxes                   = wallet.vault.walletStorage
+              .getAllBoxes().collect { case ab: AssetBox => ab }.take(1)
             TransactionFactory.dataTransactionScratch(secret,
               fee,
               System.currentTimeMillis(),
-              IndexedSeq(boxes).map(_ -> None),
+              boxes.map(_ -> None),
               PubKeyLockedContract(wallet.vault.accountManagers.head.mandatoryAccount.publicImage.pubKeyBytes).contract,
               data.getBytes)
           }.toOption
         }).flatMap {
         case Some(tx: Transaction) =>
           EncryApp.system.eventStream.publish(NewTransaction(tx))
-          Future.successful(Some(Response(tx.toString)))
-        case _ => Future.successful(Some(Response("Operation failed. Malformed data.")))
+          Future.unit
+        case _ => Future.unit
       }
       complete(s"Tx with data  has been sent!!'")
     }
   }
 
   def transferR: Route = (path("transfer") & get) {
-    parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) { (addr, fee, amount, token) =>
-      (dataHolder ?
-        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+    parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) {
+      (addr, fee, amount, token) =>
+      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+        wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
               case Success(value) => ADKey @@ value
-              case Failure(_) => throw new RuntimeException(s"Failed to decode tokeId $s")
+              case Failure(e) => throw new RuntimeException(s"Failed to decode tokeId $s. Cause: $e")
             })
             val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
               .getAllBoxes()
@@ -155,8 +146,8 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
                   Apply[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
                 case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
               }.foldLeft(List.empty[MonetaryBox]) {
-              case (seq, box) if decodedTokenOpt.isEmpty =>
-                if (seq.map(_.amount).sum < (amount + fee)) seq :+ box else seq
+              case (seq, box) if decodedTokenOpt.isEmpty && seq.map(_.amount).sum < (amount + fee) => seq :+ box
+              case (seq, _) if decodedTokenOpt.isEmpty => seq
               case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
                 if (seq.collect{ case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < fee) seq :+ box else seq
               case (seq, box: AssetBox) =>
@@ -191,9 +182,10 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
 
   def transferContractR: Route = (path("transferContract") & get) {
-    parameters('contract, 'fee.as[Int], 'amount.as[Long], 'token.?) { (contract, fee, amount, token) =>
-      (dataHolder ?
-        GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+    parameters('contract, 'fee.as[Int], 'amount.as[Long], 'token.?) {
+      (contract, fee, amount, token) =>
+      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+        wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
@@ -242,15 +234,18 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   }
 
   def createKeyR: Route = (path("createKey") & get) {
-    createKey.map(key => Algos.encode(key.privKeyBytes).asJson).okJson()
+    (dataHolder ? GetViewCreateKey)
+      .mapTo[PrivateKey25519].map(key => Algos.encode(key.privKeyBytes).asJson).okJson()
   }
 
   def printPubKeysR: Route = (path("pubKeys") & get) {
-    pubKeys.map(_.asJson).okJson()
+    (dataHolder ? GetViewPrintPubKeys)
+      .mapTo[List[String]].map(_.asJson).okJson()
   }
 
   def getBalanceR: Route = (path("balance") & get) {
-    getBalance.map(_.asJson).okJson()
+    (dataHolder ? GetViewGetBalance)
+      .mapTo[String].map(_.asJson).okJson()
   }
 
   def getUtxosR: Route = (path("utxos") & get) {

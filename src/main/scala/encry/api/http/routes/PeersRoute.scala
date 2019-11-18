@@ -17,22 +17,15 @@ import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
 
-case class PeersRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
+case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
-
-
-  def walletF: Future[Map[String, Amount]] = (dataHolder ? GetViewGetBalance).mapTo[Map[String, Amount]]
-
-  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
   def peersAllF: Future[Seq[InetSocketAddress]] = (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]]
 
   def info: Future[Seq[InetSocketAddress]] = for {
     peerAll <- peersAllF
   } yield peerAll
-
-  def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
   def peerScript(peers: Seq[InetSocketAddress] ): Text.TypedTag[String] = {
 

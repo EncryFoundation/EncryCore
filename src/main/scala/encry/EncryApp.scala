@@ -89,17 +89,17 @@ object EncryApp extends App with StrictLogging  {
 
       val apiRoutes: Seq[ApiRoute] = Seq(
         WebRoute(settings.restApi, settings.node, dataHolderForApi),
-        WalletRoute(settings.restApi, settings.node, dataHolderForApi, settings),
+        WalletRoute(settings.restApi, dataHolderForApi, settings),
         PeersRoute(settings.restApi, settings.node, dataHolderForApi),
-        PeersConnectedRoute(settings.restApi, settings.node, dataHolderForApi),
+        PeersConnectedRoute(settings.restApi, dataHolderForApi),
         BanPeersRoute(settings.restApi, dataHolderForApi),
         ArgonRoute(settings.restApi),
         PeersApiRoute(settings.restApi, dataHolderForApi),
-        InfoApiRoute(dataHolderForApi, settings, nodeId, timeProvider),
-        HistoryApiRoute(dataHolderForApi, settings, nodeId),
+        InfoApiRoute(dataHolderForApi, settings.restApi, nodeId, timeProvider),
+        HistoryApiRoute(dataHolderForApi, settings.restApi, nodeId),
         TransactionsApiRoute(dataHolderForApi, memoryPool, settings.restApi),
-        WalletInfoApiRoute(dataHolderForApi, settings.restApi, Algos.encode(settings.constants.IntrinsicTokenId), settings),
-        NodeRoute(dataHolderForApi, settings)
+        WalletInfoApiRoute(dataHolderForApi, settings.restApi, Algos.encode(settings.constants.IntrinsicTokenId)),
+        NodeRoute(dataHolderForApi, settings.restApi)
       )
       Http().bindAndHandle(
         CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,

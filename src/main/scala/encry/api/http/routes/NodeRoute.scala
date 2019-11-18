@@ -6,10 +6,8 @@ import akka.http.scaladsl.server.Route
 import encry.api.http.DataHolderForApi._
 import encry.settings.{ EncryAppSettings, RESTApiSettings }
 
-case class NodeRoute(dataHolder: ActorRef, appSettings: EncryAppSettings)(implicit val context: ActorRefFactory)
+case class NodeRoute(dataHolder: ActorRef, settings: RESTApiSettings)(implicit val context: ActorRefFactory)
     extends EncryBaseApiRoute {
-
-  override val settings: RESTApiSettings = appSettings.restApi
 
   override def route: Route = pathPrefix("node") {
     nodeStartMiningR ~ nodeStopMiningR ~ nodeShutdownR

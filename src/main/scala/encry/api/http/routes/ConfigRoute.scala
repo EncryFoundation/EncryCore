@@ -152,7 +152,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               )
                             ),
                               //
-                            //2. Node name
+                            //2. Declared address
                             h3("2. Set up your declared address"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
@@ -162,7 +162,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               )
                             ),
                             //
-                            //3. Node name
+                            //3. Bind address
                             h3("3. Set up your bind address"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
@@ -172,7 +172,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               )
                             ),
                             //
-                        // 2. Password
+                        // 4. Password
                             h3("4. Set up your password for node"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
@@ -184,7 +184,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 input(cls := "form-control", placeholder := "Password", tpe := "password", id:="nodepass", name:="nodepass")
                               )
                             ),
-                            // 3
+                            //
+                            // 5. Password
                             h3("5. Set up your password for wallet"),
                           div(cls := "form-group",
                             div(cls := "input-group input-group-alternative",
@@ -196,8 +197,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               input(cls := "form-control", placeholder := "Password", tpe := "password", id:="password", name:="password")
                             )
                           ),
-                            // 3.
-                            // 4. Enter mnemonic
+                            // 5.
+                            // 6. Enter mnemonic
                             h3("6. Enter your mnemonic if available (leave empty and we'll generate new one for you)"),
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative",
@@ -208,8 +209,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                   input(cls := "form-control", value:="", placeholder := "Mnemonic", id:="mnemonic", name:="mnemonic")
                                 )
                               ),
-                            // 4.
-                            // 5. Would you like to start new chain?
+                            //
+                            // 7. Would you like to start new chain?
                             h3("7. Would you like to start your own chain?"),
                               Seq(
                               div(cls := "custom-control custom-radio mb-3",
@@ -221,8 +222,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             label(cls := "custom-control-label", `for` := "customRadio2", "No")
                             )
                           ),
-                            // 5.
-                            // 6. Choose sync type (fast / normal)
+                            //
+                            // 8. Choose sync type (fast / normal)
                             h3("8. Choose sync type (fast / normal)"),
                               Seq(
                               div(cls := "custom-control custom-radio mb-3",
@@ -234,8 +235,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 label(cls := "custom-control-label", `for` := "customRadio4", "Normal")
                               )
                             ),
-                            // 6.
-                            // 7. Add peer to connect
+                            //
+                            // 9. Add peer to connect
                             h3("9. Add peer to set connection with"),
 
                               div(cls := "form-group",
@@ -308,6 +309,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               )
                             ),
                             //
+                            // 11. Workers amount
                             h3("11. Set up amount of workers"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
@@ -338,7 +340,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 ),
                               )
                             ),
-                            // 8. Would you like to connect with only known peers?
+                            //
+                            // 12. Would you like to connect with only known peers?
                             h3("12. Would you like to connect with only known peers?"),
                             Seq(
                               div(cls := "custom-control custom-radio mb-3",
@@ -414,9 +417,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
       (password, mnemonic, chain, sync, host, peer, cwp, nodePass, nodeName, declaredAddr, bindAddr) =>
 
         val passwordR: String = password
-        val mnemonicR: String = mnemonic match {
-          case x: String => x
-        }
+
         val chainR: Boolean = chain match {
           case "Yes" => true
           case "No" => false
@@ -446,7 +447,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           case Failure(_) => new InetSocketAddress("0.0.0.0", 9001)
         }
 
-        starter ! InitNodeResult(mnemonicR, passwordR, chainR, syncR, List(peerR), cwpR, nodePass, nodeName, declared, bind)
+        starter ! InitNodeResult(mnemonic, passwordR, chainR, syncR, List(peerR), cwpR, nodePass, nodeName, declared, bind)
         complete("OK")
     }
   }
@@ -456,6 +457,5 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
   }
 
   override def route: Route = configR ~ sendAllInfo
-
 
 }

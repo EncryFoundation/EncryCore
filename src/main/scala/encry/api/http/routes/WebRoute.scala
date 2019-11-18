@@ -1,24 +1,23 @@
 package encry.api.http.routes
 
-import java.security.Security
 import java.util.concurrent.TimeUnit
 
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
-import akka.http.scaladsl.server.Directives.complete
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{ GetAllInfoHelper, GetMinerStatus, GetNodePass}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetMinerStatus, GetNodePass}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
 import io.circe.{Json, parser}
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scalatags.Text
 import scalatags.Text.all.{div, td, _}
+import scorex.utils.Random
+
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
@@ -38,8 +37,7 @@ case class InfoApi(name: String,
                    storage: String,
                    isConnectedWithKnownPeers: Boolean,
                    isMining: Boolean,
-                   knownPeers: Seq[String]
-                  )
+                   knownPeers: Seq[String])
 
 case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
@@ -195,15 +193,15 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def webResponse(json: Json, minerStatus: MinerStatus): Text.TypedTag[String] = {
     val nodeInfo = parser.decode[InfoApi](json.toString())
+
     html(
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
         meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
-        meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
+        meta(name := "description", content := "Encry Core"),
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function shutdown(){
-    var input1 = document.getElementById("input1");
     window.alert("The node was disconnected...");
     var request = new XMLHttpRequest();
     request.open('GET', "http://localhost:9051/node/shutdown");
@@ -561,7 +559,7 @@ object WebRoute  {
   // JWT
 
   val algorithm = JwtAlgorithm.HS256
-  val secretKey = "encry"
+  val secretKey = new String(Random.randomBytes())
 
   def createToken(username: String, expirationPeriodInDays: Int): String = {
       val claims = JwtClaim(
@@ -595,7 +593,7 @@ object WebRoute  {
   }
 
   def extractIp(pingedRoute: Route): Route = extractClientIP { ip =>
-    if (ip.toOption.exists(_.getHostAddress sameElements "127.0.0.1")) pingedRoute
+    if (ip.toOption.exists(_.getHostAddress == "127.0.0.1")) pingedRoute
     else reject(ValidationRejection("Access denied"))
   }
 

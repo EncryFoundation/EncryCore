@@ -15,12 +15,10 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.constants.Constants
 
 case class InfoApiRoute(dataHolder: ActorRef,
-                        appSettings: EncryAppSettings,
+                        settings: RESTApiSettings,
                         nodeId: Array[Byte],
                         timeProvider: NetworkTimeProvider)(implicit val context: ActorRefFactory)
     extends EncryBaseApiRoute {
-
-  override val settings: RESTApiSettings = appSettings.restApi
 
   override val route: Route = (path("info") & get) {
     (dataHolder ? GetAllInfoHelper)
@@ -28,7 +26,6 @@ case class InfoApiRoute(dataHolder: ActorRef,
       .okJson()
   }
 }
-
 
 object InfoApiRoute {
 

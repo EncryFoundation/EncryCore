@@ -17,9 +17,7 @@ import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
 
-
-case class WalletRoute(override val settings: RESTApiSettings,
-                       nodeSettings: NodeSettings,
+case class WalletRoute(settings: RESTApiSettings,
                        dataHolder: ActorRef,
                        encrySettings: EncryAppSettings)(
    implicit val context: ActorRefFactory

@@ -6,14 +6,13 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetBannedPeersHelperAPI, GetViewGetBalance, GetViewPrintPubKeys}
+import encry.api.http.DataHolderForApi.GetBannedPeersHelperAPI
 import encry.network.BlackList.{BanReason, BanTime, BanType}
-import encry.settings.{NodeSettings, RESTApiSettings}
-import io.circe.Json
+import encry.settings.RESTApiSettings
 import io.circe.generic.auto._
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
+import io.circe.Json
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
@@ -22,13 +21,8 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
-  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
-
   def peersAllF: Future[Seq[(InetAddress, (BanReason, BanTime, BanType))]] =
     (dataHolder ? GetBannedPeersHelperAPI).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
-
-
-  def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
   def peerScript(peers: Seq[(InetAddress, (BanReason, BanTime, BanType))] ): Text.TypedTag[String] = {
 
@@ -36,29 +30,29 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
       scalatags.Text.all.head(
         meta(charset := "utf-8"),
         meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
-        meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
+        meta(name := "description", content := "Encry Core"),
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function validateForm() {
-  var fee = document.forms["myForm"]["fee"].value;
-  var amount = document.forms["myForm"]["amount"].value;
-  if (fee == "") {
-     alert("Fee must be filled out");
+  var addr = document.forms["myForm"]["addr"].value;
+  var port = document.forms["myForm"]["port"].value;
+  if (addr == "") {
+     alert("Address must be filled out");
      return false;
    }
- if (amount == "") {
-    alert("Amount must be filled out");
+ if (port == "") {
+    alert("Port must be filled out");
     return false;
   }
 }""")
         ),
         script(
           raw("""function wallet(){
-                 var fee = document.forms["myForm"]["fee"].value;
-                 var amount = document.forms["myForm"]["amount"].value;
+                 var addr = document.forms["myForm"]["addr"].value;
+                 var port = document.forms["myForm"]["port"].value;
                     var request = new XMLHttpRequest();
                     request.open('POST', "http://localhost:9051/peers/add", true);
-                    request.send(fee.toString() + ':' + amount.toString());
+                    request.send(addr.toString() + ':' + port.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
                   }""")
@@ -198,7 +192,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="bibo", name:="fee", placeholder := "Address", tpe := "text"),
+                                          input(cls := "form-control", id:="addr", name:="addr", placeholder := "Address", tpe := "text"),
 
                                         )
 
@@ -210,7 +204,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id:="amount", name:="amount", placeholder := "Port"),
+                                          input(cls := "form-control", id:="port", name:="port", placeholder := "Port"),
                                           script(
                                             raw(
                                               """
@@ -229,7 +223,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
      });
    });
  }
-              setInputFilter(document.getElementById("amount"), function(value) {
+              setInputFilter(document.getElementById("port"), function(value) {
                 return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
               });
             """.stripMargin)

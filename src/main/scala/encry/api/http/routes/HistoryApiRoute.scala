@@ -11,7 +11,7 @@ import encry.api.http.DataHolderForApi.{
   GetMinerStatus
 }
 import encry.local.miner.Miner.MinerStatus
-import encry.settings.{ EncryAppSettings, RESTApiSettings }
+import encry.settings.RESTApiSettings
 import encry.view.history.History
 import io.circe.Json
 import io.circe.syntax._
@@ -19,12 +19,12 @@ import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.utils.Algos
 import scala.concurrent.Future
 
-case class HistoryApiRoute(dataHolder: ActorRef, appSettings: EncryAppSettings, nodeId: Array[Byte])(
+case class HistoryApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, nodeId: Array[Byte])(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute {
 
   override val route: Route = pathPrefix("history") {
-    getBlocksR ~
+    getHeaderIdsR ~
       getLastHeadersR ~
       getBlockIdsAtHeightR ~
       getBlockHeaderByHeaderIdR ~
@@ -33,11 +33,9 @@ case class HistoryApiRoute(dataHolder: ActorRef, appSettings: EncryAppSettings, 
       candidateBlockR
   }
 
-  override val settings: RESTApiSettings = appSettings.restApi
-
   private def getHistory: Future[History] = (dataHolder ? GetDataFromHistory).mapTo[History]
 
-  def getBlocksR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
+  def getHeaderIdsR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
     getHistory.map {
       _.getHeaderIds(offset, limit).map(Algos.encode).asJson
     }.okJson()
