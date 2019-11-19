@@ -242,7 +242,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
-
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
