@@ -98,7 +98,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
         ),
 
         tag("title")(
-          "Argon Dashboard - Free Dashboard for Bootstrap 4"
+          "Encry Foundation"
         ),
         // Favicon
         link(href := "/argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),
@@ -151,7 +151,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 input(cls := "form-control", placeholder := " Node name", id:="nodename", name:="nodename")
                               )
                             ),
-                              //
+                              //1.
                             //2. Declared address
                             h3("2. Set up your declared address"),
                             div(cls := "form-group",
@@ -161,7 +161,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 input(cls := "form-control", placeholder := " Declared address", id:="declared", name:="declared")
                               )
                             ),
-                            //
+                            //2.
                             //3. Bind address
                             h3("3. Set up your bind address"),
                             div(cls := "form-group",
@@ -171,7 +171,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 input(cls := "form-control", placeholder := " Bind address", id:="bind", name:="bind")
                               )
                             ),
-                            //
+                            //3.
                         // 4. Password
                             h3("4. Set up your password for node"),
                             div(cls := "form-group",
@@ -184,7 +184,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 input(cls := "form-control", placeholder := "Password", tpe := "password", id:="nodepass", name:="nodepass")
                               )
                             ),
-                            //
+                            //4.
                             // 5. Password
                             h3("5. Set up your password for wallet"),
                           div(cls := "form-group",
@@ -209,7 +209,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                   input(cls := "form-control", value:="", placeholder := "Mnemonic", id:="mnemonic", name:="mnemonic")
                                 )
                               ),
-                            //
+                            //6.
                             // 7. Would you like to start new chain?
                             h3("7. Would you like to start your own chain?"),
                               Seq(
@@ -222,7 +222,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             label(cls := "custom-control-label", `for` := "customRadio2", "No")
                             )
                           ),
-                            //
+                            //7.
                             // 8. Choose sync type (fast / normal)
                             h3("8. Choose sync type (fast / normal)"),
                               Seq(
@@ -235,7 +235,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 label(cls := "custom-control-label", `for` := "customRadio4", "Normal")
                               )
                             ),
-                            //
+                            //8.
                             // 9. Add peer to connect
                             h3("9. Add peer to set connection with"),
 
@@ -276,6 +276,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                   ),
                                 )
                               ),
+                            //9.
                             // 10.
                             h3("10. Set up max connections"),
                             div(cls := "form-group",
@@ -308,7 +309,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 ),
                               )
                             ),
-                            //
+                            //10.
                             // 11. Workers amount
                             h3("11. Set up amount of workers"),
                             div(cls := "form-group",
@@ -340,7 +341,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 ),
                               )
                             ),
-                            //
+                            //11.
                             // 12. Would you like to connect with only known peers?
                             h3("12. Would you like to connect with only known peers?"),
                             Seq(
@@ -353,8 +354,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 label(cls := "custom-control-label", `for` := "customRadio6", "No")
                               )
                             ),
-                            // 8.
-
+                            //12.
                               div(cls := "text-center",
                               button(tpe := "button", onclick:="configure()", cls := "btn btn-primary mt-4", "Configure")
                             )

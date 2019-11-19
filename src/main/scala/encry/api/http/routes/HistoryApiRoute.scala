@@ -17,7 +17,6 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.utils.Algos
-import scala.concurrent.Future
 
 case class HistoryApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, nodeId: Array[Byte])(
   implicit val context: ActorRefFactory

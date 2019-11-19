@@ -4,13 +4,13 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import cats.Apply
+import cats.instances.option._
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp
 import encry.api.http.DataHolderForApi._
-import encry.cli.Response
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings, RESTApiSettings}
+import encry.settings.RESTApiSettings
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
@@ -24,7 +24,6 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
-import cats.instances.option._
 
 case class WalletInfoApiRoute(dataHolder: ActorRef,
                               settings: RESTApiSettings,

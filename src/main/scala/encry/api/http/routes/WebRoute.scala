@@ -227,7 +227,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
         ),
 
         tag("title")(
-          "Argon Dashboard - Free Dashboard for Bootstrap 4"
+          "Encry Core"
         ),
         // Favicon
         link(href := "argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),

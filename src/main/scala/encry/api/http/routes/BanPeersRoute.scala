@@ -53,7 +53,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                  var addr = document.forms["myForm"]["addr"].value;
                  var port = document.forms["myForm"]["port"].value;
                     var request = new XMLHttpRequest();
-                    request.open('POST', "http://localhost:9051/peers/add", true);
+                    request.open('POST', "http://localhost:9051/peers/remove", true);
                     request.send(addr.toString() + ':' + port.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
@@ -62,7 +62,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
         ),
 
         tag("title")(
-          "Argon Dashboard - Free Dashboard for Bootstrap 4"
+          "Encry Foundation"
         ),
         // Favicon
         link(href := "/argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),

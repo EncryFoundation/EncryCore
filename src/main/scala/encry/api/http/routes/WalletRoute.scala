@@ -56,51 +56,37 @@ case class WalletRoute(settings: RESTApiSettings,
                   if (fee == "") {
                      alert("Fee must be filled out");
                      return false;
-                   }
+                   } else return true;
                   if (data == "") {
                      alert("Data must be filled out");
                      return false;
-                   }
+                   } else return true;
                   }""")
        ),
        script(
          raw(
-           """function validateForm() {
+           """function validateTransferForm() {
                 var addr = document.forms["myForm"]["addr"].value;
                 var fee = document.forms["myForm"]["fee"].value;
                 var amount = document.forms["myForm"]["amount"].value;
-                  if (addr == "") {
-                alert("Address must be filled out");
-                return false;
-                  }
-                  if (fee == "") {
-                alert("Fee must be filled out");
-                return false;
-                  }
-                  if (amount == "") {
-                alert("Amount must be filled out");
-                return false;
-                  }
-                }""")
-       ),
-       script(
-         raw(
-           """function validateForm1() {
-                var fee = document.forms["myForm1"]["fee"].value;
-                var amount = document.forms["myForm1"]["amount"].value;
-              if (fee == "") {
-              alert("Fee must be filled out");
+              if (addr == "") {
+              alert("Address must be filled out");
               return false;
-              }
-              if (amount == "") {
-                 alert("Amount must be filled out");
+              } else return true;
+              if (fee == "") {
+                 alert("Fee must be filled out");
                  return false;
-               }
+               } else return true;
+               if (amount == "") {
+                  alert("Amount must be filled out");
+                  return false;
+                } else return true;
               }""")
        ),
        script(
          raw(
            s"""function wallet(){
+               if(validateTransferForm()){
                  var addr = document.forms["myForm"]["addr"].value;
                  var fee = document.forms["myForm"]["fee"].value;
                  var amount = document.forms["myForm"]["amount"].value;
@@ -114,13 +100,34 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Transaction has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
-
+                  }
                   }""")
+       ),
+       script(
+         raw(
+           """function validateContractForm() {
+                var contract = document.forms["myForm4"]["contract"].value;
+                var fee = document.forms["myForm4"]["fee"].value;
+                var amount = document.forms["myForm4"]["amount"].value;
+              if (contract == "") {
+              alert("Contract must be filled out");
+              return false;
+              } else return true;
+              if (fee == "") {
+                 alert("Fee must be filled out");
+                 return false;
+               } else return true;
+               if (amount == "") {
+                  alert("Amount must be filled out");
+                  return false;
+                } else return true;
+              }""")
        ),
        script(
          raw(
            s"""
                function contractF(){
+               if(validateContractForm()){
                  var contract = document.forms["myForm4"]["contract"].value;
                  var fee = document.forms["myForm4"]["fee"].value;
                  var amount = document.forms["myForm4"]["amount"].value;
@@ -134,12 +141,28 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Transaction has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
-
+                  }
                   }""")
        ),
        script(
          raw(
+           """function validateForm1() {
+                var fee = document.forms["myForm1"]["fee"].value;
+                var amount = document.forms["myForm1"]["amount"].value;
+              if (fee == "") {
+              alert("Fee must be filled out");
+              return false;
+              } else return true;
+              if (amount == "") {
+                 alert("Amount must be filled out");
+                 return false;
+               } else return true;
+              }""")
+       ),
+       script(
+         raw(
            """function token(){
+              if (validateForm1()){
                  var fee = document.forms["myForm1"]["fee"].value;
                  var amount = document.forms["myForm1"]["amount"].value;
                     var request = new XMLHttpRequest();
@@ -147,12 +170,28 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Transaction with token creation has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
-
+                  }
                   }""")
         ),
+       script(
+         raw(
+           """function validateDataForm() {
+                var fee = document.forms["myForm2"]["fee"].value;
+                var data = document.forms["myForm2"]["data"].value;
+              if (fee == "") {
+              alert("Fee must be filled out");
+              return false;
+              } else return true;
+              if (data == "") {
+                 alert("Data must be filled out");
+                 return false;
+               } else return true;
+              }""")
+       ),
         script(
           raw(
             """function dataTx(){
+               if(validateDataForm()) {
                  var fee = document.forms["myForm2"]["fee"].value;
                  var data = document.forms["myForm2"]["data"].value;
                     var request = new XMLHttpRequest();
@@ -160,7 +199,7 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Data transaction has been created successfully");
                     setTimeout(location.reload.bind(location), 3000);
-
+                  }
                   }""")
        ),
        script(
@@ -176,7 +215,7 @@ case class WalletRoute(settings: RESTApiSettings,
 
 
         tag("title")(
-          "Argon Dashboard - Free Dashboard for Bootstrap 4"
+          "Encry Foundation"
         ),
         // Favicon
         link(href := "/argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),
@@ -397,7 +436,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                             coinI <- balances.toList
                                             coinIds <- coinI._2
                                           } yield {
-                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) "ETT" else coinIds._1)
+                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
                                           }
                                         )
                                       ),
@@ -658,7 +697,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                             coinIds <- coinI
                                           }
                                             yield {
-                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) "ETT" else coinIds._1)
+                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
                                           }
                                         )
                                       ),

@@ -38,11 +38,11 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   if (addr == "") {
      alert("Address must be filled out");
      return false;
-   }
+   } else return true;
  if (port == "") {
     alert("Port must be filled out");
     return false;
-  }
+  } else return true;
 }""")
         ),
         script(
@@ -60,7 +60,7 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
         ),
 
         tag("title")(
-          "Encry Core"
+          "Encry Foundation"
         ),
         // Favicon
         link(href := "/argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),

@@ -37,7 +37,7 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
         meta(name := "author", content := "Creative Tim"),
 
         tag("title")(
-          "Argon Dashboard - Free Dashboard for Bootstrap 4"
+          "Encry Foundation"
         ),
         // Favicon
         link(href := "/argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),
