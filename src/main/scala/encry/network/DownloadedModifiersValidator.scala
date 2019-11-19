@@ -16,9 +16,12 @@ import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
-import org.encryfoundation.common.modifiers.mempool.transaction.{ Transaction, TransactionProtoSerializer }
-import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
-import scala.util.{ Failure, Success, Try }
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
+import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(modifierIdSize: Int,
                                    nodeViewHolder: ActorRef,
