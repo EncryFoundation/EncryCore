@@ -1,5 +1,6 @@
 package encry.api.http.routes
 
+import java.security.Security
 import java.util.concurrent.TimeUnit
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.headers.{HttpCookie, RawHeader}
@@ -12,6 +13,7 @@ import encry.local.miner.Miner.MinerStatus
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
 import io.circe.{Json, parser}
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scalatags.Text
 import scalatags.Text.all.{div, td, _}
@@ -556,6 +558,9 @@ object WebRoute  {
   import akka.http.scaladsl.model._
   import akka.http.scaladsl.server.Directives._
   // JWT
+  if (Security.getProvider("BC") == null) {
+    Security.addProvider(new BouncyCastleProvider())
+  }
 
   val algorithm = JwtAlgorithm.HS256
   val secretKey = new String(Random.randomBytes())

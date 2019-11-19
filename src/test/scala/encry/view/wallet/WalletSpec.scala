@@ -27,6 +27,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val dir = FileHelper.getRandomTempDir
 
+    val aM = AccountManager.init(
+      "another accuse index island little scissors insect little absurd island keep valid",
+      "",
+      settings.copy(directory = dir.getAbsolutePath))
+
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
 
     val accountManager: AccountManager = wallet.accountManagers.head
@@ -74,6 +79,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader: Header = genHeader
 
+    val aM = AccountManager.init(
+      "another accuse index island little scissors insect little absurd island keep valid",
+      "",
+      settings.copy(directory = dir.getAbsolutePath))
+
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
 
     val keyManager: AccountManager = wallet.accountManagers.head
@@ -106,6 +116,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val alsoSeed = "another accuse index island little island absurd little absurd scissors keep valid"
 
     val dir = FileHelper.getRandomTempDir
+
+    val aM = AccountManager.init(
+      "another accuse index island little scissors insect little insect island keep valid",
+      "",
+      settings.copy(directory = dir.getAbsolutePath))
 
     val txsQty: Int = 4
 

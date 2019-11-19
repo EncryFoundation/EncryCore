@@ -101,7 +101,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           "Encry Foundation"
         ),
         // Favicon
-        link(href := "/argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),
+        link(href := "argon/assets/img/brand/favicon.png", rel := "icon", tpe := "image/png"),
         // Fonts
         link(href := "https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700", rel := "stylesheet"),
         // Icons
@@ -129,7 +129,6 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
             div(cls := "container-fluid",
               div(cls := "header-body"),
               div(cls := "row",
-
               )
             )
           ),
@@ -141,7 +140,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                   div(cls := "card-header border-0",
                     div(cls := "row align-items-center",
                       div(cls := "col",
-                          form(role:="form", id:="myForm", onsubmit:="return validateForm2()",
+                          form(role:="form", id:="myForm",
                             //1. Node name
                             h3("1. Set up your node name"),
                             div(cls := "form-group",
@@ -153,7 +152,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             ),
                               //1.
                             //2. Declared address
-                            h3("2. Set up your declared address"),
+                            h3("2. Set up your declared address (required)"),
+                            p("The address at which other nodes connect to yours."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
@@ -164,6 +164,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //2.
                             //3. Bind address
                             h3("3. Set up your bind address"),
+                            p("The address on which the node starts on the local machine."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
@@ -174,6 +175,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //3.
                         // 4. Password
                             h3("4. Set up your password for node"),
+                            p("This password gives you access to front API."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
@@ -187,6 +189,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //4.
                             // 5. Password
                             h3("5. Set up your password for wallet"),
+                            p("This password gives you access to your wallet."),
                           div(cls := "form-group",
                             div(cls := "input-group input-group-alternative",
                               div(cls := "input-group-prepend",
@@ -200,6 +203,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             // 5.
                             // 6. Enter mnemonic
                             h3("6. Enter your mnemonic if available (leave empty and we'll generate new one for you)"),
+                            p("A mnemonic phrase is a list of 12 words which store all the information needed to recover your bitcoin wallet."),
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative",
                                   div(cls := "input-group-prepend",
@@ -225,6 +229,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //7.
                             // 8. Choose sync type (fast / normal)
                             h3("8. Choose sync type (fast / normal)"),
+                            p("Choose fast if you want to use fast synchronization and normal if you want to download all blocks from 0."),
                               Seq(
                               div(cls := "custom-control custom-radio mb-3",
                                 input(name := "custom-radio-2", value:="Fast", cls := "custom-control-input", id := "customRadio3", tpe := "radio"),
@@ -238,7 +243,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //8.
                             // 9. Add peer to connect
                             h3("9. Add peer to set connection with"),
-
+                            p("The address of peer with which you want to connect to."),
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative mb-3",
                                   div(cls := "input-group-prepend",
@@ -279,6 +284,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //9.
                             // 10.
                             h3("10. Set up max connections"),
+                            p("Maximum number of connections with other nodes."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
@@ -312,6 +318,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //10.
                             // 11. Workers amount
                             h3("11. Set up amount of workers"),
+                            p("How many threads do you want to allocate for your mining."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
@@ -344,6 +351,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //11.
                             // 12. Would you like to connect with only known peers?
                             h3("12. Would you like to connect with only known peers?"),
+                            p("Do you want to establish a connection with peers about which you initially knew nothing."),
                             Seq(
                               div(cls := "custom-control custom-radio mb-3",
                                 input(name := "custom-radio-3", value:="true", cls := "custom-control-input", id := "customRadio5", tpe := "radio"),
@@ -401,10 +409,6 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
         // Optional JS
         script(src := "argon/assets/vendor/chart.js/dist/Chart.min.js"),
         script(src := "argon/assets/vendor/chart.js/dist/Chart.extension.js"),
-        Seq(
-          link(rel := "stylesheet", tpe := "text/css", href := "https://cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css"),
-          script(tpe := "text/javascript", src := "https://cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js")
-        ),
         // Argon JS
         script(src := "argon/assets/js/argon.js?v=1.0.0")
 
