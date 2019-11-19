@@ -86,6 +86,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       SnapshotProcessor.initialize(settings)
     } catch {
       case _: Throwable => sys.exit(9999)
+    } finally {
+      storage.close()
     }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {

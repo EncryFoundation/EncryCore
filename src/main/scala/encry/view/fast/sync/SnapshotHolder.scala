@@ -202,8 +202,6 @@ class SnapshotHolder(settings: EncryAppSettings,
           s"New required manifest id is ${Algos.encode(manifestId)}."
       )
       requestManifestScheduler = none
-      snapshotDownloadController =
-        snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
       restartFastSync(history)
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
@@ -308,7 +306,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
     snapshotDownloadController = newController
     snapshotProcessor = snapshotProcessor.reInitStorage
-    self ! HeaderChainIsSynced
     context.become(
       fastSyncMod(history, processHeaderSyncedMsg = true, none, reRequestsNumber = 0).orElse(commonMessages)
     )

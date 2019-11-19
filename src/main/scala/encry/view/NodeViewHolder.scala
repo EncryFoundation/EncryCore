@@ -100,7 +100,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.info(s"Updated best block in fast sync mod. Updated state height")
         nodeView.history.blockDownloadProcessor.updateBestBlock(bestHeader)
         nodeView.history.isHeadersChainSyncedVar = true
-        nodeView.history.workWithFastSync = false
+        nodeView.history.fastSyncInProgress = false
         ModifiersCache.finishFastSync()
         val history = nodeView.history.reportModifierIsValidFastSync(bestHeader.id, bestHeader.payloadId)
         logger.info(s"Wallet scanning started")
@@ -217,8 +217,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   (History, UtxoState, Seq[PersistentModifier]) = {
     logger.info(s"\nStarting updating state in updateState function!")
     progressInfo.toApply.foreach {
-      case header: Header if !history.workWithFastSync => requestDownloads(progressInfo, Some(header.id))
-      case _ if !history.workWithFastSync => requestDownloads(progressInfo, None)
+      case header: Header if !history.fastSyncInProgress => requestDownloads(progressInfo, Some(header.id))
+      case _ if !history.fastSyncInProgress => requestDownloads(progressInfo, None)
       case _ =>
     }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
@@ -251,8 +251,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
                         s"\n\n\n header - $h \n\n\n")
-                      nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
                       newHis.heightOfLastAvailablePayloadForRequest = requiredHeight
+                      if (newHis.isHeadersChainSynced) {
+                        nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
+                      }
                       logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
                     }
                   }
