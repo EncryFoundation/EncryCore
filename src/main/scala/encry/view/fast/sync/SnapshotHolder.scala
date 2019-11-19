@@ -159,7 +159,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       }
 
     case StartProcessingChunks =>
-      println(
+      logger.info(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
       )
@@ -197,7 +197,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
 
     case RequiredManifestHeightAndId(height, manifestId) =>
-      println(
+      logger.info(
         s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
           s"New required manifest id is ${Algos.encode(manifestId)}."
       )
