@@ -29,7 +29,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val aM = AccountManager.init(
       "another accuse index island little scissors insect little absurd island keep valid",
-      "",
+      "encry",
       settings.copy(directory = dir.getAbsolutePath))
 
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
@@ -81,7 +81,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val aM = AccountManager.init(
       "another accuse index island little scissors insect little absurd island keep valid",
-      "",
+      "encry",
       settings.copy(directory = dir.getAbsolutePath))
 
     val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
@@ -119,7 +119,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val aM = AccountManager.init(
       "another accuse index island little scissors insect little insect island keep valid",
-      "",
+      "encry",
       settings.copy(directory = dir.getAbsolutePath))
 
     val txsQty: Int = 4
