@@ -156,7 +156,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         case _ =>
       }
 
-    case StartProcessingChunks =>
+    case BroadcastManifestRequestMessage =>
       logger.info(
         s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
           s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
@@ -165,7 +165,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         Broadcast)
       val newScheduler = context.system.scheduler.scheduleOnce(settings.snapshotSettings.manifestReAskTimeout) {
         logger.info(s"Trigger scheduler for re-request manifest")
-        self ! StartProcessingChunks
+        self ! BroadcastManifestRequestMessage
       }
       logger.info(s"Start awaiting manifest network message.")
       requestManifestScheduler = Some(newScheduler)
@@ -194,9 +194,11 @@ class SnapshotHolder(settings: EncryAppSettings,
         s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
           s"New required manifest id is ${Algos.encode(manifestId)}."
       )
+      snapshotDownloadController =
+        snapshotDownloadController.copy(requiredManifestHeight = height, requiredManifestId = manifestId)
       requestManifestScheduler = none
       restartFastSync(history)
-      self ! StartProcessingChunks
+      self ! BroadcastManifestRequestMessage
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
       snapshotDownloadController.requestedChunks.map { id =>
@@ -308,7 +310,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
 object SnapshotHolder {
 
-  final case object StartProcessingChunks
+  final case object BroadcastManifestRequestMessage
 
   final case class FastSyncFinished(state: UtxoState) extends AnyVal
 
