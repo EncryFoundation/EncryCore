@@ -207,7 +207,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
-      if (!nodeView.history.isFullChainSynced && tid == Payload.modifierTypeId)
+      if ((nodeView.history.isFullChainSynced && tid == Payload.modifierTypeId) || tid != Payload.modifierTypeId)
         nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
       else logger.info(s"Ignore sending request for payload (${Algos.encode(id)}) from nvh because of nodeView.history.isFullChainSynced = false")
     }
