@@ -251,9 +251,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
                         s"\n\n\n header - $h \n\n\n")
                       newHis.heightOfLastAvailablePayloadForRequest = requiredHeight
-                      if (newHis.isHeadersChainSynced) {
+                      //if (newHis.isHeadersChainSynced) {
                         nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
-                      }
+                      //}
                       logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
                     }
                   }
@@ -313,7 +313,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (settings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
-      if (pmod.modifierTypeId == Payload.modifierTypeId && nodeView.history.workWithFastSync) {
+      if (pmod.modifierTypeId == Payload.modifierTypeId && nodeView.history.fastSyncInProgress) {
         pmod match {
           case p: Payload =>
             nodeView.history.processPayloadFastSync(p, rawBytes)
@@ -379,7 +379,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
           } else {
-            if (!isLocallyGenerated && !historyBeforeStUpdate.workWithFastSync) requestDownloads(progressInfo, Some(pmod.id))
+            if (!isLocallyGenerated && !historyBeforeStUpdate.fastSyncInProgress) requestDownloads(progressInfo, Some(pmod.id))
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
             logger.info(s"\nProgress info is empty")
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
