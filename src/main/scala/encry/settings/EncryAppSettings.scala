@@ -120,7 +120,6 @@ final case class SnapshotSettings(enableSnapshotCreation: Boolean,
                                   updateRequestsPerTime: FiniteDuration,
                                   liveConnectionTimeout: FiniteDuration,
                                   manifestReAskTimeout: FiniteDuration,
-                                  manifestReAskQty: Int,
                                   chunkDepth: Int)
 final case class StorageSettings(history: StorageType, state: StorageType, snapshotHolder: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])

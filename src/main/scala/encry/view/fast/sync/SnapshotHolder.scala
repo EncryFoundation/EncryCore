@@ -22,8 +22,6 @@ import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
-
-import scala.concurrent.duration._
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -60,7 +58,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     )
   }
 
-  var requestManifestScheduler: Option[(Cancellable, Int)] = Option.empty
+  var requestManifestScheduler: Option[Cancellable] = Option.empty
 
   override def receive: Receive = awaitingHistory
 
@@ -95,16 +93,16 @@ class SnapshotHolder(settings: EncryAppSettings,
           if (isValidManifest && canBeProcessed) {
             (for {
               controller <- snapshotDownloadController.processManifest(manifest, remote, history)
-              processor <- snapshotProcessor.initializeApplicableChunksCache(
-                            history,
-                            snapshotDownloadController.requiredManifestHeight
-                          )
+              processor  <- snapshotProcessor.initializeApplicableChunksCache(
+                             history,
+                             snapshotDownloadController.requiredManifestHeight
+                           )
             } yield (controller, processor)) match {
               case Left(error) =>
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
               case Right((controller, processor)) =>
                 logger.info(s"Request manifest message successfully processed.")
-                requestManifestScheduler.foreach(_._1.cancel())
+                requestManifestScheduler.foreach(_.cancel())
                 snapshotDownloadController = controller
                 snapshotProcessor = processor
                 self ! RequestNextChunks
@@ -123,10 +121,10 @@ class SnapshotHolder(settings: EncryAppSettings,
             (controller, chunk) = controllerAndChunk
             validChunk          <- snapshotProcessor.validateChunkId(chunk)
             processor           = snapshotProcessor.updateCache(validChunk)
-            newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
-                             case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
-                             case t                          => t.asLeft[SnapshotProcessor]
-                           }
+            newProcessor        <- processor.processNextApplicableChunk(processor).leftFlatMap {
+                                    case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
+                                    case t                          => t.asLeft[SnapshotProcessor]
+                                  }
           } yield (newProcessor, controller)) match {
             case Left(error) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
@@ -169,16 +167,11 @@ class SnapshotHolder(settings: EncryAppSettings,
         logger.info(s"Trigger scheduler for re-request manifest")
         self ! StartProcessingChunks
       }
-      val currentRequestsNumber = requestManifestScheduler.map(_._2).getOrElse(0)
-      if (currentRequestsNumber < settings.snapshotSettings.manifestReAskQty) {
-        requestManifestScheduler = Some(newScheduler -> (currentRequestsNumber + 1))
-        context.become(
-          fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
-        )
-      } else {
-        logger.info("Fast sync is unavailable, there are no nods with manifest")
-        sys.exit(159)
-      }
+      logger.info(s"Start awaiting manifest network message.")
+      requestManifestScheduler = Some(newScheduler)
+      context.become(
+        fastSyncMod(history, processHeaderSyncedMsg = false, none, reRequestsNumber).orElse(commonMessages)
+      )
 
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
