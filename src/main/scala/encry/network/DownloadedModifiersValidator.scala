@@ -43,11 +43,11 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
       filteredModifiers.foreach {
         case (id, bytes) =>
           ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
-            case Success(modifier) =>
-              val syntacticValidation: Boolean = ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize)
+            case Success(modifier: PersistentModifier) =>
+              val syntacticValidation = ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize)
               val preSemanticValidation: Either[HeaderUtils.PreSemanticValidationException, Unit] =
                 ModifiersToNetworkUtils.isPreSemanticValidation(modifier, history, settings)
-              if (syntacticValidation && preSemanticValidation.isRight) {
+              if (syntacticValidation.isSuccess && preSemanticValidation.isRight) {
                 logger.debug(
                   s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
                     s"Sending validated modifier to NodeViewHolder"
@@ -57,9 +57,13 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
               } else {
                 logger.info(
                   s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of:" +
-                    s"isSyntacticallyValid = false or $preSemanticValidation"
+                    s"isSyntacticallyValid = ${syntacticValidation.errors} or $preSemanticValidation." +
+                    s" Modifier is ${modifier match {
+                      case h: Header => h
+                      case l => l
+                    }}"
                 )
-                if (!syntacticValidation) peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
+                if (!syntacticValidation.isSuccess) peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
                 else
                   preSemanticValidation match {
                     case Left(value) => peersKeeper ! BanPeer(remote, PreSemanticInvalidModifier(value.error))

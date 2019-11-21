@@ -3,15 +3,17 @@ package encry.network
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.history.{ HeaderUtils, PayloadUtils }
+import encry.modifiers.history.{HeaderUtils, PayloadUtils}
 import encry.settings.EncryAppSettings
 import encry.view.history.History
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer }
+import org.encryfoundation.common.modifiers.history.{Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierTypeId
 import cats.syntax.either._
 import encry.modifiers.history.HeaderUtils.PreSemanticValidationException
-import scala.util.{ Failure, Try }
+import org.encryfoundation.common.validation.ValidationResult
+
+import scala.util.{Failure, Try}
 
 object ModifiersToNetworkUtils extends StrictLogging {
 
@@ -28,10 +30,10 @@ object ModifiersToNetworkUtils extends StrictLogging {
       case m                      => Failure(new RuntimeException(s"Try to deserialize unknown modifier: $m from proto."))
     }).flatten
 
-  def isSyntacticallyValid(modifier: PersistentModifier, modifierIdSize: Int): Boolean = modifier match {
-    case h: Header  => HeaderUtils.syntacticallyValidity(h, modifierIdSize).isSuccess
-    case p: Payload => PayloadUtils.syntacticallyValidity(p, modifierIdSize).isSuccess
-    case _          => true
+  def isSyntacticallyValid(modifier: PersistentModifier, modifierIdSize: Int) = modifier match {
+    case h: Header  => HeaderUtils.syntacticallyValidity(h, modifierIdSize)
+    case p: Payload => PayloadUtils.syntacticallyValidity(p, modifierIdSize)
+    case _          => ValidationResult.Valid
   }
 
   def isPreSemanticValidation(modifier: PersistentModifier,
