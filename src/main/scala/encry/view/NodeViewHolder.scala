@@ -251,10 +251,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
                         s"\n\n\n header - $h \n\n\n")
                       newHis.heightOfLastAvailablePayloadForRequest = requiredHeight
-                      //if (newHis.isHeadersChainSynced) {
-                        nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
-                      //}
-                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${newHis.heightOfLastAvailablePayloadForRequest}")
+                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${
+                        newHis.heightOfLastAvailablePayloadForRequest
+                      }")
                     }
                   }
                 case _ =>
@@ -321,7 +320,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (nodeView.history.getBestBlockHeight >= nodeView.history.heightOfLastAvailablePayloadForRequest) {
               logger.info(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
               logger.info(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
-              nodeViewSynchronizer ! StartProcessingChunks
+              nodeView.history.getBestHeaderAtHeight(nodeView.history.heightOfLastAvailablePayloadForRequest)
+                .foreach { h =>
+                  nodeViewSynchronizer ! RequiredManifestHeightAndId(
+                    nodeView.history.heightOfLastAvailablePayloadForRequest,
+                    Algos.hash(h.stateRoot ++ h.id)
+                  )
+                }
             }
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)

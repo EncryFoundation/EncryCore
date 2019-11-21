@@ -203,6 +203,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       )
       requestManifestScheduler = none
       restartFastSync(history)
+      self ! StartProcessingChunks
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
       snapshotDownloadController.requestedChunks.map { id =>
