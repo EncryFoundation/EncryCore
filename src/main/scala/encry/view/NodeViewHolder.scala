@@ -33,7 +33,7 @@ import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.{UtxoState, _}
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.LSMStore
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state._
@@ -84,7 +84,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     System.exit(100)
   }
 
-  context.system.scheduler.schedule(1.seconds, 10.seconds)(logger.debug(s"Modifiers cache from NVH: " +
+  context.system.scheduler.schedule(1.seconds, 10.seconds)(logger.info(s"Modifiers cache from NVH: " +
     s"${ModifiersCache.size}. Elems: ${ModifiersCache.cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")}"))
 
   override def postStop(): Unit = {
@@ -108,7 +108,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
-      if (state.tree.selfInspectionAfterFastSync) {
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
           nodeView.history.blockDownloadProcessor.updateBestBlock(h)
@@ -124,7 +123,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))
         }
-      } else sys.exit(1234567)
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -209,7 +207,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
-      nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
+      if ((nodeView.history.isFullChainSynced && tid == Payload.modifierTypeId) || tid != Payload.modifierTypeId)
+        nodeViewSynchronizer ! DownloadRequest(tid, id, previousModifier)
+      else logger.info(s"Ignore sending request for payload (${Algos.encode(id)}) from nvh because of nodeView.history.isFullChainSynced = false")
     }
 
   def trimChainSuffix(suffix: IndexedSeq[PersistentModifier], rollbackPoint: ModifierId):
@@ -250,7 +250,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
-
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - settings.levelDB.maxVersions
@@ -285,6 +284,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
               )
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+              if (newHis.getBestHeaderId.exists(bestHeaderId =>
+                  newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
+                  )) newHis.isFullChainSynced = true
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
               logger.info(s"Application to state failed cause $e")

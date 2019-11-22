@@ -8,10 +8,12 @@ import encry.modifiers.history.HeaderChain
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import cats.syntax.option._
+
 import scala.annotation.tailrec
 import cats.syntax.either._
+import org.encryfoundation.common.utils.Algos
 
 trait HistoryModifiersProcessors extends HistoryApi {
 
@@ -86,7 +88,9 @@ trait HistoryModifiersProcessors extends HistoryApi {
               .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
           )
-      updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader)
+      val updatedHeadersAtHeightIds =
+        newChain.headers.map(header => updatedBestHeaderAtHeightRaw(header.id, Height @@ header.height)).toList
+      updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader, updatedHeadersAtHeightIds)
       if (blocksToKeep >= 0) {
         val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
         val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(0)
@@ -102,6 +106,12 @@ trait HistoryModifiersProcessors extends HistoryApi {
     logger.info(s"Process block to history ${fullBlock.encodedId}||${fullBlock.header.height}||")
     historyStorage.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload))
     ProgressInfo(none, Seq.empty, Seq.empty, none)
+  }
+
+  private def updatedBestHeaderAtHeightRaw(headerId: ModifierId, height: Height): (Array[Byte], Array[Byte]) = {
+    heightIdsKey(height) ->
+       (Seq(headerId) ++
+        headerIdsAtHeight(height).filterNot(_ sameElements headerId)).flatten.toArray
   }
 
   def continuationHeaderChains(header: Header,
@@ -214,11 +224,12 @@ trait HistoryModifiersProcessors extends HistoryApi {
 
   private def updateStorage(newModRow: PersistentModifier,
                             bestFullHeaderId: ModifierId,
-                            updateHeaderInfo: Boolean = false): Unit = {
+                            updateHeaderInfo: Boolean = false,
+                            additionalIndexes: List[(Array[Byte], Array[Byte])] = List.empty): Unit = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
       else Seq(BestBlockKey -> bestFullHeaderId)
-    historyStorage.bulkInsert(newModRow.id, indicesToInsert, Seq(newModRow))
+    historyStorage.bulkInsert(newModRow.id, indicesToInsert ++ additionalIndexes, Seq(newModRow))
   }
 
   private def isValidFirstBlock(header: Header): Boolean =

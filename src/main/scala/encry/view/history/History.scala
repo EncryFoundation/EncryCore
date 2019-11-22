@@ -24,8 +24,7 @@ import supertagged.@@
   **/
 trait History extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
-  def isFullChainSynced: Boolean = getBestHeaderId
-    .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
+  var isFullChainSynced: Boolean = settings.node.offlineGeneration
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {

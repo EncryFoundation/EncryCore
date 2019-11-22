@@ -96,14 +96,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       blocksCache.get(ByteArrayWrapper(id)).isDefined ||
       isModifierDefined(id)
 
-  def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = headersCacheIndexes
-    .get(h)
-    .flatMap(_.headOption)
-    .orElse(getBestHeaderIdAtHeightDB(h))
-
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = headersCacheIndexes
-    .get(height)
-    .orElse(headerIdsAtHeightDB(height))
+  def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = getBestHeaderIdAtHeightDB(h)
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = headerIdsAtHeightDB(height)
     .getOrElse(Seq.empty[ModifierId])
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
