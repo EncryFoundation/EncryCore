@@ -5,14 +5,13 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetViewGetBalance, GetViewPrintPubKeys}
-import encry.settings.{EncryAppSettings, NodeSettings, RESTApiSettings}
-import io.circe.Json
-import scalatags.Text
-import scalatags.Text.all.{div, span, _}
+import encry.api.http.DataHolderForApi.{GetViewGetBalance, GetViewPrintPubKeys}
+import encry.settings.{EncryAppSettings, RESTApiSettings}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+import scalatags.Text
+import scalatags.Text.all.{div, span, _}
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
@@ -38,16 +37,23 @@ case class WalletRoute(settings: RESTApiSettings,
    pubKeys <- pubKeysF
  } yield (wallet, pubKeys)
 
- def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
-
  def walletScript(balances: Map[String, List[(String, Amount)]], pubKeysList: List[String]): Text.TypedTag[String] = {
 
    html(
      scalatags.Text.all.head(
        meta(charset := "utf-8"),
        meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
-       meta(name := "description", content := "Start your development with a Dashboard for Bootstrap 4."),
+       meta(name := "description", content := "Encry Core."),
        meta(name := "author", content := "Creative Tim"),
+       script(
+         raw(
+           """
+              function AvoidSpace(event) {
+                  var k = event ? event.which : window.event.keyCode;
+                  if (k == 32) return false;
+              }
+            """.stripMargin)
+       ),
        script(
          raw(
            """function validateForm2() {
@@ -360,7 +366,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-email-83")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "contract", name := "contract", placeholder := "Contract", tpe := "text")
+                                          input(cls := "form-control", id := "contract", name := "contract", placeholder := "Contract", tpe := "text", onkeypress:="return AvoidSpace(event)")
                                         )
                                       ),
                                       div(cls := "form-group",
@@ -370,7 +376,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "contractfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "contractfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """
@@ -404,7 +410,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "contractamount", name := "amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "contractamount", name := "amount", placeholder := "Amount", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """
@@ -467,7 +473,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "datafee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "datafee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """
@@ -501,7 +507,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "data", name := "data", placeholder := "Data"),
+                                          input(cls := "form-control", id := "data", name := "data", placeholder := "Data", onkeypress:="return AvoidSpace(event)"),
                                         )
                                       ),
 
@@ -532,7 +538,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "tokenfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "tokenfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """
@@ -566,7 +572,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "tokenamount", name := "amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "tokenamount", name := "amount", placeholder := "Amount", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """
@@ -620,7 +626,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-email-83")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "transfer", name := "addr", placeholder := "Address", tpe := "text")
+                                          input(cls := "form-control", id := "transfer", name := "addr", placeholder := "Address", tpe := "text", onkeypress:="return AvoidSpace(event)")
                                         )
                                       ),
                                       div(cls := "form-group",
@@ -630,7 +636,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-money-coins")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "transferfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text"),
+                                          input(cls := "form-control", id := "transferfee", name := "fee", placeholder := "Fee (min = 0)", tpe := "text", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """
@@ -664,7 +670,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                               i(cls := "ni ni-credit-card")
                                             )
                                           ),
-                                          input(cls := "form-control", id := "transferamount", name := "amount", placeholder := "Amount"),
+                                          input(cls := "form-control", id := "transferamount", name := "amount", placeholder := "Amount", onkeypress:="return AvoidSpace(event)"),
                                           script(
                                             raw(
                                               """

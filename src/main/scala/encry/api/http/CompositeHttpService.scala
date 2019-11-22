@@ -20,6 +20,6 @@ case class CompositeHttpService(system: ActorSystem,
   val compositeRoute: Route = routes.map(_.route).reduce(_ ~ _) ~
     path("swagger") { getFromResource("swagger-ui/index.html") } ~
     getFromResourceDirectory("swagger-ui") ~
-//    swaggerRoute.routes ~
+    SwaggerRoute.routes ~
     redirectToSwagger
 }

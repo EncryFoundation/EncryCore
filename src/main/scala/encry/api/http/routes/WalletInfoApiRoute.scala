@@ -3,8 +3,8 @@ package encry.api.http.routes
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
-import cats.Apply
-import cats.instances.option._
+import cats.syntax.eq._
+import cats.kernel.Eq
 import com.typesafe.scalalogging.StrictLogging
 import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
 import encry.EncryApp
@@ -29,6 +29,12 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
                               settings: RESTApiSettings,
                               intrinsicTokenId: String)(implicit val context: ActorRefFactory)
   extends EncryBaseApiRoute with FailFastCirceSupport with StrictLogging {
+
+  implicit val eqOptBytes = new Eq[Option[Array[Byte]]] {
+    override def eqv(x: Option[Array[Byte]], y: Option[Array[Byte]]) = {
+      x.exists(l => y.exists(_.sameElements(l)))
+    }
+  }
 
   override val route: Route = pathPrefix("wallet") {
     infoR ~
@@ -67,15 +73,8 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       .mapTo[String].map(_.asJson).okJson()
   }
 
-  def errorR: Route = path("restricted") {
-    reject(ValidationRejection("Restricted!"))
-  }
-
-  case class LoginRequest(a:String, b:String)
-
   def createTokenR: Route = (path("createToken") & get) {
-    parameters('fee.as[Int], 'amount.as[Long]) {
-      (fee, amount) =>
+    parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>
       (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
@@ -102,8 +101,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
 
   def dataTransactionR: Route = (path("data") & get) {
-    parameters('fee.as[Int], 'data) {
-      (fee, data) =>
+    parameters('fee.as[Int], 'data) { (fee, data) =>
       (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
@@ -128,36 +126,34 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   }
 
   def transferR: Route = (path("transfer") & get) {
-    parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) {
-      (addr, fee, amount, token) =>
+    parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) { (addr, fee, amount, token) =>
       (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
-            val decodedTokenOpt         = token.map(s => Algos.decode(s) match {
+            val decodedTokenOpt = token.map(s => Algos.decode(s) match {
               case Success(value) => ADKey @@ value
               case Failure(e) => throw new RuntimeException(s"Failed to decode tokeId $s. Cause: $e")
             })
             val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
               .getAllBoxes()
               .collect {
-                case ab: AssetBox if ab.tokenIdOpt.isEmpty ||
-                  Apply[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
+                case ab: AssetBox if ab.tokenIdOpt.isEmpty || ab.tokenIdOpt === decodedTokenOpt => ab
                 case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
               }.foldLeft(List.empty[MonetaryBox]) {
               case (seq, box) if decodedTokenOpt.isEmpty && seq.map(_.amount).sum < (amount + fee) => seq :+ box
               case (seq, _) if decodedTokenOpt.isEmpty => seq
               case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
-                if (seq.collect{ case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < fee) seq :+ box else seq
+                if (seq.collect { case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < fee) seq :+ box else seq
               case (seq, box: AssetBox) =>
                 val totalAmount =
                   seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
-                    seq.collect{ case tib: TokenIssuingBox => tib.amount }.sum
+                    seq.collect { case tib: TokenIssuingBox => tib.amount }.sum
                 if (totalAmount < amount) seq :+ box else seq
               case (seq, box: TokenIssuingBox) =>
                 val totalAmount =
-                  seq.collect{ case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount}.sum +
-                    seq.collect{ case tib: TokenIssuingBox => tib.amount }.sum
+                  seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
+                    seq.collect { case tib: TokenIssuingBox => tib.amount }.sum
                 if (totalAmount < amount) seq :+ box else seq
             }
               .toIndexedSeq
@@ -169,7 +165,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               amount,
               decodedTokenOpt)
           }.toOption
-        }).flatMap {
+      }).flatMap {
         case Some(tx: Transaction) =>
           EncryApp.system.eventStream.publish(NewTransaction(tx))
           Future.unit
@@ -193,8 +189,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
             val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
               .getAllBoxes()
               .collect {
-                case ab: AssetBox if ab.tokenIdOpt.isEmpty ||
-                  Apply[Option].map2(ab.tokenIdOpt, decodedTokenOpt)(_.sameElements(_)).getOrElse(false) => ab
+                case ab: AssetBox if ab.tokenIdOpt.isEmpty || ab.tokenIdOpt === decodedTokenOpt => ab
                 case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
               }.foldLeft(List.empty[MonetaryBox]) {
               case (seq, box) if decodedTokenOpt.isEmpty =>

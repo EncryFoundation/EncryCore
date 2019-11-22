@@ -18,7 +18,7 @@ import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scalatags.Text
 import scalatags.Text.all.{div, td, _}
 import scorex.utils.Random
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
@@ -50,6 +50,14 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     scalatags.Text.all.head(
       meta(charset := "utf-8"),
       meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
+      script(
+        raw("""
+       function encode(){
+       var x = document.forms["myForm2"]["password"].value;
+      window.alert(x);
+      decodeURI(x);
+  }""")
+      ),
       tag("title")(
         "Encry Foundation"
       ),
@@ -92,7 +100,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
             div(cls := "col-lg-5 col-md-7",
               div(cls := "card bg-secondary shadow border-0",
                 div(cls := "card-body px-lg-5 py-lg-5",
-                  form(role := "form", action := "/token", attr("method") := "post",
+                  form(role := "form", id:="myForm2", onsubmit:="encode()", action := "/token", attr("method") := "post",
                     div(cls := "form-group",
                       div(cls := "input-group input-group-alternative",
                         div(cls := "input-group-prepend",
@@ -151,30 +159,29 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   def login: Route = path("login") {
         complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, signUp.render))
   }
-
   def loginRoute: Route =
     (path("token") & post) {
       onComplete(getPass) {
         case Success(pass) =>
-        entity(as[String]) {
-          case x: String if pass.right.get == x.substring(9) =>
-            val token = WebRoute.createToken(x, 1)
-            respondWithHeader(RawHeader("Access-Token", token)) {
-              setCookie(HttpCookie("JWT", value = token)) {
-                redirect("/web", StatusCodes.PermanentRedirect)
+          entity(as[String]) {
+            case s: String  => println(pass + s.substring(9)); complete("ok")
+            case x: String if pass.right.get == x.substring(9) =>
+              val token = WebRoute.createToken(x, 1)
+              respondWithHeader(RawHeader("Access-Token", token)) {
+                setCookie(HttpCookie("JWT", value = token)) {
+                  redirect("/web", StatusCodes.PermanentRedirect)
+                }
               }
-            }
-        }
-        case Failure(exception) =>
-          complete(exception)
+          }
+        case Failure(exception) => complete(exception)
       }
     }
 
   def authenticatedRoute: Route =
     path("web") {
       WebRoute.extractIp(
-          WebRoute.authRoute(
-            onComplete(currentInfoF) {
+        WebRoute.authRoute(
+          onComplete(currentInfoF) {
             case Success(info) =>
               complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2).render))
             case Failure(exception) => complete(exception)
@@ -597,7 +604,7 @@ object WebRoute  {
   }
 
   def extractIp(pingedRoute: Route): Route = extractClientIP { ip =>
-    if (ip.toOption.exists(_.getHostAddress == "127.0.0.1")) pingedRoute
+    if (ip.toOption.exists(x => (x.getHostAddress == "127.0.0.1") || x.getHostAddress == "172.17.0.1")) pingedRoute
     else reject(ValidationRejection("Access denied"))
   }
 

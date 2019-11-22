@@ -13,10 +13,9 @@ import encry.settings.RESTApiSettings
 import io.circe.generic.auto._
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
-import io.circe.Json
 import scala.concurrent.Future
 import scala.language.implicitConversions
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
@@ -305,12 +304,14 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   }
 
   override def route: Route = (path("bannedPeers") & get) {
-   WebRoute.extractIp(
-        onComplete(peersAllF) {
-          case Success(info) =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
-        }
-   )
+    WebRoute.extractIp(
+      onComplete(peersAllF) {
+        case Success(info) =>
+          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+        case Failure(_) =>
+          complete(s"Couldn't load page with banned peers cause of inner system is overloaded. Try it later!")
+      }
+    )
   }
 }
 

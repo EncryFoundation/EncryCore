@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import com.typesafe.scalalogging.StrictLogging
 import encry.Starter.InitNodeResult
+import encry.api.http.ApiRoute
 import encry.settings.RESTApiSettings
 import encry.utils.Mnemonic
 import io.circe.generic.auto._
@@ -16,9 +17,11 @@ import scala.util.{Failure, Success, Try}
 
 case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
   implicit val context: ActorRefFactory
-) extends EncryBaseApiRoute with StrictLogging {
+) extends ApiRoute with StrictLogging {
 
   val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+
+  val apiPort: Int = settings.bindAddress.getPort
 
   val words: String = Mnemonic.getWords.toList.mkString(",")
 
@@ -34,12 +37,56 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           raw(
             """
               function ValidateIPaddress(address) {
-                if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(address)) {
+                if (/^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?):[0-9]{1,5}$/.test(address)) {
                   return true;
                 }
                 alert("You have entered an invalid IP address!");
                 return false;
               }
+            """.stripMargin)
+        ),
+        script(
+          raw(
+            """
+              function disableChecks() {
+                document.getElementById("customRadio3").disabled = true;
+                document.getElementById("customRadio4").disabled = true;
+                document.getElementById("host").disabled = true;
+              }
+            """.stripMargin)
+        ),
+        script(
+          raw(
+            """
+              function enableChecks() {
+                document.getElementById("customRadio3").disabled = false;
+                document.getElementById("customRadio4").disabled = false;
+                document.getElementById("host").disabled = false;
+              }
+            """.stripMargin)
+        ),
+        script(
+          raw(
+            """
+              function AvoidSpace(event) {
+                  var k = event ? event.which : window.event.keyCode;
+                  if (k == 32) return false;
+              }
+            """.stripMargin)
+        ),script(
+          raw(
+            s"""
+              function checkPorts(declaredR, bindR) {
+                                var declaredPort = declaredR.split(":")[1];
+                                var bindPort = bindR.split(":")[1];
+                                if (declaredPort == "${apiPort.toString}") {
+                                  window.alert("Please check your port in declared address. Seems like it's the same as API port.")
+                                  return false;
+                                } else if (bindPort == "${apiPort.toString}") {
+                                  window.alert("Please check your port in bind address. Seems like it's the same as API port.")
+                                  return false;
+                                } else return true;
+                               }
             """.stripMargin)
         ),
         script(
@@ -53,7 +100,6 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                   var check2 = document.querySelector('input[name="custom-radio-2"]:checked').value;
                   var check3 = document.querySelector('input[name="custom-radio-3"]:checked').value;
                   var host = document.forms["myForm"]["host"].value;
-                  var peer = document.forms["myForm"]["port"].value;
                   var node = document.getElementById("nodepass").value;
                   var nodeName= document.getElementById("nodename").value;
                   var declared= document.getElementById("declared").value;
@@ -69,25 +115,39 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                    });
                  }
 
+                 if(nodeName == null) {
+                 window.alert("null")
+                 }
+
+                 if (!(checkPorts(declared, bind))) {
+                 return false;
+                 }
+
                  if (pass == "") {
                     alert("Password must be filled out");
                     return false;
                   }
 
-                 if (!(ValidateIPaddress(host))){
+                 if (host!="" && !(ValidateIPaddress(host))){
+                    return false;
+                  };
+                  if (!(ValidateIPaddress(declared))){
+                    return false;
+                  };
+                  if (!(ValidateIPaddress(bind))){
                     return false;
                   };
 
                 if (mnem == "") {
-                    alert("Please, save it and don't show to anyone! : ${phrase}");
+                    window.alert("Please, save it and don't show to anyone! ${phrase}");
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&peer="+peer+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
+                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
                     request.send();
                     window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
                 } else {
                  if ((mnemToList.length == 12) && arrayContainsArray(str, mnemToList)) {
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+mnem+"&chain="+check1+"&sync="+check2+"&host="+host+"&peer="+peer+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
+                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+mnem+"&chain="+check1+"&sync="+check2+"&host="+host+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
                     request.send();
                     window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
                     } else {
@@ -150,7 +210,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 input(cls := "form-control", placeholder := " Node name", id:="nodename", name:="nodename")
                               )
                             ),
-                              //1.
+                            //1.
                             //2. Declared address
                             h3("2. Set up your declared address (required)"),
                             p("The address at which other nodes connect to yours."),
@@ -158,7 +218,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
                                 ),
-                                input(cls := "form-control", placeholder := " Declared address", id:="declared", name:="declared")
+                                input(cls := "form-control", placeholder := " Declared address", id:="declared", name:="declared", onkeypress:="return AvoidSpace(event)")
                               )
                             ),
                             //2.
@@ -169,11 +229,11 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
                                 ),
-                                input(cls := "form-control", placeholder := " Bind address", id:="bind", name:="bind")
+                                input(cls := "form-control", placeholder := " Bind address", id:="bind", name:="bind", onkeypress:="return AvoidSpace(event)")
                               )
                             ),
                             //3.
-                        // 4. Password
+                            // 4. Password
                             h3("4. Set up your password for node"),
                             p("This password gives you access to front API."),
                             div(cls := "form-group",
@@ -183,7 +243,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                     i(cls := "ni ni-lock-circle-open")
                                   )
                                 ),
-                                input(cls := "form-control", placeholder := "Password", tpe := "password", id:="nodepass", name:="nodepass")
+                                input(cls := "form-control", placeholder := "Password", tpe := "password", id:="nodepass", name:="nodepass", onkeypress:="return AvoidSpace(event)")
                               )
                             ),
                             //4.
@@ -197,13 +257,13 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                   i(cls := "ni ni-lock-circle-open")
                                 )
                               ),
-                              input(cls := "form-control", placeholder := "Password", tpe := "password", id:="password", name:="password")
+                              input(cls := "form-control", placeholder := "Password", tpe := "password", id:="password", name:="password", onkeypress:="return AvoidSpace(event)")
                             )
                           ),
                             // 5.
                             // 6. Enter mnemonic
                             h3("6. Enter your mnemonic if available (leave empty and we'll generate new one for you)"),
-                            p("A mnemonic phrase is a list of 12 words which store all the information needed to recover your bitcoin wallet."),
+                            p("A mnemonic phrase is a list of 12 words which store all the information needed to recover your wallet."),
                               div(cls := "form-group",
                                 div(cls := "input-group input-group-alternative",
                                   div(cls := "input-group-prepend",
@@ -248,48 +308,48 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                 div(cls := "input-group input-group-alternative mb-3",
                                   div(cls := "input-group-prepend",
                                   ),
-                                  input(cls := "form-control", id:="host", name:="host", placeholder := " Address", tpe := "text"),
+                                  input(cls := "form-control", id:="host", name:="host", placeholder := " Address", tpe := "text", onkeypress:="return AvoidSpace(event)"),
                                 )
                               ),
-                              div(cls := "form-group",
-                                div(cls := "input-group input-group-alternative",
-                                  div(cls := "input-group-prepend",
-                                  ),
-                                  input(cls := "form-control", id:="port", name:="port", placeholder := " Port"),
-                                  script(
-                                    raw(
-                                      """
-                  function setInputFilter(textbox, inputFilter) {
-                      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-                        textbox.oldValue = "";
-                         textbox.addEventListener(event, function() {
-                       if (inputFilter(this.value)) {
-                         this.oldValue = this.value;
-                         this.oldSelectionStart = this.selectionStart;
-                         this.oldSelectionEnd = this.selectionEnd;
-                       } else if (this.hasOwnProperty("oldValue")) {
-                         this.value = this.oldValue;
-                         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-                       }
-                    });
-                  });
-                }
-              setInputFilter(document.getElementById("port"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
-              });
-            """.stripMargin)
-                                  ),
-                                )
-                              ),
+//                              div(cls := "form-group",
+//                                div(cls := "input-group input-group-alternative",
+//                                  div(cls := "input-group-prepend",
+//                                  ),
+//                                  input(cls := "form-control", id:="port", name:="port", placeholder := " Port", onkeypress:="return AvoidSpace(event)"),
+//                                  script(
+//                                    raw(
+//                                      """
+//                  function setInputFilter(textbox, inputFilter) {
+//                      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
+//                        textbox.oldValue = "";
+//                         textbox.addEventListener(event, function() {
+//                       if (inputFilter(this.value)) {
+//                         this.oldValue = this.value;
+//                         this.oldSelectionStart = this.selectionStart;
+//                         this.oldSelectionEnd = this.selectionEnd;
+//                       } else if (this.hasOwnProperty("oldValue")) {
+//                         this.value = this.oldValue;
+//                         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
+//                       }
+//                    });
+//                  });
+//                }
+//              setInputFilter(document.getElementById("port"), function(value) {
+//                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
+//              });
+//            """.stripMargin)
+//                                  ),
+//                                )
+//                              ),
                             //9.
-                            // 10.
+                            // 10. max connections
                             h3("10. Set up max connections"),
                             p("Maximum number of connections with other nodes."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
                                 ),
-                                input(cls := "form-control", id:="maxconnect", name:="maxconnect", placeholder := " Max connections (max = 30)"),
+                                input(cls := "form-control", id:="maxconnect", name:="maxconnect", placeholder := " Max connections (max = 30)", onkeypress:="return AvoidSpace(event)"),
                                 script(
                                   raw(
                                     """
@@ -316,14 +376,14 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                               )
                             ),
                             //10.
-                            // 11. Workers amount
+                            // 11. Workers quantity
                             h3("11. Set up amount of workers"),
                             p("How many threads do you want to allocate for your mining."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
                                 ),
-                                input(cls := "form-control", id:="worker", name:="worker", placeholder := " Workers (max = 10)"),
+                                input(cls := "form-control", id:="worker", name:="worker", placeholder := " Workers (max = 10)"),  onkeypress:="return AvoidSpace(event)",
                                 script(
                                   raw(
                                     """function setInputFilter(textbox, inputFilter) {
@@ -417,8 +477,8 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
   }
 
   def sendAllInfo: Route = (path("collect") & get) {
-    parameters('password, 'mnem, 'chain, 'sync, 'host, 'peer, 'cwp, 'nodePass, 'nodeName, 'declared, 'bind) {
-      (password, mnemonic, chain, sync, host, peer, cwp, nodePass, nodeName, declaredAddr, bindAddr) =>
+    parameters('password, 'mnem, 'chain, 'sync, 'host, 'cwp, 'nodePass, 'nodeName, 'declared, 'bind) {
+      (password, mnemonic, chain, sync, host, cwp, nodePass, nodeName, declaredAddr, bindAddr) =>
 
         val chainR: Boolean = chain match {
           case "Yes" => true
@@ -428,7 +488,13 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           case "Fast" => true
           case "Normal" => false
         }
-        val peerR: InetSocketAddress = new InetSocketAddress(host, peer.toInt)
+        val peerR = Try {
+          val peerSpl = host.split(":")
+          (peerSpl(0), peerSpl(1).toInt)
+        } match {
+          case Success((hostS, port)) => List(new InetSocketAddress(hostS, port))
+          case Failure(_) =>  List.empty[InetSocketAddress]
+        }
 
         val cwpR: Boolean = cwp match {
           case "true" => true
@@ -450,7 +516,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           case Failure(_) => new InetSocketAddress("0.0.0.0", 9001)
         }
 
-        starter ! InitNodeResult(mnemonic, password, chainR, syncR, List(peerR), cwpR, nodePass, nodeName, declared, bind)
+        starter ! InitNodeResult(mnemonic, password, chainR, syncR, peerR, cwpR, nodePass, nodeName, declared, bind)
         complete("OK")
     }
   }

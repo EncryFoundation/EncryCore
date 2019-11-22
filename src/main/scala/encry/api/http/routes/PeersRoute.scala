@@ -6,26 +6,20 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetAllPeers, GetViewGetBalance, GetViewPrintPubKeys}
+import encry.api.http.DataHolderForApi.GetAllPeers
 import encry.settings.{NodeSettings, RESTApiSettings}
-import io.circe.Json
 import io.circe.generic.auto._
-import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
 import scala.concurrent.Future
 import scala.language.implicitConversions
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
   def peersAllF: Future[Seq[InetSocketAddress]] = (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]]
-
-  def info: Future[Seq[InetSocketAddress]] = for {
-    peerAll <- peersAllF
-  } yield peerAll
 
   def peerScript(peers: Seq[InetSocketAddress] ): Text.TypedTag[String] = {
 
@@ -220,9 +214,10 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
 
   override def route: Route = (path("allPeers") & get) {
     WebRoute.extractIp(
-        onComplete(info) {
+        onComplete(peersAllF) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+          case Failure(_) => complete("Couldn't load page with peers cause of inner system is overloaded. Try it later!")
         }
     )
   }

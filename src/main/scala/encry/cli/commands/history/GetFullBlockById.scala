@@ -3,7 +3,7 @@ package encry.cli.commands.history
 import akka.actor.ActorRef
 import akka.util.Timeout
 import encry.api.http.DataHolderForApi.GetFullBlockByIdCommand
-import encry.cli.{ Ast, Response }
+import encry.cli.{Ast, Response}
 import encry.cli.commands.Command
 import encry.settings.EncryAppSettings
 import akka.pattern._
@@ -26,8 +26,8 @@ object GetFullBlockById extends Command {
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
 
-    val num = args.requireArg[Ast.Str]("modifier").s
+    val mod = args.requireArg[Ast.Str]("modifier").s
 
-    (dataHolder ? GetFullBlockByIdCommand(Left(num))).mapTo[Option[Block]].map(x => Some(Response(x.asJson.toString())))
+    (dataHolder ? GetFullBlockByIdCommand(Left(mod))).mapTo[Option[Block]].map(x => Some(Response(x.asJson.toString())))
   }
 }

@@ -1,38 +1,35 @@
 package encry
 
-import akka.actor.{ Actor, ActorRef }
-import encry.settings.{ EncryAppSettings, NetworkSettings, NodeSettings, SnapshotSettings, WalletSettings }
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
-
+import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.Http
+import cats.Functor
+import cats.data.{NonEmptyChain, Validated}
+import cats.instances.future._
+import cats.instances.option._
+import cats.instances.string._
+import cats.syntax.apply._
+import cats.syntax.either._
+import cats.syntax.option._
+import cats.syntax.validated._
+import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
+import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{ prompt, StartListening }
+import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
-import encry.utils.{ Mnemonic, NetworkTimeProvider }
+import encry.settings._
+import encry.utils.{Mnemonic, NetworkTimeProvider}
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
-import cats.Functor
-import cats.syntax.option._
-import cats.syntax.either._
-import cats.data.{ NonEmptyChain, Validated }
-import cats.syntax.validated._
-import cats.instances.string._
-import cats.syntax.apply._
-import cats.instances.option._
-import cats.instances.future._
-
-import scala.concurrent.Future
-import encry.Starter.InitNodeResult
-import encry.api.http.DataHolderForApi.PassForStorage
 import encry.view.wallet.AccountManager
-
+import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
@@ -154,7 +151,7 @@ class Starter(settings: EncryAppSettings,
     def readPeersToConnect: Either[Throwable, List[InetSocketAddress]] = {
       def loop(peers: List[InetSocketAddress]): Either[Throwable, List[InetSocketAddress]] = {
         def handleError: Throwable => Either[Throwable, List[InetSocketAddress]] = (ex: Throwable) => {
-          println(s"You entered incorrect input cause: $ex. Enter it again")
+          println(s"You entered incorrect input cause: ${ex.getMessage}. Enter it again")
           loop(peers)
         }
         def handleResult: InetSocketAddress => Either[Throwable, List[InetSocketAddress]] =
@@ -167,11 +164,17 @@ class Starter(settings: EncryAppSettings,
             }
           }
         Either.catchNonFatal {
-          println("Enter port:")
-          val port = StdIn.readLine(prompt).toInt
-          println("Enter host:")
-          val host = StdIn.readLine(prompt)
-          new InetSocketAddress(host, port)
+          println("Enter address:")
+          val addr = StdIn.readLine(prompt)
+          Try {
+            val split = addr.split(':')
+            (split(0), split(1).toInt)
+          } match {
+            case Success((host, port)) =>
+              new InetSocketAddress(host, port)
+            case Failure(_) =>
+              throw new Exception("Invalid address")
+          }
         }.fold(handleError, handleResult)
       }
 
@@ -181,18 +184,23 @@ class Starter(settings: EncryAppSettings,
     def readDeclaredAddress: Either[Throwable, List[InetSocketAddress]] = {
       def loop(peers: List[InetSocketAddress]): Either[Throwable, List[InetSocketAddress]] = {
         def handleError: Throwable => Either[Throwable, List[InetSocketAddress]] = (ex: Throwable) => {
-          println(s"You entered incorrect input cause: $ex. Enter it again")
+          println(s"You entered incorrect input cause: ${ex.getMessage}. Enter it again")
           loop(peers)
         }
         def handleResult: InetSocketAddress => Either[Throwable, List[InetSocketAddress]] =
           (peer: InetSocketAddress) => {(peers :+ peer).asRight[Throwable]
           }
         Either.catchNonFatal {
-          println("Enter port:")
-          val port = StdIn.readLine(prompt).toInt
-          println("Enter host:")
-          val host = StdIn.readLine(prompt)
-          new InetSocketAddress(host, port)
+          val addr = StdIn.readLine(prompt)
+          Try {
+            val split = addr.split(':')
+            (split(0), split(1).toInt)
+          } match {
+            case Success((host, port)) =>
+              new InetSocketAddress(host, port)
+            case Failure(_) =>
+              throw new Exception("Invalid address")
+          }
         }.fold(handleError, handleResult)
       }
 
@@ -210,11 +218,11 @@ class Starter(settings: EncryAppSettings,
                       readAndValidateInput(validateMnemonicKey)
                     } else {
                       val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-                      println(s"\nYour new mnemonic code is:\n$phrase. Please, save it and don't show to anyone!")
+                      println(s"\nYour new mnemonic code is:\n<$phrase> \nPlease, save it and don't show to anyone!")
                       phrase.asRight[Throwable]
                     }
       startOwnChain <- {
-        println("Would you like to start your own chain? yes - if start your won, otherwise no")
+        println("\nWould you like to start your own chain? yes - if start your own, otherwise no")
         readAnswer
       }
       enableFastSync <- if (startOwnChain) false.asRight[Throwable]
@@ -223,8 +231,11 @@ class Starter(settings: EncryAppSettings,
                          readAnswer
                        }
       answerPeers <- {
-        println("Would you like to enter peers to connect with? yes or no")
-        readAnswer
+        if (startOwnChain) false.asRight[Throwable]
+        else {
+          println("Would you like to enter peers to connect with? yes or no")
+          readAnswer
+        }
       }
       peers <- if (answerPeers) readPeersToConnect else List.empty[InetSocketAddress].asRight[Throwable]
       connectWithOnlyKnownPeers <- {

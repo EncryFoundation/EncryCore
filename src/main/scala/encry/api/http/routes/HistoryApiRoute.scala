@@ -13,7 +13,6 @@ import encry.api.http.DataHolderForApi.{
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.RESTApiSettings
 import encry.view.history.History
-import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.utils.Algos
