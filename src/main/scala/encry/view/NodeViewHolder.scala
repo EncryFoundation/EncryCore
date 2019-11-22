@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -24,17 +25,14 @@ import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import encry.view.history.History
-import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state._
-import encry.view.wallet.EncryWallet
+import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
