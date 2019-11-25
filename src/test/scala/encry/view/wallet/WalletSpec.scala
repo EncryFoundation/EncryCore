@@ -123,7 +123,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val validTxs1: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty, keyManagerOne.mandatoryAccount.publicImage.address.address)
     val validTxs2: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 1, keyManagerTwo.mandatoryAccount.publicImage.address.address)
     val validTxs3: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 2, extraAcc.publicImage.address.address)
-    val validTxstoOther: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 3, "9fRWpnERVQKzR14qN5EGknx8xk11SU6LoZxcJAc53uAv3HRbL4K")
+    val validTxstoOther: Seq[Transaction] = genValidPaymentTxsToAddr(txsQty - 3, randomAddress)
 
     val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs1 ++ validTxs2 ++ validTxs3 ++ validTxstoOther)
 

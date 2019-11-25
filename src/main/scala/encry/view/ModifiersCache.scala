@@ -17,12 +17,16 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-  val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
-  private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
+  val cache: TrieMap[Key, (PersistentModifier, Array[Byte])] = TrieMap.empty
+  private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap.empty[Int, List[ModifierId]]
 
   private var isChainSynced = false
 
+  private var isFastSync = settings.snapshotSettings.enableFastSynchronization
+
   def setChainSynced(): Unit = isChainSynced = true
+
+  def finishFastSync(): Unit = isFastSync = false
 
   def size: Int = cache.size
 
@@ -30,9 +34,9 @@ object ModifiersCache extends StrictLogging {
 
   def contains(key: Key): Boolean = cache.contains(key)
 
-  def put(key: Key, value: PersistentModifier, history: History): Unit = if (!contains(key)) {
+  def put(key: Key, value: PersistentModifier, bytes: Array[Byte], history: History): Unit = if (!contains(key)) {
     logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
-    cache.put(key, value)
+    cache.put(key, value -> bytes)
     value match {
       case header: Header =>
         val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(header.height, List())
@@ -43,7 +47,7 @@ object ModifiersCache extends StrictLogging {
       case _ =>
     }
 
-    if (size > history.settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
+    if (size > history.settings.node.modifiersCacheSize) cache.find { case (_, (modifier, _)) =>
       history.testApplicable(modifier) match {
         case Right(_) | Left(_: NonFatalValidationError) => false
         case _ => true
@@ -51,12 +55,12 @@ object ModifiersCache extends StrictLogging {
     }.map(mod => remove(mod._1))
   }
 
-  def remove(key: Key): Option[PersistentModifier] = {
+  def remove(key: Key): Option[(PersistentModifier, Array[Byte])] = {
     logger.debug(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
     cache.remove(key)
   }
 
-  def popCandidate(history: History): List[PersistentModifier] = synchronized {
+  def popCandidate(history: History): List[(PersistentModifier, Array[Byte])] = synchronized {
     findCandidateKey(history).flatMap(k => remove(k))
   }
 
@@ -64,7 +68,7 @@ object ModifiersCache extends StrictLogging {
 
   def findCandidateKey(history: History): List[Key] = {
 
-    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
+    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier._1) match {
       case Left(_: FatalValidationError) => remove(key); false
       case Right(_)                      => true
       case Left(_)                       => false
@@ -89,7 +93,7 @@ object ModifiersCache extends StrictLogging {
       }
       }.toList
 
-    def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
+    def exhaustiveSearch: List[Key] = List(cache.find { case (k, (v, _)) =>
       v match {
         case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
         case _ =>
@@ -113,7 +117,7 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
           logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
-            case Some(v: Header)
+            case Some((v: Header, _))
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
                 (history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
@@ -139,8 +143,8 @@ object ModifiersCache extends StrictLogging {
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isFullChainSynced => exhaustiveSearch
         case _ if history.isHeadersChainSynced =>
-          if (settings.snapshotSettings.enableFastSynchronization) exhaustiveSearch
-          else List.empty[Key]
+          if (isFastSync) List.empty[Key]
+          else exhaustiveSearch
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>

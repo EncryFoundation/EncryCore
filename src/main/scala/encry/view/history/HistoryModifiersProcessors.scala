@@ -5,7 +5,7 @@ import encry.EncryApp.forceStopApplication
 import encry.consensus.ConsensusSchemeReaders
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.modifiers.history.HeaderChain
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
@@ -35,6 +35,21 @@ trait HistoryModifiersProcessors extends HistoryApi {
       processBlock(block).some
     }
     .getOrElse(putToHistory(payload))
+
+  def processPayloadFastSync(payload: Payload, raw: Array[Byte]): Unit = {
+    val startTime: Long = System.currentTimeMillis()
+    getBlockByPayload(payload).foreach { block =>
+      historyStorage.inserFastSync(payload.id, Seq(BestBlockKey -> payload.headerId), Seq(payload.id -> raw))
+      blockDownloadProcessor.updateBestBlock(block.header)
+      logger.info(s"BlockDownloadProcessor updated block at height ${block.header.height} successfully")
+      historyStorage.insert(
+        StorageVersion @@ validityKey(block.header.id).untag(StorageKey),
+        List(block.header.id, block.payload.id).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+      )
+      logger.info(s"Finished processing block ${block.encodedId}. " +
+        s"Processing time is ${(System.currentTimeMillis() - startTime) / 1000} s")
+    }
+  }
 
   private def processBlock(blockToProcess: Block): ProgressInfo = {
     logger.info(s"Starting processing block to history ||${blockToProcess.encodedId}||${blockToProcess.header.height}||")

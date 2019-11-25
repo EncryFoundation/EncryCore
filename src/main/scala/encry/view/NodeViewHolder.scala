@@ -60,7 +60,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
 
-  var applicationsSuccessful: Boolean = true
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
   nodeViewSynchronizer ! ChangedHistory(nodeView.history)
 
@@ -74,7 +73,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       s" Best header at best block height ${nodeView.history.getBestBlock.flatMap(b =>
         nodeView.history.getBestHeaderAtHeight(b.header.height)
       ).map(l => l.encodedId -> Algos.encode(l.payloadId))}")
-    ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.state.height)
   })
 
   override def preStart(): Unit = logger.info(s"Node view holder started.")
@@ -91,15 +89,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     logger.warn(s"Stopping NodeViewHolder...")
     nodeView.history.closeStorage()
   }
-  var isHeaderChainSyncedLocal: Boolean = false
 
-  override def receive: Receive =
-    if (settings.snapshotSettings.enableFastSynchronization && !nodeView.history.isBestBlockDefined)
-      defaultMessages(canProcessPayloads = false)
-    else
-      defaultMessages(canProcessPayloads = true)
-
-  def defaultMessages(canProcessPayloads: Boolean): Receive = {
+  override def receive: Receive = {
     case CreateAccountManagerFromSeed(seed) =>
       val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)
@@ -110,26 +101,25 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
         nodeView.history.getBestHeaderAtHeight(state.height).foreach { h =>
           logger.info(s"Updated best block in fast sync mod. Updated state height.")
-          nodeView.history.blockDownloadProcessor.updateBestBlock(h)
           nodeView.history.isHeadersChainSyncedVar = true
-          nodeView.history.isFastSync = false
-          val history = nodeView.history.reportModifierIsValidFastSync(h.id, h.payloadId)
+          nodeView.history.fastSyncInProgress = false
+          ModifiersCache.finishFastSync()
+          logger.info(s"Start wallet scanning")
           val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
+          logger.info(s"Finished wallet scanning")
           updateNodeView(
-            updatedHistory = Some(history),
             updatedState = Some(state),
             updatedVault = Some(wallet)
           )
           nodeViewSynchronizer ! FastSyncDone
-          context.become(defaultMessages(true))
         }
-    case ModifierFromRemote(mod) =>
+    case ModifierFromRemote(mod, bytes) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
       if (isInHistory || isInCache)
         logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      else ModifiersCache.put(key(mod.id), mod, bytes, nodeView.history)
       computeApplications()
 
     case lm: LocallyGeneratedModifier =>
@@ -138,10 +128,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       lm.pmod match {
         case block: Block =>
-          pmodModify(block.header, isLocallyGenerated = true)
-          pmodModify(block.payload, isLocallyGenerated = true)
+          pmodModify(block.header, Array.emptyByteArray, isLocallyGenerated = true)
+          pmodModify(block.payload, Array.emptyByteArray, isLocallyGenerated = true)
         case anyMod =>
-          pmodModify(anyMod, isLocallyGenerated = true)
+          pmodModify(anyMod, Array.emptyByteArray, isLocallyGenerated = true)
       }
       logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
@@ -156,8 +146,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (history) sender() ! ChangedHistory(nodeView.history)
       if (state) sender() ! ChangedState(nodeView.state)
 
-    case CompareViews(peer, modifierTypeId, modifierIds)
-      if (modifierTypeId == Payload.modifierTypeId && canProcessPayloads) || modifierTypeId != Payload.modifierTypeId =>
+    case CompareViews(peer, modifierTypeId, modifierIds) =>
       logger.info(s"Start processing CompareViews message on NVH.")
       val startTime = System.currentTimeMillis()
       val ids: Seq[ModifierId] = modifierTypeId match {
@@ -172,7 +161,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         sender() ! RequestFromLocal(peer, modifierTypeId, ids)
       logger.debug(s"Time processing of msg CompareViews from $sender with modTypeId $modifierTypeId: ${System.currentTimeMillis() - startTime}")
     case SemanticallySuccessfulModifier(_) =>
-    case CompareViews(_, _, _) =>
     case msg => logger.error(s"Got strange message on nvh: $msg")
   }
 
@@ -180,8 +168,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def computeApplications(): Unit = {
     val mods = ModifiersCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
-      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
-      mods.foreach(mod => pmodModify(mod))
+      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod._1.id))}")
+      mods.foreach(mod => pmodModify(mod._1, mod._2))
       computeApplications()
     }
     else Unit
@@ -258,7 +246,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                       logger.info(s"Sent to snapshot holder new required manifest height $requiredHeight. " +
                         s"header id ${h.encodedId}, state root ${Algos.encode(h.stateRoot)}" +
                         s"\n\n\n header - $h \n\n\n")
-                      nodeViewSynchronizer ! RequiredManifestHeightAndId(requiredHeight, Algos.hash(h.stateRoot ++ h.id))
+                      newHis.heightOfLastAvailablePayloadForRequest = requiredHeight
+                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${
+                        newHis.heightOfLastAvailablePayloadForRequest
+                      }")
                     }
                   }
                 case _ =>
@@ -272,7 +263,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 import encry.view.state.avlTree.utils.implicits.Instances._
                 newHis.getBestBlock.foreach { b =>
                   val chunks: List[SnapshotChunk] =
-                    AvlTree.getChunks(stateAfterApply.tree.rootNode, currentChunkHeight = 1, stateAfterApply.tree.storage)
+                    AvlTree.getChunks(
+                      stateAfterApply.tree.rootNode,
+                      currentChunkHeight = settings.snapshotSettings.chunkDepth,
+                      stateAfterApply.tree.storage
+                    )
                   val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
                   nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
                 }
@@ -280,9 +275,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
               }
 
-              influxRef.foreach(ref =>
-                ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, stateAfterApply.height)
-              )
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
@@ -306,69 +298,100 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     }
   }
 
-  def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
+  def pmodModify(pmod: PersistentModifier, bytes: Array[Byte], isLocallyGenerated: Boolean = false): Unit =
     if (!nodeView.history.isModifierDefined(pmod.id)) {
       logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
       val startAppHistory = System.currentTimeMillis()
       if (settings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
-      nodeView.history.append(pmod) match {
-        case Right((historyBeforeStUpdate, progressInfo)) =>
-          logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
-          logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
-          influxRef.foreach { ref =>
-            ref ! EndOfApplyingModifier(pmod.id)
-            val isHeader: Boolean = pmod match {
-              case _: Header => true
-              case _: Payload => false
-            }
-            ref ! ModifierAppendedToHistory(isHeader, success = true)
-          }
-          logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
-          if (progressInfo.toApply.nonEmpty) {
-            logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
-            val startPoint: Long = System.currentTimeMillis()
-            val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
-              updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
-            influxRef.foreach(_ ! HeightStatistics(newHistory.getBestHeaderHeight, newHistory.getBestBlockHeight))
-            if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
-            influxRef.foreach { ref =>
-              logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
-              ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)
-            }
-            if (settings.influxDB.isDefined)
-              context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
-            influxRef.foreach { ref =>
-              val isBlock: Boolean = pmod match {
-                case _: Payload => true
-                case _ => false
-              }
-              if (isBlock) ref ! ModifierAppendedToState(success = true)
-            }
-            sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
-            if (progressInfo.chainSwitchingNeeded)
-              nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
-            blocksApplied.foreach(nodeView.wallet.scanPersistent)
-            logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-            if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
-              context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-            if (newHistory.isFullChainSynced) {
-              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
-              ModifiersCache.setChainSynced()
-              Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
-            }
-            updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
-          } else {
-            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
+      if (pmod.modifierTypeId == Payload.modifierTypeId && nodeView.history.fastSyncInProgress) {
+        pmod match {
+          case p: Payload =>
+            nodeView.history.processPayloadFastSync(p, bytes)
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-            logger.info(s"\nProgress info is empty")
-            updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
-          }
-        case Left(e) =>
-          logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
-            s" to history caused $e")
-          context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
+            if (nodeView.history.getBestBlockHeight >= nodeView.history.heightOfLastAvailablePayloadForRequest) {
+              logger.info(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
+              logger.info(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${nodeView.history.heightOfLastAvailablePayloadForRequest}")
+              nodeView.history.getBestHeaderAtHeight(nodeView.history.heightOfLastAvailablePayloadForRequest)
+                .foreach { h =>
+                  nodeViewSynchronizer ! RequiredManifestHeightAndId(
+                    nodeView.history.heightOfLastAvailablePayloadForRequest,
+                    Algos.hash(h.stateRoot ++ h.id)
+                  )
+                }
+            }
+            influxRef.foreach { ref =>
+              ref ! EndOfApplyingModifier(pmod.id)
+              val isHeader: Boolean = pmod match {
+                case _: Header => true
+                case _: Payload => false
+              }
+              ref ! ModifierAppendedToHistory(isHeader, success = true)
+              ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
+            }
+        }
+      } else {
+        nodeView.history.append(pmod) match {
+          case Right((historyBeforeStUpdate, progressInfo)) =>
+            logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+            logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+            influxRef.foreach { ref =>
+              ref ! EndOfApplyingModifier(pmod.id)
+              val isHeader: Boolean = pmod match {
+                case _: Header => true
+                case _: Payload => false
+              }
+              ref ! ModifierAppendedToHistory(isHeader, success = true)
+            }
+            logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+            if (progressInfo.toApply.nonEmpty) {
+              logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
+              val startPoint: Long = System.currentTimeMillis()
+              val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
+                updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+              if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
+              influxRef.foreach { ref =>
+                logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
+                ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)
+              }
+              if (settings.influxDB.isDefined)
+                context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+              influxRef.foreach { ref =>
+                val isBlock: Boolean = pmod match {
+                  case _: Payload => true
+                  case _ => false
+                }
+                if (isBlock) ref ! ModifierAppendedToState(success = true)
+              }
+              sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
+              if (progressInfo.chainSwitchingNeeded)
+                nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
+              blocksApplied.foreach(nodeView.wallet.scanPersistent)
+              logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+              if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
+                context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
+              if (newHistory.isFullChainSynced) {
+                logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
+                ModifiersCache.setChainSynced()
+                Seq(nodeViewSynchronizer, miner).foreach(_ ! FullBlockChainIsSynced)
+              }
+              updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
+            } else {
+              influxRef.foreach { ref =>
+                logger.info(s"send info 3. about ${historyBeforeStUpdate.getBestHeaderHeight} | ${historyBeforeStUpdate.getBestBlockHeight}")
+                ref ! HeightStatistics(historyBeforeStUpdate.getBestHeaderHeight, nodeView.state.height)
+              }
+              if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
+              context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
+              logger.info(s"\nProgress info is empty")
+              updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
+            }
+          case Left(e) =>
+            logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+              s" to history caused $e")
+            context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
+        }
       }
     } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
 
@@ -485,7 +508,7 @@ object NodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
+    final case class ModifierFromRemote(serializedModifiers: PersistentModifier, bytes: Array[Byte])
 
     case class LocallyGeneratedModifier(pmod: PersistentModifier)
 
