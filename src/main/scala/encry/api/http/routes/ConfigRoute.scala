@@ -71,6 +71,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
               function AvoidSpace(event) {
                   var k = event ? event.which : window.event.keyCode;
                   if (k == 32) return false;
+                  if(k == 37) return false;
               }
             """.stripMargin)
         ),script(

@@ -91,26 +91,13 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
               // Collapse header
               div(cls := "navbar-collapse-header d-md-none",
                 div(cls := "row",
-                  div(cls := "col-6 collapse-brand",
-                    a(href := "./index.html",
-                      img(src := "argon/assets/img/brand/blue.png")
-                    )
-                  ),
                   div(cls := "col-6 collapse-close",
+                    a(href := "/web",
+                      img(src := "argon/assets/img/brand/encry-logo.png")
+                    ),
                     button(tpe := "button", cls := "navbar-toggler", data("toggle") := "collapse", data("target") := "#sidenav-collapse-main", aria.controls := "sidenav-main", aria.expanded := "false", aria.label := "Toggle sidenav",
                       span(),
                       span()
-                    )
-                  )
-                )
-              ),
-              // Form
-              form(cls := "mt-4 mb-3 d-md-none",
-                div(cls := "input-group input-group-rounded input-group-merge",
-                  input(tpe := "search", cls := "form-control form-control-rounded form-control-prepended", placeholder := "Search", aria.label := "Search"),
-                  div(cls := "input-group-prepend",
-                    div(cls := "input-group-text",
-                      span(cls := "fa fa-search")
                     )
                   )
                 )

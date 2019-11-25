@@ -1,5 +1,6 @@
 package encry.api.http.routes
 
+import java.net.URLDecoder
 import java.security.Security
 import java.util.concurrent.TimeUnit
 import akka.actor.{ActorRef, ActorRefFactory}
@@ -50,14 +51,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     scalatags.Text.all.head(
       meta(charset := "utf-8"),
       meta(name := "viewport", content := "width=device-width, initial-scale=1, shrink-to-fit=no"),
-      script(
-        raw("""
-       function encode(){
-       var x = document.forms["myForm2"]["password"].value;
-      window.alert(x);
-      decodeURI(x);
-  }""")
-      ),
+
       tag("title")(
         "Encry Foundation"
       ),
@@ -100,7 +94,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
             div(cls := "col-lg-5 col-md-7",
               div(cls := "card bg-secondary shadow border-0",
                 div(cls := "card-body px-lg-5 py-lg-5",
-                  form(role := "form", id:="myForm2", onsubmit:="encode()", action := "/token", attr("method") := "post",
+                  form(role := "form", id:="myForm2", action := "/token", attr("method") := "post",
                     div(cls := "form-group",
                       div(cls := "input-group input-group-alternative",
                         div(cls := "input-group-prepend",
@@ -163,15 +157,17 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     (path("token") & post) {
       onComplete(getPass) {
         case Success(pass) =>
-          entity(as[String]) {
-            case s: String  => println(pass + s.substring(9)); complete("ok")
-            case x: String if pass.right.get == x.substring(9) =>
-              val token = WebRoute.createToken(x, 1)
-              respondWithHeader(RawHeader("Access-Token", token)) {
-                setCookie(HttpCookie("JWT", value = token)) {
-                  redirect("/web", StatusCodes.PermanentRedirect)
+          entity(as[String]) { urlPass =>
+              val decodedStr = URLDecoder.decode(urlPass, "UTF-8")
+              val receivedPass = decodedStr.substring(9)
+              if (pass.right.get == receivedPass) {
+                val token = WebRoute.createToken(receivedPass, 1)
+                respondWithHeader(RawHeader("Access-Token", token)) {
+                  setCookie(HttpCookie("JWT", value = token)) {
+                    redirect("/web", StatusCodes.PermanentRedirect)
+                  }
                 }
-              }
+              } else complete(s"Incorrect password: ${pass.right.get} / ${URLDecoder.decode(urlPass.toString, "UTF-8")}")
           }
         case Failure(exception) => complete(exception)
       }
@@ -268,25 +264,14 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
               div(cls := "navbar-collapse-header d-md-none",
                 div(cls := "row",
                   div(cls := "col-6 collapse-brand",
-                    a(href := "./index.html",
-                      img(src := "argon/assets/img/brand/blue.png")
+                    a(href := "/web",
+                      img(src := "argon/assets/img/brand/encry-logo.png")
                     )
                   ),
                   div(cls := "col-6 collapse-close",
                     button(tpe := "button", cls := "navbar-toggler", data("toggle") := "collapse", data("target") := "#sidenav-collapse-main", aria.controls := "sidenav-main", aria.expanded := "false", aria.label := "Toggle sidenav",
                       scalatags.Text.tags.span(),
                       scalatags.Text.tags.span()
-                    )
-                  )
-                )
-              ),
-              // Form
-              form(cls := "mt-4 mb-3 d-md-none",
-                div(cls := "input-group input-group-rounded input-group-merge",
-                  input(tpe := "search", cls := "form-control form-control-rounded form-control-prepended", placeholder := "Search", aria.label := "Search"),
-                  div(cls := "input-group-prepend",
-                    div(cls := "input-group-text",
-                      scalatags.Text.tags.span(cls := "fa fa-search")
                     )
                   )
                 )
