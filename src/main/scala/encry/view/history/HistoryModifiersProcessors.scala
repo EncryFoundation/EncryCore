@@ -39,11 +39,11 @@ trait HistoryModifiersProcessors extends HistoryApi {
   def processPayloadFastSync(payload: Payload, raw: Array[Byte]): Unit = {
     val startTime: Long = System.currentTimeMillis()
     getBlockByPayload(payload).foreach { block =>
-      historyStorage.inserFastSync(payload.id, Seq(BestBlockKey -> payload.headerId), Seq(payload.id -> raw))
+      historyStorage.insertFastSync(payload.id, Seq(BestBlockKey -> payload.headerId), Seq(payload.id -> raw))
       blockDownloadProcessor.updateBestBlock(block.header)
       logger.info(s"BlockDownloadProcessor updated block at height ${block.header.height} successfully")
       historyStorage.insert(
-        StorageVersion @@ validityKey(block.header.id).untag(StorageKey),
+        StorageVersion @@ validityKey(block.payload.id).untag(StorageKey),
         List(block.header.id, block.payload.id).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
       )
       logger.info(s"Finished processing block ${block.encodedId}. " +
