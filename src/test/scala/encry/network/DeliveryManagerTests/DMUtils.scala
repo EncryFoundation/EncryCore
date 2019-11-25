@@ -1,6 +1,8 @@
 package encry.network.DeliveryManagerTests
 
+import java.io.File
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.local.miner.Miner.{DisableMining, StartMining}
@@ -10,10 +12,18 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.utils.FileHelper
+import encry.view.fast.sync.FastSyncTestsUtils.settings
 import encry.view.history.History
+import encry.view.state.avlTree.AvlTree
 import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.iq80.leveldb.Options
+
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 
@@ -43,6 +53,36 @@ object DMUtils extends InstanceFactory {
         val a = prevHistory.reportModifierIsValid(block)
         (a, blocks :+ block)
     }
+
+  def generateBlocksWithTree(qty: Int,
+                             history: History,
+                             prevTreeOpt: Option[AvlTree[StorageKey, StorageValue]] = None,
+                             addressOpt: Option[Address] = None): (History, List[Block], AvlTree[StorageKey, StorageValue]) = {
+
+    import encry.view.state.avlTree.utils.implicits.Instances._
+
+    val avl: AvlTree[StorageKey, StorageValue] = prevTreeOpt match {
+      case Some(t) => t
+      case None =>
+        val dir: File = FileHelper.getRandomTempDir
+        val storage: VLDBWrapper = {
+          val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+        }
+
+        AvlTree[StorageKey, StorageValue](storage)
+    }
+
+    (0 until qty).foldLeft(history, List.empty[Block], avl) {
+      case ((prevHistory, blocks, tree), _) =>
+        val (block: Block, newTree: AvlTree[StorageKey, StorageValue]) =
+          generateNextBlockAndInsert(prevHistory, tree, prevTreeOpt.isEmpty, addressOpt = addressOpt)
+        prevHistory.append(block.header)
+        prevHistory.append(block.payload)
+        val newHist = prevHistory.reportModifierIsValid(block)
+        (newHist, blocks :+ block, newTree)
+    }
+  }
 
   def toKey(id: ModifierId): WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 

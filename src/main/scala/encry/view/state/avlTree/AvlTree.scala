@@ -182,6 +182,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     kSer: Serializer[K],
     vSer: Serializer[V]
   ): (Option[Node[K, V]]) = node match {
+    case _: EmptyNode[K, V] => None
     case shadowNode: ShadowNode[K, V] =>
       val restoredNode = shadowNode.restoreFullNode(storage)
       delete(restoredNode, key)
@@ -498,6 +499,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     }
 
   def selfInspectionAfterFastSync(implicit kSer: Serializer[K]): Boolean = {
+
     @scala.annotation.tailrec
     def loop(nodesToProcess: List[Node[K, V]], keysToInspect: List[Array[Byte]]): List[Array[Byte]] =
       if (nodesToProcess.nonEmpty) nodesToProcess.head match {
@@ -520,10 +522,13 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
           loop(updatedNodeToProcess ::: next, Algos.hash(kSer.toBytes(i.key).reverse) :: i.hash :: current ::: keysToInspect)
         case l: LeafNode[K, V] => loop(nodesToProcess.drop(1), Algos.hash(kSer.toBytes(l.key).reverse) :: l.hash :: keysToInspect)
       } else keysToInspect
+
     val keys: Set[ByteArrayWrapper] = loop(List(rootNode), List.empty).map(ByteArrayWrapper(_)).toSet
+
     val allKeysFromDB: Set[ByteArrayWrapper] = storage.getAllKeys(-1)
       .map(ByteArrayWrapper(_)).toSet - ByteArrayWrapper(UtxoState.bestHeightKey) - ByteArrayWrapper(AvlTree.rootNodeKey)
     logger.debug(s"${keys.map(l => Algos.encode(l.data))}")
+
     (allKeysFromDB -- keys).isEmpty
   }
 

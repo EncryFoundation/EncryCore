@@ -1,46 +1,30 @@
 package encry.view.fast.sync
 
 import java.io.File
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
-import encry.view.state.UtxoState
-import org.encryfoundation.common.modifiers.history.Block
-import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
-import encry.storage.VersionalStorage
-import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
-import encry.view.fast.sync.SnapshotHolder.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
-import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
-import org.encryfoundation.common.utils.Algos
-import scorex.utils.Random
-import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
-import org.iq80.leveldb.{ DB, Options }
+
 import cats.syntax.either._
-import scala.language.postfixOps
 import com.google.common.primitives.Ints
-import encry.view.fast.sync.FastSyncExceptions.{
-  ApplicableChunkIsAbsent,
-  BestHeaderAtHeightIsAbsent,
-  ChunkApplyError,
-  ChunkValidationError,
-  EmptyHeightKey,
-  EmptyRootNodeError,
-  FastSyncException,
-  InconsistentChunkId,
-  InitializeHeightAndRootKeysException,
-  ProcessNewBlockError,
-  ProcessNewSnapshotError,
-  UtxoCreationError
-}
+import com.typesafe.scalalogging.StrictLogging
+import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.fast.sync.FastSyncExceptions._
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
 import encry.view.history.History
+import encry.view.state.UtxoState
+import encry.view.state.avlTree.utils.implicits.Instances._
+import encry.view.state.avlTree._
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import scala.collection.immutable.{ HashMap, HashSet }
+import org.iq80.leveldb.{DB, Options}
+import scorex.utils.Random
+
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.language.postfixOps
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
                                    storage: VersionalStorage,
@@ -193,26 +177,30 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 
   def createNewSnapshot(
     id: Array[Byte],
-    manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
   ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
-    //todo add only exists chunks
-    val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
-    val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
-      val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
-      StorageKey @@ elem.id -> StorageValue @@ bytes
-    }
-    val manifestToDB: (StorageKey, StorageValue) =
-      StorageKey @@ manifest.manifestId -> StorageValue @@ SnapshotManifestSerializer
-        .toProto(manifest)
-        .toByteArray
-    val updateList: (StorageKey, StorageValue) =
-      PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
-    val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
-    logger.info(s"A new snapshot created successfully. Insertion started.")
-    Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
-      case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
-      case Right(_)    => this.asRight[ProcessNewSnapshotError]
+    val potential = potentialManifestsIds
+    if (potential.exists(_.sameElements(id)))
+      ProcessNewSnapshotError(s"Potential manifest with id ${Algos.encode(id)} already exists").asLeft[SnapshotProcessor]
+    else {
+      //todo add only exists chunks
+      val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
+      val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
+        val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
+        StorageKey @@ elem.id -> StorageValue @@ bytes
+      }
+      val manifestToDB: (StorageKey, StorageValue) =
+        StorageKey @@ manifest.manifestId -> StorageValue @@ SnapshotManifestSerializer
+          .toProto(manifest)
+          .toByteArray
+      val updateList: (StorageKey, StorageValue) =
+        PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: potential.toList).flatten.toArray
+      val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
+      logger.info(s"A new snapshot created successfully. Insertion started.")
+      Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
+        case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
+        case Right(_) => this.asRight[ProcessNewSnapshotError]
+      }
     }
   }
 
