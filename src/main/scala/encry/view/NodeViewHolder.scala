@@ -279,6 +279,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
                   )) newHis.isFullChainSynced = true
+              influxRef.foreach { ref =>
+                logger.info(s"send info 2. about ${newHis.getBestHeaderHeight} | ${newHis.getBestBlockHeight}")
+                ref ! HeightStatistics(newHis.getBestHeaderHeight, stateAfterApply.height)
+              }
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
               logger.info(s"Application to state failed cause $e")
@@ -351,10 +355,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
                 updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
               if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
-              influxRef.foreach { ref =>
-                logger.info(s"send info 2. about ${newHistory.getBestHeaderHeight} | ${newHistory.getBestBlockHeight}")
-                ref ! HeightStatistics(newHistory.getBestHeaderHeight, newState.height)
-              }
               if (settings.influxDB.isDefined)
                 context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
               influxRef.foreach { ref =>
