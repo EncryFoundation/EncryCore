@@ -283,6 +283,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 logger.info(s"send info 2. about ${newHis.getBestHeaderHeight} | ${newHis.getBestBlockHeight}")
                 ref ! HeightStatistics(newHis.getBestHeaderHeight, stateAfterApply.height)
                 val isBlock: Boolean = modToApply match {
+                  case _: Block => true
                   case _: Payload => true
                   case _ => false
                 }
