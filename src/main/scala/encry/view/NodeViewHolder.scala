@@ -282,6 +282,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               influxRef.foreach { ref =>
                 logger.info(s"send info 2. about ${newHis.getBestHeaderHeight} | ${newHis.getBestBlockHeight}")
                 ref ! HeightStatistics(newHis.getBestHeaderHeight, stateAfterApply.height)
+                val isBlock: Boolean = modToApply match {
+                  case _: Payload => true
+                  case _ => false
+                }
+                if (isBlock) ref ! ModifierAppendedToState(success = true)
               }
               UpdateInformation(newHis, stateAfterApply, None, None, u.suffix :+ modToApply)
             case Left(e) =>
@@ -357,13 +362,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
               if (settings.influxDB.isDefined)
                 context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
-              influxRef.foreach { ref =>
-                val isBlock: Boolean = pmod match {
-                  case _: Payload => true
-                  case _ => false
-                }
-                if (isBlock) ref ! ModifierAppendedToState(success = true)
-              }
               sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
               if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
