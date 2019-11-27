@@ -36,10 +36,11 @@ trait HistoryModifiersProcessors extends HistoryApi {
     }
     .getOrElse(putToHistory(payload))
 
-  def processPayloadFastSync(payload: Payload, raw: Array[Byte]): Unit = {
+  def processPayloadFastSync(payload: Payload): Unit = {
     val startTime: Long = System.currentTimeMillis()
     getBlockByPayload(payload).foreach { block =>
-      historyStorage.insertFastSync(payload.id, Seq(BestBlockKey -> payload.headerId), Seq(payload.id -> raw))
+      logger.info(s"processPayloadFastSync")
+      historyStorage.bulkInsert(payload.id, Seq(BestBlockKey -> payload.headerId), Seq(payload))
       blockDownloadProcessor.updateBestBlock(block.header)
       logger.info(s"BlockDownloadProcessor updated block at height ${block.header.height} successfully")
       historyStorage.insert(

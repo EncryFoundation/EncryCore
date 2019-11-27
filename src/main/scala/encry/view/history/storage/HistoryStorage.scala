@@ -56,33 +56,6 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
       )
   }
 
-  def insertFastSync(version: Array[Byte],
-                     indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                     bytesToInsert: Seq[(Array[Byte], Array[Byte])]): Unit = {
-    store match {
-      case ioDb: IODBHistoryWrapper =>
-        ioDb.objectStore.update(
-          Random.nextLong(),
-          Seq.empty,
-          bytesToInsert.map(o => ByteArrayWrapper(o._1) -> ByteArrayWrapper(Payload.modifierTypeId +: o._2))
-        )
-        insert(
-          StorageVersion @@ version,
-          indexesToInsert.map { case (key, value) =>
-            StorageKey @@ key -> StorageValue @@ value
-          }.toList
-        )
-      case _: VLDBWrapper =>
-        insert(
-          StorageVersion @@ version,
-          (indexesToInsert.map { case (key, value) =>
-            StorageKey @@ key -> StorageValue @@ value
-          } ++ bytesToInsert.map(o => StorageKey @@ o._1 -> StorageValue @@ (Payload.modifierTypeId +: o._2))
-            ).toList
-        )
-    }
-  }
-
   def bulkInsert(version: Array[Byte],
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
                  objectsToInsert: Seq[PersistentModifier]): Unit = store match {

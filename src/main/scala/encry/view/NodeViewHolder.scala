@@ -113,13 +113,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           )
           nodeViewSynchronizer ! FastSyncDone
         }
-    case ModifierFromRemote(mod, bytes) =>
+    case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
       if (isInHistory || isInCache)
         logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, bytes, nodeView.history)
+      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
       computeApplications()
 
     case lm: LocallyGeneratedModifier =>
@@ -128,10 +128,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       lm.pmod match {
         case block: Block =>
-          pmodModify(block.header, Array.emptyByteArray, isLocallyGenerated = true)
-          pmodModify(block.payload, Array.emptyByteArray, isLocallyGenerated = true)
+          pmodModify(block.header, isLocallyGenerated = true)
+          pmodModify(block.payload, isLocallyGenerated = true)
         case anyMod =>
-          pmodModify(anyMod, Array.emptyByteArray, isLocallyGenerated = true)
+          pmodModify(anyMod, isLocallyGenerated = true)
       }
       logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
@@ -168,8 +168,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def computeApplications(): Unit = {
     val mods = ModifiersCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
-      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod._1.id))}")
-      mods.foreach(mod => pmodModify(mod._1, mod._2))
+      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
+      mods.foreach(mod => pmodModify(mod))
       computeApplications()
     }
     else Unit
@@ -302,7 +302,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     }
   }
 
-  def pmodModify(pmod: PersistentModifier, bytes: Array[Byte], isLocallyGenerated: Boolean = false): Unit =
+  def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
     if (!nodeView.history.isModifierDefined(pmod.id)) {
       logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
       val startAppHistory = System.currentTimeMillis()
@@ -312,7 +312,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (pmod.modifierTypeId == Payload.modifierTypeId && nodeView.history.fastSyncInProgress) {
         pmod match {
           case p: Payload =>
-            nodeView.history.processPayloadFastSync(p, bytes)
+            nodeView.history.processPayloadFastSync(p)
             context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
             if (nodeView.history.getBestBlockHeight >= nodeView.history.heightOfLastAvailablePayloadForRequest) {
               logger.info(s"nodeView.history.getBestBlockHeight ${nodeView.history.getBestBlockHeight}")
@@ -508,7 +508,7 @@ object NodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    final case class ModifierFromRemote(serializedModifiers: PersistentModifier, bytes: Array[Byte])
+    final case class ModifierFromRemote(serializedModifiers: PersistentModifier)
 
     case class LocallyGeneratedModifier(pmod: PersistentModifier)
 

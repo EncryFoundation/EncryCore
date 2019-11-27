@@ -52,8 +52,7 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
                     s"Sending validated modifier to NodeViewHolder"
                 )
                 influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
-                if (history.fastSyncInProgress) nodeViewHolder ! ModifierFromRemote(modifier, bytes)
-                else nodeViewHolder ! ModifierFromRemote(modifier, Array.emptyByteArray)
+                nodeViewHolder ! ModifierFromRemote(modifier)
               } else {
                 logger.info(
                   s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of:" +
