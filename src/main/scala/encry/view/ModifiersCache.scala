@@ -142,9 +142,6 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isFullChainSynced => exhaustiveSearch
-        case _ if history.isHeadersChainSynced =>
-          if (isFastSync) List.empty[Key]
-          else exhaustiveSearch
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>

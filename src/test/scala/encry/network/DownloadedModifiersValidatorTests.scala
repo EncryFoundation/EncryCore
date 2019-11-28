@@ -90,7 +90,7 @@ class DownloadedModifiersValidatorTests
         .toMap
       downloadedModifiersValidator ! ModifiersForValidating(connectedPeer, Header.modifierTypeId, mods1)
       nodeViewHolder.expectMsgPF(10.seconds) {
-        case ModifierFromRemote(mod, bytes) => mod == validHeightHeader.header
+        case ModifierFromRemote(mod) => mod == validHeightHeader.header
       }
     }
     "find corrupted header" in {
@@ -215,7 +215,7 @@ class DownloadedModifiersValidatorTests
         .send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
       peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
-      nodeViewHolder.expectMsg(ModifierFromRemote(payload, bytes))
+      nodeViewHolder.expectMsg(ModifierFromRemote(payload))
     }
   }
 
