@@ -1,22 +1,17 @@
 package encry.view.history.storage
 
+import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
+import encry.storage.{EncryStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.VLDBWrapper
-import encry.storage.VersionalStorage
-import scorex.utils.{Random => ScorexRandom}
-import encry.storage.EncryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Header, HistoryModifiersProtoSerializer, Payload}
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
+import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import scorex.utils.{Random => ScorexRandom}
 import scala.util.{Failure, Random, Success}
-import cats.syntax.option._
-import org.encryfoundation.common.utils.{Algos, TaggedTypes}
-import org.encryfoundation.common.utils.constants.TestNetConstants
-import supertagged.@@
 
 case class HistoryStorage(override val store: VersionalStorage) extends EncryStorage with StrictLogging {
 

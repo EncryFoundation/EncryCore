@@ -1,13 +1,13 @@
 package encry.network
 
 import TransactionProto.TransactionProtoMessage
-import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
-import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import akka.actor.{ Actor, ActorRef, ActorSystem, PoisonPill, Props }
+import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.HeaderUtils
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -16,11 +16,9 @@ import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
-import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
-import scala.util.{Failure, Success, Try}
+import org.encryfoundation.common.modifiers.mempool.transaction.{ Transaction, TransactionProtoSerializer }
+import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
+import scala.util.{ Failure, Success, Try }
 
 class DownloadedModifiersValidator(modifierIdSize: Int,
                                    nodeViewHolder: ActorRef,

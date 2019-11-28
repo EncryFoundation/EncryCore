@@ -22,11 +22,7 @@ object ModifiersCache extends StrictLogging {
 
   private var isChainSynced = false
 
-  private var isFastSync = settings.snapshotSettings.enableFastSynchronization
-
   def setChainSynced(): Unit = isChainSynced = true
-
-  def finishFastSync(): Unit = isFastSync = false
 
   def size: Int = cache.size
 
