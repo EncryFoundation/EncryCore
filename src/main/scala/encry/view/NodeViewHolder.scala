@@ -13,6 +13,7 @@ import encry.EncryApp
 import encry.EncryApp.{miner, nodeViewSynchronizer, timeProvider}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.{EncryAppSettings, LevelDBSettings}
@@ -123,13 +124,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))
         }
-    case ModifierFromRemote(mod) =>
-      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+    case ModifierFromRemote(modifierWithBytes) =>
+      val isInHistory: Boolean = nodeView.history.isModifierDefined(modifierWithBytes.modifier.id)
+      val isInCache: Boolean = ModifiersCache.contains(key(modifierWithBytes.modifier.id))
       if (isInHistory || isInCache)
-        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+        logger.info(s"Received modifier of type: ${modifierWithBytes.modifier.modifierTypeId} " +
+          s" ${Algos.encode(modifierWithBytes.modifier.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      else ModifiersCache.put(key(modifierWithBytes.modifier.id), modifierWithBytes, nodeView.history)
       computeApplications()
 
     case lm: LocallyGeneratedModifier =>
@@ -485,7 +487,7 @@ object NodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
+    final case class ModifierFromRemote(serializedModifiers: ModifierWithBytes) extends AnyVal
 
     case class LocallyGeneratedModifier(pmod: PersistentModifier)
 
