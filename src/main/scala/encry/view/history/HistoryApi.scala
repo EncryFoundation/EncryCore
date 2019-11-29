@@ -33,7 +33,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var heightOfLastAvailablePayloadForRequest: Int = 0
 
-  var fastSyncInProgress: Boolean = settings.snapshotSettings.enableFastSynchronization
+  var fastSyncInProgress: Boolean =
+    settings.snapshotSettings.enableFastSynchronization || settings.node.offlineGeneration
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
