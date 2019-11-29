@@ -1,6 +1,7 @@
 package encry.view.history
 
 import java.io.File
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
@@ -17,6 +18,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import supertagged.@@
 
 /**
@@ -27,13 +29,13 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
   var isFullChainSynced: Boolean = settings.node.offlineGeneration
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
-    logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
-    Either.catchNonFatal(modifier match {
+  def append(modWithBytes: ModifierWithBytes): Either[Throwable, (History, ProgressInfo)] = {
+    logger.info(s"Trying to append modifier ${Algos.encode(modWithBytes.modifier.id)} of type ${modWithBytes.modifier.modifierTypeId} to history")
+    Either.catchNonFatal(modWithBytes.modifier match {
       case header: Header   =>
         logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
-        (this, processHeader(header))
-      case payload: Payload => (this, processPayload(payload))
+        (this, processHeader(header, modWithBytes.bytes))
+      case payload: Payload => (this, processPayload(payload, modWithBytes.bytes))
     })
   }
 

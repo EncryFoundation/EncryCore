@@ -6,6 +6,7 @@ import NetworkMessagesProto.GeneralizedNetworkProtoMessage
 import NetworkMessagesProto.GeneralizedNetworkProtoMessage.InnerMessage
 import encry.EncryApp
 import encry.modifiers.InstanceFactory
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.settings.{EncryAppSettings, Settings}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -21,8 +22,8 @@ class BasicNetworkMessagesProtoTest extends PropSpec with Matchers with Instance
   val testedBlocks: Vector[Block] = (0 until 10).foldLeft(generateDummyHistory(settings), Vector.empty[Block]) {
     case ((prevHistory, blocks), _) =>
       val block: Block = generateNextBlock(prevHistory)
-      prevHistory.append(block.header)
-      prevHistory.append(block.payload)
+      prevHistory.append(ModifierWithBytes(block.header))
+      prevHistory.append(ModifierWithBytes(block.payload))
       (prevHistory.reportModifierIsValid(block), blocks :+ block)
   }._2
   val testedTransaction: Seq[Transaction] = genValidPaymentTxs(10)

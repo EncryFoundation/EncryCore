@@ -1,9 +1,6 @@
 package encry.view
 
 import java.io.File
-import java.nio.file.{Path, SimpleFileVisitor}
-
-import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -13,39 +10,28 @@ import encry.EncryApp
 import encry.EncryApp.{miner, nodeViewSynchronizer, timeProvider}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.{EncryAppSettings, LevelDBSettings}
-import encry.stats.StatsSender._
-import encry.storage.VersionalStorage
-import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotProcessor
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
+import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state.{UtxoState, _}
+import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import encry.view.history.History
-import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state._
-import encry.view.wallet.EncryWallet
+import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-import org.iq80.leveldb.Options
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -123,13 +109,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           nodeViewSynchronizer ! FastSyncDone
           context.become(defaultMessages(true))
         }
-    case ModifierFromRemote(mod) =>
-      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
+    case ModifierFromRemote(modifierWithBytes) =>
+      val isInHistory: Boolean = nodeView.history.isModifierDefined(modifierWithBytes.modifier.id)
+      val isInCache: Boolean = ModifiersCache.contains(key(modifierWithBytes.modifier.id))
       if (isInHistory || isInCache)
-        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
+        logger.info(s"Received modifier of type: ${modifierWithBytes.modifier.modifierTypeId} " +
+          s" ${Algos.encode(modifierWithBytes.modifier.id)} " +
           s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
+      else ModifiersCache.put(key(modifierWithBytes.modifier.id), modifierWithBytes, nodeView.history)
       computeApplications()
 
     case lm: LocallyGeneratedModifier =>
@@ -138,10 +125,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       lm.pmod match {
         case block: Block =>
-          pmodModify(block.header, isLocallyGenerated = true)
-          pmodModify(block.payload, isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(block.header), isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(block.payload), isLocallyGenerated = true)
         case anyMod =>
-          pmodModify(anyMod, isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(anyMod), isLocallyGenerated = true)
       }
       logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
@@ -180,7 +167,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def computeApplications(): Unit = {
     val mods = ModifiersCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
-      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
+      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.modifier.id))}")
       mods.foreach(mod => pmodModify(mod))
       computeApplications()
     }
@@ -306,26 +293,26 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     }
   }
 
-  def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
-    if (!nodeView.history.isModifierDefined(pmod.id)) {
-      logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+  def pmodModify(pmod: ModifierWithBytes, isLocallyGenerated: Boolean = false): Unit =
+    if (!nodeView.history.isModifierDefined(pmod.modifier.id)) {
+      logger.debug(s"\nStarting to apply modifier ${pmod.modifier.encodedId} of type ${pmod.modifier.modifierTypeId} on nodeViewHolder to history.")
       val startAppHistory = System.currentTimeMillis()
       if (settings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
-        StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+        StartApplyingModifier(pmod.modifier.id, pmod.modifier.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
-          logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
-          logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+          logger.info(s"Successfully applied modifier ${pmod.modifier.encodedId} of type ${pmod.modifier.modifierTypeId} on nodeViewHolder to history.")
+          logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.modifier.encodedId}")
           influxRef.foreach { ref =>
-            ref ! EndOfApplyingModifier(pmod.id)
-            val isHeader: Boolean = pmod match {
+            ref ! EndOfApplyingModifier(pmod.modifier.id)
+            val isHeader: Boolean = pmod.modifier match {
               case _: Header => true
               case _: Payload => false
             }
             ref ! ModifierAppendedToHistory(isHeader, success = true)
           }
-          logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+          logger.info(s"Going to apply modifications ${pmod.modifier.encodedId} of type ${pmod.modifier.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
           if (progressInfo.toApply.nonEmpty) {
             logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
             val startPoint: Long = System.currentTimeMillis()
@@ -340,7 +327,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (settings.influxDB.isDefined)
               context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
             influxRef.foreach { ref =>
-              val isBlock: Boolean = pmod match {
+              val isBlock: Boolean = pmod.modifier match {
                 case _: Payload => true
                 case _ => false
               }
@@ -350,7 +337,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (progressInfo.chainSwitchingNeeded)
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
-            logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+            logger.debug(s"\nPersistent modifier ${pmod.modifier.encodedId} applied successfully")
             if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
               context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
             if (newHistory.isFullChainSynced) {
@@ -360,17 +347,17 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
           } else {
-            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
-            context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
+            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.modifier.id))
+            context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod.modifier))
             logger.info(s"\nProgress info is empty")
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
           }
         case Left(e) =>
-          logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+          logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.modifier.encodedId}, contents: $pmod)" +
             s" to history caused $e")
-          context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
+          context.system.eventStream.publish(SyntacticallyFailedModification(pmod.modifier, List(HistoryApplyError(e.getMessage))))
       }
-    } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
+    } else logger.info(s"\nTrying to apply modifier ${pmod.modifier.encodedId} that's already in history.")
 
   def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
     val rolledBackTxs: IndexedSeq[Transaction] = toRemove
@@ -485,7 +472,7 @@ object NodeViewHolder {
 
     case class CompareViews(source: ConnectedPeer, modifierTypeId: ModifierTypeId, modifierIds: Seq[ModifierId])
 
-    final case class ModifierFromRemote(serializedModifiers: PersistentModifier) extends AnyVal
+    final case class ModifierFromRemote(serializedModifiers: ModifierWithBytes) extends AnyVal
 
     case class LocallyGeneratedModifier(pmod: PersistentModifier)
 

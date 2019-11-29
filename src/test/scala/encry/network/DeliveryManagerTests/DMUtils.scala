@@ -1,12 +1,14 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
 import encry.settings.EncryAppSettings
@@ -14,6 +16,7 @@ import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 
@@ -38,8 +41,8 @@ object DMUtils extends InstanceFactory {
     (0 until qty).foldLeft(history, List.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
-        prevHistory.append(block.header)
-        prevHistory.append(block.payload)
+        prevHistory.append(ModifierWithBytes(block.header))
+        prevHistory.append(ModifierWithBytes(block.payload))
         val a = prevHistory.reportModifierIsValid(block)
         (a, blocks :+ block)
     }

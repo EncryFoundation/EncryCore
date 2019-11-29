@@ -1,13 +1,13 @@
 package encry.network
 
 import TransactionProto.TransactionProtoMessage
-import akka.actor.{ Actor, ActorRef, ActorSystem, PoisonPill, Props }
-import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.HeaderUtils
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifierWithBytes, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -16,9 +16,12 @@ import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
-import org.encryfoundation.common.modifiers.mempool.transaction.{ Transaction, TransactionProtoSerializer }
-import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
-import scala.util.{ Failure, Success, Try }
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
+import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(modifierIdSize: Int,
                                    nodeViewHolder: ActorRef,
@@ -50,7 +53,7 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
                     s"Sending validated modifier to NodeViewHolder"
                 )
                 influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
-                nodeViewHolder ! ModifierFromRemote(modifier)
+                nodeViewHolder ! ModifierFromRemote(ModifierWithBytes(modifier, bytes))
               } else {
                 logger.info(
                   s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of:" +
@@ -96,6 +99,13 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
 }
 
 object DownloadedModifiersValidator {
+
+  final case class ModifierWithBytes(modifier: PersistentModifier, bytes: Array[Byte])
+  
+  object ModifierWithBytes {
+    def apply(modifier: PersistentModifier): ModifierWithBytes =
+      new ModifierWithBytes(modifier, HistoryModifiersProtoSerializer.toProto(modifier).tail)
+  }
 
   final case class ModifiersForValidating(remote: ConnectedPeer,
                                           typeId: ModifierTypeId,
