@@ -337,7 +337,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 case _: Payload => false
               }
               ref ! ModifierAppendedToHistory(isHeader, success = true)
-              ref ! HeightStatistics(nodeView.history.getBestHeaderHeight, nodeView.history.getBestBlockHeight)
             }
         }
       } else {
