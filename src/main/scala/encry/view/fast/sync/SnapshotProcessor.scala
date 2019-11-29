@@ -250,8 +250,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 object SnapshotProcessor extends StrictLogging {
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    if (settings.snapshotSettings.enableFastSynchronization) create(settings, new File(s"${settings.directory}/state"))
-    else create(settings, getDirProcessSnapshots(settings))
+    if (settings.snapshotSettings.enableFastSynchronization)
+      create(settings, new File(s"${settings.directory}/state"))
+    else
+      create(settings, getDirProcessSnapshots(settings))
 
   def recreate(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDirProcessSnapshots(settings))
 
@@ -259,6 +261,7 @@ object SnapshotProcessor extends StrictLogging {
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {
     snapshotsDir.mkdirs()
+    //todo bug with choosing db for state while fast sync
     val storage: VersionalStorage = settings.storage.snapshotHolder match {
       case VersionalStorage.IODB =>
         logger.info("Init snapshots holder with iodb storage")
