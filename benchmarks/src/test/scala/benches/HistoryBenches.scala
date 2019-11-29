@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import benches.HistoryBenches.HistoryBenchState
 import benches.Utils._
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.view.history.History
 import encryBenchmark.BenchSettings
 import org.encryfoundation.common.modifiers.history.Block
@@ -21,8 +22,8 @@ class HistoryBenches {
     bh.consume {
       val history: History = generateHistory(benchStateHistory.settings, getRandomTempDir)
       benchStateHistory.blocks.foldLeft(history) { case (historyL, block) =>
-        historyL.append(block.header)
-        historyL.append(block.payload)
+        historyL.append(ModifierWithBytes(block.header))
+        historyL.append(ModifierWithBytes(block.payload))
         historyL.reportModifierIsValid(block)
       }
       history.closeStorage()
@@ -70,8 +71,8 @@ object HistoryBenches extends BenchSettings {
           case ((prevHistory, prevBlock, vector), _) =>
             val block: Block =
               generateNextBlockValidForHistory(prevHistory, 0, prevBlock,  Seq(coinbaseTransaction(0)))
-            prevHistory.append(block.header)
-            prevHistory.append(block.payload)
+            prevHistory.append(ModifierWithBytes(block.header))
+            prevHistory.append(ModifierWithBytes(block.payload))
             (prevHistory.reportModifierIsValid(block), Some(block), vector :+ block)
         }
     resultedHistory._1.closeStorage()

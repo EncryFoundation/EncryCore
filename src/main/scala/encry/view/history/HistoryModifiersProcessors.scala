@@ -17,9 +17,9 @@ import org.encryfoundation.common.utils.Algos
 
 trait HistoryModifiersProcessors extends HistoryApi {
 
-  def processHeader(h: Header): ProgressInfo = getHeaderInfoUpdate(h) match {
+  def processHeader(h: Header, headerBytes: Array[Byte]): ProgressInfo = getHeaderInfoUpdate(h) match {
     case dataToUpdate: Seq[_] if dataToUpdate.nonEmpty =>
-      historyStorage.bulkInsert(h.id, dataToUpdate, Seq(h))
+      historyStorage.bulkInsert(h.id, dataToUpdate, Seq(h -> headerBytes))
       getBestHeaderId match {
         case Some(bestHeaderId) =>
           ProgressInfo(none, Seq.empty, if (!bestHeaderId.sameElements(h.id)) Seq.empty else Seq(h), toDownload(h))
@@ -29,24 +29,24 @@ trait HistoryModifiersProcessors extends HistoryApi {
     case _ => ProgressInfo(none, Seq.empty, Seq.empty, none)
   }
 
-  def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
+  def processPayload(payload: Payload, payloadBytes: Array[Byte]): ProgressInfo = getBlockByPayload(payload)
     .flatMap{block =>
       logger.info(s"proc block ${block.header.encodedId}!")
-      processBlock(block).some
+      processBlock(block, payloadBytes).some
     }
-    .getOrElse(putToHistory(payload))
+    .getOrElse(putToHistory(payload, payloadBytes))
 
-  private def processBlock(blockToProcess: Block): ProgressInfo = {
+  private def processBlock(blockToProcess: Block, payloadBytes: Array[Byte]): ProgressInfo = {
     logger.info(s"Starting processing block to history ||${blockToProcess.encodedId}||${blockToProcess.header.height}||")
     val bestFullChain: Seq[Block] = calculateBestFullChain(blockToProcess)
     addBlockToCacheIfNecessary(blockToProcess)
     bestFullChain.lastOption.map(_.header) match {
       case Some(header) if isValidFirstBlock(blockToProcess.header) =>
-        processValidFirstBlock(blockToProcess, header, bestFullChain)
+        processValidFirstBlock(blockToProcess, header, bestFullChain, payloadBytes)
       case Some(header) if isBestBlockDefined && isBetterChain(header.id) =>
-        processBetterChain(blockToProcess, header, Seq.empty, settings.node.blocksToKeep)
+        processBetterChain(blockToProcess, payloadBytes, header, Seq.empty, settings.node.blocksToKeep)
       case Some(_) =>
-        nonBestBlock(blockToProcess)
+        nonBestBlock(blockToProcess, payloadBytes)
       case None =>
         logger.debug(s"Best full chain is empty. Returning empty progress info")
         ProgressInfo(none, Seq.empty, Seq.empty, none)
@@ -55,13 +55,15 @@ trait HistoryModifiersProcessors extends HistoryApi {
 
   private def processValidFirstBlock(fullBlock: Block,
                                      newBestHeader: Header,
-                                     newBestChain: Seq[Block]): ProgressInfo = {
+                                     newBestChain: Seq[Block],
+                                     payloadBytes: Array[Byte]): ProgressInfo = {
     logger.info(s"Appending ${fullBlock.encodedId} as a valid first block with height ${fullBlock.header.height}")
-    updateStorage(fullBlock.payload, newBestHeader.id)
+    updateStorage(fullBlock.payload, payloadBytes, newBestHeader.id)
     ProgressInfo(none, Seq.empty, newBestChain, none)
   }
 
   private def processBetterChain(fullBlock: Block,
+                                 payloadBytes: Array[Byte],
                                  newBestHeader: Header,
                                  newBestChain: Seq[Block],
                                  blocksToKeep: Int): ProgressInfo = getHeaderOfBestBlock.map { header =>
@@ -75,7 +77,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
       .headers
       .flatMap(h => if (h == fullBlock.header) fullBlock.some else getBlockByHeader(h))
     toApply.foreach(addBlockToCacheIfNecessary)
-    if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(fullBlock)
+    if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(fullBlock, payloadBytes)
     else {
       //application of this block leads to full chain with higher score
       logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
@@ -90,7 +92,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
           )
       val updatedHeadersAtHeightIds =
         newChain.headers.map(header => updatedBestHeaderAtHeightRaw(header.id, Height @@ header.height)).toList
-      updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader, updatedHeadersAtHeightIds)
+      updateStorage(fullBlock.payload, payloadBytes, newBestHeader.id, updateBestHeader, updatedHeadersAtHeightIds)
       if (blocksToKeep >= 0) {
         val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
         val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(0)
@@ -101,10 +103,10 @@ trait HistoryModifiersProcessors extends HistoryApi {
     }
   }.getOrElse(ProgressInfo(none, Seq.empty, Seq.empty, none))
 
-  private def nonBestBlock(fullBlock: Block): ProgressInfo = {
+  private def nonBestBlock(fullBlock: Block, payloadBytes: Array[Byte]): ProgressInfo = {
     //Orphaned block or full chain is not initialized yet
     logger.info(s"Process block to history ${fullBlock.encodedId}||${fullBlock.header.height}||")
-    historyStorage.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload))
+    historyStorage.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload -> payloadBytes))
     ProgressInfo(none, Seq.empty, Seq.empty, none)
   }
 
@@ -192,8 +194,8 @@ trait HistoryModifiersProcessors extends HistoryApi {
     Seq(heightIdsKey(h.height) -> StorageValue @@ (headerIdsAtHeight(h.height) :+ h.id).flatten.toArray)
   }
 
-  private def putToHistory(payload: Payload): ProgressInfo = {
-    historyStorage.insertObjects(Seq(payload))
+  private def putToHistory(payload: Payload, payloadBytes: Array[Byte]): ProgressInfo = {
+    historyStorage.insertObjects(Seq(payload -> payloadBytes))
     ProgressInfo(none, Seq.empty, Seq.empty, none)
   }
 
@@ -223,13 +225,14 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   private def updateStorage(newModRow: PersistentModifier,
+                            newModRowBytes: Array[Byte],
                             bestFullHeaderId: ModifierId,
                             updateHeaderInfo: Boolean = false,
                             additionalIndexes: List[(Array[Byte], Array[Byte])] = List.empty): Unit = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
       else Seq(BestBlockKey -> bestFullHeaderId)
-    historyStorage.bulkInsert(newModRow.id, indicesToInsert ++ additionalIndexes, Seq(newModRow))
+    historyStorage.bulkInsert(newModRow.id, indicesToInsert ++ additionalIndexes, Seq(newModRow -> newModRowBytes))
   }
 
   private def isValidFirstBlock(header: Header): Boolean =

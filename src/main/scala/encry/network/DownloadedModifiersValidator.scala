@@ -17,6 +17,7 @@ import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.HistoryModifiersProtoSerializer
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
@@ -100,6 +101,10 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
 object DownloadedModifiersValidator {
 
   final case class ModifierWithBytes(modifier: PersistentModifier, bytes: Array[Byte])
+  
+  object ModifierWithBytes {
+    def apply(modifier: PersistentModifier): ModifierWithBytes = new ModifierWithBytes(modifier, HistoryModifiersProtoSerializer.toProto(modifier))
+  }
 
   final case class ModifiersForValidating(remote: ConnectedPeer,
                                           typeId: ModifierTypeId,

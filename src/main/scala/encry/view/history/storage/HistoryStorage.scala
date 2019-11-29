@@ -39,26 +39,26 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
     case _: VLDBWrapper           => store.get(StorageKey @@ id.untag(ModifierId)).map(_.tail)
   }
 
-  def insertObjects(objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+  def insertObjects(objectsToInsert: Seq[(PersistentModifier, Array[Byte])]): Unit = store match {
     case iodb: IODBHistoryWrapper =>
       iodb.objectStore.update(
         Random.nextLong(),
         Seq.empty,
-        objectsToInsert.map(obj => ByteArrayWrapper(obj.id) ->
-          ByteArrayWrapper(HistoryModifiersProtoSerializer.toProto(obj)))
+        objectsToInsert.map(obj => ByteArrayWrapper(obj._1.id) ->
+          ByteArrayWrapper(obj._2))
       )
     case _: VLDBWrapper =>
       insert(
-        StorageVersion @@ objectsToInsert.head.id.untag(ModifierId),
+        StorageVersion @@ objectsToInsert.head._1.id,
         objectsToInsert.map(obj =>
-          StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
+          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2
         ).toList,
       )
   }
 
   def bulkInsert(version: Array[Byte],
                  indexesToInsert: Seq[(Array[Byte], Array[Byte])],
-                 objectsToInsert: Seq[PersistentModifier]): Unit = store match {
+                 objectsToInsert: Seq[(PersistentModifier, Array[Byte])]): Unit = store match {
     case _: IODBHistoryWrapper =>
       insertObjects(objectsToInsert)
       insert(
@@ -66,13 +66,12 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         indexesToInsert.map { case (key, value) => StorageKey @@ key -> StorageValue @@ value }.toList
       )
     case _: VLDBWrapper =>
-      logger.info(s"Inserting2: $objectsToInsert")
       insert(
         StorageVersion @@ version,
         (indexesToInsert.map { case (key, value) =>
           StorageKey @@ key -> StorageValue @@ value
         } ++ objectsToInsert.map { obj =>
-          StorageKey @@ obj.id.untag(ModifierId) -> StorageValue @@ HistoryModifiersProtoSerializer.toProto(obj)
+          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2
         }).toList
       )
   }

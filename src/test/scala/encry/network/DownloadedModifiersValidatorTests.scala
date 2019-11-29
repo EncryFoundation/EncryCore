@@ -3,27 +3,21 @@ package encry.network
 import java.net.InetSocketAddress
 
 import akka.actor.ActorSystem
-import akka.testkit.{ TestActorRef, TestProbe }
+import akka.testkit.{TestActorRef, TestProbe}
 import encry.modifiers.InstanceFactory
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, UpdatedHistory }
-import encry.network.PeerConnectionHandler.{ ConnectedPeer, Outgoing }
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifierWithBytes, ModifiersForValidating}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, UpdatedHistory}
+import encry.network.PeerConnectionHandler.{ConnectedPeer, Outgoing}
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.TestNetSettings
 import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
-import org.encryfoundation.common.modifiers.history.{
-  Block,
-  Header,
-  HeaderProtoSerializer,
-  Payload,
-  PayloadProtoSerializer
-}
+import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
-import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
-import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 import scorex.crypto.hash.Digest32
 import scorex.utils.Random
 
@@ -150,7 +144,7 @@ class DownloadedModifiersValidatorTests
         Random.randomBytes()
       )
 
-      history.append(header_first)
+      history.append(ModifierWithBytes(header_first))
 
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(history))
 
@@ -196,8 +190,8 @@ class DownloadedModifiersValidatorTests
       val historyWith10Blocks = (0 until 10).foldLeft(history, Seq.empty[Block]) {
         case ((prevHistory, blocks), _) =>
           val block: Block = generateNextBlock(prevHistory)
-          prevHistory.append(block.header)
-          prevHistory.append(block.payload)
+          prevHistory.append(ModifierWithBytes(block.header))
+          prevHistory.append(ModifierWithBytes(block.payload))
           (prevHistory.reportModifierIsValid(block), blocks :+ block)
       }
 
@@ -213,7 +207,7 @@ class DownloadedModifiersValidatorTests
         .send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
       peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
-      nodeViewHolder.expectMsg(ModifierFromRemote(payload))
+      nodeViewHolder.expectMsg(ModifierFromRemote(ModifierWithBytes(payload)))
     }
   }
 
@@ -221,8 +215,8 @@ class DownloadedModifiersValidatorTests
     (0 until qty).foldLeft(history, List.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
-        prevHistory.append(block.header)
-        prevHistory.append(block.payload)
+        prevHistory.append(ModifierWithBytes(block.header))
+        prevHistory.append(ModifierWithBytes(block.payload))
         val a = prevHistory.reportModifierIsValid(block)
         (a, blocks :+ block)
     }

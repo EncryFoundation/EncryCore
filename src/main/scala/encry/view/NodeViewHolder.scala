@@ -1,9 +1,6 @@
 package encry.view
 
 import java.io.File
-import java.nio.file.{Path, SimpleFileVisitor}
-
-import encry.view.state.avlTree.utils.implicits.Instances._
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -16,37 +13,25 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.{EncryAppSettings, LevelDBSettings}
-import encry.stats.StatsSender._
-import encry.storage.VersionalStorage
-import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotProcessor
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
+import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state.{UtxoState, _}
+import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import encry.view.history.History
-import encry.view.mempool.MemoryPool.RolledBackTransactions
-import encry.view.state._
-import encry.view.wallet.EncryWallet
+import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-import org.iq80.leveldb.Options
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -140,11 +125,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       lm.pmod match {
         case block: Block =>
-
-          pmodModify(ModifierWithBytes(block.header, block.header.bytes), isLocallyGenerated = true)
-          pmodModify(ModifierWithBytes(block.payload, block.header.bytes), isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(block.header), isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(block.payload), isLocallyGenerated = true)
         case anyMod =>
-          pmodModify(ModifierWithBytes(anyMod, anyMod.bytes), isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(anyMod), isLocallyGenerated = true)
       }
       logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")

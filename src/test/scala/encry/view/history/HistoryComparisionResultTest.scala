@@ -3,6 +3,7 @@ package encry.view.history
 import encry.consensus.HistoryConsensus._
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils.generateBlocks
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.settings.{EncryAppSettings, TestNetSettings}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.SyncInfo
@@ -21,8 +22,8 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.map(_.header.id))
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header)
-        hst.append(block.payload)
+        hst.append(ModifierWithBytes(block.header))
+        hst.append(ModifierWithBytes(block.payload))
         hst.reportModifierIsValid(block)
       }
 
@@ -36,8 +37,8 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.map(_.header.id))
 
       val updatedHistory: History = blocks.take(50).foldLeft(history) { case (hst, block) =>
-        hst.append(block.header)
-        hst.append(block.payload)
+        hst.append(ModifierWithBytes(block.header))
+        hst.append(ModifierWithBytes(block.payload))
         hst.reportModifierIsValid(block)
       }
 
@@ -51,8 +52,8 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(Seq.empty)
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header)
-        hst.append(block.payload)
+        hst.append(ModifierWithBytes(block.header))
+        hst.append(ModifierWithBytes(block.payload))
         hst.reportModifierIsValid(block)
       }
 
@@ -67,8 +68,8 @@ class HistoryComparisionResultTest extends WordSpecLike
       val syncInfo: SyncInfo = SyncInfo(blocks.take(30).map(_.header.id))
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
-        hst.append(block.header)
-        hst.append(block.payload)
+        hst.append(ModifierWithBytes(block.header))
+        hst.append(ModifierWithBytes(block.payload))
         hst.reportModifierIsValid(block)
       }
 
@@ -86,8 +87,8 @@ class HistoryComparisionResultTest extends WordSpecLike
       )
 
       val updatedHistory: History = fork._1.take(30).foldLeft(history) { case (hst, block) =>
-        hst.append(block.header)
-        hst.append(block.payload)
+        hst.append(ModifierWithBytes(block.header))
+        hst.append(ModifierWithBytes(block.payload))
         hst.reportModifierIsValid(block)
       }
 

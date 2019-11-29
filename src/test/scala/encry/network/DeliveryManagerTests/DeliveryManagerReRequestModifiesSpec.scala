@@ -1,6 +1,7 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.consensus.HistoryConsensus
@@ -8,6 +9,7 @@ import encry.consensus.HistoryConsensus.Older
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager
 import encry.network.DeliveryManagerTests.DMUtils._
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
@@ -21,6 +23,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage, RequestModifiersNetworkMessage}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+
 import scala.concurrent.duration._
 import scala.collection.mutable.WrappedArray
 
@@ -133,7 +136,7 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(Header.modifierTypeId,
         Map(headerIds.head -> headerBytes)), cp1)
 
-      history.append(blocks.head.header)
+      history.append(ModifierWithBytes(blocks.head.header))
       val uHistory: History = history.reportModifierIsValid(blocks.head.header)
 
       deliveryManager ! UpdatedHistory(uHistory)

@@ -3,13 +3,14 @@ package encry.modifiers
 import encry.consensus.EncrySupplyController
 import encry.modifiers.mempool._
 import encry.modifiers.state.Keys
+import encry.network.DownloadedModifiersValidator.ModifierWithBytes
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header, HistoryModifiersProtoSerializer, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Input, Transaction}
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
@@ -184,35 +185,35 @@ trait InstanceFactory extends Keys with EncryGenerator {
             val secondHistory = generateDummyHistory(settings)
             blocks._1.foldLeft(secondHistory) {
               case (prevHistory, blockToApply) =>
-                prevHistory.append(blockToApply.header)
-                prevHistory.append(blockToApply.payload)
+                prevHistory.append(ModifierWithBytes(blockToApply.header))
+                prevHistory.append(ModifierWithBytes(blockToApply.payload))
                 prevHistory.reportModifierIsValid(blockToApply)
                 prevHistory
             }
             val nextBlockInFirstChain = generateNextBlock(histories.head)
             val nextBlockInSecondChain = generateNextBlock(secondHistory, additionalDifficulty = addDifficulty)
-            histories.head.append(nextBlockInFirstChain.header)
-            histories.head.append(nextBlockInFirstChain.payload)
+            histories.head.append(ModifierWithBytes(nextBlockInFirstChain.header))
+            histories.head.append(ModifierWithBytes(nextBlockInFirstChain.payload))
             val a = histories.head.reportModifierIsValid(nextBlockInFirstChain)
-            secondHistory.append(nextBlockInSecondChain.header)
-            secondHistory.append(nextBlockInSecondChain.payload)
+            secondHistory.append(ModifierWithBytes(nextBlockInSecondChain.header))
+            secondHistory.append(ModifierWithBytes(nextBlockInSecondChain.payload))
             val b = secondHistory.reportModifierIsValid(nextBlockInSecondChain)
             (List(a, b), (blocks._1 :+ nextBlockInFirstChain) -> List(nextBlockInSecondChain))
           } else {
             val nextBlockInFirstChain = generateNextBlock(histories.head)
             val nextBlockInSecondChain = generateNextBlock(histories.last, additionalDifficulty = addDifficulty)
-            histories.head.append(nextBlockInFirstChain.header)
-            histories.head.append(nextBlockInFirstChain.payload)
+            histories.head.append(ModifierWithBytes(nextBlockInFirstChain.header))
+            histories.head.append(ModifierWithBytes(nextBlockInFirstChain.payload))
             val a = histories.head.reportModifierIsValid(nextBlockInFirstChain)
-            histories.last.append(nextBlockInSecondChain.header)
-            histories.last.append(nextBlockInSecondChain.payload)
+            histories.last.append(ModifierWithBytes(nextBlockInSecondChain.header))
+            histories.last.append(ModifierWithBytes(nextBlockInSecondChain.payload))
             val b = histories.last.reportModifierIsValid(nextBlockInSecondChain)
             (List(a, b), (blocks._1 :+ nextBlockInFirstChain) -> (blocks._2 :+ nextBlockInSecondChain))
           }
         } else {
           val block: Block = generateNextBlock(histories.head)
-          histories.head.append(block.header)
-          histories.head.append(block.payload)
+          histories.head.append(ModifierWithBytes(block.header))
+          histories.head.append(ModifierWithBytes(block.payload))
           val a = histories.head.reportModifierIsValid(block)
           (List(a), (blocks._1 :+ block) -> blocks._2)
         }
