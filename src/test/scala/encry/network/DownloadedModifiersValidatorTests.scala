@@ -199,15 +199,17 @@ class DownloadedModifiersValidatorTests
 
       nodeViewSync.send(downloadedModifiersValidator, UpdatedHistory(historyWith10Blocks._1))
 
+      val payloadBytes = PayloadProtoSerializer.toProto(payload).toByteArray
+
       val mods: Map[ModifierId, Array[Byte]] = (historyWith10Blocks._2.map(
         b => b.payload.id -> PayloadProtoSerializer.toProto(b.payload).toByteArray.reverse
-      ) :+ (payload.id -> PayloadProtoSerializer.toProto(payload).toByteArray)).toMap
+      ) :+ (payload.id -> payloadBytes)).toMap
 
       deliveryManager
         .send(downloadedModifiersValidator, ModifiersForValidating(connectedPeer, Payload.modifierTypeId, mods))
 
       peersKeeper.expectMsg(BanPeer(connectedPeer, CorruptedSerializedBytes))
-      nodeViewHolder.expectMsg(ModifierFromRemote(ModifierWithBytes(payload)))
+      nodeViewHolder.expectMsg(ModifierFromRemote(ModifierWithBytes(payload, payloadBytes)))
     }
   }
 
