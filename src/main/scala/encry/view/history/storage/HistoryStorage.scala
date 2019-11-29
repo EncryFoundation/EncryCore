@@ -45,13 +45,13 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         Random.nextLong(),
         Seq.empty,
         objectsToInsert.map(obj => ByteArrayWrapper(obj._1.id) ->
-          ByteArrayWrapper(obj._2))
+          ByteArrayWrapper(obj._1.modifierTypeId +: obj._2))
       )
     case _: VLDBWrapper =>
       insert(
         StorageVersion @@ objectsToInsert.head._1.id,
         objectsToInsert.map(obj =>
-          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2
+          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ (obj._1.modifierTypeId +: obj._2)
         ).toList,
       )
   }
@@ -71,7 +71,7 @@ case class HistoryStorage(override val store: VersionalStorage) extends EncrySto
         (indexesToInsert.map { case (key, value) =>
           StorageKey @@ key -> StorageValue @@ value
         } ++ objectsToInsert.map { obj =>
-          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ obj._2
+          StorageKey @@ obj._1.id.untag(ModifierId) -> StorageValue @@ (obj._1.modifierTypeId +: obj._2)
         }).toList
       )
   }
