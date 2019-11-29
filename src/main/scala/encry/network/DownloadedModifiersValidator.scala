@@ -103,7 +103,8 @@ object DownloadedModifiersValidator {
   final case class ModifierWithBytes(modifier: PersistentModifier, bytes: Array[Byte])
   
   object ModifierWithBytes {
-    def apply(modifier: PersistentModifier): ModifierWithBytes = new ModifierWithBytes(modifier, HistoryModifiersProtoSerializer.toProto(modifier))
+    def apply(modifier: PersistentModifier): ModifierWithBytes =
+      new ModifierWithBytes(modifier, HistoryModifiersProtoSerializer.toProto(modifier).tail)
   }
 
   final case class ModifiersForValidating(remote: ConnectedPeer,
