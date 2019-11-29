@@ -140,10 +140,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
       lm.pmod match {
         case block: Block =>
-          pmodModify(block.header, isLocallyGenerated = true)
-          pmodModify(block.payload, isLocallyGenerated = true)
+
+          pmodModify(ModifierWithBytes(block.header, block.header.bytes), isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(block.payload, block.header.bytes), isLocallyGenerated = true)
         case anyMod =>
-          pmodModify(anyMod, isLocallyGenerated = true)
+          pmodModify(ModifierWithBytes(anyMod, anyMod.bytes), isLocallyGenerated = true)
       }
       logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
         s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
@@ -182,7 +183,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def computeApplications(): Unit = {
     val mods = ModifiersCache.popCandidate(nodeView.history)
     if (mods.nonEmpty) {
-      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
+      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.modifier.id))}")
       mods.foreach(mod => pmodModify(mod))
       computeApplications()
     }
@@ -308,26 +309,26 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     }
   }
 
-  def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
-    if (!nodeView.history.isModifierDefined(pmod.id)) {
-      logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
+  def pmodModify(pmod: ModifierWithBytes, isLocallyGenerated: Boolean = false): Unit =
+    if (!nodeView.history.isModifierDefined(pmod.modifier.id)) {
+      logger.debug(s"\nStarting to apply modifier ${pmod.modifier.encodedId} of type ${pmod.modifier.modifierTypeId} on nodeViewHolder to history.")
       val startAppHistory = System.currentTimeMillis()
       if (settings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
-        StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
+        StartApplyingModifier(pmod.modifier.id, pmod.modifier.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
-          logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
-          logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+          logger.info(s"Successfully applied modifier ${pmod.modifier.encodedId} of type ${pmod.modifier.modifierTypeId} on nodeViewHolder to history.")
+          logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.modifier.encodedId}")
           influxRef.foreach { ref =>
-            ref ! EndOfApplyingModifier(pmod.id)
-            val isHeader: Boolean = pmod match {
+            ref ! EndOfApplyingModifier(pmod.modifier.id)
+            val isHeader: Boolean = pmod.modifier match {
               case _: Header => true
               case _: Payload => false
             }
             ref ! ModifierAppendedToHistory(isHeader, success = true)
           }
-          logger.info(s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
+          logger.info(s"Going to apply modifications ${pmod.modifier.encodedId} of type ${pmod.modifier.modifierTypeId} on nodeViewHolder to the state: $progressInfo")
           if (progressInfo.toApply.nonEmpty) {
             logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
             val startPoint: Long = System.currentTimeMillis()
@@ -342,7 +343,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (settings.influxDB.isDefined)
               context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
             influxRef.foreach { ref =>
-              val isBlock: Boolean = pmod match {
+              val isBlock: Boolean = pmod.modifier match {
                 case _: Payload => true
                 case _ => false
               }
@@ -352,7 +353,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             if (progressInfo.chainSwitchingNeeded)
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
-            logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
+            logger.debug(s"\nPersistent modifier ${pmod.modifier.encodedId} applied successfully")
             if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
               context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
             if (newHistory.isFullChainSynced) {
@@ -362,17 +363,17 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             }
             updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
           } else {
-            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
-            context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
+            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.modifier.id))
+            context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod.modifier))
             logger.info(s"\nProgress info is empty")
             updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
           }
         case Left(e) =>
-          logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
+          logger.debug(s"\nCan`t apply persistent modifier (id: ${pmod.modifier.encodedId}, contents: $pmod)" +
             s" to history caused $e")
-          context.system.eventStream.publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
+          context.system.eventStream.publish(SyntacticallyFailedModification(pmod.modifier, List(HistoryApplyError(e.getMessage))))
       }
-    } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
+    } else logger.info(s"\nTrying to apply modifier ${pmod.modifier.encodedId} that's already in history.")
 
   def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
     val rolledBackTxs: IndexedSeq[Transaction] = toRemove
