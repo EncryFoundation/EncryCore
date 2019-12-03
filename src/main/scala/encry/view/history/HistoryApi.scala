@@ -31,7 +31,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var isHeadersChainSyncedVar: Boolean = false
 
-  var heightOfLastAvailablePayloadForRequest: Int = 0
+  var lastAvailableManifestHeight: Int = 0
 
   var fastSyncInProgress: Boolean =
     settings.snapshotSettings.enableFastSynchronization || !settings.node.offlineGeneration
@@ -118,7 +118,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
-      else if (height > heightOfLastAvailablePayloadForRequest && fastSyncInProgress) acc
+      else if (height > lastAvailableManifestHeight && fastSyncInProgress) acc
       else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
         case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
           continuation(height + 1, acc :+ h.payloadId)
@@ -286,6 +286,29 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
+
+  def continuationHeaderChains(header: Header,
+                               filterCond: Header => Boolean): Seq[Seq[Header]] = {
+    @tailrec def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
+      val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1)
+        .view
+        .flatMap(getHeaderById)
+        .filter(filterCond)
+        .toList
+      if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
+      else {
+        val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(h =>
+          acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
+        )
+        val nonUpdatedChains: Seq[Seq[Header]] =
+          acc.filter(chain => !nextHeightHeaders.exists(_.parentId sameElements chain.head.id))
+
+        loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
+      }
+    }
+
+    loop(header.height, Seq(Seq(header)))
+  }
 
   def addHeaderToCacheIfNecessary(h: Header): Unit =
     if (h.height >= getBestHeaderHeight - settings.constants.MaxRollbackDepth) {

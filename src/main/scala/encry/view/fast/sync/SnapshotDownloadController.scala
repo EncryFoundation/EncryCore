@@ -11,11 +11,13 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.view.fast.sync.FastSyncExceptions.{ ChunkValidationError, InvalidChunkBytes }
 import encry.view.fast.sync.FastSyncExceptions.{
+  ChunkValidationError,
+  InvalidChunkBytes,
   InvalidManifestBytes,
   ProcessManifestHasChangedMessageException,
-  SnapshotDownloadControllerException
+  SnapshotDownloadControllerException,
+  UnexpectedChunkMessage
 }
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 
@@ -68,7 +70,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
         } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-          InvalidChunkBytes(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+          UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
             .asLeft[(SnapshotDownloadController, SnapshotChunk)]
         }
     }

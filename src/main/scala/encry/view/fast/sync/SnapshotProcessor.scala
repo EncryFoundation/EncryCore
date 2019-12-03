@@ -116,9 +116,11 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
         StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
       fullData :: shadowData :: Nil
     }
-    Either.catchNonFatal(
+    val startTime = System.currentTimeMillis()
+    Either.catchNonFatal {
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-    ) match {
+      logger.info(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime)/1000}s")
+    } match {
       case Right(_) =>
         logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
         val newApplicableChunk = (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
