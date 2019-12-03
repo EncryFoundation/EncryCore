@@ -164,8 +164,6 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
         deletions.foreach { elemKey =>
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
-          logger.info(s"accessMap of key(delete) ${Algos.encode(elemKey)} in rollback resolver is: " +
-            s"${if (accessMap != null) Algos.encode(accessMap) else null}")
           if (accessMap != null)
             writeBatch.put(userKey(VersionalLevelDbKey @@ elemKey), ACCESSIBLE_KEY_PREFIX +: accessMap.drop(1))
         }

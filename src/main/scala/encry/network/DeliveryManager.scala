@@ -24,8 +24,6 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.fast.sync.SnapshotHolder.FastSyncDone
-import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -33,7 +31,6 @@ import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
 import scala.concurrent.ExecutionContextExecutor
 
 class DeliveryManager(influxRef: Option[ActorRef],
@@ -125,7 +122,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
-      logger.debug(s"receivedModifiers: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
+      logger.debug(s"Qty to req: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,

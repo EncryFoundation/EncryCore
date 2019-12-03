@@ -127,6 +127,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   }
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
+    logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
     val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
     logger.info(s"UTXO -> rollbackTo ->${tree.storage.get(UtxoState.bestHeightKey)} ")
     val height: Height = Height !@@ Ints.fromByteArray(tree.storage.get(UtxoState.bestHeightKey).get)
