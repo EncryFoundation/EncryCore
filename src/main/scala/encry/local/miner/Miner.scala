@@ -220,7 +220,7 @@ class Miner(dataHolder: ActorRef,
         }
         val candidate: CandidateEnvelope =
           if ((bestHeaderOpt.isDefined &&
-            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+            (syncingDone || nodeView.history.isFullChainSynced.isFullChainSynced)) || settings.node.offlineGeneration) {
             logger.info(s"Starting candidate generation at " +
               s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
             if (settings.influxDB.isDefined)

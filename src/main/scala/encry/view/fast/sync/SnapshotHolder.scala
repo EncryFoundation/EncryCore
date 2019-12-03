@@ -237,7 +237,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         snapshotProcessor.createNewSnapshot(id, manifestIds, chunks)
       } else logger.info(s"Doesn't need to create snapshot")
 
-    case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
+    case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced.isFullChainSynced =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")
       val condition: Int =
         (block.header.height - settings.levelDB.maxVersions) % settings.snapshotSettings.newSnapshotCreationHeight

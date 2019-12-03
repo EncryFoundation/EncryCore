@@ -24,7 +24,11 @@ import supertagged.@@
   **/
 trait History extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
-  var isFullChainSynced: Boolean = settings.node.offlineGeneration
+  final case class IsFullChainSyncedProcessor(localSettings: EncryAppSettings) {
+    var isFullChainSynced: Boolean = localSettings.node.offlineGeneration
+  }
+
+  lazy val isFullChainSynced = IsFullChainSyncedProcessor(settings)
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {

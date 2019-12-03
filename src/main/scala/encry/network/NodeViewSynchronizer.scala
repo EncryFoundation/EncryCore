@@ -175,7 +175,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
             s" ${invData._1}. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
-          if (invData._1 == Payload.modifierTypeId && !history.isFullChainSynced) {
+          if (invData._1 == Payload.modifierTypeId && !history.isFullChainSynced.isFullChainSynced) {
             logger.info(s"Got inv message with payloads: ${invData._2.map(Algos.encode).mkString(",")}. But full chain is not synced. Ignore them.")
           }
           else nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
