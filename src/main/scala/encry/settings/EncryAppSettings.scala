@@ -127,6 +127,7 @@ final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32, key
 final case class MonitoringSettings(kamonEnabled: Boolean)
 final case class RESTApiSettings(enabled: Option[Boolean],
                                  bindAddress: InetSocketAddress,
+                                 allowedPeers: List[String],
                                  corsAllowedOrigin: Option[String],
                                  timeout: FiniteDuration)
 final case class NetworkSettings(nodeName: Option[String],

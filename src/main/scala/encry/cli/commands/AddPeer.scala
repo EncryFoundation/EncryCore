@@ -13,8 +13,8 @@ import encry.utils.NetworkTimeProvider
 import scala.concurrent.Future
 
 /**
- * Command "settings addPeer -host=<addr[String]> -port=<addr[String]>"
- * Example: settings addPeer -host='172.16.10.57' -port=9020
+ * Command "peer addPeer -host=<addr[String]> -port=<addr[String]>"
+ * Example: peer addPeer -host='172.16.10.57' -port=9020
  */
 object AddPeer extends Command {
   override def execute(args: Command.Args,

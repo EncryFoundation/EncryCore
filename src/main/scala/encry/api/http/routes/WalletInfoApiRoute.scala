@@ -75,12 +75,12 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
   def createTokenR: Route = (path("createToken") & get) {
     parameters('fee.as[Int], 'amount.as[Long]) { (fee, amount) =>
-      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+      (dataHolder ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val boxes = wallet.vault.walletStorage
-              .getAllBoxes().collect { case ab: AssetBox => ab }.take(1)
+              .getAllBoxes().collectFirst { case ab: AssetBox => ab }.toList.take(1)
             TransactionFactory.assetIssuingTransactionScratch(
               secret,
               fee,
@@ -102,12 +102,12 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
 
   def dataTransactionR: Route = (path("data") & get) {
     parameters('fee.as[Int], 'data) { (fee, data) =>
-      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+      (dataHolder ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
             val boxes                   = wallet.vault.walletStorage
-              .getAllBoxes().collect { case ab: AssetBox => ab }.take(1)
+              .getAllBoxes().collectFirst { case ab: AssetBox => ab }.toList.take(1)
             TransactionFactory.dataTransactionScratch(secret,
               fee,
               System.currentTimeMillis(),
@@ -121,13 +121,13 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
           Future.unit
         case _ => Future.unit
       }
-      complete(s"Tx with data  has been sent!!'")
+      complete(s"Tx with data has been sent!!'")
     }
   }
 
   def transferR: Route = (path("transfer") & get) {
     parameters('addr, 'fee.as[Int], 'amount.as[Long], 'token.?) { (addr, fee, amount, token) =>
-      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+      (dataHolder ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
@@ -178,7 +178,7 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
   def transferContractR: Route = (path("transferContract") & get) {
     parameters('contract, 'fee.as[Int], 'amount.as[Long], 'token.?) {
       (contract, fee, amount, token) =>
-      (dataHolder ? GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] {
+      (dataHolder ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] {
         wallet =>
           Try {
             val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount

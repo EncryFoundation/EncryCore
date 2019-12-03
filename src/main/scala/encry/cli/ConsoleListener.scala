@@ -68,14 +68,8 @@ object ConsoleListener {
 
   private val appCmds = Map(
     "app" -> Map(
-      "help" -> Help
-    )
-  )
-//link peer
-  private val settingsCmds = Map(
-    "settings" -> Map(
-      "addPeer"             -> AddPeer,
-      "removeFromBlackList" -> RemoveFromBlackList
+      "help" -> Help,
+      "info" -> GetInfo
     )
   )
 // link "wallet"
@@ -103,24 +97,20 @@ object ConsoleListener {
     )
   )
 
-  private val infoCmds = Map(
-    "info" -> Map(
-      "get" -> GetInfo
-    )
-  )
-
   private val peerCmds = Map(
     "peer" -> Map(
-      "all"       -> GetPeers,
-      "banned"    -> GetBannedPeers,
-      "connected" -> GetConnectedPeers,
-      "ban"       -> GetBan
+      "all"                 -> GetPeers,
+      "banned"              -> GetBannedPeers,
+      "connected"           -> GetConnectedPeers,
+      "ban"                 -> GetBan,
+      "addPeer"             -> AddPeer,
+      "removeFromBlackList" -> RemoveFromBlackList
     )
   )
 
   val cmdDictionary: Map[String, Map[String, Command]] =
-    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.settingsCmds ++
-      ConsoleListener.historyCmds ++ ConsoleListener.infoCmds ++ ConsoleListener.peerCmds
+    ConsoleListener.nodeCmds ++ ConsoleListener.appCmds ++ ConsoleListener.walletCmds ++ ConsoleListener.historyCmds ++
+      ConsoleListener.peerCmds
 
   def props(settings: EncryAppSettings,
             dataHolder: ActorRef,

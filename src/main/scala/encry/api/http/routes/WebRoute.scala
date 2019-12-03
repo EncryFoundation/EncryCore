@@ -160,14 +160,18 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
           entity(as[String]) { urlPass =>
               val decodedStr = URLDecoder.decode(urlPass, "UTF-8")
               val receivedPass = decodedStr.substring(9)
-              if (pass.right.get == receivedPass) {
+              val dbPass: String = pass match {
+                case Right(password) => password
+                case Left(err) => throw new Exception(err)
+              }
+              if (dbPass == receivedPass) {
                 val token = WebRoute.createToken(receivedPass, 1)
                 respondWithHeader(RawHeader("Access-Token", token)) {
                   setCookie(HttpCookie("JWT", value = token)) {
                     redirect("/web", StatusCodes.PermanentRedirect)
                   }
                 }
-              } else complete(s"Incorrect password: ${pass.right.get} / ${URLDecoder.decode(urlPass.toString, "UTF-8")}")
+              } else complete(s"Incorrect password: $dbPass / ${URLDecoder.decode(urlPass, "UTF-8")}")
           }
         case Failure(exception) => complete(exception)
       }
@@ -181,8 +185,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
             case Success(info) =>
               complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2).render))
             case Failure(exception) => complete(exception)
-          })
-      )
+          }),
+        settings)
     }
 
   //  JWT
@@ -568,7 +572,6 @@ object WebRoute  {
       JwtSprayJson.encode(claims, secretKey, algorithm) // JWT string
     }
 
-
   def isTokenExpired(token: String): Boolean = JwtSprayJson.decode(token, secretKey, Seq(algorithm)) match {
     case Success(claims) => claims.expiration.getOrElse(0L) < System.currentTimeMillis() / 1000
     case Failure(_) => true
@@ -588,8 +591,8 @@ object WebRoute  {
     }
   }
 
-  def extractIp(pingedRoute: Route): Route = extractClientIP { ip =>
-    if (ip.toOption.exists(x => (x.getHostAddress == "127.0.0.1") || x.getHostAddress == "172.17.0.1")) pingedRoute
+  def extractIp(pingedRoute: Route, restApi: RESTApiSettings): Route = extractClientIP { ip =>
+    if (ip.toOption.exists(x => restApi.allowedPeers.contains(x.getHostAddress))) pingedRoute
     else reject(ValidationRejection("Access denied"))
   }
 

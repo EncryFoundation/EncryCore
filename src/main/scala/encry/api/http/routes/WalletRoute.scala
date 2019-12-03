@@ -22,9 +22,7 @@ case class WalletRoute(settings: RESTApiSettings,
    implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
-  val IntrinsicTokenId: ADKey = encrySettings.constants.IntrinsicTokenId
-
-  val EttTokenId: String = Algos.encode(IntrinsicTokenId)
+  val EttTokenId: String = Algos.encode(encrySettings.constants.IntrinsicTokenId)
 
  def walletF: Future[Map[String, List[(String, Amount)]]] =
    (dataHolder ? GetViewGetBalance)
@@ -824,7 +822,8 @@ case class WalletRoute(settings: RESTApiSettings,
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
         }
-      )
+      ),
+      settings
     )
   }
 

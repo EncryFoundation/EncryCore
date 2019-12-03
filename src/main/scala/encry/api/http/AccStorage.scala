@@ -1,12 +1,12 @@
 package encry.api.http
 
 import java.io.File
+import cats.syntax.either._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
-import cats.syntax.either._
 import org.encryfoundation.common.utils.Algos
-import org.iq80.leveldb.{ DB, Options }
+import org.iq80.leveldb.{DB, Options}
 
 trait AccStorage extends StrictLogging with AutoCloseable {
 
@@ -17,10 +17,18 @@ trait AccStorage extends StrictLogging with AutoCloseable {
       new String(storage.get(AccStorage.PasswordKey)).mkString
     }
 
-  def putPassword(pass: String): Either[Throwable, Unit] =
-    Either.catchNonFatal {
-      storage.put(AccStorage.PasswordKey, pass.getBytes())
+  def putPassword(pass: String): Either[Throwable, Unit] = {
+    val batch = storage.createWriteBatch()
+    try {
+      batch.put(AccStorage.PasswordKey, pass.getBytes())
+      storage.write(batch).asRight[Throwable]
+    } catch {
+      case err: Throwable => err.asLeft[Unit]
     }
+    finally {
+      batch.close()
+    }
+  }
 
   override def close(): Unit = storage.close()
 

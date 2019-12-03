@@ -12,8 +12,8 @@ import encry.utils.NetworkTimeProvider
 import scala.concurrent.Future
 
 /**
- * Command "settings removeFromBlackList -host=<addr[String]> -port=<addr[String]>"
- * Example: settings removeFromBlackList -host='10.101.0.30' -port=53648
+ * Command "peer removeFromBlackList -host=<addr[String]> -port=<addr[String]>"
+ * Example: peer removeFromBlackList -host='10.101.0.30' -port=53648
  */
 object RemoveFromBlackList extends Command {
 

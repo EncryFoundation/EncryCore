@@ -297,8 +297,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.system.eventStream.publish(DisableMining)
     case ShutdownNode =>
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
-    case GetDataFromPresentView(f) =>
-      (nvhRef ? GetDataFromCurrentView(f)).pipeTo(sender)
+    case msg@GetDataFromCurrentView(f) => (nvhRef ? msg).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
@@ -327,8 +326,6 @@ object DataHolderForApi { //scalastyle:ignore
   final case class RemovePeerFromBanList(peer: InetSocketAddress)
 
   final case class UserAddPeer(peer: InetSocketAddress)
-
-  final case class GetDataFromPresentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
   final case class GetFullBlockByIdCommand(headerId: Either[String, ModifierId])
 

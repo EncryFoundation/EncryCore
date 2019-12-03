@@ -299,7 +299,8 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
         case Failure(_) =>
           complete(s"Couldn't load page with banned peers cause of inner system is overloaded. Try it later!")
-      }
+      },
+      settings
     )
   }
 }

@@ -15,7 +15,7 @@ import scala.concurrent._
 object GetInfo extends Command {
 
   /**
-    * Command "info get"
+    * Command "app info"
     */
   override def execute(args: Command.Args,
                        settings: EncryAppSettings,

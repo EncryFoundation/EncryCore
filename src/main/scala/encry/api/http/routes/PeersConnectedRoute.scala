@@ -300,7 +300,8 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
         onComplete(connectedPeers) {
           case Success(info) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
           case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
-        }
+        },
+      settings
     )
   }
 

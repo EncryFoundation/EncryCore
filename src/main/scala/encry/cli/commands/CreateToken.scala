@@ -5,22 +5,19 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp
 import encry.EncryApp._
-import encry.api.http.DataHolderForApi.{GetDataFromPresentView, GetViewCreateKey}
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox}
-
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import org.encryfoundation.common.modifiers.state.box.AssetBox
+import scala.concurrent.Future
 import scala.util.Try
 
 
@@ -37,7 +34,7 @@ object CreateToken extends Command {
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
-      GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+      GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
         Try {
           val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
           val fee: Long               = args.requireArg[Ast.Num]("fee").i

@@ -7,11 +7,11 @@ import cats.Applicative
 import cats.implicits._
 import encry.EncryApp
 import encry.EncryApp._
-import encry.api.http.DataHolderForApi.GetDataFromPresentView
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
@@ -22,9 +22,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
-
 import scala.concurrent.Future
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
 object Transfer extends Command {
@@ -40,7 +38,7 @@ object Transfer extends Command {
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     (dataHolder ?
-      GetDataFromPresentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
+      GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { wallet =>
         Try {
           val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
           val recipient: Address      = args.requireArg[Ast.Str]("addr").s

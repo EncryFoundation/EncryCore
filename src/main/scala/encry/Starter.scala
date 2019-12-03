@@ -43,11 +43,11 @@ class Starter(settings: EncryAppSettings,
 
   val preview =
     """
-      |~~~~~~XXXXXX~~XX~~~~~~XX~~~~XXXXX~~XXXXXX~~~~XX~~~~XX~~~~~~
-      |~~~~~~XX~~~~~~XXXX~~~~XX~~XX~~~~~~~XX~~~~XX~~~XXXXXX~~~~~~~
-      |~~~~~~XXXXXX~~XX~~XX~~XX~~XX~~~~~~~XXXXXX~~~~~~~XX~~~~~~~~~
-      |~~~~~~XX~~~~~~XX~~~~XXXX~~XX~~~~~~~XX~~~~XX~~~~~XX~~~~~~~~~
-      |~~~~~~XXXXXX~~XX~~~~~~XX~~~~XXXXX~~XX~~~~XX~~~~~XX~~~~~~~~~
+      |XXXXXX  XX      XX    XXXXX  XXXXXX   XX    XX
+      |XX      XXXX    XX  XX       XX   XX   XXXXXX
+      |XXXXXX  XX  XX  XX  XX       XXXXXX      XX
+      |XX      XX    XXXX  XX       XX   XX     XX
+      |XXXXXX  XX      XX    XXXXX  XX   XX     XX
     """.stripMargin
 
   def startNode(): Unit =

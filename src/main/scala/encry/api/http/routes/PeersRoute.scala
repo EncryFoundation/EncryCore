@@ -207,7 +207,8 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
           case Failure(_) => complete("Couldn't load page with peers cause of inner system is overloaded. Try it later!")
-        }
+        },
+      settings
     )
   }
 

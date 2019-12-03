@@ -23,8 +23,6 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
 
   val apiPort: Int = settings.bindAddress.getPort
 
-  val words: String = Mnemonic.getWords.toList.mkString(",")
-
   def peerScript(): Text.TypedTag[String] = {
 
     html(
@@ -93,7 +91,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
         script(
           raw(
             s"""function configure(){
-                  var words = "$words";
+                  var words = "${Mnemonic.getWords.toList.mkString(",")}";
                   var str = words.split(",");
                   var pass = document.getElementById("password").value;
                   var mnem = document.getElementById("mnemonic").value;
@@ -312,36 +310,6 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                                   input(cls := "form-control", id:="host", name:="host", placeholder := " Address", tpe := "text", onkeypress:="return AvoidSpace(event)"),
                                 )
                               ),
-//                              div(cls := "form-group",
-//                                div(cls := "input-group input-group-alternative",
-//                                  div(cls := "input-group-prepend",
-//                                  ),
-//                                  input(cls := "form-control", id:="port", name:="port", placeholder := " Port", onkeypress:="return AvoidSpace(event)"),
-//                                  script(
-//                                    raw(
-//                                      """
-//                  function setInputFilter(textbox, inputFilter) {
-//                      ["input", "keydown", "keyup", "mousedown", "mouseup", "select", "contextmenu", "drop"].forEach(function(event) {
-//                        textbox.oldValue = "";
-//                         textbox.addEventListener(event, function() {
-//                       if (inputFilter(this.value)) {
-//                         this.oldValue = this.value;
-//                         this.oldSelectionStart = this.selectionStart;
-//                         this.oldSelectionEnd = this.selectionEnd;
-//                       } else if (this.hasOwnProperty("oldValue")) {
-//                         this.value = this.oldValue;
-//                         this.setSelectionRange(this.oldSelectionStart, this.oldSelectionEnd);
-//                       }
-//                    });
-//                  });
-//                }
-//              setInputFilter(document.getElementById("port"), function(value) {
-//                return /^\d*$/.test(value) && (value === "" || parseInt(value) <= 10000);
-//              });
-//            """.stripMargin)
-//                                  ),
-//                                )
-//                              ),
                             //9.
                             // 10. max connections
                             h3("10. Set up max connections"),
@@ -523,7 +491,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
   }
 
   def configR: Route = (path("config") & get) {
-    WebRoute.extractIp(complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript().render)))
+    WebRoute.extractIp(complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript().render)), settings)
   }
 
   override def route: Route = configR ~ sendAllInfo
