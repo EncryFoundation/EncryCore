@@ -81,7 +81,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     reRequestsNumber: Int
   ): Receive = {
     case DataFromPeer(message, remote) =>
-      logger.info(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
+      logger.debug(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
       message match {
         case ResponseManifestMessage(manifest) =>
           logger.info(s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks.")
@@ -214,12 +214,12 @@ class SnapshotHolder(settings: EncryAppSettings,
               case Left(error) =>
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
               case Right((controller, processor)) =>
-                logger.info(s"Request manifest message successfully processed.")
+                logger.debug(s"Request manifest message successfully processed.")
                 scheduler.foreach(_.cancel())
                 snapshotDownloadController = controller
                 snapshotProcessor = processor
                 self ! RequestNextChunks
-                logger.info("Manifest processed")
+                logger.debug("Manifest processed")
                 context.become(fastSyncMod(history, none, 0))
             }
           } else if (!isValidManifest) {
@@ -269,12 +269,12 @@ class SnapshotHolder(settings: EncryAppSettings,
             connectionsHandler = connectionsHandler.addNewConnect(remote, m.chunksKeys.size)
           }
         case RequestManifestMessage(manifest) =>
-          logger.info(s"Got request for manifest with ${Algos.encode(manifest)}")
+          logger.debug(s"Got request for manifest with ${Algos.encode(manifest)}")
         case RequestChunkMessage(chunkId) if connectionsHandler.canProcessResponse(remote) =>
-          logger.info(s"Got RequestChunkMessage. Current handledRequests ${connectionsHandler.handledRequests}.")
+          logger.debug(s"Got RequestChunkMessage. Current handledRequests ${connectionsHandler.handledRequests}.")
           val chunkFromDB: Option[SnapshotChunkMessage] = snapshotProcessor.getChunkById(chunkId)
           chunkFromDB.foreach { chunk =>
-            logger.info(s"Sent tp $remote chunk $chunk.")
+            logger.debug(s"Sent tp $remote chunk $chunk.")
             val networkMessage: NetworkMessage = ResponseChunkMessage(chunk)
             remote.handlerRef ! networkMessage
           }
