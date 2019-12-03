@@ -97,9 +97,9 @@ case class WalletRoute(settings: RESTApiSettings,
                  var coin = document.forms["myForm"]["coin"].value;
                     var request = new XMLHttpRequest();
                     if (coin == "$EttTokenId") {
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount);
+                    request.open('GET', "/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount);
                     } else {
-                    request.open('GET', "http://localhost:9051/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount+"&token="+coin);
+                    request.open('GET', "/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount+"&token="+coin);
                     }
                     request.send();
                      window.alert("Transaction has been sent successfully");
@@ -138,9 +138,9 @@ case class WalletRoute(settings: RESTApiSettings,
                  var coin = document.forms["myForm4"]["coin"].value;
                     var request = new XMLHttpRequest();
                     if (coin == "$EttTokenId") {
-                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount);
+                    request.open('GET', "/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount);
                     } else {
-                    request.open('GET', "http://localhost:9051/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount+"&token="+coin);
+                    request.open('GET', "/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount+"&token="+coin);
                     }
                     request.send();
                      window.alert("Transaction has been sent successfully");
@@ -170,7 +170,7 @@ case class WalletRoute(settings: RESTApiSettings,
                  var fee = document.forms["myForm1"]["fee"].value;
                  var amount = document.forms["myForm1"]["amount"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/createToken?fee="+fee+"&amount="+amount);
+                    request.open('GET', "/wallet/createToken?fee="+fee+"&amount="+amount);
                     request.send();
                      window.alert("Transaction with token creation has been sent successfully");
                     setTimeout(location.reload.bind(location), 3000);
@@ -199,7 +199,7 @@ case class WalletRoute(settings: RESTApiSettings,
                  var fee = document.forms["myForm2"]["fee"].value;
                  var data = document.forms["myForm2"]["data"].value;
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://localhost:9051/wallet/data?fee="+fee+"&data="+data);
+                    request.open('GET', "/wallet/data?fee="+fee+"&data="+data);
                     request.send();
                      window.alert("Data transaction has been created successfully");
                     setTimeout(location.reload.bind(location), 3000);
@@ -210,7 +210,7 @@ case class WalletRoute(settings: RESTApiSettings,
          raw(
            """function keyCreate() {
                    var request = new XMLHttpRequest();
-                     request.open('GET', "http://localhost:9051/wallet/createKey");
+                     request.open('GET', "/wallet/createKey");
                      request.send();
                       window.alert("Key created successfully");
                      setTimeout(location.reload.bind(location), 1500);

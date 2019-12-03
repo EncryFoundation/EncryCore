@@ -140,13 +140,13 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                 if (mnem == "") {
                     window.alert("Please, save it and don't show to anyone! ${phrase}");
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
+                    request.open('GET', "/collect?password="+pass+"&mnem="+"${phrase}"+"&chain="+check1+"&sync="+check2+"&host="+host+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
                     request.send();
                     window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
                 } else {
                  if ((mnemToList.length == 12) && arrayContainsArray(str, mnemToList)) {
                     var request = new XMLHttpRequest();
-                    request.open('GET', "http://0.0.0.0:9051/collect?password="+pass+"&mnem="+mnem+"&chain="+check1+"&sync="+check2+"&host="+host+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
+                    request.open('GET', "/collect?password="+pass+"&mnem="+mnem+"&chain="+check1+"&sync="+check2+"&host="+host+"&cwp="+check3+"&nodePass="+node+"&nodeName="+nodeName+"&declared="+declared+"&bind="+bind);
                     request.send();
                     window.alert("Configuration completed. URL: http://0.0.0.0:9051/login will be available.");
                     } else {

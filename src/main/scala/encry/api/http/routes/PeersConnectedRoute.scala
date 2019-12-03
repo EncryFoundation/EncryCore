@@ -51,7 +51,7 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                  var addr = document.forms["myForm"]["addr"].value;
                  var port = document.forms["myForm"]["port"].value;
                     var request = new XMLHttpRequest();
-                    request.open('POST', "http://localhost:9051/peers/add", true);
+                    request.open('POST', "/peers/add", true);
                     request.send(addr.toString() + ':' + port.toString());
                      window.alert("Info about adding peer was sent to node");
                     setTimeout(location.reload.bind(location), 1500);
