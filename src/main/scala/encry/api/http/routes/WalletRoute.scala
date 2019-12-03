@@ -685,12 +685,16 @@ case class WalletRoute(settings: RESTApiSettings,
                                       ),
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
-                                          for {
-                                            coinI <- balances.values.toList
-                                            coinIds <- coinI
-                                          }
-                                            yield {
-                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
+                                          if (balances.nonEmpty) {
+                                            for {
+                                              coinI <- balances.values.toList
+                                              coinIds <- coinI
+                                            }
+                                              yield {
+                                                option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
+                                              }
+                                          } else {
+                                            option(value := "", "")
                                           }
                                         )
                                       ),
@@ -719,20 +723,24 @@ case class WalletRoute(settings: RESTApiSettings,
                         )
                       ),
                       tbody(
-                        (for {
-                          mapKeyValue <- balances
-                          tokenAmount <- mapKeyValue._2
-                        } yield {
-                          val tknStr = tokenAmount._1 match {
-                            case tokenId if tokenId == EttTokenId => "ETT"
-                            case tokenId => tokenId
-                          }
-                          tr(
-                            th(mapKeyValue._1),
-                            th(tknStr),
-                            th(tokenAmount._2)
-                          )
-                        }).toList
+                        if (balances.nonEmpty) {
+                          (for {
+                            mapKeyValue <- balances
+                            tokenAmount <- mapKeyValue._2
+                          } yield {
+                            val tknStr = tokenAmount._1 match {
+                              case tokenId if tokenId == EttTokenId => "ETT"
+                              case tokenId => tokenId
+                            }
+                            tr(
+                              th(mapKeyValue._1),
+                              th(tknStr),
+                              th(tokenAmount._2)
+                            )
+                          }).toList
+                        } else {
+                          tr()
+                        }
                       )
                     )
                   )
@@ -759,8 +767,12 @@ case class WalletRoute(settings: RESTApiSettings,
                         )
                       ),
                       tbody(
-                        for (p <- pubKeysList) yield {
-                          tr(th(attr("scope") := "row", p))
+                        if(pubKeysList.nonEmpty) {
+                          for (p <- pubKeysList) yield {
+                            tr(th(attr("scope") := "row", p))
+                          }
+                        } else {
+                          tr()
                         }
                       )
                     )
