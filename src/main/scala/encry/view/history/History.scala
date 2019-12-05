@@ -140,18 +140,6 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
     }
   }
 
-  def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
-    logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
-    val modsRaw: List[(StorageKey, StorageValue)] =
-      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
-    val bestBlock = BestBlockKey -> StorageValue @@ headerId
-    historyStorage.insert(
-      StorageVersion @@ validityKey(payloadId).untag(StorageKey),
-      bestBlock :: modsRaw
-    )
-    this
-  }
-
   override def close(): Unit = historyStorage.close()
 
   def closeStorage(): Unit = historyStorage.close()
