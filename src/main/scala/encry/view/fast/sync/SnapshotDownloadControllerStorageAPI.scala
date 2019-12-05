@@ -1,7 +1,6 @@
 package encry.view.fast.sync
 
 import cats.syntax.either._
-import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
 import encry.view.fast.sync.FastSyncExceptions.{
   FastSyncException,
@@ -10,7 +9,7 @@ import encry.view.fast.sync.FastSyncExceptions.{
   SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty
 }
 import org.encryfoundation.common.utils.Algos
-import org.iq80.leveldb.{ DB, DBIterator, ReadOptions, WriteBatch }
+import org.iq80.leveldb.DB
 
 trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
 
