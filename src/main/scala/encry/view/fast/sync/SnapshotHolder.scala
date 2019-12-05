@@ -138,9 +138,8 @@ class SnapshotHolder(settings: EncryAppSettings,
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
       (for {
-        size             <- snapshotDownloadController.currentNonRequestedBatchesSize
-        _                = logger.info(s"Current notYetRequested queue $size.")
         controllerAndIds <- snapshotDownloadController.chunksIdsToDownload
+        _                = logger.info(s"Current notYetRequested queue ${snapshotDownloadController.batchesSize}.")
       } yield controllerAndIds) match {
         case Left(err) =>
           logger.info(s"Error has occurred: ${err.error}")

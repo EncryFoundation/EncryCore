@@ -39,7 +39,9 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             settings: EncryAppSettings,
                                             cp: Option[ConnectedPeer],
                                             requiredManifestHeight: Int,
-                                            storage: DB)
+                                            storage: DB,
+                                            batchesSize: Int,
+                                            nextGroupForRequestNumber: Int)
     extends SnapshotDownloadControllerStorageAPI
     with StrictLogging {
 
@@ -56,11 +58,13 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           .asLeft[SnapshotDownloadController]
       case Right(manifest) =>
         logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
-        insertMany(manifest.chunksKeys) match {
+        val batchesSize: Int = insertMany(manifest.chunksKeys) match {
           case Left(error) =>
             logger.info(s"Error ${error.error} has occurred while processing new manifest.")
-          case Right(_) =>
+            0 //todo ???
+          case Right(v) =>
             logger.info(s"New chunks ids successfully inserted into db")
+            v
         }
         SnapshotDownloadController(
           requiredManifestId,
@@ -68,7 +72,9 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           settings,
           remote.some,
           requiredManifestHeight,
-          storage
+          storage,
+          batchesSize,
+          1
         ).asRight[SnapshotDownloadControllerException]
     }
   }
@@ -99,16 +105,16 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   def chunksIdsToDownload
     : Either[FastSyncExceptions.FastSyncException, (SnapshotDownloadController, List[RequestChunkMessage])] =
     for {
-      nextBatch                                       <- getNextForRequest
+      nextBatch                                       <- getNextForRequest(nextGroupForRequestNumber)
       serializedToDownload: List[RequestChunkMessage] = nextBatch.map(id => RequestChunkMessage(id))
-    } yield this.copy(requestedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet) -> serializedToDownload
+    } yield
+      this.copy(
+        requestedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet,
+        batchesSize = batchesSize - 1,
+        nextGroupForRequestNumber = nextGroupForRequestNumber + 1
+      ) -> serializedToDownload
 
-  def isNotYetRequestedNonEmpty: Boolean = isBatchesListNonEmpty match {
-    case Left(value) =>
-      logger.info(s"Error ${value.error} has occurred")
-      false
-    case Right(value) => value
-  }
+  def isNotYetRequestedNonEmpty: Boolean = batchesSize == 0
 
   def checkManifestValidity(manifestId: Array[Byte], history: History): Boolean =
     history.getBestHeaderAtHeight { requiredManifestHeight }.exists { header =>
@@ -130,6 +136,6 @@ object SnapshotDownloadController {
 
   def empty(settings: EncryAppSettings): SnapshotDownloadController = {
     val levelDBInit = LevelDbFactory.factory.open(getChunksStorageDir(settings), new Options)
-    SnapshotDownloadController(Array.emptyByteArray, Set.empty, settings, none, 0, levelDBInit)
+    SnapshotDownloadController(Array.emptyByteArray, Set.empty, settings, none, 0, levelDBInit, 0, 0)
   }
 }

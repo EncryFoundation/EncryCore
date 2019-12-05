@@ -5,14 +5,12 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
 import encry.view.fast.sync.FastSyncExceptions.{
   FastSyncException,
-  SnapshotDownloadControllerStorageAPIGetBatchesSize,
   SnapshotDownloadControllerStorageAPIGetManyFunctionFailed,
   SnapshotDownloadControllerStorageAPIInsertMany,
   SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty
 }
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.{ DB, DBIterator, ReadOptions, WriteBatch }
-import com.google.common.primitives.Ints
 
 trait SnapshotDownloadControllerStorageAPI extends StrictLogging {
 
@@ -20,7 +18,7 @@ trait SnapshotDownloadControllerStorageAPI extends StrictLogging {
 
   val settings: EncryAppSettings
 
-  val notRequestedBatchesSizeKey: Array[Byte] = Algos.hash("not_requested_batches_size_key")
+  def nextGroupKey(n: Int): Array[Byte] = Algos.hash(s"next_group_key_$n")
 
   /**
    * Key is the first element of batch.
@@ -29,20 +27,22 @@ trait SnapshotDownloadControllerStorageAPI extends StrictLogging {
    *
    * @param ids - elements for insertion into db
    */
-  def insertMany(ids: List[Array[Byte]]): Either[FastSyncException, Unit] = {
+  def insertMany(ids: List[Array[Byte]]): Either[FastSyncException, Int] = {
     val batch: WriteBatch = storage.createWriteBatch()
     try {
-      val groups = ids.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
-      groups.foreach { nextBatch =>
-        batch.put(nextBatch.head, nextBatch.flatten.toArray)
+      val groups: List[List[Array[Byte]]] =
+        ids.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
+      val groupsCount: Int = groups.foldLeft(1) {
+        case (groupNumber, group) =>
+          batch.put(nextGroupKey(groupNumber), group.flatten.toArray)
+          groupNumber + 1
       }
-      batch.put(notRequestedBatchesSizeKey, Ints.toByteArray(groups.size))
       storage.write(batch)
-      ().asRight[FastSyncException]
+      groupsCount.asRight[FastSyncException]
     } catch {
       case err: Throwable =>
-        logger.info(s"While insertMany function error ${err.getMessage} has occurred.")
-        SnapshotDownloadControllerStorageAPIInsertMany(err.getMessage).asLeft[Unit]
+        println(s"While insertMany function error ${err.getMessage} has occurred.")
+        SnapshotDownloadControllerStorageAPIInsertMany(err.getMessage).asLeft[Int]
     } finally {
       batch.close()
     }
@@ -51,32 +51,25 @@ trait SnapshotDownloadControllerStorageAPI extends StrictLogging {
   /**
    * @return - returns next chunks ids for request
    */
-  def getNextForRequest: Either[FastSyncException, List[Array[Byte]]] = {
-    val snapshot             = storage.getSnapshot
-    val readOptions          = new ReadOptions().snapshot(snapshot)
-    val iterator: DBIterator = storage.iterator(readOptions)
-    val batch: WriteBatch    = storage.createWriteBatch()
+  def getNextForRequest(groupNumber: Int): Either[FastSyncException, List[Array[Byte]]] = {
+    val snapshot          = storage.getSnapshot
+    val readOptions       = new ReadOptions().snapshot(snapshot)
+    val batch: WriteBatch = storage.createWriteBatch()
     try {
-      iterator.seekToFirst()
+      val res = storage.get(nextGroupKey(groupNumber))
       val buffer: List[Array[Byte]] =
-        if (iterator.hasNext) {
-          val res = iterator.next().getValue.grouped(32).toList
-          batch.delete(iterator.next().getKey)
-          val currentNonRequested: Int = Ints.fromByteArray(storage.get(notRequestedBatchesSizeKey))
-          if (currentNonRequested != 0) {
-            batch.put(notRequestedBatchesSizeKey, Ints.toByteArray(currentNonRequested - 1))
-          }
+        if (res != null) {
+          batch.delete(nextGroupKey(groupNumber))
           storage.write(batch)
-          res
+          res.grouped(32).toList
         } else List.empty[Array[Byte]]
       buffer.asRight[FastSyncException]
     } catch {
       case err: Throwable =>
-        logger.info(s"While getMany function error ${err.getMessage} has occurred")
+        println(s"While getMany function error ${err.getMessage} has occurred")
         SnapshotDownloadControllerStorageAPIGetManyFunctionFailed(err.getMessage).asLeft[List[Array[Byte]]]
     } finally {
       batch.close()
-      iterator.close()
       readOptions.snapshot().close()
     }
   }
@@ -103,13 +96,4 @@ trait SnapshotDownloadControllerStorageAPI extends StrictLogging {
       readOptions.snapshot().close()
     }
   }
-
-  def currentNonRequestedBatchesSize: Either[FastSyncException, Int] =
-    try {
-      Ints.fromByteArray(storage.get(notRequestedBatchesSizeKey)).asRight[FastSyncException]
-    } catch {
-      case err: Throwable =>
-        logger.info(s"Error has occurred while isBatchesListNonEmpty function processing.")
-        SnapshotDownloadControllerStorageAPIGetBatchesSize(err.getMessage).asLeft[Int]
-    }
 }
