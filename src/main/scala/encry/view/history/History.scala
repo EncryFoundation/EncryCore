@@ -186,7 +186,7 @@ object History extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
-    if (settingsEncry.snapshotSettings.enableFastSynchronization)
+    if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
       new History with HistoryHeadersProcessor with FastSyncProcessor {
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
