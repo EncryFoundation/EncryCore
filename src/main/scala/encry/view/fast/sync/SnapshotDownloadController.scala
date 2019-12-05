@@ -1,14 +1,27 @@
 package encry.view.fast.sync
 
+import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
+import cats.syntax.either._
+import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
-import SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
+import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
+import encry.view.fast.sync.FastSyncExceptions.{
+  ChunkValidationError,
+  InvalidChunkBytes,
+  InvalidManifestBytes,
+  SnapshotDownloadControllerException
+}
+import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.network.BasicMessagesRepo.RequestChunkMessage
 import org.encryfoundation.common.utils.Algos
+import org.iq80.leveldb.{ DB, Options }
 import cats.syntax.either._
 import cats.syntax.option._
 import encry.view.fast.sync.FastSyncExceptions.{
@@ -22,12 +35,13 @@ import encry.view.fast.sync.FastSyncExceptions.{
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
-                                            notYetRequested: List[Array[Byte]],
                                             requestedChunks: Set[ByteArrayWrapper],
                                             settings: EncryAppSettings,
                                             cp: Option[ConnectedPeer],
-                                            requiredManifestHeight: Int)
-    extends StrictLogging {
+                                            requiredManifestHeight: Int,
+                                            storage: DB)
+    extends SnapshotDownloadControllerStorageAPI
+    with StrictLogging {
 
   def processManifest(
     manifestProto: SnapshotManifestProtoMessage,
@@ -42,13 +56,19 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           .asLeft[SnapshotDownloadController]
       case Right(manifest) =>
         logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
+        insertMany(manifest.chunksKeys) match {
+          case Left(error) =>
+            logger.info(s"Error ${error.error} has occurred while processing new manifest.")
+          case Right(_) =>
+            logger.info(s"New chunks ids successfully inserted into db")
+        }
         SnapshotDownloadController(
           requiredManifestId,
-          manifest.chunksKeys,
           Set.empty[ByteArrayWrapper],
           settings,
           remote.some,
-          requiredManifestHeight
+          requiredManifestHeight,
+          storage
         ).asRight[SnapshotDownloadControllerException]
     }
   }
@@ -76,43 +96,18 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     }
   }
 
-  def processManifestHasChangedMessage(
-    newManifest: SnapshotManifestProtoMessage,
-    remote: ConnectedPeer
-  ): Either[ProcessManifestHasChangedMessageException, SnapshotDownloadController] = {
-    logger.info(
-      s"Got message Manifest has changed from ${remote.socketAddress}. " +
-        s"New manifest id is ${Algos.encode(newManifest.manifestId.toByteArray)}"
-    )
-    Either.fromTry(SnapshotManifestSerializer.fromProto(newManifest)) match {
-      case Left(error) =>
-        ProcessManifestHasChangedMessageException(
-          s"New manifest after manifest has changed was parsed with error ${error.getCause}."
-        ).asLeft[SnapshotDownloadController]
-      case Right(newManifest) =>
-        logger.info(s"Manifest ${Algos.encode(newManifest.manifestId)} contains correct root node.")
-        SnapshotDownloadController(
-          newManifest.manifestId,
-          newManifest.chunksKeys,
-          Set.empty[ByteArrayWrapper],
-          settings,
-          remote.some,
-          requiredManifestHeight
-        ).asRight[ProcessManifestHasChangedMessageException]
-    }
-  }
+  def chunksIdsToDownload
+    : Either[FastSyncExceptions.FastSyncException, (SnapshotDownloadController, List[RequestChunkMessage])] =
+    for {
+      nextBatch                                       <- getNextForRequest
+      serializedToDownload: List[RequestChunkMessage] = nextBatch.map(id => RequestChunkMessage(id))
+    } yield this.copy(requestedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet) -> serializedToDownload
 
-  def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
-    val newToRequest: Set[ByteArrayWrapper] = notYetRequested
-      .take(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
-      .map(ByteArrayWrapper(_))
-      .toSet
-    val updatedToRequest: List[Array[Byte]] =
-      notYetRequested.drop(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
-    val serializedToDownload: List[RequestChunkMessage] = newToRequest
-      .map(id => RequestChunkMessage(id.data))
-      .toList
-    this.copy(notYetRequested = updatedToRequest, requestedChunks = newToRequest) -> serializedToDownload
+  def isNotYetRequestedNonEmpty: Boolean = isBatchesListNonEmpty match {
+    case Left(value) =>
+      logger.info(s"Error ${value.error} has occurred")
+      false
+    case Right(value) => value
   }
 
   def checkManifestValidity(manifestId: Array[Byte], history: History): Boolean =
@@ -127,6 +122,14 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 
 object SnapshotDownloadController {
 
-  def empty(settings: EncryAppSettings): SnapshotDownloadController =
-    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0)
+  def getChunksStorageDir(settings: EncryAppSettings): File = {
+    val dir: File = new File(s"${settings.directory}/chunksStorage")
+    dir.mkdirs()
+    dir
+  }
+
+  def empty(settings: EncryAppSettings): SnapshotDownloadController = {
+    val levelDBInit = LevelDbFactory.factory.open(getChunksStorageDir(settings), new Options)
+    SnapshotDownloadController(Array.emptyByteArray, Set.empty, settings, none, 0, levelDBInit)
+  }
 }

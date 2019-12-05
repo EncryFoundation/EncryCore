@@ -8,11 +8,17 @@ import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
+import encry.network.BlackList.BanReason._
 import encry.network.Broadcast
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.{ Broadcast, PeerConnectionHandler }
 import encry.settings.EncryAppSettings
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException }
+import encry.view.fast.sync.SnapshotHolder._
+import encry.view.history.History
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
 import encry.view.fast.sync.SnapshotHolder._
@@ -22,6 +28,7 @@ import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -102,11 +109,11 @@ class SnapshotHolder(settings: EncryAppSettings,
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
               restartFastSync(history)
             case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty && processor.chunksCache.nonEmpty =>
+                if controller.requestedChunks.isEmpty && !controller.isNotYetRequestedNonEmpty && processor.chunksCache.nonEmpty =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
               restartFastSync(history)
             case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
+                if controller.requestedChunks.isEmpty && !controller.isNotYetRequestedNonEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) =>
                   logger.info(s"Tree is valid on Snapshot holder!")
@@ -130,17 +137,27 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
-      logger.info(s"Current notYetRequested queue ${snapshotDownloadController.notYetRequested.size}.")
-      val (newController, toDownload) = snapshotDownloadController.chunksIdsToDownload
-      snapshotDownloadController = newController
-      toDownload.foreach { msg =>
-        snapshotDownloadController.cp.foreach { peer =>
-          peer.handlerRef ! msg
-        }
+      (for {
+        size             <- snapshotDownloadController.currentNonRequestedBatchesSize
+        _                = logger.info(s"Current notYetRequested queue $size.")
+        controllerAndIds <- snapshotDownloadController.chunksIdsToDownload
+      } yield controllerAndIds) match {
+        case Left(err) =>
+          logger.info(s"Error has occurred: ${err.error}")
+
+        case Right(controllerAndIds) =>
+          snapshotDownloadController = controllerAndIds._1
+          controllerAndIds._2.foreach { msg =>
+            snapshotDownloadController.cp.foreach { peer: PeerConnectionHandler.ConnectedPeer =>
+              peer.handlerRef ! msg
+            }
+          }
+          val timer: Option[Cancellable] =
+            context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
+          context.become(
+            fastSyncMod(history, processHeaderSyncedMsg, timer, reRequestsNumber = 0).orElse(commonMessages)
+          )
       }
-      val timer: Option[Cancellable] =
-        context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
-      context.become(fastSyncMod(history, timer, reRequestsNumber = 0).orElse(commonMessages))
 
     case RequiredManifestHeightAndId(height, manifestId) =>
       logger.info(

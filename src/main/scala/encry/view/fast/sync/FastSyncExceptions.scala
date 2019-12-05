@@ -30,4 +30,9 @@ object FastSyncExceptions {
   final case class ApplicableChunkIsAbsent(error: String, processor: SnapshotProcessor) extends FastSyncException
   final case class BestHeaderAtHeightIsAbsent(error: String) extends FastSyncException
   final case class InitializeHeightAndRootKeysException(error: String) extends FastSyncException
+
+  final case class SnapshotDownloadControllerStorageAPIInsertMany(error: String) extends FastSyncException
+  final case class SnapshotDownloadControllerStorageAPIGetManyFunctionFailed(error: String) extends FastSyncException
+  final case class SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty(error: String) extends FastSyncException
+  final case class SnapshotDownloadControllerStorageAPIGetBatchesSize(error: String) extends FastSyncException
 }
