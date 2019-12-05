@@ -9,6 +9,7 @@ import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
+
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -18,8 +19,8 @@ object CreateKey extends Command {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
     nodeViewHolder ?
       GetDataFromCurrentView[History, UtxoState, EncryWallet, Unit] { view =>
-        if (view.vault.accountManager.accounts.isEmpty) view.vault.accountManager.mandatoryAccount
-        else view.vault.accountManager.createAccount(None)
+        if (view.vault.accountManagers.head.accounts.isEmpty) view.vault.accountManagers.head.mandatoryAccount
+        else view.vault.accountManagers.head.createAccount(None)
       }
   }.map(_ => Future(Some(Response("OK")))).getOrElse(Future(Some(Response("Operation failed"))))
 }

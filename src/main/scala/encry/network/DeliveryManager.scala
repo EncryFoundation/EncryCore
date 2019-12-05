@@ -10,7 +10,6 @@ import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, Registe
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler._
 import encry.stats.StatsSender.{GetModifiers, SendDownloadRequest, SerializedModifierFromNetwork}
-import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.history.History
 import encry.settings.EncryAppSettings
 import scala.concurrent.duration._
@@ -24,6 +23,7 @@ import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
+import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -36,10 +36,10 @@ import scala.concurrent.ExecutionContextExecutor
 class DeliveryManager(influxRef: Option[ActorRef],
                       nodeViewHolderRef: ActorRef,
                       networkControllerRef: ActorRef,
-                      settings: EncryAppSettings,
                       memoryPoolRef: ActorRef,
                       nodeViewSync: ActorRef,
-                      downloadedModifiersValidator: ActorRef) extends Actor with StrictLogging {
+                      downloadedModifiersValidator: ActorRef,
+                      settings: EncryAppSettings) extends Actor with StrictLogging {
 
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
@@ -65,7 +65,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
   var peersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)] = Map.empty
 
-  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings)
+  var priorityCalculator: PrioritiesCalculator = PrioritiesCalculator(settings.network)
 
   var canProcessTransactions: Boolean = true
 
@@ -122,6 +122,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
+      logger.debug(s"Qty to req: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
@@ -180,9 +181,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
       case _ => logger.debug(s"DeliveryManager got invalid type of DataFromPeer message!")
     }
 
-    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>
+    case DownloadRequest(modifierTypeId, modifiersId, previousModifier) =>  //todo check this condition
       if (modifierTypeId != Transaction.modifierTypeId)
-        logger.debug(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
+        logger.info(s"DownloadRequest for mod ${Algos.encode(modifiersId)} of type: $modifierTypeId prev mod: " +
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
@@ -435,7 +436,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         influxRef.foreach(_ ! SendDownloadRequest(modifierTypeId, modifierIds))
         coll.foreach { case (_, (cp, _, _)) =>
           if (modifierTypeId != Transaction.modifierTypeId)
-            logger.debug(s"Sent download request to the ${cp.socketAddress} to modifiers of type: $modifierTypeId.")
+            logger.info(s"Sent download request to the ${cp.socketAddress} to modifiers of type: $modifierTypeId.")
           requestModifies(history, cp, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
         }
       case _ => logger.info(s"BlockChain is synced. There is no nodes, which we can connect with.")
@@ -454,8 +455,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               peer: ConnectedPeer,
               isBlockChainSynced: Boolean): Unit =
     if (isExpecting(mId, mTid, peer)) {
-      if (mTid != Transaction.modifierTypeId)
+      if (mTid != Transaction.modifierTypeId) {
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
+      }
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)
@@ -505,19 +507,19 @@ object DeliveryManager {
 
   case object CheckPayloadsToDownload
 
-  case object FullBlockChainIsSynced
+  final case object FullBlockChainIsSynced
 
   final case class CheckModifiersWithQueueSize(size: Int) extends AnyVal
 
   def props(influxRef: Option[ActorRef],
             nodeViewHolderRef: ActorRef,
             networkControllerRef: ActorRef,
-            settings: EncryAppSettings,
             memoryPoolRef: ActorRef,
             nodeViewSync: ActorRef,
-            downloadedModifiersValidator: ActorRef): Props =
-    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, settings,
-      memoryPoolRef, nodeViewSync, downloadedModifiersValidator))
+            downloadedModifiersValidator: ActorRef,
+            settings: EncryAppSettings): Props =
+    Props(new DeliveryManager(influxRef, nodeViewHolderRef, networkControllerRef, memoryPoolRef, nodeViewSync,
+      downloadedModifiersValidator, settings))
 
   class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(

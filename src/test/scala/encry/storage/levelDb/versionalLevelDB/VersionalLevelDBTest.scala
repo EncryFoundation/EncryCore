@@ -2,7 +2,7 @@ package encry.storage.levelDb.versionalLevelDB
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.LevelDBSettings
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{VersionalLevelDbKey, VersionalLevelDbValue}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{DELETION_PREFIX, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.utils.FileHelper
 import encry.utils.levelDBUtils.LevelDbUnitsGenerator
 import io.iohk.iodb.ByteArrayWrapper
@@ -162,10 +162,14 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     levelDBElems.foreach(vldbInit.insert)
 
-    vldbInit.rollbackTo(levelDBElems(6).version)
+    println(s"rollback to: ${Algos.encode(levelDBElems(5).version)}")
 
-    Algos.hash(vldbInit.get(levelDBElems(6).elemsToInsert.head._1).get) shouldEqual
-      Algos.hash(levelDBElems(6).elemsToInsert.head._2)
+    vldbInit.rollbackTo(levelDBElems(5).version)
+
+    Algos.hash(vldbInit.get(levelDBElems(5).elemsToInsert.head._1).get) shouldEqual
+      Algos.hash(levelDBElems(5).elemsToInsert.head._2)
+
+
   }
 
   property("deleted key from deleted version should not exist") {
@@ -182,7 +186,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, Random.nextInt(300))
+    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, maxVersions + 2)
 
     levelDbElems.foreach(vldbInit.insert)
 
@@ -193,6 +197,10 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     levelDbElems.last.elemsToDelete.forall{key =>
       vldbInit.get(key) == Option.empty[VersionalLevelDbValue]
     } shouldBe true
+
+    levelDbElems.head.elemsToDelete.forall{key =>
+      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)).isEmpty
+    } shouldBe true
   }
 
   property("Check that after rollback, it is impossible to get last generated version.") {
@@ -201,7 +209,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val levelDbElemsQty = Random.nextInt(maxVersions) + 10
 
-    val rollbackPointIdx = Random.nextInt(levelDbElemsQty)
+    val rollbackPointIdx = Random.nextInt(Math.abs(levelDbElemsQty - 1))
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -261,7 +269,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val maxVersions = Random.nextInt(10)
 
-    val levelDbElemsQty = maxVersions + Random.nextInt(1000) + 1000
+    val levelDbElemsQty = maxVersions + 5
 
     val dummyLevelDBSettings: LevelDBSettings = LevelDBSettings(maxVersions)
 
@@ -271,12 +279,14 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
 
     val vldbInit = VersionalLevelDBCompanion(levelDBInit, dummyLevelDBSettings)
 
-    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, 100)
+    val levelDbElems: Seq[LevelDbDiff] = generateRandomLevelDbElemsWithLinkedDeletions(levelDbElemsQty, 5)
 
     levelDbElems.foreach(vldbInit.insert)
 
     levelDbElems.head.elemsToInsert.forall{case (key, _) =>
       vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)) == null
     } shouldEqual true
+
+
   }
 }

@@ -7,10 +7,6 @@ import scala.concurrent.duration._
 
 case object TestConstants extends Constants {
 
-  val StateRootSize: Int = 33
-
-  val TransactionsRootSize: Int = 32
-
   val DigestLength: Int = 32
 
   val ModifierIdSize: Int = DigestLength
@@ -24,6 +20,8 @@ case object TestConstants extends Constants {
   val PersistentByteCost: Int = 16
 
   val StateByteCost: Int = 26
+
+  val stateRootSize: Int = 32
 
   val MaxDataLength: Int = 1000
 

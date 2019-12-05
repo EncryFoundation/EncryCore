@@ -17,20 +17,22 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
+import supertagged.@@
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
 trait History extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
 
-  def isFullChainSynced: Boolean = getBestHeaderId
-    .exists(bestHeaderId => getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId)))
+  var isFullChainSynced: Boolean = settings.node.offlineGeneration
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
-      case header: Header   => (this, processHeader(header))
+      case header: Header   =>
+        logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
+        (this, processHeader(header))
       case payload: Payload => (this, processPayload(payload))
     })
   }
@@ -134,6 +136,18 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
     }
   }
 
+  def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
+    logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
+    val modsRaw: List[(StorageKey, StorageValue)] =
+      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
+    val bestBlock = BestBlockKey -> StorageValue @@ headerId
+    historyStorage.insert(
+      StorageVersion @@ validityKey(payloadId).untag(StorageKey),
+      bestBlock :: modsRaw
+    )
+    this
+  }
+
   override def close(): Unit = historyStorage.close()
 
   def closeStorage(): Unit = historyStorage.close()
@@ -170,7 +184,6 @@ object History extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
     new History {
-      override val settings: EncryAppSettings = settingsEncry
       override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
       override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
     }

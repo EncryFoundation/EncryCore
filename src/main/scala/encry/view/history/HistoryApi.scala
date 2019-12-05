@@ -4,21 +4,18 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus._
 import encry.consensus._
 import encry.modifiers.history._
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, Settings}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.ValidationError.HistoryApiError
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.history.{Block, BlockProtoSerializer, Header, HeaderProtoSerializer, Payload}
+import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
 trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
-
-  val settings: EncryAppSettings
 
   val timeProvider: NetworkTimeProvider
 
@@ -30,9 +27,11 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
-  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node)
+  lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
-  private var isHeadersChainSyncedVar: Boolean = false
+  var isHeadersChainSyncedVar: Boolean = false
+
+  var isFastSync: Boolean = settings.snapshotSettings.enableFastSynchronization
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
@@ -54,7 +53,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     headersCache.get(ByteArrayWrapper(id)).map(_.height)
       .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
       .orElse(getHeightByHeaderId(id))
-  ).getOrElse(TestNetConstants.PreGenesisHeight)
+  ).getOrElse(settings.constants.PreGenesisHeight)
 
   def getBestBlock: Option[Block] = getBestBlockId.flatMap(id =>
     blocksCache.get(ByteArrayWrapper(id))
@@ -63,13 +62,17 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   def getBestBlockHeight: Int = getBestBlockId
     .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header.height).orElse(getHeightByHeaderId(id)))
-    .getOrElse(TestNetConstants.PreGenesisHeight)
+    .getOrElse(settings.constants.PreGenesisHeight)
 
   def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(id =>
     headersCache.get(ByteArrayWrapper(id))
       .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
       .orElse(getHeaderByIdDB(id))
   )
+
+  def getBestHeaderAtHeight(h: Int): Option[Header] = headersCacheIndexes.get(h)
+    .flatMap(_.headOption).flatMap(id => headersCache.get(ByteArrayWrapper(id)))
+    .orElse(getBestHeaderAtHeightDB(h))
 
   def getBlockByPayload(payload: Payload): Option[Block] = headersCache
     .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
@@ -93,14 +96,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       blocksCache.get(ByteArrayWrapper(id)).isDefined ||
       isModifierDefined(id)
 
-  def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = headersCacheIndexes
-    .get(h)
-    .flatMap(_.headOption)
-    .orElse(getBestHeaderIdAtHeightDB(h))
-
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = headersCacheIndexes
-    .get(height)
-    .orElse(headerIdsAtHeightDB(height))
+  def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = getBestHeaderIdAtHeightDB(h)
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] = headerIdsAtHeightDB(height)
     .getOrElse(Seq.empty[ModifierId])
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
@@ -131,16 +128,16 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       bestBlockId             <- getBestBlockId
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-        case _ if !isHeadersChainSynced =>
-          Seq.empty
-        case Some(header) if isInBestChain(header) =>
-          continuation(header.height + 1, Seq.empty)
-        case Some(header) =>
-          lastBestBlockHeightRelevantToBestChain(header.height)
-            .map(height => continuation(height + 1, Seq.empty))
-            .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
-        case None =>
-          continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
+      case _ if !isHeadersChainSynced =>
+        Seq.empty
+      case Some(header) if isInBestChain(header) =>
+        continuation(header.height + 1, Seq.empty)
+      case Some(header) =>
+        lastBestBlockHeightRelevantToBestChain(header.height)
+          .map(height => continuation(height + 1, Seq.empty))
+          .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty))
+      case None =>
+        continuation(blockDownloadProcessor.minimalBlockHeightVar, Seq.empty)
     }
   }
 
@@ -148,7 +145,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && isNewHeader(header)) {
+    else if (!isHeadersChainSynced && isNewHeader(header) && !isFastSync) {
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none
@@ -172,12 +169,13 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     .find(p)
     .flatMap(getHeaderById) match {
       case h@Some(_)                                       => h
-      case None if height > TestNetConstants.GenesisHeight => loopHeightDown(height - 1, p)
+      case None if height > settings.constants.GenesisHeight => loopHeightDown(height - 1, p)
       case n@None                                          => n
   }
 
   def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
-    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1))
+    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1),
+      settings.constants.EpochLength, settings.constants.RetargetingEpochsQty)
     for {
       _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
         HistoryApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
@@ -187,7 +185,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
         .filter(p => requiredHeights.contains(p._1))
       _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
         HistoryApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
-    } yield PowLinearController.getDifficulty(requiredHeaders)
+    } yield PowLinearController.getDifficulty(requiredHeaders, settings.constants.EpochLength,
+      settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
   }
 
   def syncInfo: SyncInfo =
@@ -225,7 +224,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
         startId     <- headerIdsAtHeight(heightFrom).headOption
         startHeader <- getHeaderById(startId)
       } yield headerChainBack(size, startHeader, _ => false)) match {
-        case Some(value) if value.headers.exists(_.height == TestNetConstants.GenesisHeight) => value.headers.map(_.id)
+        case Some(value) if value.headers.exists(_.height == settings.constants.GenesisHeight) => value.headers.map(_.id)
         case _ => Seq.empty
       }
     } else {
@@ -278,45 +277,45 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
-  private def isNewHeader(header: Header): Boolean =
+  def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
-      TestNetConstants.DesiredBlockInterval.toMillis * TestNetConstants.NewHeaderTimeMultiplier
+      settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
   def addHeaderToCacheIfNecessary(h: Header): Unit =
-    if (h.height >= getBestHeaderHeight - TestNetConstants.MaxRollbackDepth) {
+    if (h.height >= getBestHeaderHeight - settings.constants.MaxRollbackDepth) {
       logger.debug(s"Should add ${Algos.encode(h.id)} to header cache")
       val newHeadersIdsAtHeaderHeight = headersCacheIndexes.getOrElse(h.height, Seq.empty[ModifierId]) :+ h.id
       headersCacheIndexes = headersCacheIndexes + (h.height -> newHeadersIdsAtHeaderHeight)
       headersCache = headersCache + (ByteArrayWrapper(h.id) -> h)
       // cleanup cache if necessary
-      if (headersCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
-        headersCacheIndexes.get(getBestHeaderHeight - TestNetConstants.MaxRollbackDepth).foreach { headersIds =>
+      if (headersCacheIndexes.size > settings.constants.MaxRollbackDepth) {
+        headersCacheIndexes.get(getBestHeaderHeight - settings.constants.MaxRollbackDepth).foreach { headersIds =>
           val wrappedIds = headersIds.map(ByteArrayWrapper.apply)
           logger.debug(s"Cleanup header cache from headers: ${headersIds.map(Algos.encode).mkString(",")}")
           headersCache = headersCache.filterNot { case (id, _) => wrappedIds.contains(id) }
         }
-        headersCacheIndexes = headersCacheIndexes - (getBestHeaderHeight - TestNetConstants.MaxRollbackDepth)
+        headersCacheIndexes = headersCacheIndexes - (getBestHeaderHeight - settings.constants.MaxRollbackDepth)
       }
       logger.debug(s"headersCache size: ${headersCache.size}")
       logger.debug(s"headersCacheIndexes size: ${headersCacheIndexes.size}")
     }
 
   def addBlockToCacheIfNecessary(b: Block): Unit =
-    if (b.header.height >= getBestBlockHeight - TestNetConstants.MaxRollbackDepth) {
-      logger.debug(s"Should add ${Algos.encode(b.id)} to header cache")
+    if (!blocksCache.contains(ByteArrayWrapper(b.id)) && (b.header.height >= getBestBlockHeight - settings.constants.MaxRollbackDepth)) {
+      logger.debug(s"Should add ${Algos.encode(b.id)} to block cache")
       val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
       blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
       blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
       // cleanup cache if necessary
-      if (blocksCacheIndexes.size > TestNetConstants.MaxRollbackDepth) {
-        blocksCacheIndexes.get(getBestBlockHeight - TestNetConstants.MaxRollbackDepth).foreach { blocksIds =>
+      if (blocksCacheIndexes.size > settings.constants.MaxRollbackDepth) {
+        blocksCacheIndexes.get(getBestBlockHeight - settings.constants.MaxRollbackDepth).foreach { blocksIds =>
           val wrappedIds = blocksIds.map(ByteArrayWrapper.apply)
           logger.debug(s"Cleanup block cache from headers: ${blocksIds.map(Algos.encode).mkString(",")}")
           blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
         }
-        blocksCacheIndexes = blocksCacheIndexes - (getBestBlockHeight - TestNetConstants.MaxRollbackDepth)
+        blocksCacheIndexes = blocksCacheIndexes - (getBestBlockHeight - settings.constants.MaxRollbackDepth)
       }
       logger.debug(s"headersCache size: ${blocksCache.size}")
       logger.debug(s"headersCacheIndexes size: ${blocksCacheIndexes.size}")

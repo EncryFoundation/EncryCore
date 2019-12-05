@@ -10,6 +10,7 @@ import encry.EncryApp._
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.state.UtxoState
 import org.encryfoundation.common.utils.Algos
+
 import scala.concurrent.Future
 
 object PrintPubKeys extends Command {

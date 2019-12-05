@@ -41,6 +41,9 @@ case class IODBWrapper(store: Store) extends VersionalStorage with StrictLogging
   override def getAll(maxQty: Int = -1): Iterator[(StorageKey, StorageValue)] =
     store.getAll().map{case (key, value) => StorageKey @@ key.data -> StorageValue @@ value.data}
 
+  override def getAllKeys(maxQty: Int = -1): Iterator[StorageKey] =
+    store.getAll().map{case (key, _) => StorageKey @@ key.data}
+
   override def close(): Unit = store.close()
 }
 

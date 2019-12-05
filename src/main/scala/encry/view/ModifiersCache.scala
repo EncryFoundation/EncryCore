@@ -1,8 +1,6 @@
 package encry.view
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import encry.view.history.History
 import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -13,6 +11,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
+import encry.EncryApp.settings
 
 object ModifiersCache extends StrictLogging {
 
@@ -32,7 +31,7 @@ object ModifiersCache extends StrictLogging {
   def contains(key: Key): Boolean = cache.contains(key)
 
   def put(key: Key, value: PersistentModifier, history: History): Unit = if (!contains(key)) {
-    logger.debug(s"put ${Algos.encode(key.toArray)} to cache")
+    logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
     cache.put(key, value)
     value match {
       case header: Header =>
@@ -44,7 +43,7 @@ object ModifiersCache extends StrictLogging {
       case _ =>
     }
 
-    if (size > settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
+    if (size > history.settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
       history.testApplicable(modifier) match {
         case Right(_) | Left(_: NonFatalValidationError) => false
         case _ => true
@@ -88,7 +87,7 @@ object ModifiersCache extends StrictLogging {
         case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           new mutable.WrappedArray.ofByte(header.payloadId)
       }
-    }.toList
+      }.toList
 
     def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
       v match {
@@ -116,7 +115,7 @@ object ModifiersCache extends StrictLogging {
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
               if ((v.parentId sameElements history.getBestHeaderId.getOrElse(Array.emptyByteArray)) ||
-                (history.getBestHeaderHeight == TestNetConstants.PreGenesisHeight &&
+                (history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId)
                   ) || history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
@@ -125,9 +124,10 @@ object ModifiersCache extends StrictLogging {
           value.map(id => new mutable.WrappedArray.ofByte(id)).filterNot(res.contains).foreach(cache.remove)
           res
         case None =>
+          logger.debug(s"${history.getBestHeader}")
           logger.debug(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
-            s"Trying to find in range [${history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
-          (history.getBestHeaderHeight - TestNetConstants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
+            s"Trying to find in range [${history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
+          (history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
             getHeadersKeysAtHeight(height)
           ).toList
       }
@@ -137,7 +137,10 @@ object ModifiersCache extends StrictLogging {
       case Some(id) => history.getHeaderById(id) match {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
-        case _ if history.isHeadersChainSynced => exhaustiveSearch
+        case _ if history.isFullChainSynced => exhaustiveSearch
+        case _ if history.isHeadersChainSynced =>
+          if (settings.snapshotSettings.enableFastSynchronization) exhaustiveSearch
+          else List.empty[Key]
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>

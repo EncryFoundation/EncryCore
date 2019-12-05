@@ -33,24 +33,27 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
     .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx, id.head).toOption)
 
   def getTokenBalanceById(id: TokenId): Option[Amount] = getBalances
-    .find(_._1 sameElements Algos.encode(id))
+    .find(_._1._2 == Algos.encode(id))
     .map(_._2)
 
   def containsBox(id: ADKey): Boolean = getBoxById(id).isDefined
 
   def rollback(modId: ModifierId): Unit = levelDb.rollbackTo(LevelDBVersion @@ modId.untag(ModifierId))
 
-  def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox]): Unit = {
+  def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox],
+                   intrinsicTokenId: ADKey): Unit = {
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
-    val newBalances: Map[String, Amount] = {
-      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs).map { case (key, value) => ByteStr(key) -> value * -1 }
-      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs).map { case (key, value) => ByteStr(key) -> value }
-      val prevBalance = getBalances.map { case (id, value) => ByteStr(Algos.decode(id).get) -> value }
-      (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case (tokenId, value) => tokenId.toString -> value }
+    val newBalances: Map[(String, String), Amount] = {
+      val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs, intrinsicTokenId)
+        .map { case ((hash, key), value) => (hash, ByteStr(key)) -> value * -1 }
+      val toAddToBalance = BalanceCalculator.balanceSheet(newBxs, intrinsicTokenId)
+        .map { case ((hash, key), value) => (hash, ByteStr(key)) -> value }
+      val prevBalance = getBalances.map { case ((hash, id), value) => (hash, ByteStr(Algos.decode(id).get)) -> value }
+      (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case ((hash, tokenId), value) => (hash, tokenId.toString) -> value }
     }
     val newBalanceKeyValue = BALANCE_KEY -> VersionalLevelDbValue @@
-      newBalances.foldLeft(Array.emptyByteArray) { case (acc, (id, balance)) =>
-        acc ++ Algos.decode(id).get ++ Longs.toByteArray(balance)
+      newBalances.foldLeft(Array.emptyByteArray) { case (acc, ((hash, tokenId), balance)) =>
+        acc ++ Algos.decode(hash).get ++ Algos.decode(tokenId).get ++ Longs.toByteArray(balance)
       }
     levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
       newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
@@ -59,10 +62,10 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
     )
   }
 
-  def getBalances: Map[String, Amount] =
+  def getBalances: Map[(String, String), Amount] =
     levelDb.get(BALANCE_KEY)
-      .map(_.sliding(40, 40)
-        .map(ch => Algos.encode(ch.take(32)) -> Longs.fromByteArray(ch.takeRight(8)))
+      .map(_.sliding(72, 72)
+        .map(ch => (Algos.encode(ch.take(32)), Algos.encode(ch.slice(32, 64))) -> Longs.fromByteArray(ch.takeRight(8)))
         .toMap).getOrElse(Map.empty)
 
   override def close(): Unit = levelDb.close()

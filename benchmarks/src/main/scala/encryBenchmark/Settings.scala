@@ -11,6 +11,10 @@ case class Settings(serializedAssetBenchSettings: SerializedAssetBenchSettings,
                     stateBenchSettings: StateBenchSettings,
                     historyBenchSettings: HistoryBenchSettings)
 
+trait BenchSettings {
+  lazy val benchSettings: Settings = Settings.read
+}
+
 object Settings {
   val configPath = "encry.benchmark"
   val read: Settings = ConfigFactory.load("application.conf").as[Settings](configPath)

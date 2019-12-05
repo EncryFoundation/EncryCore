@@ -2,23 +2,24 @@ package encry.view.history
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage.StorageKey
 import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId, ModifierTypeId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import scorex.crypto.hash.Digest32
+
 import scala.reflect.ClassTag
 
-trait HistoryDBApi extends StrictLogging {
+trait HistoryDBApi extends StrictLogging with Settings {
 
   val historyStorage: HistoryStorage
 
   val BestHeaderKey: StorageKey =
-    StorageKey @@ Array.fill(TestNetConstants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
+    StorageKey @@ Array.fill(settings.constants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
   val BestBlockKey: StorageKey =
-    StorageKey @@ Array.fill(TestNetConstants.DigestLength)(-1: Byte)
+    StorageKey @@ Array.fill(settings.constants.DigestLength)(-1: Byte)
 
   private def getModifierById[T: ClassTag](id: ModifierId): Option[T] = historyStorage
     .modifierById(id)
@@ -39,13 +40,13 @@ trait HistoryDBApi extends StrictLogging {
   def getBestHeaderDB: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdDB)
   def getBestHeaderHeightDB: Int = getBestHeaderId
     .flatMap(getHeightByHeaderIdDB)
-    .getOrElse(TestNetConstants.PreGenesisHeight)
+    .getOrElse(settings.constants.PreGenesisHeight)
 
   def getBestBlockId: Option[ModifierId] = historyStorage.get(BestBlockKey).map(ModifierId @@ _)
   def getBestBlockDB: Option[Block] = getBestBlockId.flatMap(getBlockByHeaderIdDB)
   def getBestBlockHeightDB: Int = getBestBlockId
     .flatMap(getHeightByHeaderIdDB)
-    .getOrElse(TestNetConstants.PreGenesisHeight)
+    .getOrElse(settings.constants.PreGenesisHeight)
 
   def modifierBytesByIdDB(id: ModifierId): Option[Array[Byte]] = historyStorage.modifiersBytesById(id)
 
@@ -62,6 +63,8 @@ trait HistoryDBApi extends StrictLogging {
     .map(_.grouped(32).map(ModifierId @@ _).toSeq)
 
   def getBestHeaderIdAtHeightDB(h: Int): Option[ModifierId] = headerIdsAtHeightDB(h).flatMap(_.headOption)
+
+  def getBestHeaderAtHeightDB(h: Int): Option[Header] = getBestHeaderIdAtHeightDB(h).flatMap(getHeaderByIdDB)
 
   def isInBestChain(h: Header): Boolean = getBestHeaderIdAtHeightDB(h.height)
     .exists(_.sameElements(h.id))

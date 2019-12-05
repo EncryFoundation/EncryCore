@@ -52,7 +52,7 @@ lazy val monitoringDependencies = Seq(
   "io.kamon" %% "kamon-influxdb" % "1.0.1"
 )
 
-libraryDependencies ++= Seq(
+libraryDependencies ++= (Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
@@ -66,7 +66,7 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
-  "org.encry" %% "encry-common" % "0.9.0",
+  "org.encry" %% "encry-common" % "0.9.2",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
@@ -84,12 +84,13 @@ libraryDependencies ++= Seq(
   "com.sun.jersey" % "jersey-client" % "1.19",
   "commons-net" % "commons-net" % "3.6",
   "org.aspectj" % "aspectjweaver" % "1.9.2",
-  "org.typelevel" % "cats-core_2.12" % "1.0.1",
-  "org.typelevel" % "cats-kernel_2.12" % "1.0.1",
-  "org.typelevel" % "cats-macros_2.12" % "1.0.1",
+  "org.typelevel" % "cats-core_2.12" % "2.0.0",
+  "org.typelevel" % "cats-kernel_2.12" % "2.0.0",
+  "org.typelevel" % "cats-macros_2.12" % "2.0.0",
   "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
   "com.google.guava" % "guava" % "27.1-jre"
-) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies)
+
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",

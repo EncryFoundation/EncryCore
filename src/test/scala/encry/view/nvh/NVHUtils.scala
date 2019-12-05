@@ -2,7 +2,6 @@ package encry.view.nvh
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActor, TestActorRef, TestProbe}
-import encry.EncryApp.settings
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 

@@ -1,6 +1,7 @@
 package encry.api.http.routes
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
@@ -13,7 +14,8 @@ import io.circe.Json
 import io.circe.syntax._
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.utils.constants.Constants
+
 import scala.concurrent.Future
 
 case class InfoApiRoute(dataHolder: ActorRef,
@@ -26,7 +28,6 @@ case class InfoApiRoute(dataHolder: ActorRef,
 
   private val getNodeName: String = appSettings.network.nodeName
     .getOrElse(InetAddress.getLocalHost.getHostAddress + ":" + appSettings.network.bindAddress.getPort)
-
 
   //todo: remove later
   private val getStateType: String = "UTXO"
@@ -59,7 +60,8 @@ case class InfoApiRoute(dataHolder: ActorRef,
       txsQty,
       getConnectionWithPeers,
       blocksInfo.header,
-      blocksInfo.block
+      blocksInfo.block,
+      appSettings.constants
     )).okJson()
   }
 }
@@ -78,9 +80,11 @@ object InfoApiRoute {
                    mempoolSize: Int,
                    connectWithOnlyKnownPeer: Boolean,
                    header: Option[Header],
-                   block: Option[Block]
+                   block: Option[Block],
+                   constants: Constants
                   ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
+    val stateRoot: Option[String] = readers.s.map(_.tree.rootHash).map(Algos.encode)
     val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     Map(
       "name"                      -> nodeName.asJson,
@@ -90,8 +94,9 @@ object InfoApiRoute {
       "bestFullHeaderId"          -> block.map(_.encodedId).getOrElse("").asJson,
       "previousFullHeaderId"      -> prevFullHeaderId.asJson,
       "difficulty"                -> block.map(_.header.difficulty.toString)
-        .getOrElse(TestNetConstants.InitialDifficulty.toString).asJson,
+        .getOrElse(constants.InitialDifficulty.toString).asJson,
       "unconfirmedCount"          -> mempoolSize.asJson,
+      "stateRoot"                 -> stateRoot.asJson,
       "stateType"                 -> stateType.asJson,
       "stateVersion"              -> stateVersion.asJson,
       "isMining"                  -> minerInfo.isMining.asJson,

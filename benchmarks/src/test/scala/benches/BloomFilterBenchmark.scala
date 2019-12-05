@@ -43,9 +43,7 @@
 //    }
 //}
 //
-//object BloomFilterBenchmark {
-//
-//  val benchSettings: Settings = Settings.read
+//object BloomFilterBenchmark extends BenchSettings {
 //
 //  @throws[RunnerException]
 //  def main(args: Array[String]): Unit = {

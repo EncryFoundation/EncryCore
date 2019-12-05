@@ -6,7 +6,7 @@ import encry.EncryApp._
 import encry.cli.{Ast, Response}
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.EncryAppSettings
-import encry.view.NodeViewHolder.ReceivableMessages._
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
 import encry.view.state.UtxoState
@@ -15,8 +15,10 @@ import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.mempool.transaction.EncryAddress.Address
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
+
 import scala.concurrent.Future
-import scala.util.Try
+import scala.util.{Failure, Try}
+import scala.util.control.NonFatal
 
 object Transfer extends Command {
 
@@ -29,7 +31,7 @@ object Transfer extends Command {
     (nodeViewHolder ?
       GetDataFromCurrentView[History, UtxoState, EncryWallet, Option[Transaction]] { view =>
         Try {
-          val secret: PrivateKey25519 = view.vault.accountManager.mandatoryAccount
+          val secret: PrivateKey25519 = view.vault.accountManagers.head.mandatoryAccount
           val recipient: Address = args.requireArg[Ast.Str]("addr").s
           val fee: Long = args.requireArg[Ast.Num]("fee").i
           val amount: Long = args.requireArg[Ast.Num]("amount").i
@@ -44,6 +46,10 @@ object Transfer extends Command {
             boxes.map(_ -> None),
             recipient,
             amount)
+        }.recoverWith {
+          case NonFatal(th) =>
+            th.printStackTrace()
+            Failure(th)
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>

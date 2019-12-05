@@ -8,11 +8,12 @@ import encry.modifiers.history.HeaderChain
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
-import org.encryfoundation.common.utils.constants.TestNetConstants
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import cats.syntax.option._
+
 import scala.annotation.tailrec
 import cats.syntax.either._
+import org.encryfoundation.common.utils.Algos
 
 trait HistoryModifiersProcessors extends HistoryApi {
 
@@ -29,13 +30,14 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   def processPayload(payload: Payload): ProgressInfo = getBlockByPayload(payload)
-    .flatMap(block =>
-      if (block.header.height - getBestBlockHeight >= 2 + settings.network.maxInvObjects) none
-      else processBlock(block).some
-    )
+    .flatMap{block =>
+      logger.info(s"proc block ${block.header.encodedId}!")
+      processBlock(block).some
+    }
     .getOrElse(putToHistory(payload))
 
   private def processBlock(blockToProcess: Block): ProgressInfo = {
+    logger.info(s"Starting processing block to history ||${blockToProcess.encodedId}||${blockToProcess.header.height}||")
     val bestFullChain: Seq[Block] = calculateBestFullChain(blockToProcess)
     addBlockToCacheIfNecessary(blockToProcess)
     bestFullChain.lastOption.map(_.header) match {
@@ -86,7 +88,9 @@ trait HistoryModifiersProcessors extends HistoryApi {
               .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
               .getOrElse(false)
           )
-      updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader)
+      val updatedHeadersAtHeightIds =
+        newChain.headers.map(header => updatedBestHeaderAtHeightRaw(header.id, Height @@ header.height)).toList
+      updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader, updatedHeadersAtHeightIds)
       if (blocksToKeep >= 0) {
         val lastKept: Int = blockDownloadProcessor.updateBestBlock(fullBlock.header)
         val bestHeight: Int = toApply.lastOption.map(_.header.height).getOrElse(0)
@@ -99,8 +103,15 @@ trait HistoryModifiersProcessors extends HistoryApi {
 
   private def nonBestBlock(fullBlock: Block): ProgressInfo = {
     //Orphaned block or full chain is not initialized yet
+    logger.info(s"Process block to history ${fullBlock.encodedId}||${fullBlock.header.height}||")
     historyStorage.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload))
     ProgressInfo(none, Seq.empty, Seq.empty, none)
+  }
+
+  private def updatedBestHeaderAtHeightRaw(headerId: ModifierId, height: Height): (Array[Byte], Array[Byte]) = {
+    heightIdsKey(height) ->
+       (Seq(headerId) ++
+        headerIdsAtHeight(height).filterNot(_ sameElements headerId)).flatten.toArray
   }
 
   def continuationHeaderChains(header: Header,
@@ -110,6 +121,7 @@ trait HistoryModifiersProcessors extends HistoryApi {
         .view
         .flatMap(getHeaderById)
         .filter(filterCond)
+        .toList
       if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
       else {
         val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(h =>
@@ -131,11 +143,12 @@ trait HistoryModifiersProcessors extends HistoryApi {
       logger.info(s"Initialize header chain with genesis header ${header.encodedId}")
       Seq(
         BestHeaderKey                                -> StorageValue @@ header.id,
-        heightIdsKey(TestNetConstants.GenesisHeight) -> StorageValue @@ header.id,
-        headerHeightKey(header.id)                   -> StorageValue @@ Ints.toByteArray(TestNetConstants.GenesisHeight),
+        heightIdsKey(settings.constants.GenesisHeight) -> StorageValue @@ header.id,
+        headerHeightKey(header.id)                   -> StorageValue @@ Ints.toByteArray(settings.constants.GenesisHeight),
         headerScoreKey(header.id)                    -> StorageValue @@ header.difficulty.toByteArray
       )
     } else scoreOf(header.parentId).map { parentScore =>
+      logger.info(s"getHeaderInfoUpdate for header $header")
       val score: Difficulty =
         Difficulty @@ (parentScore + ConsensusSchemeReaders.consensusScheme.realDifficulty(header))
       val bestHeaderHeight: Int = getBestHeaderHeight
@@ -156,15 +169,14 @@ trait HistoryModifiersProcessors extends HistoryApi {
   }
 
   private def bestBlockHeaderIdsRow(h: Header, score: Difficulty): Seq[(StorageKey, StorageValue)] = {
-    logger.info(s"New best header ${h.encodedId} with score: $score")
+    logger.info(s"New best header ${h.encodedId} with score: $score at height ${h.height}")
     val self: (StorageKey, StorageValue) =
       heightIdsKey(h.height) ->
         StorageValue @@ (Seq(h.id) ++ headerIdsAtHeight(h.height).filterNot(_ sameElements h.id)).flatten.toArray
-    val parentHeaderOpt: Option[Header] = getHeaderById(h.parentId)
-    val forkHeaders: Seq[(StorageKey, StorageValue)] = parentHeaderOpt
+    val forkHeaders: Seq[(StorageKey, StorageValue)] = getHeaderById(h.parentId)
       .toList
       .view
-      .flatMap(parent => headerChainBack(h.height, parent, h => isInBestChain(h)).headers)
+      .flatMap(headerChainBack(h.height, _, h => isInBestChain(h)).headers)
       .filterNot(isInBestChain)
       .map(header =>
         heightIdsKey(header.height) ->
@@ -212,11 +224,12 @@ trait HistoryModifiersProcessors extends HistoryApi {
 
   private def updateStorage(newModRow: PersistentModifier,
                             bestFullHeaderId: ModifierId,
-                            updateHeaderInfo: Boolean = false): Unit = {
+                            updateHeaderInfo: Boolean = false,
+                            additionalIndexes: List[(Array[Byte], Array[Byte])] = List.empty): Unit = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
       else Seq(BestBlockKey -> bestFullHeaderId)
-    historyStorage.bulkInsert(newModRow.id, indicesToInsert, Seq(newModRow))
+    historyStorage.bulkInsert(newModRow.id, indicesToInsert ++ additionalIndexes, Seq(newModRow))
   }
 
   private def isValidFirstBlock(header: Header): Boolean =

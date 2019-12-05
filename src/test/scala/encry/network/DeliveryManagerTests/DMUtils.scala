@@ -26,7 +26,7 @@ object DMUtils extends InstanceFactory {
     val history: History = generateDummyHistory(settings)
     val deliveryManager: TestActorRef[DeliveryManager] =
       TestActorRef[DeliveryManager](DeliveryManager
-        .props(None, TestProbe().ref, TestProbe().ref, settings, TestProbe().ref, TestProbe().ref, TestProbe().ref))
+        .props(None, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, settings))
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     else deliveryManager ! DisableMining
@@ -38,7 +38,10 @@ object DMUtils extends InstanceFactory {
     (0 until qty).foldLeft(history, List.empty[Block]) {
       case ((prevHistory, blocks), _) =>
         val block: Block = generateNextBlock(prevHistory)
-        (prevHistory.append(block.header).right.get._1.append(block.payload).right.get._1.reportModifierIsValid(block), blocks :+ block)
+        prevHistory.append(block.header)
+        prevHistory.append(block.payload)
+        val a = prevHistory.reportModifierIsValid(block)
+        (a, blocks :+ block)
     }
 
   def toKey(id: ModifierId): WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)

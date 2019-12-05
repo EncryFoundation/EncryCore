@@ -9,6 +9,7 @@ import encry.view.wallet.EncryWallet
 import encry.EncryApp._
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.state.UtxoState
+
 import scala.concurrent.Future
 
 object PrintAddresses extends Command {

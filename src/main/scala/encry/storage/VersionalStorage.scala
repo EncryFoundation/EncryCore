@@ -14,6 +14,8 @@ trait VersionalStorage {
 
   def getAll(maxQty: Int): Iterator[(StorageKey, StorageValue)]
 
+  def getAllKeys(maxQty: Int): Iterator[StorageKey]
+
   def currentVersion: StorageVersion
 
   def versions: List[StorageVersion]

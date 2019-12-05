@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
-import encry.settings.{EncryAppSettings, NodeSettings}
+import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -14,8 +14,10 @@ import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
 import encry.view.history.History
 import encry.view.history.storage.HistoryStorage
+import encry.view.state.avlTree.AvlTree
 import encry.view.state.{BoxHolder, UtxoState}
 import io.iohk.iodb.LSMStore
+import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519, Signature25519}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -25,7 +27,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction._
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
-import org.encryfoundation.common.utils.constants.TestNetConstants
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
 import org.iq80.leveldb.Options
 import scorex.crypto.hash.{Blake2b256, Digest32}
@@ -35,7 +36,7 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.util.{Random => R}
 
-object Utils extends StrictLogging {
+object Utils extends Settings with StrictLogging {
 
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
@@ -53,6 +54,20 @@ object Utils extends StrictLogging {
                            valueSize: Int = defaultValueSize): (VersionalLevelDbKey, VersionalLevelDbValue) =
     (generateRandomKey(keySize), generateRandomValue(valueSize))
 
+  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None, nonce: Long = 0L): AssetBox =
+    AssetBox(EncryProposition.addressLocked(address), nonce, amount, tokenIdOpt)
+
+  def generateGenesisBlock(genesisHeight: Height): Block = {
+    val txs: Seq[Transaction] = Seq(coinbaseTransaction)
+    val txsRoot: Digest32 = Payload.rootHash(txs.map(_.id))
+    val header = genHeader.copy(
+      parentId = Header.GenesisParentId,
+      height = genesisHeight,
+      transactionsRoot = txsRoot
+    )
+    Block(header, Payload(header.id, Seq(coinbaseTransaction)))
+  }
+
   def generateRandomLevelDbElemsWithoutDeletions(qty: Int, qtyOfElemsToInsert: Int): List[LevelDbDiff] =
     (0 until qty).foldLeft(List.empty[LevelDbDiff]) {
       case (acc, i) =>
@@ -66,13 +81,13 @@ object Utils extends StrictLogging {
     val txs = Seq(coinbaseTransaction(0))
     val header = genHeader.copy(
       parentId = Header.GenesisParentId,
-      height = TestNetConstants.GenesisHeight
+      height = settings.constants.GenesisHeight
     )
     Block(header, Payload(header.id, txs))
   }
 
   def generateGenesisBlockValidForHistory: Block = {
-    val header = genHeader.copy(parentId = Header.GenesisParentId, height = TestNetConstants.GenesisHeight)
+    val header = genHeader.copy(parentId = Header.GenesisParentId, height = settings.constants.GenesisHeight)
     Block(header, Payload(header.id, Seq(coinbaseTransaction)))
   }
 
@@ -105,7 +120,8 @@ object Utils extends StrictLogging {
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ BigInt(1),
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Random.randomBytes()
     )
     Block(header, Payload(header.id, transactions))
   }
@@ -128,7 +144,7 @@ object Utils extends StrictLogging {
           numOfOutputs = splitCoef
         )
         (boxes.tail, transactionsL :+ tx)
-    }._2.filter(tx => state.validate(tx).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
+    }._2.filter(tx => state.validate(tx, prevBlock.header.timestamp, Height @@ prevBlock.header.height).isRight) ++ Seq(coinbaseTransaction(prevBlock.header.height + 1))
     logger.info(s"Number of generated transactions: ${transactions.size}.")
     val header = Header(
       1.toByte,
@@ -138,7 +154,8 @@ object Utils extends StrictLogging {
       prevBlock.header.height + 1,
       R.nextLong(),
       Difficulty @@ (BigInt(1) + addDiff),
-      EquihashSolution(Seq(1, 3))
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
     Block(header, Payload(header.id, transactions))
   }
@@ -150,7 +167,7 @@ object Utils extends StrictLogging {
     val previousHeaderId: ModifierId = prevBlock.map(_.id).getOrElse(Header.GenesisParentId)
     val requiredDifficulty: Difficulty = prevBlock.map(b =>
       history.requiredDifficultyAfter(b.header).getOrElse(Difficulty @@ BigInt(0)))
-      .getOrElse(TestNetConstants.InitialDifficulty)
+      .getOrElse(settings.constants.InitialDifficulty)
     val header = genHeader.copy(
       parentId = previousHeaderId,
       height = history.getBestHeaderHeight + 1,
@@ -169,9 +186,6 @@ object Utils extends StrictLogging {
     }
   }
 
-  def genAssetBox(address: Address, amount: Amount = 100000L, tokenIdOpt: Option[ADKey] = None): AssetBox =
-    AssetBox(EncryProposition.addressLocked(address), R.nextLong(), amount, tokenIdOpt)
-
   def utxoFromBoxHolder(bh: BoxHolder,
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
@@ -180,7 +194,7 @@ object Utils extends StrictLogging {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(dir, keepVersions = TestNetConstants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(dir, keepVersions = settings.constants.DefaultKeepVersions))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(dir, new Options)
@@ -192,11 +206,7 @@ object Utils extends StrictLogging {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(
-      storage,
-      TestNetConstants.PreGenesisHeight,
-      0L,
-    )
+    new UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants)
   }
 
   def getRandomTempDir: File = {
@@ -214,8 +224,9 @@ object Utils extends StrictLogging {
       Math.abs(random.nextLong()),
       Math.abs(random.nextInt(10000)),
       random.nextLong(),
-      TestNetConstants.InitialDifficulty,
-      EquihashSolution(Seq(1, 3))
+      settings.constants.InitialDifficulty,
+      EquihashSolution(Seq(1, 3)),
+      Array.emptyByteArray
     )
   }
 
@@ -403,18 +414,17 @@ object Utils extends StrictLogging {
     uTransaction.toSigned(IndexedSeq.empty, Some(Proof(BoxedValue.Signature25519Value(signature.bytes.toList))))
   }
 
-  def generateHistory(settingsEncry: EncryAppSettings, file: File): History = {
+  def generateHistory(settings: EncryAppSettings, file: File): History = {
 
     val indexStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val objectsStore: LSMStore = new LSMStore(FileHelper.getRandomTempDir, keepVersions = 0)
     val levelDBInit = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
-    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
+    val vldbInit = VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB))
     val storage: HistoryStorage = new HistoryStorage(vldbInit)
 
-    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
+    val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
     new History {
-      override  val settings: EncryAppSettings = settingsEncry
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }
