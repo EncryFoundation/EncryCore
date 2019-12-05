@@ -29,7 +29,7 @@ class SnapshotDownloadControllerStorageAPITests extends WordSpecLike with Matche
       val randomIds: List[Array[Byte]]              = (1 to 5000).map(_ => Random.randomBytes()).toList
       val _                                         = api.insertMany(randomIds)
       val groupsL = randomIds.grouped(settingsR.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
-      (1 to 5).foreach { r =>
+      (1 to groupsL.size).foreach { r =>
         val res = api.getNextForRequest(r)
         api.getNextForRequest(r).right.get.isEmpty shouldBe true
         res.isRight shouldBe true
