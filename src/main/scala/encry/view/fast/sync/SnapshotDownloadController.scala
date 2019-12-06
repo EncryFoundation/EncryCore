@@ -10,29 +10,13 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
-import encry.view.fast.sync.FastSyncExceptions.{
-  ChunkValidationError,
-  InvalidChunkBytes,
-  InvalidManifestBytes,
-  SnapshotDownloadControllerException
-}
+import encry.view.fast.sync.FastSyncExceptions._
 import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.RequestChunkMessage
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.{ DB, Options }
-import cats.syntax.either._
-import cats.syntax.option._
-import encry.view.fast.sync.FastSyncExceptions.{
-  ChunkValidationError,
-  InvalidChunkBytes,
-  InvalidManifestBytes,
-  ProcessManifestHasChangedMessageException,
-  SnapshotDownloadControllerException,
-  UnexpectedChunkMessage
-}
-import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             requestedChunks: Set[ByteArrayWrapper],

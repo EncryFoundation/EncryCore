@@ -27,8 +27,8 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
    * @param ids - elements for insertion into db
    */
   def insertMany(ids: List[Array[Byte]]): Either[FastSyncException, Int] =
-    readWrite[Either[FastSyncException, Int]] {
-      case (batch, _, _) =>
+    readWrite[Either[FastSyncException, Int]](
+      (batch, _, _) => {
         val groups: List[List[Array[Byte]]] =
           ids.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
         val groupsCount: Int = groups.foldLeft(1) {
@@ -37,14 +37,16 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
             groupNumber + 1
         }
         groupsCount.asRight[FastSyncException]
-    }(err => SnapshotDownloadControllerStorageAPIInsertMany(err.getMessage).asLeft[Int])
+      },
+      err => SnapshotDownloadControllerStorageAPIInsertMany(err.getMessage).asLeft[Int]
+    )
 
   /**
    * @return - returns next chunks ids for request
    */
   def getNextForRequest(groupNumber: Int): Either[FastSyncException, List[Array[Byte]]] =
-    readWrite[Either[FastSyncException, List[Array[Byte]]]] {
-      case (batch, readOptions, _) =>
+    readWrite[Either[FastSyncException, List[Array[Byte]]]](
+      (batch, readOptions, _) => {
         val res = storage.get(nextGroupKey(groupNumber), readOptions)
         val buffer: List[Array[Byte]] =
           if (res != null) {
@@ -53,7 +55,9 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
             res.grouped(32).toList
           } else List.empty[Array[Byte]]
         buffer.asRight[FastSyncException]
-    }(err => SnapshotDownloadControllerStorageAPIGetManyFunctionFailed(err.getMessage).asLeft[List[Array[Byte]]])
+      },
+      err => SnapshotDownloadControllerStorageAPIGetManyFunctionFailed(err.getMessage).asLeft[List[Array[Byte]]]
+    )
 
   /**
    * Check if chunk's size 0 or not
@@ -61,9 +65,11 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
    * @return true if current batches size > 0, otherwise false
    */
   def isBatchesListNonEmpty: Either[FastSyncException, Boolean] =
-    readWrite[Either[FastSyncException, Boolean]] {
-      case (_, _, iterator) =>
+    readWrite[Either[FastSyncException, Boolean]](
+      (_, _, iterator) => {
         iterator.seekToFirst()
         iterator.hasNext.asRight[FastSyncException]
-    }(err => SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty(err.getMessage).asLeft[Boolean])
+      },
+      err => SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty(err.getMessage).asLeft[Boolean]
+    )
 }

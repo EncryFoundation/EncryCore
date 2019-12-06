@@ -8,17 +8,11 @@ import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
-import encry.network.BlackList.BanReason._
-import encry.network.Broadcast
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.network.{ Broadcast, PeerConnectionHandler }
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException }
-import encry.view.fast.sync.SnapshotHolder._
-import encry.view.history.History
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
 import encry.view.fast.sync.SnapshotHolder._
@@ -91,7 +85,9 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.debug(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
       message match {
         case ResponseManifestMessage(manifest) =>
-          logger.info(s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks.")
+          logger.info(
+            s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks."
+          )
         case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
           (for {
             controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
@@ -143,7 +139,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       } yield controllerAndIds) match {
         case Left(err) =>
           logger.info(s"Error has occurred: ${err.error}")
-
         case Right(controllerAndIds) =>
           snapshotDownloadController = controllerAndIds._1
           controllerAndIds._2.foreach { msg =>
@@ -153,9 +148,7 @@ class SnapshotHolder(settings: EncryAppSettings,
           }
           val timer: Option[Cancellable] =
             context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
-          context.become(
-            fastSyncMod(history, processHeaderSyncedMsg, timer, reRequestsNumber = 0).orElse(commonMessages)
-          )
+          context.become(fastSyncMod(history, timer, reRequestsNumber = 0).orElse(commonMessages))
       }
 
     case RequiredManifestHeightAndId(height, manifestId) =>
@@ -223,10 +216,10 @@ class SnapshotHolder(settings: EncryAppSettings,
           if (isValidManifest && canBeProcessed) {
             (for {
               controller <- snapshotDownloadController.processManifest(manifest, remote, history)
-              processor  <- snapshotProcessor.initializeApplicableChunksCache(
-                history,
-                snapshotDownloadController.requiredManifestHeight
-              )
+              processor <- snapshotProcessor.initializeApplicableChunksCache(
+                            history,
+                            snapshotDownloadController.requiredManifestHeight
+                          )
             } yield (controller, processor)) match {
               case Left(error) =>
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))

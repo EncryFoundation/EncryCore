@@ -7,7 +7,7 @@ trait DBTryCatchFinallyProvider extends StrictLogging {
 
   val storage: DB
 
-  def readWrite[Output](f: (WriteBatch, ReadOptions, DBIterator) => Output)(onFailure: Throwable => Output): Output = {
+  def readWrite[Output](f: (WriteBatch, ReadOptions, DBIterator) => Output, onFailure: Throwable => Output): Output = {
     val snapshot             = storage.getSnapshot
     val readOptions          = new ReadOptions().snapshot(snapshot)
     val batch: WriteBatch    = storage.createWriteBatch()
