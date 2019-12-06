@@ -96,7 +96,8 @@ class SnapshotHolder(settings: EncryAppSettings,
                              case t                          => t.asLeft[SnapshotProcessor]
                            }
           } yield (newProcessor, controller)) match {
-            case Left(err: UnexpectedChunkMessage) => logger.info(s"${err.error}")
+            case Left(err: UnexpectedChunkMessage) =>
+              logger.info(s"Error during received chunk processing has occurred: ${err.error}")
             case Left(error) =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
               restartFastSync(history)
