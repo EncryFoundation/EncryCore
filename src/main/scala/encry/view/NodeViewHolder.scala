@@ -98,6 +98,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       }
       newHistory.fastSyncInProgress = false
       newHistory.blockDownloadProcessor.updateMinimalBlockHeightVar(nodeView.history.blockDownloadProcessor.minimalBlockHeight)
+      newHistory.isHeadersChainSyncedVar = true
       updateNodeView(
         updatedHistory = Some(newHistory),
         updatedState = Some(state),
