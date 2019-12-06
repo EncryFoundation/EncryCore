@@ -17,8 +17,8 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-  val cache: TrieMap[Key, PersistentModifier] = TrieMap[Key, PersistentModifier]()
-  private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap[Int, List[ModifierId]]()
+  val cache: TrieMap[Key, PersistentModifier] = TrieMap.empty
+  private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap.empty[Int, List[ModifierId]]
 
   private var isChainSynced = false
 
@@ -138,9 +138,6 @@ object ModifiersCache extends StrictLogging {
         case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           List(new mutable.WrappedArray.ofByte(header.payloadId))
         case _ if history.isFullChainSynced => exhaustiveSearch
-        case _ if history.isHeadersChainSynced =>
-          if (settings.snapshotSettings.enableFastSynchronization) exhaustiveSearch
-          else List.empty[Key]
         case _ => List.empty[Key]
       }
       case None if isChainSynced =>

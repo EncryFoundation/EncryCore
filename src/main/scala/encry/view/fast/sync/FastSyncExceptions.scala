@@ -20,6 +20,7 @@ object FastSyncExceptions {
   final case class InconsistentChunkId(error: String) extends ChunkValidationError
   final case class NotApplicableId(error: String) extends ChunkValidationError
   final case class InvalidChunkBytes(error: String) extends ChunkValidationError
+  final case class UnexpectedChunkMessage(error: String) extends ChunkValidationError
 
   sealed trait SnapshotDownloadControllerException extends FastSyncException
   final case class InvalidManifestBytes(error: String)             extends SnapshotDownloadControllerException
