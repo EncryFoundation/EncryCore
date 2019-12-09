@@ -231,6 +231,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
       override val settings: EncryAppSettings = settingsEncry
+      override var isFullChainSynced = settings.node.offlineGeneration
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
     }

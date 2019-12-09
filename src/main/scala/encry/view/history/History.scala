@@ -24,11 +24,7 @@ import supertagged.@@
   **/
 trait History extends HistoryModifiersValidator with AutoCloseable {
 
-  final case class IsFullChainSyncedProcessor(localSettings: EncryAppSettings) {
-    var isFullChainSynced: Boolean = localSettings.node.offlineGeneration
-  }
-
-  lazy val isFullChainSynced = IsFullChainSyncedProcessor(settings)
+  var isFullChainSynced: Boolean
 
   /** Appends modifier to the history if it is applicable. */
   def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
@@ -181,12 +177,14 @@ object History extends StrictLogging {
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
       new History with HistoryHeadersProcessor with FastSyncProcessor {
         override val settings: EncryAppSettings = settingsEncry
+        override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
     else
       new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
         override val settings: EncryAppSettings = settingsEncry
+        override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }

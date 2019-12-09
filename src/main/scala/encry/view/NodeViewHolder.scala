@@ -102,6 +102,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       logger.info(s"Finished wallet scanning")
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
         override val settings: EncryAppSettings = encrySettings
+        override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
         override val historyStorage: HistoryStorage = nodeView.history.historyStorage
       }
@@ -196,7 +197,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     pi.toDownload.foreach { case (tid, id) =>
       if (tid != Transaction.modifierTypeId) logger.info(s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
         s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}.")
-      if ((nodeView.history.isFullChainSynced.isFullChainSynced && tid == Payload.modifierTypeId) || tid != Payload.modifierTypeId)
+      if ((nodeView.history.isFullChainSynced && tid == Payload.modifierTypeId) || tid != Payload.modifierTypeId)
         system.actorSelection("/user/nodeViewSynchronizer")! DownloadRequest(tid, id, previousModifier)
       else logger.info(s"Ignore sending request for payload (${Algos.encode(id)}) from nvh because of nodeView.history.isFullChainSynced = false")
     }
@@ -235,7 +236,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
             case Right(stateAfterApply) =>
               influxRef.foreach(ref => modToApply match {
-                case b: Block if history.isFullChainSynced.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
+                case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
                 case _ =>
               })
               val newHis: History = history.reportModifierIsValid(modToApply)
@@ -253,7 +254,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   }
                 case _ =>
               }
-              if (encrySettings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced.isFullChainSynced &&
+              if (encrySettings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
                 newHis.getBestBlock.exists { block =>
                 block.header.height % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0 &&
                   block.header.height != encrySettings.constants.GenesisHeight }) {
@@ -277,7 +278,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
-                  )) newHis.isFullChainSynced.isFullChainSynced = true
+                  )) newHis.isFullChainSynced = true
               influxRef.foreach { ref =>
                 logger.info(s"send info 2. about ${newHis.getBestHeaderHeight} | ${newHis.getBestBlockHeight}")
                 ref ! HeightStatistics(newHis.getBestHeaderHeight, stateAfterApply.height)
@@ -354,7 +355,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
               if (encrySettings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
                 context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
-              if (newHistory.isFullChainSynced.isFullChainSynced) {
+              if (newHistory.isFullChainSynced) {
                 logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
                 ModifiersCache.setChainSynced()
                 system.actorSelection("/user/nodeViewSynchronizer") ! FullBlockChainIsSynced
