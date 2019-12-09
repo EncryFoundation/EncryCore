@@ -70,7 +70,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       if (settings.snapshotSettings.enableFastSynchronization && !history.isBestBlockDefined &&
           !settings.node.offlineGeneration) {
         logger.info(s"Start in fast sync regime")
-        context.become(fastSyncMod(history, none, reRequestsNumber = 0, none).orElse(commonMessages))
+        context.become(fastSyncMod(history, none, none).orElse(commonMessages))
       } else {
         logger.info(s"Start in snapshot processing regime")
         context.system.scheduler
@@ -83,7 +83,6 @@ class SnapshotHolder(settings: EncryAppSettings,
   def fastSyncMod(
     history: History,
     responseTimeout: Option[Cancellable],
-    reRequestsNumber: Int,
     prevChunksPackTimeout: Option[Cancellable]
   ): Receive = {
     case DataFromPeer(message, remote) =>
@@ -152,7 +151,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       }
       val timer: Option[Cancellable] =
         context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
-      context.become(fastSyncMod(history, timer, reRequestsNumber = 0, prevChunksPackTimeout).orElse(commonMessages))
+      context.become(fastSyncMod(history, timer, prevChunksPackTimeout).orElse(commonMessages))
 
     case RequiredManifestHeightAndId(height, manifestId) =>
       logger.info(
@@ -171,7 +170,7 @@ class SnapshotHolder(settings: EncryAppSettings,
         .scheduleOnce(settings.snapshotSettings.prevChunksPackTimeout)(self ! CleanPrevChunksPackTimeout)
       context.become(awaitManifestMod(none, history, prevChunksRequestedPackTimeout.some).orElse(commonMessages))
 
-    case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
+    case CheckDelivery =>
       snapshotDownloadController.requestedChunks.map { id =>
         RequestChunkMessage(id.data)
       }.foreach { msg =>
@@ -179,14 +178,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       }
       val timer: Option[Cancellable] =
         context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
-      context.become(fastSyncMod(history, timer, reRequestsNumber + 1, prevChunksPackTimeout).orElse(commonMessages))
-
-    case CheckDelivery =>
-      snapshotDownloadController.cp.foreach { peer =>
-        logger.info(s"Ban peer ${peer.socketAddress} for ExpiredNumberOfReRequestAttempts.")
-        nodeViewSynchronizer ! BanPeer(peer, ExpiredNumberOfReRequestAttempts)
-        restartFastSync(history)
-      }
+      context.become(fastSyncMod(history, timer, prevChunksPackTimeout).orElse(commonMessages))
 
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
@@ -243,7 +235,7 @@ class SnapshotHolder(settings: EncryAppSettings,
                 snapshotProcessor = processor
                 self ! RequestNextChunks
                 logger.debug("Manifest processed")
-                context.become(fastSyncMod(history, none, 0, prevChunksPackTimeout))
+                context.become(fastSyncMod(history, none, prevChunksPackTimeout))
             }
           } else if (!isValidManifest) {
             logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
@@ -259,7 +251,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       self ! msg
       scheduler.foreach(_.cancel())
       logger.info(s"Got RequiredManifestHeightAndId while awaitManifestMod")
-      context.become(fastSyncMod(history, none, 0, prevChunksPackTimeout))
+      context.become(fastSyncMod(history, none, prevChunksPackTimeout))
   }
 
   def workMod(history: History): Receive = {
