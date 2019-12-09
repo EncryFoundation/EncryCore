@@ -101,7 +101,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val kSerializer: Serializer[StorageKey]         = implicitly[Serializer[StorageKey]]
     val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
-    logger.info(s"applyChunk -> nodes -> ${nodes.map(l => Algos.encode(l.hash) -> Algos.encode(l.key))}")
+    logger.debug(s"applyChunk -> nodes -> ${nodes.map(l => Algos.encode(l.hash) -> Algos.encode(l.key))}")
     val toApplicable                                = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
     val toStorage = nodes.collect {
       case leaf: LeafNode[StorageKey, StorageValue]         => leaf
@@ -116,9 +116,11 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
         StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
       fullData :: shadowData :: Nil
     }
-    Either.catchNonFatal(
+    val startTime = System.currentTimeMillis()
+    Either.catchNonFatal {
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-    ) match {
+      logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime)/1000}s")
+    } match {
       case Right(_) =>
         logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
         val newApplicableChunk = (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
@@ -142,7 +144,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       (id: ByteArrayWrapper, chunk: SnapshotChunk)             = idAndChunk
       newChunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = chunksCache - id
     } yield {
-      logger.info(s"getNextApplicableChunk get from cache -> ${Algos.encode(id.data)}")
+      logger.debug(s"getNextApplicableChunk get from cache -> ${Algos.encode(id.data)}")
       (chunk, this.copy(chunksCache = newChunksCache))
     }
 
@@ -250,8 +252,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 object SnapshotProcessor extends StrictLogging {
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    if (settings.snapshotSettings.enableFastSynchronization) create(settings, new File(s"${settings.directory}/state"))
-    else create(settings, getDirProcessSnapshots(settings))
+    if (settings.snapshotSettings.enableFastSynchronization)
+      create(settings, new File(s"${settings.directory}/state"))
+    else
+      create(settings, getDirProcessSnapshots(settings))
 
   def recreate(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDirProcessSnapshots(settings))
 
@@ -259,6 +263,7 @@ object SnapshotProcessor extends StrictLogging {
 
   def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {
     snapshotsDir.mkdirs()
+    //todo bug with choosing db for state while fast sync
     val storage: VersionalStorage = settings.storage.snapshotHolder match {
       case VersionalStorage.IODB =>
         logger.info("Init snapshots holder with iodb storage")

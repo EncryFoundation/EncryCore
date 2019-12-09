@@ -22,7 +22,7 @@ import supertagged.@@
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
-trait History extends HistoryModifiersValidator with HistoryModifiersProcessors with AutoCloseable {
+trait History extends HistoryModifiersValidator with AutoCloseable {
 
   final case class IsFullChainSyncedProcessor(localSettings: EncryAppSettings) {
     var isFullChainSynced: Boolean = localSettings.node.offlineGeneration
@@ -40,6 +40,10 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
       case payload: Payload => (this, processPayload(payload))
     })
   }
+
+  def processHeader(h: Header): ProgressInfo
+
+  def processPayload(payload: Payload): ProgressInfo
 
   /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
@@ -140,18 +144,6 @@ trait History extends HistoryModifiersValidator with HistoryModifiersProcessors 
     }
   }
 
-  def reportModifierIsValidFastSync(headerId: ModifierId, payloadId: ModifierId): History = {
-    logger.info(s"Modifier ${Algos.encode(headerId)} of type 101 / 100 -> 102 is marked as valid in fast sync mod")
-    val modsRaw: List[(StorageKey, StorageValue)] =
-      (headerId :: payloadId :: Nil).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
-    val bestBlock = BestBlockKey -> StorageValue @@ headerId
-    historyStorage.insert(
-      StorageVersion @@ validityKey(payloadId).untag(StorageKey),
-      bestBlock :: modsRaw
-    )
-    this
-  }
-
   override def close(): Unit = historyStorage.close()
 
   def closeStorage(): Unit = historyStorage.close()
@@ -172,7 +164,6 @@ object History extends StrictLogging {
   }
 
   def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): History = {
-
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
     //Check what kind of storage in settings:
     val vldbInit = settingsEncry.storage.history match {
@@ -187,10 +178,16 @@ object History extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(historyIndexDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
-    new History {
-      override val settings: EncryAppSettings = settingsEncry
-      override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
-      override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
-    }
+    if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
+      new History with HistoryHeadersProcessor with FastSyncProcessor {
+        override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
+        override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
+      }
+    else
+      new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+        override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
+        override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
+      }
+
   }
 }

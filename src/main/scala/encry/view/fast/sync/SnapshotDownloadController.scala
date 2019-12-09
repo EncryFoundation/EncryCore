@@ -11,11 +11,13 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.view.fast.sync.FastSyncExceptions.{ ChunkValidationError, InvalidChunkBytes }
 import encry.view.fast.sync.FastSyncExceptions.{
+  ChunkValidationError,
+  InvalidChunkBytes,
   InvalidManifestBytes,
   ProcessManifestHasChangedMessageException,
-  SnapshotDownloadControllerException
+  SnapshotDownloadControllerException,
+  UnexpectedChunkMessage
 }
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 
@@ -55,7 +57,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     chunkMessage: SnapshotChunkMessage,
     remote: ConnectedPeer
   ): Either[ChunkValidationError, (SnapshotDownloadController, SnapshotChunk)] = {
-    logger.info(s"Got new chunk from ${remote.socketAddress}.")
+    logger.debug(s"Got new chunk from ${remote.socketAddress}.")
     Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
       case Left(error) =>
         logger.info(s"Chunk was parsed with error ${error.getCause}.")
@@ -64,11 +66,11 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
       case Right(chunk) =>
         val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
         if (requestedChunks.contains(chunkId)) {
-          logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
+          logger.debug(s"Got valid chunk ${Algos.encode(chunk.id)}.")
           (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
         } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-          InvalidChunkBytes(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+          UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
             .asLeft[(SnapshotDownloadController, SnapshotChunk)]
         }
     }
