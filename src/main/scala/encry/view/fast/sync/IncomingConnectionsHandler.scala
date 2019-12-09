@@ -19,7 +19,7 @@ final case class IncomingConnectionsHandler(liveConnections: Map[ConnectedPeer, 
     cond1 && cond2 && cond3
   }
 
-  def canProcessResponse(remote: ConnectedPeer): Boolean =
+  def canProcessRequest(remote: ConnectedPeer): Boolean =
     handledRequests <= settings.snapshotSettings.requestsPerTime &&
       liveConnections.exists {
         case (peer, (requests, _)) => peer.socketAddress == remote.socketAddress && requests > 0

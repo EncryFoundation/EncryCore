@@ -17,7 +17,8 @@ import encry.view.fast.sync.FastSyncExceptions.{
   InvalidManifestBytes,
   ProcessManifestHasChangedMessageException,
   SnapshotDownloadControllerException,
-  UnexpectedChunkMessage
+  UnexpectedChunkMessage,
+  UnexpectedChunkMessageNotForBan
 }
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 
@@ -26,7 +27,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             requestedChunks: Set[ByteArrayWrapper],
                                             settings: EncryAppSettings,
                                             cp: Option[ConnectedPeer],
-                                            requiredManifestHeight: Int)
+                                            requiredManifestHeight: Int,
+                                            previousManifestRequested: Set[ByteArrayWrapper])
     extends StrictLogging {
 
   def processManifest(
@@ -48,7 +50,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           Set.empty[ByteArrayWrapper],
           settings,
           remote.some,
-          requiredManifestHeight
+          requiredManifestHeight,
+          requestedChunks
         ).asRight[SnapshotDownloadControllerException]
     }
   }
@@ -68,6 +71,10 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         if (requestedChunks.contains(chunkId)) {
           logger.debug(s"Got valid chunk ${Algos.encode(chunk.id)}.")
           (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
+        } else if (previousManifestRequested.contains(chunkId)) {
+          logger.info(s"Got chunk form previous requested chunks pack ${Algos.encode(chunk.id)}.")
+          UnexpectedChunkMessageNotForBan(s"Got chunk form previous requested chunks pack ${Algos.encode(chunk.id)}.")
+            .asLeft[(SnapshotDownloadController, SnapshotChunk)]
         } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
           UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
@@ -97,7 +104,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           Set.empty[ByteArrayWrapper],
           settings,
           remote.some,
-          requiredManifestHeight
+          requiredManifestHeight,
+          Set.empty[ByteArrayWrapper]
         ).asRight[ProcessManifestHasChangedMessageException]
     }
   }
@@ -128,5 +136,5 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 object SnapshotDownloadController {
 
   def empty(settings: EncryAppSettings): SnapshotDownloadController =
-    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0)
+    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0, Set.empty)
 }

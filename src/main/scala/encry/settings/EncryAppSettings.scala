@@ -120,7 +120,8 @@ final case class SnapshotSettings(enableSnapshotCreation: Boolean,
                                   updateRequestsPerTime: FiniteDuration,
                                   liveConnectionTimeout: FiniteDuration,
                                   manifestReAskTimeout: FiniteDuration,
-                                  chunkDepth: Int)
+                                  chunkDepth: Int,
+                                  prevChunksPackTimeout: FiniteDuration)
 final case class StorageSettings(history: StorageType, state: StorageType, snapshotHolder: StorageType)
 final case class WalletSettings(password: String, seed: Option[String])
 final case class InfluxDBSettings(url: String, login: String, password: String, udpPort: Int)
