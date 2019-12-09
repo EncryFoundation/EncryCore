@@ -2,12 +2,7 @@ package encry.view.fast.sync
 
 import cats.syntax.either._
 import encry.settings.EncryAppSettings
-import encry.view.fast.sync.FastSyncExceptions.{
-  FastSyncException,
-  SnapshotDownloadControllerStorageAPIGetManyFunctionFailed,
-  SnapshotDownloadControllerStorageAPIInsertMany,
-  SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty
-}
+import encry.view.fast.sync.FastSyncExceptions.{ FastSyncException, SnapshotDownloadControllerStorageAPIError }
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.DB
 
@@ -38,7 +33,7 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
         }
         groupsCount.asRight[FastSyncException]
       },
-      err => SnapshotDownloadControllerStorageAPIInsertMany(err.getMessage).asLeft[Int]
+      err => SnapshotDownloadControllerStorageAPIError(err.getMessage).asLeft[Int]
     )
 
   /**
@@ -56,7 +51,7 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
           } else List.empty[Array[Byte]]
         buffer.asRight[FastSyncException]
       },
-      err => SnapshotDownloadControllerStorageAPIGetManyFunctionFailed(err.getMessage).asLeft[List[Array[Byte]]]
+      err => SnapshotDownloadControllerStorageAPIError(err.getMessage).asLeft[List[Array[Byte]]]
     )
 
   /**
@@ -70,6 +65,6 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider {
         iterator.seekToFirst()
         iterator.hasNext.asRight[FastSyncException]
       },
-      err => SnapshotDownloadControllerStorageAPIIsBatchesListNonEmpty(err.getMessage).asLeft[Boolean]
+      err => SnapshotDownloadControllerStorageAPIError(err.getMessage).asLeft[Boolean]
     )
 }

@@ -124,7 +124,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     } catch {
       case err: Throwable =>
         logger.info(s"Error ${err.getMessage} has occurred")
-        sys.exit(91919)
+        throw new Exception(s"Error ${err.getMessage} has occurred")
     }
 }
 
