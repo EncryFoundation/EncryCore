@@ -311,13 +311,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def restartFastSync(history: History): Unit = {
     logger.info(s"Restart fast sync!")
-    val newController: SnapshotDownloadController = SnapshotDownloadController
-      .empty(settings)
-      .copy(
-        requiredManifestHeight = snapshotDownloadController.requiredManifestHeight,
-        requiredManifestId = snapshotDownloadController.requiredManifestId
-      )
-    snapshotDownloadController = newController
+    snapshotDownloadController = snapshotDownloadController.reInitFastSync
     snapshotProcessor = snapshotProcessor.reInitStorage
     context.become(fastSyncMod(history, none, reRequestsNumber = 0).orElse(commonMessages))
   }

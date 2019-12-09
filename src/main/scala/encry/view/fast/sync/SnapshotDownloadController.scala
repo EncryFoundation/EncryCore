@@ -108,6 +108,24 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   def canNewManifestBeProcessed: Boolean = cp.isEmpty
 
   def canChunkBeProcessed(remote: ConnectedPeer): Boolean = cp.exists(_.socketAddress == remote.socketAddress)
+
+  def reInitFastSync: SnapshotDownloadController =
+    try {
+      storage.close()
+      val dir: File = SnapshotDownloadController.getChunksStorageDir(settings)
+      import org.apache.commons.io.FileUtils
+      FileUtils.deleteDirectory(dir)
+      SnapshotDownloadController
+        .empty(settings)
+        .copy(
+          requiredManifestHeight = this.requiredManifestHeight,
+          requiredManifestId = this.requiredManifestId
+        )
+    } catch {
+      case err: Throwable =>
+        logger.info(s"Error ${err.getMessage} has occurred")
+        sys.exit(91919)
+    }
 }
 
 object SnapshotDownloadController {
