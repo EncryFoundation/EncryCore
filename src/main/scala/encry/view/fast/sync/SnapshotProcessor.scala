@@ -83,7 +83,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
       import org.apache.commons.io.FileUtils
       FileUtils.deleteDirectory(dir)
-      SnapshotProcessor.initialize(settings)
+      SnapshotProcessor.initialize(settings, isFastSync = true)
     } catch {
       case _: Throwable => sys.exit(9999)
     }
@@ -102,7 +102,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
     logger.debug(s"applyChunk -> nodes -> ${nodes.map(l => Algos.encode(l.hash) -> Algos.encode(l.key))}")
-    val toApplicable                                = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
+    val toApplicable = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
     val toStorage = nodes.collect {
       case leaf: LeafNode[StorageKey, StorageValue]         => leaf
       case internal: InternalNode[StorageKey, StorageValue] => internal
@@ -119,7 +119,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val startTime = System.currentTimeMillis()
     Either.catchNonFatal {
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-      logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime)/1000}s")
+      logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime) / 1000}s")
     } match {
       case Right(_) =>
         logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
@@ -251,28 +251,30 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 
 object SnapshotProcessor extends StrictLogging {
 
-  def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    if (settings.snapshotSettings.enableFastSynchronization)
-      create(settings, new File(s"${settings.directory}/state"))
-    else
-      create(settings, getDirProcessSnapshots(settings))
+  def initialize(settings: EncryAppSettings, isFastSync: Boolean): SnapshotProcessor =
+    if (isFastSync) create(settings, new File(s"${settings.directory}/state"), isFastSync)
+    else create(settings, getDirProcessSnapshots(settings), isFastSync)
 
-  def recreate(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDirProcessSnapshots(settings))
+  def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotProcessor =
+    create(settings, getDirProcessSnapshots(settings), isFastSync = false)
 
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
-  def create(settings: EncryAppSettings, snapshotsDir: File): SnapshotProcessor = {
+  def create(settings: EncryAppSettings, snapshotsDir: File, isFastSync: Boolean): SnapshotProcessor = {
     snapshotsDir.mkdirs()
-    //todo bug with choosing db for state while fast sync
-    val storage: VersionalStorage = settings.storage.snapshotHolder match {
-      case VersionalStorage.IODB =>
-        logger.info("Init snapshots holder with iodb storage")
-        IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        logger.info("Init snapshots holder with levelDB storage")
-        val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
-    }
+    val storagePath =
+      if (isFastSync) settings.storage.state
+      else settings.storage.snapshotHolder
+    val storage: VersionalStorage =
+      storagePath match {
+        case VersionalStorage.IODB =>
+          logger.info("Init snapshots holder with iodb storage")
+          IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
+        case VersionalStorage.LevelDB =>
+          logger.info("Init snapshots holder with levelDB storage")
+          val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
+      }
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty)
   }
 }

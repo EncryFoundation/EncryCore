@@ -40,7 +40,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   //todo 1. Add connection agreement (case while peer reconnects with other handler.ref)
 
-  var snapshotProcessor: SnapshotProcessor                   = SnapshotProcessor.initialize(settings)
+  var snapshotProcessor: SnapshotProcessor =
+    SnapshotProcessor.initialize(settings, settings.snapshotSettings.enableFastSynchronization)
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var connectionsHandler: IncomingConnectionsHandler         = IncomingConnectionsHandler.empty(settings)
 
@@ -182,7 +183,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
-        snapshotProcessor = SnapshotProcessor.recreate(settings)
+        snapshotProcessor = SnapshotProcessor.recreateAfterFastSyncIsDone(settings)
         logger.info(s"Snapshot holder context.become to snapshot processing")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
@@ -221,10 +222,10 @@ class SnapshotHolder(settings: EncryAppSettings,
           if (isValidManifest && canBeProcessed) {
             (for {
               controller <- snapshotDownloadController.processManifest(manifest, remote, history)
-              processor  <- snapshotProcessor.initializeApplicableChunksCache(
-                history,
-                snapshotDownloadController.requiredManifestHeight
-              )
+              processor <- snapshotProcessor.initializeApplicableChunksCache(
+                            history,
+                            snapshotDownloadController.requiredManifestHeight
+                          )
             } yield (controller, processor)) match {
               case Left(error) =>
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
