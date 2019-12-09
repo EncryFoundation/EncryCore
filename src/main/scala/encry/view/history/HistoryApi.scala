@@ -33,15 +33,12 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   var isHeadersChainSyncedVar: Boolean = false
 
   final case class FastSyncProcessor(localSettings: EncryAppSettings) {
-    var fastSyncVal: Boolean = localSettings.snapshotSettings.enableFastSynchronization
+    var fastSyncVal: Boolean = settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
   }
-
-  lazy val isFastSync = FastSyncProcessor(settings)
 
   var lastAvailableManifestHeight: Int = 0
 
-  var fastSyncInProgress: Boolean =
-    settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
+  lazy val fastSyncInProgress: FastSyncProcessor = FastSyncProcessor(settings)
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
@@ -132,7 +129,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
-      else if (height > lastAvailableManifestHeight && fastSyncInProgress) acc
+      else if (height > lastAvailableManifestHeight && fastSyncInProgress.fastSyncVal) acc
       else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
         case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
           continuation(height + 1, acc :+ h.payloadId)

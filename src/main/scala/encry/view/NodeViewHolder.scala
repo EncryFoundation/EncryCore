@@ -51,7 +51,7 @@ import scala.util.{Failure, Success, Try}
 class NodeViewHolder(memoryPoolRef: ActorRef,
                      influxRef: Option[ActorRef],
                      dataHolder: ActorRef,
-                     settings: EncryAppSettings) extends Actor with StrictLogging with AutoCloseable {
+                     encrySettings: EncryAppSettings) extends Actor with StrictLogging with AutoCloseable {
 
   implicit val exCon: ExecutionContextExecutor = context.dispatcher
 
@@ -89,22 +89,23 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   override def receive: Receive = {
     case CreateAccountManagerFromSeed(seed) =>
-      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
+      val newAccount = nodeView.wallet.addAccount(seed, encrySettings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)
       sender() ! newAccount
     case FastSyncFinished(state) =>
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
-      FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
+      FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/tmpDirState"))
       logger.info(s"Updated best block in fast sync mod. Updated state height.")
       logger.info(s"Start wallet scanning")
       val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
       logger.info(s"Finished wallet scanning")
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+        override val settings: EncryAppSettings = encrySettings
         override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
         override val historyStorage: HistoryStorage = nodeView.history.historyStorage
       }
-      newHistory.fastSyncInProgress = false
+      newHistory.fastSyncInProgress.fastSyncVal = false
       newHistory.blockDownloadProcessor.updateMinimalBlockHeightVar(nodeView.history.blockDownloadProcessor.minimalBlockHeight)
       newHistory.isHeadersChainSyncedVar = true
       updateNodeView(
@@ -241,9 +242,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               dataHolder ! DataHolderForApi.BlockAndHeaderInfo(newHis.getBestHeader, newHis.getBestBlock)
               modToApply match {
                 case header: Header =>
-                  val requiredHeight: Int = header.height - settings.levelDB.maxVersions
-                  if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
-                    newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
+                  val requiredHeight: Int = header.height - encrySettings.levelDB.maxVersions
+                  if (requiredHeight % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0) {
+                    newHis.getBestHeaderAtHeight(header.height - encrySettings.levelDB.maxVersions).foreach { h =>
                       newHis.lastAvailableManifestHeight = requiredHeight
                       logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${
                         newHis.lastAvailableManifestHeight
@@ -252,10 +253,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   }
                 case _ =>
               }
-              if (settings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced.isFullChainSynced &&
+              if (encrySettings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced.isFullChainSynced &&
                 newHis.getBestBlock.exists { block =>
-                block.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
-                  block.header.height != settings.constants.GenesisHeight }) {
+                block.header.height % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0 &&
+                  block.header.height != encrySettings.constants.GenesisHeight }) {
                 val startTime = System.currentTimeMillis()
                 logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
                 import encry.view.state.avlTree.utils.implicits.Instances._
@@ -263,7 +264,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   val chunks: List[SnapshotChunk] =
                     AvlTree.getChunks(
                       stateAfterApply.tree.rootNode,
-                      currentChunkHeight = settings.snapshotSettings.chunkDepth,
+                      currentChunkHeight = encrySettings.snapshotSettings.chunkDepth,
                       stateAfterApply.tree.storage
                     )
                   val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
@@ -310,7 +311,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     if (!nodeView.history.isModifierDefined(pmod.id)) {
       logger.debug(s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
       val startAppHistory = System.currentTimeMillis()
-      if (settings.influxDB.isDefined) context.system
+      if (encrySettings.influxDB.isDefined) context.system
         .actorSelection("user/statsSender") !
         StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(pmod) match {
@@ -325,7 +326,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               }
               ref ! ModifierAppendedToHistory(isHeader, success = true)
             }
-            if (historyBeforeStUpdate.fastSyncInProgress && pmod.modifierTypeId == Payload.modifierTypeId &&
+            if (historyBeforeStUpdate.fastSyncInProgress.fastSyncVal && pmod.modifierTypeId == Payload.modifierTypeId &&
               historyBeforeStUpdate.getBestBlockHeight >= historyBeforeStUpdate.lastAvailableManifestHeight) {
               logger.info(s"nodeView.history.getBestBlockHeight ${historyBeforeStUpdate.getBestBlockHeight}")
               logger.info(s"nodeView.history.heightOfLastAvailablePayloadForRequest ${historyBeforeStUpdate.lastAvailableManifestHeight}")
@@ -344,14 +345,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
                 updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
               if (newHistory.isHeadersChainSynced) system.actorSelection("/user/nodeViewSynchronizer") ! HeaderChainIsSynced
-              if (settings.influxDB.isDefined)
+              if (encrySettings.influxDB.isDefined)
                 context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
               sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
               if (progressInfo.chainSwitchingNeeded)
                 nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
               blocksApplied.foreach(nodeView.wallet.scanPersistent)
               logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-              if (settings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
+              if (encrySettings.influxDB.isDefined) newHistory.getBestHeader.foreach(header =>
                 context.actorSelection("/user/statsSender") ! BestHeaderInChain(header))
               if (newHistory.isFullChainSynced.isFullChainSynced) {
                 logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
@@ -392,41 +393,41 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def genesisState: NodeView = {
-    val stateDir: File = UtxoState.getStateDir(settings)
+    val stateDir: File = UtxoState.getStateDir(encrySettings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: UtxoState = UtxoState.genesis(stateDir, settings)
-    val history: History = History.readOrGenerate(settings, timeProvider)
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+    val state: UtxoState = UtxoState.genesis(stateDir, encrySettings)
+    val history: History = History.readOrGenerate(encrySettings, timeProvider)
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] = if (History.getHistoryIndexDir(settings).listFiles.nonEmpty)
+  def restoreState(): Option[NodeView] = if (History.getHistoryIndexDir(encrySettings).listFiles.nonEmpty)
     try {
-      val stateDir: File = UtxoState.getStateDir(settings)
+      val stateDir: File = UtxoState.getStateDir(encrySettings)
       stateDir.mkdirs()
-      val history: History = History.readOrGenerate(settings, timeProvider)
-      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+      val history: History = History.readOrGenerate(encrySettings, timeProvider)
+      val wallet: EncryWallet = EncryWallet.readOrGenerate(encrySettings)
       val state: UtxoState = restoreConsistentState(
-        UtxoState.create(stateDir, settings), history
+        UtxoState.create(stateDir, encrySettings), history
       )
       Some(NodeView(history, state, wallet))
     } catch {
       case ex: Throwable =>
         logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
-        new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
+        new File(encrySettings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
         Some(genesisState)
     } else {
     None
   }
 
   def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): UtxoState = {
-    val dir: File = UtxoState.getStateDir(settings)
+    val dir: File = UtxoState.getStateDir(encrySettings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
-    val stateDir: File = UtxoState.getStateDir(settings)
+    val stateDir: File = UtxoState.getStateDir(encrySettings)
     stateDir.mkdirs()
-    UtxoState.create(stateDir, settings)
+    UtxoState.create(stateDir, encrySettings)
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: History): UtxoState =

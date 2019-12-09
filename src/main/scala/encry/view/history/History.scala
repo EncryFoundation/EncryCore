@@ -180,11 +180,13 @@ object History extends StrictLogging {
     }
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
       new History with HistoryHeadersProcessor with FastSyncProcessor {
+        override val settings: EncryAppSettings = settingsEncry
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
     else
       new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+        override val settings: EncryAppSettings = settingsEncry
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
