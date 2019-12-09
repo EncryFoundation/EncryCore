@@ -232,36 +232,33 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               val newHis: History = history.reportModifierIsValid(modToApply)
               modToApply match {
                 case header: Header =>
-                  val requiredHeight: Int = header.height - settings.levelDB.maxVersions
+                  val requiredHeight: Int = header.height - settings.constants.MaxRollbackDepth
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
-                    newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
-                      newHis.lastAvailableManifestHeight = requiredHeight
-                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${
-                        newHis.lastAvailableManifestHeight
-                      }")
-                    }
+                    newHis.lastAvailableManifestHeight = requiredHeight
+                    logger.info(s"heightOfLastAvailablePayloadForRequest -> ${newHis.lastAvailableManifestHeight}")
                   }
                 case _ =>
               }
+              val bestBlockHeader: Option[Header] = newHis.getHeaderOfBestBlock
               if (settings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
-                newHis.getBestBlock.exists { block =>
-                block.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
-                  block.header.height != settings.constants.GenesisHeight }) {
+                bestBlockHeader.exists { header =>
+                header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
+                  header.height != settings.constants.GenesisHeight }) {
                 val startTime = System.currentTimeMillis()
-                logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
+                logger.info(s"Start chunks creation for new snapshot")
                 import encry.view.state.avlTree.utils.implicits.Instances._
-                newHis.getBestBlock.foreach { b =>
+                bestBlockHeader.foreach { header =>
                   val chunks: List[SnapshotChunk] =
                     AvlTree.getChunks(
                       stateAfterApply.tree.rootNode,
                       currentChunkHeight = settings.snapshotSettings.chunkDepth,
                       stateAfterApply.tree.storage
                     )
-                  val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
+                  val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ header.id)
                   nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
                 }
-                logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
-                logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
+                logger.info(s"State tree successfully processed for snapshot. " +
+                  s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
               }
 
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))

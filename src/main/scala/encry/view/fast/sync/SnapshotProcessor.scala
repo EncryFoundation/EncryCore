@@ -190,7 +190,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       s"Start updating actual manifest to new one at height " +
         s"${block.header.height} with block id ${block.encodedId}."
     )
-    updateActualSnapshot(history, block.header.height - settings.levelDB.maxVersions)
+    updateActualSnapshot(history, block.header.height - settings.constants.MaxRollbackDepth)
   }
 
   def createNewSnapshot(
