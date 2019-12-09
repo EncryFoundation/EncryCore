@@ -45,7 +45,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         val batchesSize: Int = insertMany(manifest.chunksKeys) match {
           case Left(error) =>
             logger.info(s"Error ${error.error} has occurred while processing new manifest.")
-            0 //todo ???
+            throw new Exception(s"Error ${error.error} has occurred while processing new manifest.")
           case Right(v) =>
             logger.info(s"New chunks ids successfully inserted into db")
             v
