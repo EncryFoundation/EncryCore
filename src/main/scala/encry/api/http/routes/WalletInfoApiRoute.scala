@@ -40,13 +40,16 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
     infoR ~
       getUtxosR ~
       printAddressR ~
-      createKeyR ~
       printPubKeysR ~
       getBalanceR ~
-      transferR ~
-      transferContractR ~
-      createTokenR ~
-      dataTransactionR
+    WebRoute.authRoute(
+      WebRoute.extractIp(
+        createKeyR ~
+        transferR ~
+        transferContractR ~
+        createTokenR ~
+        dataTransactionR, settings)
+    )
   }
 
   private def getWallet: Future[EncryWallet] =
