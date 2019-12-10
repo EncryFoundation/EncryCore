@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -10,7 +9,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp.{system, timeProvider}
 import encry.api.http.DataHolderForApi
-import encry.api.http.DataHolderForApi.{BlockAndHeaderInfo}
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -22,18 +20,12 @@ import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
-import encry.view.state.{UtxoState, _}
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor}
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
-import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
-import encry.view.history.History
-import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
