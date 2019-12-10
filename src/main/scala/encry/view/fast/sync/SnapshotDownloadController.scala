@@ -61,10 +61,11 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         if (requestedChunks.contains(chunkId)) {
           logger.debug(s"Got valid chunk ${Algos.encode(chunk.id)}.")
           (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
-        } else
+        } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-        UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-          .asLeft[(SnapshotDownloadController, SnapshotChunk)]
+          UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+            .asLeft[(SnapshotDownloadController, SnapshotChunk)]
+        }
     }
   }
 
