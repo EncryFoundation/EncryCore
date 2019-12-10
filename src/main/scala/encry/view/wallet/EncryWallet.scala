@@ -78,14 +78,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
   }
 
   def scanWalletFromUtxo(state: UtxoStateReader, props: Set[EncryProposition]): EncryWallet = {
-    val bxsToAdd: Seq[EncryBaseBox] = EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, props)
-    if (bxsToAdd.nonEmpty)
-      walletStorage.updateWallet(
-        ModifierId !@@ state.tree.storage.currentVersion,
-        bxsToAdd,
-        List.empty,
-        settings.constants.IntrinsicTokenId
-      )
+    EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, props, walletStorage, settings)
     this
   }
 
@@ -128,20 +121,40 @@ object EncryWallet extends StrictLogging {
 
   def scanTree(node: Node[StorageKey, StorageValue],
                storage: VersionalStorage,
-               accounts: Set[EncryProposition]): List[EncryBaseBox] = node match {
+               accounts: Set[EncryProposition],
+               wallet: WalletVersionalLevelDB,
+               settings: EncryAppSettings): Unit = node match {
     case sh: ShadowNode[StorageKey, StorageValue] =>
       val restoredNode = sh.restoreFullNode(storage)
-      scanTree(restoredNode, storage, accounts)
+      scanTree(restoredNode, storage, accounts, wallet, settings)
     case internalNode: InternalNode[StorageKey, StorageValue] =>
       StateModifierSerializer.parseBytes(internalNode.value, internalNode.key.head) match {
-        case Success(bx) => collectBx(bx, accounts) :::
-          internalNode.leftChild.map(leftNode => scanTree(leftNode, storage, accounts)).getOrElse(List.empty) :::
-          internalNode.rightChild.map(rightChild => scanTree(rightChild, storage, accounts)).getOrElse(List.empty)
+        case Success(bx) =>
+          val boxes: List[EncryBaseBox] = collectBx(bx, accounts)
+          if (boxes.nonEmpty) {
+            wallet.updateWallet(
+              ModifierId !@@ boxes.head.id,
+              boxes,
+              List.empty,
+              settings.constants.IntrinsicTokenId
+            )
+          }
+          internalNode.leftChild.foreach(leftNode => scanTree(leftNode, storage, accounts, wallet, settings))
+          internalNode.rightChild.foreach(rightChild => scanTree(rightChild, storage, accounts, wallet, settings))
         case Failure(exception) => throw exception //???????
       }
     case leafNode: LeafNode[StorageKey, StorageValue] =>
       StateModifierSerializer.parseBytes(leafNode.value, leafNode.key.head) match {
-        case Success(bx) => collectBx(bx, accounts)
+        case Success(bx) =>
+          val boxes: List[EncryBaseBox] = collectBx(bx, accounts)
+          if (boxes.nonEmpty) {
+            wallet.updateWallet(
+              ModifierId !@@ boxes.head.id,
+              boxes,
+              List.empty,
+              settings.constants.IntrinsicTokenId
+            )
+          }
         case Failure(exception) => throw exception //???????
       }
   }
