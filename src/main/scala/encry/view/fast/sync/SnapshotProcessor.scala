@@ -275,7 +275,7 @@ object SnapshotProcessor extends StrictLogging {
         case VersionalStorage.LevelDB =>
           logger.info("Init snapshots holder with levelDB storage")
           val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
-          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
       }
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty)
   }
