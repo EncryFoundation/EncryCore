@@ -14,18 +14,15 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, S
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{
-  ApplicableChunkIsAbsent,
-  FastSyncException
-}
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException }
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -46,7 +43,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       else settings.storage.snapshotHolder
     )
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
-  var connectionsHandler: IncomingConnectionsHandler         = IncomingConnectionsHandler.empty(settings)
+  var requestsProcessor: RequestsPerPeriodProcessor          = RequestsPerPeriodProcessor.empty(settings)
 
   override def preStart(): Unit = {
     if (settings.snapshotSettings.newSnapshotCreationHeight <= settings.constants.MaxRollbackDepth ||
@@ -263,40 +260,33 @@ class SnapshotHolder(settings: EncryAppSettings,
         case Left(_) =>
         case Right(newProcessor) =>
           snapshotProcessor = newProcessor
-          connectionsHandler = IncomingConnectionsHandler.empty(settings)
+          requestsProcessor = RequestsPerPeriodProcessor.empty(settings)
       }
 
     case DataFromPeer(message, remote) =>
       message match {
         case RequestManifestMessage(requiredManifestId)
-            if connectionsHandler.canBeProcessed(snapshotProcessor, remote, requiredManifestId) =>
+            if requestsProcessor.canBeProcessed(snapshotProcessor, remote, requiredManifestId) =>
           snapshotProcessor.actualManifest.foreach { m =>
             logger.info(s"Sent to remote actual manifest with id ${Algos.encode(requiredManifestId)}")
             remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
-            connectionsHandler = connectionsHandler.addNewConnect(remote, m.chunksKeys.size)
           }
         case RequestManifestMessage(manifest) =>
           logger.debug(s"Got request for manifest with ${Algos.encode(manifest)}")
-        case RequestChunkMessage(chunkId) if connectionsHandler.canProcessRequest(remote) =>
-          logger.debug(s"Got RequestChunkMessage. Current handledRequests ${connectionsHandler.handledRequests}.")
+        case RequestChunkMessage(chunkId) if requestsProcessor.canProcessRequest(remote) =>
+          logger.debug(s"Got RequestChunkMessage. Current handledRequests ${requestsProcessor.handledRequests}.")
           val chunkFromDB: Option[SnapshotChunkMessage] = snapshotProcessor.getChunkById(chunkId)
           chunkFromDB.foreach { chunk =>
             logger.debug(s"Sent to $remote chunk $chunk.")
             val networkMessage: NetworkMessage = ResponseChunkMessage(chunk)
             remote.handlerRef ! networkMessage
           }
-          connectionsHandler = connectionsHandler.processRequest(remote)
-        case RequestChunkMessage(_) if connectionsHandler.liveConnections.exists {
-              case (peer, (lastRequests, _)) => peer.socketAddress == remote.socketAddress && lastRequests <= 0
-            } =>
-          logger.info(s"Ban peer $remote.")
-          nodeViewSynchronizer ! BanPeer(remote, ExpiredNumberOfRequests)
-          connectionsHandler = connectionsHandler.removeConnection(remote)
+          requestsProcessor = requestsProcessor.processRequest(remote)
         case RequestChunkMessage(_) =>
         case _                      =>
       }
     case DropProcessedCount =>
-      connectionsHandler = connectionsHandler.iterationProcessing
+      requestsProcessor = requestsProcessor.iterationProcessing
       context.system.scheduler.scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
   }
 
