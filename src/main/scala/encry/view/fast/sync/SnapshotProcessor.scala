@@ -1,7 +1,8 @@
 package encry.view.fast.sync
 
 import java.io.File
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+
+import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
@@ -22,6 +23,7 @@ import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
 import org.iq80.leveldb.{ DB, Options }
 import cats.syntax.either._
+
 import scala.language.postfixOps
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
@@ -40,6 +42,7 @@ import encry.view.fast.sync.FastSyncExceptions.{
 }
 import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
+
 import scala.collection.immutable.{ HashMap, HashSet }
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
@@ -83,7 +86,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
       import org.apache.commons.io.FileUtils
       FileUtils.deleteDirectory(dir)
-      SnapshotProcessor.initialize(settings, isFastSync = true)
+      SnapshotProcessor.initialize(settings, settings.storage.state)
     } catch {
       case _: Throwable => sys.exit(9999)
     }
@@ -251,22 +254,21 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 
 object SnapshotProcessor extends StrictLogging {
 
-  def initialize(settings: EncryAppSettings, isFastSync: Boolean): SnapshotProcessor =
-    if (isFastSync) create(settings, new File(s"${settings.directory}/state"), isFastSync)
-    else create(settings, getDirProcessSnapshots(settings), isFastSync)
+  def initialize(settings: EncryAppSettings, storageType: StorageType): SnapshotProcessor =
+    if (settings.snapshotSettings.enableFastSynchronization)
+      create(settings, new File(s"${settings.directory}/state"), storageType)
+    else
+      create(settings, getDirProcessSnapshots(settings), storageType)
 
   def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotProcessor =
-    create(settings, getDirProcessSnapshots(settings), isFastSync = false)
+    create(settings, getDirProcessSnapshots(settings), settings.storage.snapshotHolder)
 
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
-  def create(settings: EncryAppSettings, snapshotsDir: File, isFastSync: Boolean): SnapshotProcessor = {
+  def create(settings: EncryAppSettings, snapshotsDir: File, storageType: StorageType): SnapshotProcessor = {
     snapshotsDir.mkdirs()
-    val storagePath =
-      if (isFastSync) settings.storage.state
-      else settings.storage.snapshotHolder
     val storage: VersionalStorage =
-      storagePath match {
+      storageType match {
         case VersionalStorage.IODB =>
           logger.info("Init snapshots holder with iodb storage")
           IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))

@@ -41,7 +41,11 @@ class SnapshotHolder(settings: EncryAppSettings,
   //todo 1. Add connection agreement (case while peer reconnects with other handler.ref)
 
   var snapshotProcessor: SnapshotProcessor =
-    SnapshotProcessor.initialize(settings, settings.snapshotSettings.enableFastSynchronization)
+    SnapshotProcessor.initialize(
+      settings,
+      if (settings.snapshotSettings.enableFastSynchronization) settings.storage.state
+      else settings.storage.snapshotHolder
+    )
   var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
   var connectionsHandler: IncomingConnectionsHandler         = IncomingConnectionsHandler.empty(settings)
 
