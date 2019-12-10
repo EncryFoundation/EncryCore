@@ -3,8 +3,9 @@ package encry.view.state.avlTree
 import NodeMsg.NodeProtoMsg
 import NodeMsg.NodeProtoMsg.NodeTypes
 import cats.Monoid
-import encry.view.state.avlTree.utils.implicits.{ Hashable, Serializer }
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 
 import scala.util.Try
@@ -16,7 +17,10 @@ abstract class Node[K: Serializer: Monoid, V: Serializer: Monoid] {
   val balance: Int
   lazy val hash: Array[Byte] = Algos.hash(NodeSerilalizer.toBytes(this))
   def selfInspection: Node[K, V]
+  Header
+
 }
+
 
 object NodeSerilalizer {
   def toProto[K: Serializer, V: Serializer](node: Node[K, V]): NodeProtoMsg = {

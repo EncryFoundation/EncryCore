@@ -47,7 +47,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
             logger.info(s"Error ${error.error} has occurred while processing new manifest.")
             throw new Exception(s"Error ${error.error} has occurred while processing new manifest.")
           case Right(v) =>
-            logger.info(s"New chunks ids successfully inserted into db")
+            logger.info(s"New chunks ids successfully inserted into db. Number of batches is $v.")
             v
         }
         SnapshotDownloadController(
@@ -57,7 +57,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           remote.some,
           requiredManifestHeight,
           storage,
-          batchesSize,
+          batchesSize - 1,
           1
         ).asRight[SnapshotDownloadControllerException]
     }
@@ -91,14 +91,19 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     for {
       nextBatch                                       <- getNextForRequest(nextGroupForRequestNumber)
       serializedToDownload: List[RequestChunkMessage] = nextBatch.map(id => RequestChunkMessage(id))
-    } yield
+    } yield {
+      val newGroupNumber: Int = nextGroupForRequestNumber + 1
+      val lastsBatchesSize: Int = batchesSize - 1
+      logger.info(s"Successfully got group with number $nextGroupForRequestNumber." +
+        s" New group number is $newGroupNumber. Lasts batches size is $lastsBatchesSize")
       this.copy(
         requestedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet,
-        batchesSize = batchesSize - 1,
-        nextGroupForRequestNumber = nextGroupForRequestNumber + 1
+        batchesSize = lastsBatchesSize,
+        nextGroupForRequestNumber = newGroupNumber
       ) -> serializedToDownload
+    }
 
-  def isNotYetRequestedNonEmpty: Boolean = batchesSize == 0
+  def isBatchesSizeEmpty: Boolean = batchesSize == 0
 
   def checkManifestValidity(manifestId: Array[Byte], history: History): Boolean =
     history.getBestHeaderAtHeight { requiredManifestHeight }.exists { header =>

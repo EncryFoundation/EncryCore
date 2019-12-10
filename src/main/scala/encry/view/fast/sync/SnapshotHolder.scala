@@ -105,11 +105,11 @@ class SnapshotHolder(settings: EncryAppSettings,
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
               restartFastSync(history)
             case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && !controller.isNotYetRequestedNonEmpty && processor.chunksCache.nonEmpty =>
+                if controller.requestedChunks.isEmpty && controller.isBatchesSizeEmpty && processor.chunksCache.nonEmpty =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
               restartFastSync(history)
             case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && !controller.isNotYetRequestedNonEmpty =>
+              if controller.requestedChunks.isEmpty && controller.isBatchesSizeEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) =>
                   logger.info(s"Tree is valid on Snapshot holder!")
@@ -135,7 +135,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       responseTimeout.foreach(_.cancel())
       (for {
         controllerAndIds <- snapshotDownloadController.chunksIdsToDownload
-        _                = logger.info(s"Current notYetRequested queue ${snapshotDownloadController.batchesSize}.")
+        _                = logger.info(s"Current notYetRequested batches is ${snapshotDownloadController.batchesSize}.")
       } yield controllerAndIds) match {
         case Left(err) =>
           logger.info(s"Error has occurred: ${err.error}")
