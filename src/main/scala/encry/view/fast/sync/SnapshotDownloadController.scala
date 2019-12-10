@@ -2,33 +2,24 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import com.typesafe.scalalogging.StrictLogging
-import SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
-import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.EncryAppSettings
-import encry.view.history.History
-import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.utils.Algos
 import cats.syntax.either._
 import cats.syntax.option._
-import encry.view.fast.sync.FastSyncExceptions.{
-  ChunkValidationError,
-  InvalidChunkBytes,
-  InvalidManifestBytes,
-  ProcessManifestHasChangedMessageException,
-  SnapshotDownloadControllerException,
-  UnexpectedChunkMessage,
-  UnexpectedChunkMessageNotForBan
-}
+import com.typesafe.scalalogging.StrictLogging
+import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.settings.EncryAppSettings
+import encry.view.fast.sync.FastSyncExceptions._
+import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
+import encry.view.history.History
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
+import org.encryfoundation.common.utils.Algos
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             notYetRequested: List[Array[Byte]],
                                             requestedChunks: Set[ByteArrayWrapper],
                                             settings: EncryAppSettings,
                                             cp: Option[ConnectedPeer],
-                                            requiredManifestHeight: Int,
-                                            previousManifestRequested: Set[ByteArrayWrapper])
+                                            requiredManifestHeight: Int)
     extends StrictLogging {
 
   def processManifest(
@@ -50,8 +41,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           Set.empty[ByteArrayWrapper],
           settings,
           remote.some,
-          requiredManifestHeight,
-          requestedChunks
+          requiredManifestHeight
         ).asRight[SnapshotDownloadControllerException]
     }
   }
@@ -71,15 +61,10 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         if (requestedChunks.contains(chunkId)) {
           logger.debug(s"Got valid chunk ${Algos.encode(chunk.id)}.")
           (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
-        } else if (previousManifestRequested.contains(chunkId)) {
-          logger.info(s"Got chunk form previous requested chunks pack ${Algos.encode(chunk.id)}.")
-          UnexpectedChunkMessageNotForBan(s"Got chunk form previous requested chunks pack ${Algos.encode(chunk.id)}.")
-            .asLeft[(SnapshotDownloadController, SnapshotChunk)]
-        } else {
+        } else
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-          UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
-            .asLeft[(SnapshotDownloadController, SnapshotChunk)]
-        }
+        UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
+          .asLeft[(SnapshotDownloadController, SnapshotChunk)]
     }
   }
 
@@ -104,8 +89,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           Set.empty[ByteArrayWrapper],
           settings,
           remote.some,
-          requiredManifestHeight,
-          Set.empty[ByteArrayWrapper]
+          requiredManifestHeight
         ).asRight[ProcessManifestHasChangedMessageException]
     }
   }
@@ -136,5 +120,5 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 object SnapshotDownloadController {
 
   def empty(settings: EncryAppSettings): SnapshotDownloadController =
-    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0, Set.empty)
+    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0)
 }
