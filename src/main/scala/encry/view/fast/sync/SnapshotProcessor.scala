@@ -1,51 +1,41 @@
 package encry.view.fast.sync
 
 import java.io.File
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+
+import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.{EncryAppSettings, LevelDBSettings}
 import encry.storage.VersionalStorage
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
-import encry.view.fast.sync.SnapshotHolder.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
-import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion, WalletVersionalLevelDB}
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.view.state.avlTree.{AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode}
 import org.encryfoundation.common.utils.Algos
 import scorex.utils.Random
 import encry.view.state.avlTree.utils.implicits.Instances._
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
-import org.iq80.leveldb.{ DB, Options }
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import org.iq80.leveldb.{DB, Options}
 import cats.syntax.either._
+
 import scala.language.postfixOps
 import com.google.common.primitives.Ints
-import encry.view.fast.sync.FastSyncExceptions.{
-  ApplicableChunkIsAbsent,
-  BestHeaderAtHeightIsAbsent,
-  ChunkApplyError,
-  ChunkValidationError,
-  EmptyHeightKey,
-  EmptyRootNodeError,
-  FastSyncException,
-  InconsistentChunkId,
-  InitializeHeightAndRootKeysException,
-  ProcessNewBlockError,
-  ProcessNewSnapshotError,
-  UtxoCreationError
-}
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, BestHeaderAtHeightIsAbsent, ChunkApplyError, ChunkValidationError, EmptyHeightKey, EmptyRootNodeError, FastSyncException, InconsistentChunkId, InitializeHeightAndRootKeysException, ProcessNewBlockError, ProcessNewSnapshotError, UtxoCreationError}
 import encry.view.history.History
-import org.encryfoundation.common.utils.TaggedTypes.Height
-import scala.collection.immutable.{ HashMap, HashSet }
+import encry.view.wallet.EncryWallet
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, MonetaryBox}
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.util.{Failure, Success, Try}
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
                                    storage: VersionalStorage,
                                    applicableChunks: HashSet[ByteArrayWrapper],
-                                   chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk])
+                                   chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk],
+                                   wallet: EncryWallet)
     extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
@@ -83,6 +73,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
       import org.apache.commons.io.FileUtils
       FileUtils.deleteDirectory(dir)
+      val walletDir = EncryWallet.getWalletDir(settings)
+      val keysDir = EncryWallet.getKeysDir(settings)
+      FileUtils.deleteDirectory(walletDir)
+      FileUtils.deleteDirectory(keysDir)
       SnapshotProcessor.initialize(settings)
     } catch {
       case _: Throwable => sys.exit(9999)
@@ -102,7 +96,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
     logger.debug(s"applyChunk -> nodes -> ${nodes.map(l => Algos.encode(l.hash) -> Algos.encode(l.key))}")
-    val toApplicable                                = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
+    val toApplicable = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
     val toStorage = nodes.collect {
       case leaf: LeafNode[StorageKey, StorageValue]         => leaf
       case internal: InternalNode[StorageKey, StorageValue] => internal
@@ -119,7 +113,31 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val startTime = System.currentTimeMillis()
     Either.catchNonFatal {
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
-      logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime)/1000}s")
+      val boxesToInsert: List[EncryBaseBox] = toStorage.foldLeft(List.empty[EncryBaseBox]) {
+        case (toInsert, i: InternalNode[StorageKey, StorageValue]) =>
+          StateModifierSerializer.parseBytes(i.value, i.key.head) match {
+            case Failure(_) => toInsert
+            case Success(box: MonetaryBox)
+                if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
+              box :: toInsert
+            case Success(_) => toInsert
+          }
+        case (toInsert, l: LeafNode[StorageKey, StorageValue]) =>
+          StateModifierSerializer.parseBytes(l.value, l.key.head) match {
+            case Failure(_) => toInsert
+            case Success(box: MonetaryBox)
+              if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
+              box :: toInsert
+            case Success(_) => toInsert
+          }
+      }
+      wallet.walletStorage.updateWallet(
+        ModifierId !@@ boxesToInsert.head.id,
+        boxesToInsert,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
+      logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime) / 1000}s")
     } match {
       case Right(_) =>
         logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
@@ -273,6 +291,6 @@ object SnapshotProcessor extends StrictLogging {
         val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
     }
-    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty)
+    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, EncryWallet.readOrGenerate(settings))
   }
 }

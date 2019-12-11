@@ -165,6 +165,23 @@ object EncryWallet extends StrictLogging {
     case _ => List.empty[MonetaryBox]
   }
 
+  def readOrGenerateDummy(settings: EncryAppSettings): EncryWallet = {
+    val walletDir: File =  new File(s"${settings.directory}/walletDummy")
+    walletDir.mkdirs()
+    val keysDir: File = new File(s"${settings.directory}/keysDummy")
+    keysDir.mkdirs()
+    val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
+    val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
+    val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
+    val restoredAccounts = AccountManager.restoreAccounts(accountManagerStore, password)
+    val resultingAccounts =
+      if (restoredAccounts.nonEmpty) restoredAccounts
+      else Seq(AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte))
+    //init keys
+    EncryWallet(walletStorage, resultingAccounts, accountManagerStore)
+  }
+
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
     val walletDir: File = getWalletDir(settings)
     walletDir.mkdirs()
