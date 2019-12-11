@@ -384,7 +384,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: UtxoState = UtxoState.genesis(stateDir, settings)
     val history: History = History.readOrGenerate(settings, timeProvider)
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+    val wallet: EncryWallet = EncryWallet.readOrGenerateDummy(settings)
     NodeView(history, state, wallet)
   }
 
