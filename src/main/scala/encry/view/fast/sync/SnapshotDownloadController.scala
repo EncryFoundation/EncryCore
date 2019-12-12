@@ -1,7 +1,6 @@
 package encry.view.fast.sync
 
 import java.io.File
-
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import cats.syntax.either._
@@ -27,7 +26,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
                                             batchesSize: Int,
                                             nextGroupForRequestNumber: Int)
     extends SnapshotDownloadControllerStorageAPI
-    with StrictLogging {
+    with StrictLogging
+    with AutoCloseable {
 
   def processManifest(
     manifestProto: SnapshotManifestProtoMessage,
@@ -44,8 +44,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
         val batchesSize: Int = insertMany(manifest.chunksKeys) match {
           case Left(error) =>
-            logger.info(s"Error ${error.error} has occurred while processing new manifest.")
-            throw new Exception(s"Error ${error.error} has occurred while processing new manifest.")
+            logger.info(s"Error ${error.getCause} has occurred while processing new manifest.")
+            throw new Exception(s"Error ${error.getCause} has occurred while processing new manifest.")
           case Right(v) =>
             logger.info(s"New chunks ids successfully inserted into db. Number of batches is $v.")
             v
@@ -88,7 +88,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 
   def chunksIdsToDownload
     : Either[FastSyncExceptions.FastSyncException, (SnapshotDownloadController, List[RequestChunkMessage])] =
-    for {
+    (for {
       nextBatch                                       <- getNextForRequest(nextGroupForRequestNumber)
       serializedToDownload: List[RequestChunkMessage] = nextBatch.map(id => RequestChunkMessage(id))
     } yield {
@@ -101,7 +101,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         batchesSize = lastsBatchesSize,
         nextGroupForRequestNumber = newGroupNumber
       ) -> serializedToDownload
-    }
+    }).leftMap(l => ChunksIdsToDownloadException(l.getMessage))
 
   def isBatchesSizeEmpty: Boolean = batchesSize == 0
 
@@ -131,6 +131,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
         logger.info(s"Error ${err.getMessage} has occurred")
         throw new Exception(s"Error ${err.getMessage} has occurred")
     }
+
+  def close(): Unit = storage.close()
 }
 
 object SnapshotDownloadController {

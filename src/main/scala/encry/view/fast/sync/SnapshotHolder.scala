@@ -2,23 +2,23 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import akka.actor.{ Actor, ActorRef, Cancellable, Props }
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
-import encry.network.{Broadcast, PeerConnectionHandler}
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
+import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.{ Broadcast, PeerConnectionHandler }
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.state.UtxoState
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
+import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
@@ -110,7 +110,7 @@ class SnapshotHolder(settings: EncryAppSettings,
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
               restartFastSync(history)
             case Right((processor, controller))
-              if controller.requestedChunks.isEmpty && controller.isBatchesSizeEmpty =>
+                if controller.requestedChunks.isEmpty && controller.isBatchesSizeEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) =>
                   logger.info(s"Tree is valid on Snapshot holder!")
@@ -183,6 +183,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
         snapshotProcessor = SnapshotProcessor.recreate(settings)
+        snapshotDownloadController.storage.close()
         logger.info(s"Snapshot holder context.become to snapshot processing")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)

@@ -1,9 +1,7 @@
 package encry.view.fast.sync
 
-import cats.syntax.either._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
-import encry.view.fast.sync.FastSyncExceptions.{FastSyncException, SnapshotDownloadControllerStorageAPIError}
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.DB
 
@@ -22,8 +20,8 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider wit
    *
    * @param ids - elements for insertion into db
    */
-  def insertMany(ids: List[Array[Byte]]): Either[FastSyncException, Int] =
-    readWrite[Either[FastSyncException, Int]](
+  def insertMany(ids: List[Array[Byte]]): Either[Throwable, Int] =
+    readWrite(
       (batch, _, _) => {
         val groups: List[List[Array[Byte]]] =
           ids.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
@@ -35,16 +33,15 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider wit
             groupNumber + 1
         }
         logger.info(s"insertMany -> groupsCount -> $groupsCount.")
-        groupsCount.asRight[FastSyncException]
-      },
-      err => SnapshotDownloadControllerStorageAPIError(err.getMessage).asLeft[Int]
+        groupsCount
+      }
     )
 
   /**
    * @return - returns next chunks ids for request
    */
-  def getNextForRequest(groupNumber: Int): Either[FastSyncException, List[Array[Byte]]] =
-    readWrite[Either[FastSyncException, List[Array[Byte]]]](
+  def getNextForRequest(groupNumber: Int): Either[Throwable, List[Array[Byte]]] =
+    readWrite(
       (batch, readOptions, _) => {
         logger.info(s"Going to get next group for request with number $groupNumber.")
         val res = storage.get(nextGroupKey(groupNumber), readOptions)
@@ -59,9 +56,8 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider wit
             logger.info(s"Requested group is null")
             List.empty[Array[Byte]]
           }
-        buffer.asRight[FastSyncException]
-      },
-      err => SnapshotDownloadControllerStorageAPIError(err.getMessage).asLeft[List[Array[Byte]]]
+        buffer
+      }
     )
 
   /**
@@ -69,12 +65,11 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider wit
    *
    * @return true if current batches size > 0, otherwise false
    */
-  def isBatchesListNonEmpty: Either[FastSyncException, Boolean] =
-    readWrite[Either[FastSyncException, Boolean]](
+  def isBatchesListNonEmpty: Either[Throwable, Boolean] =
+    readWrite(
       (_, _, iterator) => {
         iterator.seekToFirst()
-        iterator.hasNext.asRight[FastSyncException]
-      },
-      err => SnapshotDownloadControllerStorageAPIError(err.getMessage).asLeft[Boolean]
+        iterator.hasNext
+      }
     )
 }

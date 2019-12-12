@@ -18,18 +18,14 @@ object FastSyncExceptions {
 
   sealed trait ChunkValidationError extends FastSyncException
   final case class InconsistentChunkId(error: String) extends ChunkValidationError
-  final case class NotApplicableId(error: String) extends ChunkValidationError
   final case class InvalidChunkBytes(error: String) extends ChunkValidationError
   final case class UnexpectedChunkMessage(error: String) extends ChunkValidationError
 
   sealed trait SnapshotDownloadControllerException extends FastSyncException
   final case class InvalidManifestBytes(error: String)             extends SnapshotDownloadControllerException
-  final case class ProcessRequestedChunkException(error: String)            extends SnapshotDownloadControllerException
-  final case class ProcessManifestHasChangedMessageException(error: String) extends SnapshotDownloadControllerException
 
   final case class ApplicableChunkIsAbsent(error: String, processor: SnapshotProcessor) extends FastSyncException
   final case class BestHeaderAtHeightIsAbsent(error: String) extends FastSyncException
   final case class InitializeHeightAndRootKeysException(error: String) extends FastSyncException
-
-  final case class SnapshotDownloadControllerStorageAPIError(error: String) extends FastSyncException
+  final case class ChunksIdsToDownloadException(error: String) extends FastSyncException
 }

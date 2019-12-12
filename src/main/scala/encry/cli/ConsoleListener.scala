@@ -55,7 +55,6 @@ object ConsoleListener {
   ))
 
   private val walletCmds = Map("wallet" -> Map(
-
     "addrs"     -> PrintAddresses,
     "createKey" -> CreateKey,
     "pubKeys"   -> PrintPubKeys,
