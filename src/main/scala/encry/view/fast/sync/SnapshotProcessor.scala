@@ -70,9 +70,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
   def reInitStorage: SnapshotProcessor =
     try {
       storage.close()
+      wallet.close()
       val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
-      val walletDir = EncryWallet.getWalletDir(settings)
-      val keysDir = EncryWallet.getKeysDir(settings)
+      val walletDir = new File(s"${settings.directory}/walletDummy123")
+      val keysDir = new File(s"${settings.directory}/keysDummy123")
       import org.apache.commons.io.FileUtils
       FileUtils.deleteDirectory(dir)
       FileUtils.deleteDirectory(walletDir)
@@ -131,12 +132,14 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
             case Success(_) => toInsert
           }
       }
-      wallet.walletStorage.updateWallet(
-        ModifierId !@@ boxesToInsert.head.id,
-        boxesToInsert,
-        List.empty,
-        settings.constants.IntrinsicTokenId
-      )
+      if (boxesToInsert.nonEmpty) {
+        wallet.walletStorage.updateWallet(
+          ModifierId !@@ boxesToInsert.head.id,
+          boxesToInsert,
+          List.empty,
+          settings.constants.IntrinsicTokenId
+        )
+      }
       logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime) / 1000}s")
     } match {
       case Right(_) =>
@@ -297,7 +300,7 @@ object SnapshotProcessor extends StrictLogging {
     } catch {
       case err: Throwable =>
         logger.info(s"Error ${err.getMessage} has occurred while initializing wallet storage")
-        EncryWallet.readOrGenerate(settings)
+        throw new Exception(s"${err.getCause}")
     }
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }

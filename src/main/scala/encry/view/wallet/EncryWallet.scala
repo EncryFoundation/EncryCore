@@ -186,9 +186,9 @@ object EncryWallet extends StrictLogging {
   }
 
   def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    val walletDir: File = getWalletDir(settings)
+    val walletDir: File = new File(s"${settings.directory}/walletDummy123")
     walletDir.mkdirs()
-    val keysDir: File = getKeysDir(settings)
+    val keysDir: File = new File(s"${settings.directory}/keysDummy123")
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes

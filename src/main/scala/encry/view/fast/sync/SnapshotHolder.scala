@@ -23,7 +23,6 @@ import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
-
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -103,6 +102,7 @@ class SnapshotHolder(settings: EncryAppSettings,
             case Left(err: UnexpectedChunkMessage) =>
               logger.info(s"Error during received chunk processing has occurred: ${err.error}")
             case Left(error) =>
+              logger.info(s"Error has occurred: $error")
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
               restartFastSync(history)
             case Right((processor, controller))

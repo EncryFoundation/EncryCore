@@ -76,7 +76,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
       case Right(chunk) =>
         val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
         if (requestedChunks.contains(chunkId)) {
-          logger.debug(s"Got valid chunk ${Algos.encode(chunk.id)}.")
+          logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
           (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
         } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
