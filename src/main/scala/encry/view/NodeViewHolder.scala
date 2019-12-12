@@ -89,6 +89,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       nodeView.state.tree.storage.close()
       nodeView.wallet.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
       logger.info(s"Updated best block in fast sync mod. Updated state height.")
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
         override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
