@@ -126,16 +126,22 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 object EncryWallet extends StrictLogging {
 
   def getWalletDir(settings: EncryAppSettings): File =
-    if (settings.snapshotSettings.enableFastSynchronization)
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      logger.info(s"Init wallet on nvh with wallet tmp dir")
       new File(s"${settings.directory}/walletTmp")
-    else
+    } else {
+      logger.info(s"Init wallet on nvh with wallet dir")
       new File(s"${settings.directory}/wallet")
+    }
 
   def getKeysDir(settings: EncryAppSettings): File =
-    if (settings.snapshotSettings.enableFastSynchronization)
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      logger.info(s"Init wallet on nvh with keys tmp dir")
       new File(s"${settings.directory}/keysTmp")
-    else
+    } else {
+      logger.info(s"Init wallet on nvh with keys dir")
       new File(s"${settings.directory}/keys")
+    }
 
   def scanTree(node: Node[StorageKey, StorageValue],
                storage: VersionalStorage,

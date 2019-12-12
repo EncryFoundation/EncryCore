@@ -82,7 +82,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       FileUtils.deleteDirectory(keysDir)
       SnapshotProcessor.initialize(settings)
     } catch {
-      case _: Throwable => throw new Exception("Exception has occurred while restarting fast sync process")
+      case err: Throwable => throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
     }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
