@@ -78,7 +78,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
   }
 
   def scanWalletFromUtxo(state: UtxoStateReader, props: Set[EncryProposition]): EncryWallet = {
-    EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, props, walletStorage, settings)
+    EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, props)
     this
   }
 
@@ -118,46 +118,34 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
 object EncryWallet extends StrictLogging {
 
-  def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
+  def getWalletDir(settings: EncryAppSettings): File =
+    if (settings.snapshotSettings.enableFastSynchronization)
+      new File(s"${settings.directory}/walletTmp")
+    else
+      new File(s"${settings.directory}/wallet")
 
-  def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
+  def getKeysDir(settings: EncryAppSettings): File =
+    if (settings.snapshotSettings.enableFastSynchronization)
+      new File(s"${settings.directory}/keysTmp")
+    else
+      new File(s"${settings.directory}/keys")
 
   def scanTree(node: Node[StorageKey, StorageValue],
                storage: VersionalStorage,
-               accounts: Set[EncryProposition],
-               wallet: WalletVersionalLevelDB,
-               settings: EncryAppSettings): Unit = node match {
+               accounts: Set[EncryProposition]): List[EncryBaseBox] = node match {
     case sh: ShadowNode[StorageKey, StorageValue] =>
       val restoredNode = sh.restoreFullNode(storage)
-      scanTree(restoredNode, storage, accounts, wallet, settings)
+      scanTree(restoredNode, storage, accounts)
     case internalNode: InternalNode[StorageKey, StorageValue] =>
       StateModifierSerializer.parseBytes(internalNode.value, internalNode.key.head) match {
-        case Success(bx) =>
-          val boxes: List[EncryBaseBox] = collectBx(bx, accounts)
-          if (boxes.nonEmpty) {
-            wallet.updateWallet(
-              ModifierId !@@ boxes.head.id,
-              boxes,
-              List.empty,
-              settings.constants.IntrinsicTokenId
-            )
-          }
-          internalNode.leftChild.foreach(leftNode => scanTree(leftNode, storage, accounts, wallet, settings))
-          internalNode.rightChild.foreach(rightChild => scanTree(rightChild, storage, accounts, wallet, settings))
+        case Success(bx) => collectBx(bx, accounts) :::
+          internalNode.leftChild.map(leftNode => scanTree(leftNode, storage, accounts)).getOrElse(List.empty) :::
+          internalNode.rightChild.map(rightChild => scanTree(rightChild, storage, accounts)).getOrElse(List.empty)
         case Failure(exception) => throw exception //???????
       }
     case leafNode: LeafNode[StorageKey, StorageValue] =>
       StateModifierSerializer.parseBytes(leafNode.value, leafNode.key.head) match {
-        case Success(bx) =>
-          val boxes: List[EncryBaseBox] = collectBx(bx, accounts)
-          if (boxes.nonEmpty) {
-            wallet.updateWallet(
-              ModifierId !@@ boxes.head.id,
-              boxes,
-              List.empty,
-              settings.constants.IntrinsicTokenId
-            )
-          }
+        case Success(bx) => collectBx(bx, accounts)
         case Failure(exception) => throw exception //???????
       }
   }
@@ -168,27 +156,8 @@ object EncryWallet extends StrictLogging {
     case _ => List.empty[MonetaryBox]
   }
 
-  def readOrGenerateDummy(settings: EncryAppSettings): EncryWallet = {
-    val walletDir: File =  new File(s"${settings.directory}/walletDummy")
+  def readOrGenerate(walletDir: File, keysDir: File, settings: EncryAppSettings): EncryWallet = {
     walletDir.mkdirs()
-    val keysDir: File = new File(s"${settings.directory}/keysDummy")
-    keysDir.mkdirs()
-    val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
-    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
-    val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
-    val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
-    val restoredAccounts = AccountManager.restoreAccounts(accountManagerStore, password)
-    val resultingAccounts =
-      if (restoredAccounts.nonEmpty) restoredAccounts
-      else Seq(AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte))
-    //init keys
-    EncryWallet(walletStorage, resultingAccounts, accountManagerStore)
-  }
-
-  def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    val walletDir: File = new File(s"${settings.directory}/walletDummy123")
-    walletDir.mkdirs()
-    val keysDir: File = new File(s"${settings.directory}/keysDummy123")
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
