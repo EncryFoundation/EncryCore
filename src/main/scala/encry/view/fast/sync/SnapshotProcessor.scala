@@ -71,15 +71,15 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     try {
       storage.close()
       val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
-      import org.apache.commons.io.FileUtils
-      FileUtils.deleteDirectory(dir)
       val walletDir = EncryWallet.getWalletDir(settings)
       val keysDir = EncryWallet.getKeysDir(settings)
+      import org.apache.commons.io.FileUtils
+      FileUtils.deleteDirectory(dir)
       FileUtils.deleteDirectory(walletDir)
       FileUtils.deleteDirectory(keysDir)
       SnapshotProcessor.initialize(settings)
     } catch {
-      case _: Throwable => sys.exit(9999)
+      case _: Throwable => throw new Exception("Exception has occurred while restarting fast sync process")
     }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
@@ -270,9 +270,10 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 object SnapshotProcessor extends StrictLogging {
 
   def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    if (settings.snapshotSettings.enableFastSynchronization)
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      logger.info(s"Init snapshot with state dir")
       create(settings, new File(s"${settings.directory}/state"))
-    else
+    } else
       create(settings, getDirProcessSnapshots(settings))
 
   def recreate(settings: EncryAppSettings): SnapshotProcessor = create(settings, getDirProcessSnapshots(settings))
@@ -291,6 +292,13 @@ object SnapshotProcessor extends StrictLogging {
         val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
     }
-    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, EncryWallet.readOrGenerate(settings))
+    val wallet = try {
+      EncryWallet.readOrGenerate(settings)
+    } catch {
+      case err: Throwable =>
+        logger.info(s"Error ${err.getMessage} has occurred while initializing wallet storage")
+        EncryWallet.readOrGenerate(settings)
+    }
+    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }
 }

@@ -110,7 +110,10 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
     (isValidSize, isValidWords).mapN { case (_, mnemonic) => mnemonic }
   }.toEither
 
-  override def close(): Unit = walletStorage.close()
+  override def close(): Unit = {
+    walletStorage.close()
+    accountStore.close()
+  }
 }
 
 object EncryWallet extends StrictLogging {

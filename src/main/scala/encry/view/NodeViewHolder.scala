@@ -87,6 +87,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     case FastSyncFinished(state, wallet) =>
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
+      nodeView.wallet.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
       logger.info(s"Updated best block in fast sync mod. Updated state height.")
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
