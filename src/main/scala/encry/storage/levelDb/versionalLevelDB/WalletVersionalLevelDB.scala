@@ -1,5 +1,6 @@
 package encry.storage.levelDb.versionalLevelDB
 
+import BoxesProto.BoxProtoMessage.Box.DataBox
 import cats.instances.all._
 import cats.syntax.semigroup._
 import com.google.common.primitives.Longs
@@ -15,6 +16,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
+
 import scala.util.Success
 
 case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLogging with AutoCloseable {
@@ -42,6 +44,8 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 
   def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox],
                    intrinsicTokenId: ADKey): Unit = {
+    println("here wallet = " + newBxs)
+    println("here wallet1 = " + spentBxs)
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
     val newBalances: Map[(String, String), Amount] = {
       val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs, intrinsicTokenId)
@@ -55,11 +59,18 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       newBalances.foldLeft(Array.emptyByteArray) { case (acc, ((hash, tokenId), balance)) =>
         acc ++ Algos.decode(hash).get ++ Algos.decode(tokenId).get ++ Longs.toByteArray(balance)
       }
+    val newDataBoxes: Seq[DataBox] = newBxs.map(x => x.typeId match {
+      case 4 => x.asInstanceOf[DataBox].
+    })
+    val bbb =
     levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
       newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
         VersionalLevelDbValue @@ bx.bytes)).toList,
       spentBxs.map(elem => VersionalLevelDbKey @@ elem.id.untag(ADKey)))
     )
+//    levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
+//
+//    ))
   }
 
   def getBalances: Map[(String, String), Amount] =
@@ -75,6 +86,9 @@ object WalletVersionalLevelDBCompanion extends StrictLogging {
 
   val BALANCE_KEY: VersionalLevelDbKey =
     VersionalLevelDbKey @@ Algos.hash("BALANCE_KEY").untag(Digest32)
+
+  val DATA_KEY: VersionalLevelDbKey =
+    VersionalLevelDbKey @@ Algos.hash("DATA_KEY").untag(Digest32)
 
   val INIT_MAP: Map[VersionalLevelDbKey, VersionalLevelDbValue] = Map(
     BALANCE_KEY -> VersionalLevelDbValue @@ Array.emptyByteArray

@@ -303,6 +303,7 @@ class Starter(settings: EncryAppSettings,
         network = networkSettings,
         snapshotSettings = snapshotSettings
       )
+      println(newSettings.network.deliveryTimeout + " here")
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
       lazy val miner: ActorRef =
