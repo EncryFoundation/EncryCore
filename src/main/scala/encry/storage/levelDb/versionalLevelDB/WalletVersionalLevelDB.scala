@@ -1,6 +1,5 @@
 package encry.storage.levelDb.versionalLevelDB
 
-import BoxesProto.BoxProtoMessage.Box.DataBox
 import cats.instances.all._
 import cats.syntax.semigroup._
 import com.google.common.primitives.Longs
@@ -10,10 +9,11 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion._
 import encry.utils.{BalanceCalculator, ByteStr}
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
+import org.encryfoundation.common.modifiers.state.box.{DataBox, EncryBaseBox}
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
+import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
 
@@ -59,18 +59,29 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       newBalances.foldLeft(Array.emptyByteArray) { case (acc, ((hash, tokenId), balance)) =>
         acc ++ Algos.decode(hash).get ++ Algos.decode(tokenId).get ++ Longs.toByteArray(balance)
       }
-    val newDataBoxes: Seq[DataBox] = newBxs.map(x => x.typeId match {
-      case 4 => x.asInstanceOf[DataBox].
-    })
-    val bbb =
+    val newDataBoxes: Seq[DataBox] = newBxs.filter(x => x.typeId == 4).map(_.asInstanceOf[DataBox])
+//    println("1 = " + newBxs.filter(x => x.typeId == 4))
+//    println("2 = " + newBxs.filter(x => x.typeId == 4).map(_.asInstanceOf[DataBox]))
+    val mapDataBox: Map[ContractHash, ADKey] = newDataBoxes.headOption match {
+      case Some(value) => Map(value.proposition.contractHash -> value.id)
+      case None        => Map.empty[ContractHash, ADKey]
+    }
+
+    val dataKey = DATA_KEY -> VersionalLevelDbValue @@
+      mapDataBox.foldLeft(Array.emptyByteArray) { case (acc, (cc, str)) =>
+        acc ++ (Algos.decode("Data").getOrElse(Array.emptyByteArray) ++ cc) ++ str
+      }
+    println("data = " + dataKey)
     levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
       newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
         VersionalLevelDbValue @@ bx.bytes)).toList,
       spentBxs.map(elem => VersionalLevelDbKey @@ elem.id.untag(ADKey)))
     )
-//    levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
-//
-//    ))
+    levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId), List(dataKey))
+    )
+
+    println("data info = " + getDataInfo)
+
   }
 
   def getBalances: Map[(String, String), Amount] =
@@ -78,6 +89,13 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       .map(_.sliding(72, 72)
         .map(ch => (Algos.encode(ch.take(32)), Algos.encode(ch.slice(32, 64))) -> Longs.fromByteArray(ch.takeRight(8)))
         .toMap).getOrElse(Map.empty)
+
+  def getDataInfo: Map[String, String] =
+    levelDb.get(DATA_KEY)
+      .map(_.sliding(72, 72)
+          .map(ch => Algos.encode(ch.take(32)) -> Algos.encode(ch).slice(32,64))
+          .toMap
+      ).getOrElse(Map.empty)
 
   override def close(): Unit = levelDb.close()
 }
