@@ -31,14 +31,14 @@ class SnapshotDownloadControllerStorageAPITests extends WordSpecLike with Matche
       val groups                                    = randomIds.grouped(settingsR.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
       val _                                         = api.insertMany(groups)
       val groupsL                                   = randomIds.grouped(settingsR.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
-      (1 to groupsL.size).foreach { r =>
+      (0 until groupsL.size).foreach { r =>
         val res = api.getNextForRequest(r)
         api.getNextForRequest(r).isLeft shouldBe true
         res.isRight shouldBe true
         res.right.get.nonEmpty shouldBe true
-        res.right.get.head.sameElements(groupsL(r - 1).head) shouldBe true
-        res.right.get.forall(j => groupsL(r - 1).exists(_.sameElements(j))) shouldBe true
-        groupsL(r - 1).forall(j => res.right.get.exists(_.sameElements(j))) shouldBe true
+        res.right.get.head.sameElements(groupsL(r).head) shouldBe true
+        res.right.get.forall(j => groupsL(r).exists(_.sameElements(j))) shouldBe true
+        groupsL(r).forall(j => res.right.get.exists(_.sameElements(j))) shouldBe true
       }
     }
   }
