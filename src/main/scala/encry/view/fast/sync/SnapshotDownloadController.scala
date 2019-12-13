@@ -1,6 +1,7 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import cats.syntax.either._
@@ -10,15 +11,16 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
 import encry.view.fast.sync.FastSyncExceptions._
-import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer}
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.RequestChunkMessage
 import org.encryfoundation.common.utils.Algos
-import org.iq80.leveldb.{ DB, Options }
+import org.iq80.leveldb.{DB, Options}
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
-                                            requestedChunks: Set[ByteArrayWrapper],
+                                            awaitedChunks: Set[ByteArrayWrapper],
                                             settings: EncryAppSettings,
                                             cp: Option[ConnectedPeer],
                                             requiredManifestHeight: Int,
@@ -42,13 +44,16 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           .asLeft[SnapshotDownloadController]
       case Right(manifest) =>
         logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
-        val batchesSize: Int = insertMany(manifest.chunksKeys) match {
+        val groups: List[List[ChunkId]] =
+          manifest.chunksKeys.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
+        val batchesSize: Int = insertMany(groups) match {
           case Left(error) =>
             logger.info(s"Error ${error.getCause} has occurred while processing new manifest.")
             throw new Exception(s"Error ${error.getCause} has occurred while processing new manifest.")
-          case Right(v) =>
-            logger.info(s"New chunks ids successfully inserted into db. Number of batches is $v.")
-            v
+          case Right(_) =>
+            val batchesCount: Int = groups.size
+            logger.info(s"New chunks ids successfully inserted into db. Number of batches is $batchesCount.")
+            batchesCount
         }
         SnapshotDownloadController(
           requiredManifestId,
@@ -57,8 +62,8 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           remote.some,
           requiredManifestHeight,
           storage,
-          batchesSize - 1,
-          1
+          batchesSize,
+          0
         ).asRight[SnapshotDownloadControllerException]
     }
   }
@@ -75,9 +80,9 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           .asLeft[(SnapshotDownloadController, SnapshotChunk)]
       case Right(chunk) =>
         val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
-        if (requestedChunks.contains(chunkId)) {
+        if (awaitedChunks.contains(chunkId)) {
           logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
-          (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
+          (this.copy(awaitedChunks = awaitedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
         } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
           UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
@@ -86,18 +91,20 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     }
   }
 
-  def chunksIdsToDownload
+  def getNextBatchAndRemoveItFromController
     : Either[FastSyncExceptions.FastSyncException, (SnapshotDownloadController, List[RequestChunkMessage])] =
     (for {
       nextBatch                                       <- getNextForRequest(nextGroupForRequestNumber)
       serializedToDownload: List[RequestChunkMessage] = nextBatch.map(id => RequestChunkMessage(id))
     } yield {
-      val newGroupNumber: Int = nextGroupForRequestNumber + 1
+      val newGroupNumber: Int   = nextGroupForRequestNumber + 1
       val lastsBatchesSize: Int = batchesSize - 1
-      logger.info(s"Successfully got group with number $nextGroupForRequestNumber." +
-        s" New group number is $newGroupNumber. Lasts batches size is $lastsBatchesSize")
+      logger.info(
+        s"Successfully got group with number $nextGroupForRequestNumber." +
+          s" New group number is $newGroupNumber. Lasts batches size is $lastsBatchesSize"
+      )
       this.copy(
-        requestedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet,
+        awaitedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet,
         batchesSize = lastsBatchesSize,
         nextGroupForRequestNumber = newGroupNumber
       ) -> serializedToDownload

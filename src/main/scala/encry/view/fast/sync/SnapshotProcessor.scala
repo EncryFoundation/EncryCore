@@ -1,6 +1,7 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import cats.syntax.either._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
@@ -10,6 +11,7 @@ import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.view.fast.sync.FastSyncExceptions._
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder.{
   SnapshotChunk,
   SnapshotChunkSerializer,
@@ -18,17 +20,19 @@ import encry.view.fast.sync.SnapshotHolder.{
 }
 import encry.view.history.History
 import encry.view.state.UtxoState
-import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.state.avlTree._
+import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
-import org.encryfoundation.common.modifiers.state.box.{ EncryBaseBox, MonetaryBox }
+import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 import org.iq80.leveldb.{ DB, Options }
 import scorex.utils.Random
+
 import scala.collection.immutable.{ HashMap, HashSet }
 import scala.language.postfixOps
 import scala.util.{ Failure, Success }
@@ -82,7 +86,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       FileUtils.deleteDirectory(keysDir)
       SnapshotProcessor.initialize(settings)
     } catch {
-      case err: Throwable => throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
+      case err: Throwable =>
+        throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
     }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
@@ -120,18 +125,16 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
         case (toInsert, i: InternalNode[StorageKey, StorageValue]) =>
           StateModifierSerializer.parseBytes(i.value, i.key.head) match {
             case Failure(_) => toInsert
-            case Success(box: MonetaryBox)
-                if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
+            case Success(box) if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
               box :: toInsert
-            case Success(_) => toInsert
+            case Success(box) => toInsert
           }
         case (toInsert, l: LeafNode[StorageKey, StorageValue]) =>
           StateModifierSerializer.parseBytes(l.value, l.key.head) match {
             case Failure(_) => toInsert
-            case Success(box: MonetaryBox)
-                if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
+            case Success(box) if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
               box :: toInsert
-            case Success(_) => toInsert
+            case Success(box) => toInsert
           }
       }
       if (boxesToInsert.nonEmpty) {
@@ -217,7 +220,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
   }
 
   def createNewSnapshot(
-    id: Array[Byte],
+    id: ManifestId,
     manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
   ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
@@ -297,11 +300,24 @@ object SnapshotProcessor extends StrictLogging {
         val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
     }
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(
-      new File(s"${settings.directory}/wallet"),
-      new File(s"${settings.directory}/keys"),
-      settings
-    )
+    val wallet: EncryWallet =
+      if (settings.snapshotSettings.enableFastSynchronization)
+        EncryWallet.readOrGenerate(
+          new File(s"${settings.directory}/wallet"),
+          new File(s"${settings.directory}/keys"),
+          settings
+        )
+      else {
+        val wallet = EncryWallet.readOrGenerate(
+          new File(s"${settings.directory}/walletDummy"),
+          new File(s"${settings.directory}/keysDummy"),
+          settings
+        )
+        wallet.close()
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/walletDummy"))
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/keysDummy"))
+        wallet
+      }
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }
 }

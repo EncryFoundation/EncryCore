@@ -2,6 +2,7 @@ package encry.view.fast.sync
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.DB
 
@@ -18,58 +19,41 @@ trait SnapshotDownloadControllerStorageAPI extends DBTryCatchFinallyProvider wit
    * Value is a batch of elements.
    * Batch is the group of chunks' ids with size 'chunksNumberPerRequestWhileFastSyncMod'.
    *
-   * @param ids - elements for insertion into db
+   * @param groups - elements for insertion into db
    */
-  def insertMany(ids: List[Array[Byte]]): Either[Throwable, Int] =
+  def insertMany(groups: List[List[ChunkId]]): Either[Throwable, Unit] =
     readWrite(
       (batch, _, _) => {
-        val groups: List[List[Array[Byte]]] =
-          ids.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
-        val groupsCount: Int = groups.foldLeft(1) {
-          case (groupNumber, group) =>
-            logger.info(s"Inserted ${group.size} chunks with group number $groupNumber.")
-            logger.info(s"First element of the group is: ${group.headOption.map(Algos.encode)}")
-            batch.put(nextGroupKey(groupNumber), group.flatten.toArray)
-            groupNumber + 1
+        groups.zipWithIndex.foreach {
+          case (group, index) =>
+            logger.debug(s"Inserted ${group.size} chunks with group number $index.")
+            logger.debug(s"First element of the group is: ${group.headOption.map(Algos.encode)}")
+            batch.put(nextGroupKey(index), group.flatten.toArray)
         }
-        logger.info(s"insertMany -> groupsCount -> $groupsCount.")
-        groupsCount
+        logger.debug(s"insertMany -> groupsCount -> ${groups.size}.")
       }
     )
 
   /**
    * @return - returns next chunks ids for request
    */
-  def getNextForRequest(groupNumber: Int): Either[Throwable, List[Array[Byte]]] =
+  def getNextForRequest(groupNumber: Int): Either[Throwable, List[ChunkId]] =
     readWrite(
       (batch, readOptions, _) => {
-        logger.info(s"Going to get next group for request with number $groupNumber.")
+        logger.debug(s"Going to get next group for request with number $groupNumber.")
         val res = storage.get(nextGroupKey(groupNumber), readOptions)
-        val buffer: List[Array[Byte]] =
+        val buffer: List[ChunkId] =
           if (res != null) {
-            val value = res.grouped(32).toList
-            logger.info(s"Gotten group is non empty. Elements number is ${value.size}.")
-            logger.info(s"First element of the group is: ${value.headOption.map(Algos.encode)}")
+            val value = res.grouped(32).toList.map(ChunkId @@ _)
+            logger.debug(s"Gotten group is non empty. Elements number is ${value.size}.")
+            logger.debug(s"First element of the group is: ${value.headOption.map(Algos.encode)}")
             batch.delete(nextGroupKey(groupNumber))
             value
           } else {
-            logger.info(s"Requested group is null")
-            List.empty[Array[Byte]]
+            logger.debug(s"Requested group is null")
+            throw new Exception("Inconsistent snapshot download controller db state!")
           }
         buffer
-      }
-    )
-
-  /**
-   * Check if chunk's size 0 or not
-   *
-   * @return true if current batches size > 0, otherwise false
-   */
-  def isBatchesListNonEmpty: Either[Throwable, Boolean] =
-    readWrite(
-      (_, _, iterator) => {
-        iterator.seekToFirst()
-        iterator.hasNext
       }
     )
 }
