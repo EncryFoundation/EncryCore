@@ -286,25 +286,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
         }
-        if (uf.alternativeProgressInfo.nonEmpty) {
-          val pi = uf.alternativeProgressInfo.get
-          if (!pi.chainSwitchingNeeded) {
-            val dropOldOne: Vector[ModifierId] = uf.history.idsForSyncInfo.drop(pi.toApply.size)
-            val updated: Vector[ModifierId] = dropOldOne ++ pi.toApply.map(_.id)
-            uf.history.idsForSyncInfo = updated
-          } else {
-            val commonPoint = uf.history.idsForSyncInfo.takeWhile(_.sameElements(uf.alternativeProgressInfo))
-          }
-        }
-        if (!progressInfo.chainSwitchingNeeded) {
-          val dropOldOne: Vector[ModifierId] = uf.history.idsForSyncInfo.drop(progressInfo.toApply.size)
-          val updated: Vector[ModifierId] = dropOldOne ++ progressInfo.toApply.map(_.id)
-          uf.history.idsForSyncInfo = updated
-        } else {
-          val commonPoint = uf.history.idsForSyncInfo.takeWhile(_.sameElements(uf.alternativeProgressInfo))
-        }
         uf.failedMod match {
-          case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
+          case Some(_) =>
+            uf.history.updateIdsForSyncInfo(uf.alternativeProgressInfo.get)
+            updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, uf.state, uf.suffix)
         }
       case Failure(e) =>
@@ -324,6 +309,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case Right((historyBeforeStUpdate, progressInfo)) =>
             logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
             logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+            historyBeforeStUpdate.updateIdsForSyncInfo(progressInfo)
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)
               val isHeader: Boolean = pmod match {

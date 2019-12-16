@@ -210,21 +210,9 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       val commonPoint = pi.toApply.head.id
       val tillCommonPoint: Vector[ModifierId] = idsForSyncInfo.takeWhile(!_.sameElements(commonPoint))
       val withNewIds = tillCommonPoint ++ pi.toApply.map(_.id)
-      if (withNewIds.size > settings.network.maxInvObjects) {
-        val sizeForDrop: Int = withNewIds.size - settings.network.maxInvObjects
-        val resultedIds: Vector[ModifierId] = withNewIds.drop(sizeForDrop)
-        idsForSyncInfo = resultedIds
-      } else {
-        idsForSyncInfo = withNewIds
-      }
+      idsForSyncInfo = withNewIds
     }
   }
-
-//    SyncInfo(
-//      getBestHeader.map { header =>
-//        ((header.height - settings.network.maxInvObjects + 1) to header.height)
-//          .flatMap(height => headerIdsAtHeight(height).headOption)
-//      }.getOrElse(Seq.empty))
 
   def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {
     //Our best header is the same as other history best header
