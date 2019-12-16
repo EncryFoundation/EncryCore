@@ -4,7 +4,6 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus._
 import encry.consensus._
 import encry.modifiers.history._
-import encry.settings.{EncryAppSettings, Settings}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.ValidationError.HistoryApiError
 import io.iohk.iodb.ByteArrayWrapper
@@ -13,7 +12,7 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
-import scala.collection.immutable.HashSet
+import scala.collection.immutable.{HashSet, Queue}
 
 trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
@@ -26,6 +25,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
+
+  var idsForSyncInfo: Vector[ModifierId] = Vector.empty
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
@@ -193,14 +194,37 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
   }
 
-  def syncInfo: SyncInfo =
-    if (getBestHeaderId.isEmpty) SyncInfo(Seq.empty)
-    else SyncInfo(
-      getBestHeader.map(header =>
-        ((header.height - settings.network.maxInvObjects + 1) to header.height)
-          .flatMap(height => headerIdsAtHeight(height).headOption)
-      ).getOrElse(Seq.empty))
+  def syncInfo: SyncInfo = SyncInfo(idsForSyncInfo)
 
+  def updateIdsForSyncInfo(pi: ProgressInfo): Unit = {
+    if (!pi.chainSwitchingNeeded) {
+      val removeOldIds: Vector[ModifierId] =
+        if (idsForSyncInfo.size + pi.toApply.size > settings.network.maxInvObjects) {
+          val sizeForDrop: Int = idsForSyncInfo.size + pi.toApply.size - settings.network.maxInvObjects
+          idsForSyncInfo.drop(sizeForDrop)
+        } else idsForSyncInfo
+      val newIds: Vector[ModifierId] = removeOldIds ++ pi.toApply.map(_.id)
+      idsForSyncInfo = newIds
+    }
+    else {
+      val commonPoint = pi.toApply.head.id
+      val tillCommonPoint: Vector[ModifierId] = idsForSyncInfo.takeWhile(!_.sameElements(commonPoint))
+      val withNewIds = tillCommonPoint ++ pi.toApply.map(_.id)
+      if (withNewIds.size > settings.network.maxInvObjects) {
+        val sizeForDrop: Int = withNewIds.size - settings.network.maxInvObjects
+        val resultedIds: Vector[ModifierId] = withNewIds.drop(sizeForDrop)
+        idsForSyncInfo = resultedIds
+      } else {
+        idsForSyncInfo = withNewIds
+      }
+    }
+  }
+
+//    SyncInfo(
+//      getBestHeader.map { header =>
+//        ((header.height - settings.network.maxInvObjects + 1) to header.height)
+//          .flatMap(height => headerIdsAtHeight(height).headOption)
+//      }.getOrElse(Seq.empty))
 
   def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {
     //Our best header is the same as other history best header

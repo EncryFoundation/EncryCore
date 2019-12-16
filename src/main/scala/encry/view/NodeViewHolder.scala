@@ -220,7 +220,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       } else Success(state) -> suffixApplied
     stateToApplyTry match {
       case Success(stateToApply) =>
-        context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
@@ -286,6 +285,23 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
               UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
           } else u
+        }
+        if (uf.alternativeProgressInfo.nonEmpty) {
+          val pi = uf.alternativeProgressInfo.get
+          if (!pi.chainSwitchingNeeded) {
+            val dropOldOne: Vector[ModifierId] = uf.history.idsForSyncInfo.drop(pi.toApply.size)
+            val updated: Vector[ModifierId] = dropOldOne ++ pi.toApply.map(_.id)
+            uf.history.idsForSyncInfo = updated
+          } else {
+            val commonPoint = uf.history.idsForSyncInfo.takeWhile(_.sameElements(uf.alternativeProgressInfo))
+          }
+        }
+        if (!progressInfo.chainSwitchingNeeded) {
+          val dropOldOne: Vector[ModifierId] = uf.history.idsForSyncInfo.drop(progressInfo.toApply.size)
+          val updated: Vector[ModifierId] = dropOldOne ++ progressInfo.toApply.map(_.id)
+          uf.history.idsForSyncInfo = updated
+        } else {
+          val commonPoint = uf.history.idsForSyncInfo.takeWhile(_.sameElements(uf.alternativeProgressInfo))
         }
         uf.failedMod match {
           case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
