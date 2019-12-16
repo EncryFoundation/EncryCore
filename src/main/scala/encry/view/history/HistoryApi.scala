@@ -12,7 +12,7 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
 import scala.annotation.tailrec
-import scala.collection.immutable.{HashSet, Queue}
+import scala.collection.immutable.HashSet
 
 trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
@@ -207,10 +207,14 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       idsForSyncInfo = newIds
     }
     else {
-      val commonPoint = pi.toApply.head.id
-      val tillCommonPoint: Vector[ModifierId] = idsForSyncInfo.takeWhile(!_.sameElements(commonPoint))
-      val withNewIds = tillCommonPoint ++ pi.toApply.map(_.id)
-      idsForSyncInfo = withNewIds
+      pi.toApply.headOption match {
+        case Some(mod) =>
+          val commonPoint = mod.id
+          val tillCommonPoint: Vector[ModifierId] = idsForSyncInfo.takeWhile(!_.sameElements(commonPoint))
+          val withNewIds = tillCommonPoint ++ pi.toApply.map(_.id)
+          idsForSyncInfo = withNewIds
+        case None => //nothing has changed
+      }
     }
   }
 
