@@ -26,7 +26,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
-  var idsForSyncInfo: List[ModifierId] = List.empty
+  private var lastSyncInfo: SyncInfo = SyncInfo(Seq.empty[ModifierId])
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
@@ -192,17 +192,16 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
   }
 
-  def syncInfo: SyncInfo = SyncInfo(idsForSyncInfo)
+  def syncInfo: SyncInfo = lastSyncInfo
 
-  def updateIdsForSyncInfo(): Unit = {
-    idsForSyncInfo = getBestHeader.map { header: Header =>
+  def updateIdsForSyncInfo(): Unit =
+    lastSyncInfo = SyncInfo(getBestHeader.map { header: Header =>
       ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
         headerIdsAtHeight(height).headOption
       }.toList
-    }.getOrElse(List.empty)
-  }
+    }.getOrElse(List.empty))
 
-  def compare(si: SyncInfo): HistoryComparisonResult = idsForSyncInfo.lastOption match {
+  def compare(si: SyncInfo): HistoryComparisonResult = lastSyncInfo.lastHeaderIds.lastOption match {
     //Our best header is the same as other history best header
     case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
     //Our best header is in other history best chain, but not at the last position
