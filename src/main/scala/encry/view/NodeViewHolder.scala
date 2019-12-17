@@ -220,6 +220,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       } else Success(state) -> suffixApplied
     stateToApplyTry match {
       case Success(stateToApply) =>
+        context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
           if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
@@ -288,7 +289,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         }
         uf.failedMod match {
           case Some(_) =>
-            uf.history.updateIdsForSyncInfo(uf.alternativeProgressInfo.get)
+            uf.history.updateIdsForSyncInfo()
             updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, uf.state, uf.suffix)
         }
@@ -309,7 +310,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case Right((historyBeforeStUpdate, progressInfo)) =>
             logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
             logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
-            historyBeforeStUpdate.updateIdsForSyncInfo(progressInfo)
+            historyBeforeStUpdate.updateIdsForSyncInfo()
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)
               val isHeader: Boolean = pmod match {

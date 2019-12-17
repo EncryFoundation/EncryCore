@@ -26,7 +26,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
 
-  var idsForSyncInfo: Vector[ModifierId] = Vector.empty
+  var idsForSyncInfo: List[ModifierId] = List.empty
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
@@ -74,9 +74,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       .orElse(getHeaderByIdDB(id))
   )
 
-  def getBestHeaderAtHeight(h: Int): Option[Header] = headersCacheIndexes.get(h)
-    .flatMap(_.headOption).flatMap(id => headersCache.get(ByteArrayWrapper(id)))
-    .orElse(getBestHeaderAtHeightDB(h))
+  def getBestHeaderAtHeight(h: Int): Option[Header] = getBestHeaderAtHeightDB(h)
 
   def getBlockByPayload(payload: Payload): Option[Block] = headersCache
     .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
@@ -196,29 +194,15 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   def syncInfo: SyncInfo = SyncInfo(idsForSyncInfo)
 
-  def updateIdsForSyncInfo(pi: ProgressInfo): Unit = {
-    if (!pi.chainSwitchingNeeded) {
-      val removeOldIds: Vector[ModifierId] =
-        if (idsForSyncInfo.size + pi.toApply.size > settings.network.maxInvObjects) {
-          val sizeForDrop: Int = idsForSyncInfo.size + pi.toApply.size - settings.network.maxInvObjects
-          idsForSyncInfo.drop(sizeForDrop)
-        } else idsForSyncInfo
-      val newIds: Vector[ModifierId] = removeOldIds ++ pi.toApply.map(_.id)
-      idsForSyncInfo = newIds
-    }
-    else {
-      pi.toApply.headOption match {
-        case Some(mod) =>
-          val commonPoint = mod.id
-          val tillCommonPoint: Vector[ModifierId] = idsForSyncInfo.takeWhile(!_.sameElements(commonPoint))
-          val withNewIds = tillCommonPoint ++ pi.toApply.map(_.id)
-          idsForSyncInfo = withNewIds
-        case None => //nothing has changed
-      }
-    }
+  def updateIdsForSyncInfo(): Unit = {
+    idsForSyncInfo = getBestHeader.map { header: Header =>
+      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
+        headerIdsAtHeight(height).headOption
+      }.toList
+    }.getOrElse(List.empty)
   }
 
-  def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {
+  def compare(si: SyncInfo): HistoryComparisonResult = idsForSyncInfo.lastOption match {
     //Our best header is the same as other history best header
     case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
     //Our best header is in other history best chain, but not at the last position
