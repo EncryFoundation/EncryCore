@@ -250,6 +250,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
                               header2: Header): (HeaderChain, HeaderChain) = {
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
+    @scala.annotation.tailrec
     def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
       val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
       if (chains._1.head == chains._2.head) chains
