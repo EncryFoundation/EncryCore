@@ -25,6 +25,7 @@ class HistoryComparisionResultTest extends WordSpecLike
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
+      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Equal)
@@ -40,6 +41,7 @@ class HistoryComparisionResultTest extends WordSpecLike
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
+      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Older)
@@ -55,6 +57,7 @@ class HistoryComparisionResultTest extends WordSpecLike
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
+      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Younger)
@@ -71,6 +74,7 @@ class HistoryComparisionResultTest extends WordSpecLike
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
+      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Younger)
@@ -90,6 +94,7 @@ class HistoryComparisionResultTest extends WordSpecLike
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
+      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Fork)
