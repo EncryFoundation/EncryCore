@@ -22,10 +22,10 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
-      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Equal)
@@ -38,10 +38,10 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.take(50).foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
-      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Older)
@@ -54,10 +54,10 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
-      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Younger)
@@ -71,10 +71,10 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
-      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Younger)
@@ -91,10 +91,10 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = fork._1.take(30).foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
-      updatedHistory.updateIdsForSyncInfo()
 
       val comparisonResult = updatedHistory.compare(syncInfo)
       assert(comparisonResult == Fork)
