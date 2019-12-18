@@ -233,7 +233,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                             ),
                             th(p._2._1.toString
                             ),
-                            th((System.currentTimeMillis() - p._2._2.time).toString
+                            th(p._2._2.time.toString
                             ),
                             th(p._2._3.toString
                             ),
@@ -298,7 +298,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
         case Success(info) =>
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
         case Failure(_) =>
-          complete(s"Couldn't load page with banned peers cause of inner system is overloaded. Try it later!")
+          complete(s"Couldn't load page with banned peers cause inner system is overloaded. Try it later!")
       },
       settings
     )

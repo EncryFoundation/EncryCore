@@ -264,8 +264,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         blockInfo,
         allPeers)
       (for {
-        currentTime                                                     <- ntp.time()
-        launchTime                                                      <- launchTimeFuture
+        currentTime  <- ntp.time()
+        launchTime   <- launchTimeFuture
       } yield
         InfoApiRoute.makeInfoJson(
           nodeId,

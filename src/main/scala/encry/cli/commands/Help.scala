@@ -30,7 +30,7 @@ object Help extends Command {
         |wallet        addrs            None           Print available addresses
         |wallet        createKey        None           Add key to storage
         |wallet        balance          None           Show balance of current wallet
-        |wallet        transfer         addr, amount   Transfer `amount` to `addr`ess
+        |wallet        transfer         addr, amount   Transfer `amount` to `address`
         |app           help             None           Show all supported commands
       """
         .stripMargin)))

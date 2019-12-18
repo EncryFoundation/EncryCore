@@ -60,7 +60,7 @@ class Starter(settings: EncryAppSettings,
       case Left(_) =>
         println(s"Node start with http api.")
       case Right(res) =>
-        println("Node config read successfully!")
+        println("Node config was read successfully!")
         self ! res
     }
 
