@@ -3,29 +3,19 @@ package encry.view.state.avlTree
 import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
-import NodeMsg.NodeProtoMsg
-import cats.syntax.order._
-import cats.{Monoid, Order}
-import com.google.common.primitives.Ints
-import cats.{Monoid, Order}
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.view.fast.sync.SnapshotHolder.SnapshotChunk
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
 import encry.view.state.UtxoState
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotManifest}
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.encryfoundation.common.modifiers.history.Block
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.Height
-import scorex.utils.Random
-import cats.{Monoid, Order}
-import scala.collection.immutable
+
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging {
@@ -600,7 +590,7 @@ object AvlTree {
     }
 
     val (rootChunk: Node[StorageKey, StorageValue], rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)
-    SnapshotChunk(rootChunk, rootChunk.hash) ::
+    SnapshotChunk(rootChunk, ChunkId @@ rootChunk.hash) ::
       rootChunkChildren.flatMap(node => getChunks(node, currentChunkHeight, storage))
   }
 }

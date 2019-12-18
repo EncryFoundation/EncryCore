@@ -32,7 +32,11 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
       "encry",
       settings.copy(directory = dir.getAbsolutePath))
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(
+      FileHelper.getRandomTempDir,
+      FileHelper.getRandomTempDir,
+      settings
+    )
 
     val accountManager: AccountManager = wallet.accountManagers.head
 
@@ -84,7 +88,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
       "encry",
       settings.copy(directory = dir.getAbsolutePath))
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(FileHelper.getRandomTempDir,
+      FileHelper.getRandomTempDir,
+      settings)
 
     val keyManager: AccountManager = wallet.accountManagers.head
 
@@ -126,7 +132,9 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader: Header = genHeader
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings.copy(directory = dir.getAbsolutePath))
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(FileHelper.getRandomTempDir,
+      FileHelper.getRandomTempDir,
+      settings)
       .addAccount(seed, settings.wallet.map(_.password).get, stateMock).toOption.get
 
     val keyManagerOne = wallet.accountManagers.head

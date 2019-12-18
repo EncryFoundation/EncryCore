@@ -15,13 +15,16 @@ import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.{ Broadcast, PeerConnectionHandler }
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ ChunkId, ManifestId }
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
+import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
@@ -38,6 +41,8 @@ import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyn
 import encry.view.history.History
 import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import cats.syntax.either._
+import supertagged.TaggedType
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -100,7 +105,9 @@ class SnapshotHolder(settings: EncryAppSettings,
       logger.debug(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
       message match {
         case ResponseManifestMessage(manifest) =>
-          logger.info(s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks.")
+          logger.info(
+            s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks."
+          )
         case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
           (for {
             controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
@@ -115,18 +122,18 @@ class SnapshotHolder(settings: EncryAppSettings,
             case Left(err: UnexpectedChunkMessage) =>
               logger.info(s"Error during received chunk processing has occurred: ${err.error}")
             case Left(error) =>
+              logger.info(s"Error has occurred: $error")
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
               restartFastSync(history)
             case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty && processor.chunksCache.nonEmpty =>
+                if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty && processor.chunksCache.nonEmpty =>
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
               restartFastSync(history)
-            case Right((processor, controller))
-                if controller.requestedChunks.isEmpty && controller.notYetRequested.isEmpty =>
+            case Right((processor, controller)) if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty =>
               processor.assembleUTXOState match {
                 case Right(state) =>
                   logger.info(s"Tree is valid on Snapshot holder!")
-                  (nodeViewHolder ! FastSyncFinished(state)).asRight[FastSyncException]
+                  (nodeViewHolder ! FastSyncFinished(state, processor.wallet)).asRight[FastSyncException]
                 case _ =>
                   nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
                   restartFastSync(history).asLeft[Unit]
@@ -134,7 +141,7 @@ class SnapshotHolder(settings: EncryAppSettings,
             case Right((processor, controller)) =>
               snapshotDownloadController = controller
               snapshotProcessor = processor
-              if (snapshotDownloadController.requestedChunks.isEmpty) self ! RequestNextChunks
+              if (snapshotDownloadController.awaitedChunks.isEmpty) self ! RequestNextChunks
           }
 
         case ResponseChunkMessage(_) =>
@@ -146,17 +153,24 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case RequestNextChunks =>
       responseTimeout.foreach(_.cancel())
-      logger.info(s"Current notYetRequested queue ${snapshotDownloadController.notYetRequested.size}.")
-      val (newController, toDownload) = snapshotDownloadController.chunksIdsToDownload
-      snapshotDownloadController = newController
-      toDownload.foreach { msg =>
-        snapshotDownloadController.cp.foreach { peer =>
-          peer.handlerRef ! msg
-        }
+      (for {
+        controllerAndIds <- snapshotDownloadController.getNextBatchAndRemoveItFromController
+        _                = logger.info(s"Current notYetRequested batches is ${snapshotDownloadController.batchesSize}.")
+      } yield controllerAndIds) match {
+        case Left(err) =>
+          logger.info(s"Error has occurred: ${err.error}")
+          throw new Exception(s"Error has occurred: ${err.error}")
+        case Right(controllerAndIds) =>
+          snapshotDownloadController = controllerAndIds._1
+          controllerAndIds._2.foreach { msg =>
+            snapshotDownloadController.cp.foreach { peer: PeerConnectionHandler.ConnectedPeer =>
+              peer.handlerRef ! msg
+            }
+          }
+          val timer: Option[Cancellable] =
+            context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
+          context.become(fastSyncMod(history, timer, reRequestsNumber = 0).orElse(commonMessages))
       }
-      val timer: Option[Cancellable] =
-        context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
-      context.become(fastSyncMod(history, timer, reRequestsNumber = 0).orElse(commonMessages))
 
     case RequiredManifestHeightAndId(height, manifestId) =>
       logger.info(
@@ -170,7 +184,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       context.become(awaitManifestMod(none, history).orElse(commonMessages))
 
     case CheckDelivery if reRequestsNumber < settings.snapshotSettings.reRequestAttempts =>
-      snapshotDownloadController.requestedChunks.map { id =>
+      snapshotDownloadController.awaitedChunks.map { id =>
         RequestChunkMessage(id.data)
       }.foreach { msg =>
         snapshotDownloadController.cp.foreach(peer => peer.handlerRef ! msg)
@@ -189,6 +203,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
         snapshotProcessor = SnapshotProcessor.recreate(settings)
+        snapshotDownloadController.storage.close()
         logger.info(s"Snapshot holder context.become to snapshot processing")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
@@ -223,10 +238,10 @@ class SnapshotHolder(settings: EncryAppSettings,
           if (isValidManifest && canBeProcessed) {
             (for {
               controller <- snapshotDownloadController.processManifest(manifest, remote, history)
-              processor  <- snapshotProcessor.initializeApplicableChunksCache(
-                history,
-                snapshotDownloadController.requiredManifestHeight
-              )
+              processor <- snapshotProcessor.initializeApplicableChunksCache(
+                            history,
+                            snapshotDownloadController.requiredManifestHeight
+                          )
             } yield (controller, processor)) match {
               case Left(error) =>
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
@@ -261,7 +276,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       //todo add collection with potentialManifestsIds to NVH
       val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
       if (!manifestIds.exists(_.sameElements(id))) {
-        snapshotProcessor.createNewSnapshot(id, manifestIds, chunks)
+        snapshotProcessor.createNewSnapshot(ManifestId @@ id, manifestIds, chunks)
       } else logger.info(s"Doesn't need to create snapshot")
 
     case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
@@ -318,13 +333,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def restartFastSync(history: History): Unit = {
     logger.info(s"Restart fast sync!")
-    val newController: SnapshotDownloadController = SnapshotDownloadController
-      .empty(settings)
-      .copy(
-        requiredManifestHeight = snapshotDownloadController.requiredManifestHeight,
-        requiredManifestId = snapshotDownloadController.requiredManifestId
-      )
-    snapshotDownloadController = newController
+    snapshotDownloadController = snapshotDownloadController.reInitFastSync
     snapshotProcessor = snapshotProcessor.reInitStorage
     context.become(fastSyncMod(history, none, reRequestsNumber = 0).orElse(commonMessages))
   }
@@ -334,7 +343,7 @@ object SnapshotHolder {
 
   final case object BroadcastManifestRequestMessage
 
-  final case class FastSyncFinished(state: UtxoState) extends AnyVal
+  final case class FastSyncFinished(state: UtxoState, wallet: EncryWallet)
 
   final case class TreeChunks(list: List[SnapshotChunk], id: Array[Byte])
 
@@ -354,9 +363,15 @@ object SnapshotHolder {
 
   import encry.view.state.avlTree.utils.implicits.Instances._
 
-  final case class SnapshotManifest(manifestId: Array[Byte], chunksKeys: List[Array[Byte]])
+  final case class SnapshotManifest(manifestId: ManifestId, chunksKeys: List[ChunkId])
+  object SnapshotManifest {
+    type ChunkId = ChunkId.Type
+    object ChunkId extends TaggedType[Array[Byte]]
+    type ManifestId = ManifestId.Type
+    object ManifestId extends TaggedType[Array[Byte]]
+  }
 
-  final case class SnapshotChunk(node: Node[StorageKey, StorageValue], id: Array[Byte])
+  final case class SnapshotChunk(node: Node[StorageKey, StorageValue], id: ChunkId)
 
   object SnapshotManifestSerializer {
 
@@ -367,8 +382,8 @@ object SnapshotHolder {
 
     def fromProto(manifest: SnapshotManifestProtoMessage): Try[SnapshotManifest] = Try(
       SnapshotManifest(
-        manifest.manifestId.toByteArray,
-        manifest.chunksIds.map(_.toByteArray).toList
+        ManifestId @@ manifest.manifestId.toByteArray,
+        manifest.chunksIds.map(raw => ChunkId @@ raw.toByteArray).toList
       )
     )
   }
@@ -381,7 +396,7 @@ object SnapshotHolder {
         .withId(ByteString.copyFrom(chunk.id))
 
     def fromProto[K, V](chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
-      SnapshotChunk(NodeSerilalizer.fromProto(chunk.chunk.get), chunk.id.toByteArray)
+      SnapshotChunk(NodeSerilalizer.fromProto(chunk.chunk.get), ChunkId @@ chunk.id.toByteArray)
     )
   }
 
