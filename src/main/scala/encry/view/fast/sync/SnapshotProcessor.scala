@@ -2,28 +2,44 @@ package encry.view.fast.sync
 
 import java.io.File
 
+import cats.syntax.either._
+import com.google.common.primitives.Ints
+
 import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
 import encry.view.state.UtxoState
 import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{ EncryAppSettings, LevelDBSettings }
 import encry.storage.VersionalStorage
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.view.fast.sync.FastSyncExceptions._
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder.{
   SnapshotChunk,
   SnapshotChunkSerializer,
   SnapshotManifest,
   SnapshotManifestSerializer
 }
-import encry.view.state.avlTree.{ AvlTree, InternalNode, LeafNode, Node, NodeSerilalizer, ShadowNode }
-import org.encryfoundation.common.utils.Algos
-import scorex.utils.Random
+import encry.view.history.History
+import encry.view.state.UtxoState
+import encry.view.state.avlTree._
 import encry.view.state.avlTree.utils.implicits.Instances._
+import encry.view.wallet.EncryWallet
 import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import org.apache.commons.io.FileUtils
+import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 import org.iq80.leveldb.{ DB, Options }
 import cats.syntax.either._
 
+import scorex.utils.Random
+
+import scala.collection.immutable.{ HashMap, HashSet }
 import scala.language.postfixOps
 import com.google.common.primitives.Ints
 import encry.view.fast.sync.FastSyncExceptions.{
@@ -44,11 +60,13 @@ import encry.view.history.History
 import org.encryfoundation.common.utils.TaggedTypes.Height
 
 import scala.collection.immutable.{ HashMap, HashSet }
+import scala.util.{ Failure, Success }
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
                                    storage: VersionalStorage,
                                    applicableChunks: HashSet[ByteArrayWrapper],
-                                   chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk])
+                                   chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk],
+                                   wallet: EncryWallet)
     extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
@@ -83,12 +101,18 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
   def reInitStorage: SnapshotProcessor =
     try {
       storage.close()
-      val dir: File = SnapshotProcessor.getDirProcessSnapshots(settings)
+      wallet.close()
+      val stateDir: File  = new File(s"${settings.directory}/state")
+      val walletDir: File = new File(s"${settings.directory}/wallet")
+      val keysDir: File   = new File(s"${settings.directory}/keys")
       import org.apache.commons.io.FileUtils
-      FileUtils.deleteDirectory(dir)
-      SnapshotProcessor.initialize(settings, settings.storage.state)
+      FileUtils.deleteDirectory(stateDir)
+      FileUtils.deleteDirectory(walletDir)
+      FileUtils.deleteDirectory(keysDir)
+      SnapshotProcessor.initialize(settings)
     } catch {
-      case _: Throwable => sys.exit(9999)
+      case err: Throwable =>
+        throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
     }
 
   private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
@@ -122,6 +146,30 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     val startTime = System.currentTimeMillis()
     Either.catchNonFatal {
       storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
+      val boxesToInsert: List[EncryBaseBox] = toStorage.foldLeft(List.empty[EncryBaseBox]) {
+        case (toInsert, i: InternalNode[StorageKey, StorageValue]) =>
+          StateModifierSerializer.parseBytes(i.value, i.key.head) match {
+            case Failure(_) => toInsert
+            case Success(box) if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
+              box :: toInsert
+            case Success(box) => toInsert
+          }
+        case (toInsert, l: LeafNode[StorageKey, StorageValue]) =>
+          StateModifierSerializer.parseBytes(l.value, l.key.head) match {
+            case Failure(_) => toInsert
+            case Success(box) if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
+              box :: toInsert
+            case Success(box) => toInsert
+          }
+      }
+      if (boxesToInsert.nonEmpty) {
+        wallet.walletStorage.updateWallet(
+          ModifierId !@@ boxesToInsert.head.id,
+          boxesToInsert,
+          List.empty,
+          settings.constants.IntrinsicTokenId
+        )
+      }
       logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime) / 1000}s")
     } match {
       case Right(_) =>
@@ -197,7 +245,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
   }
 
   def createNewSnapshot(
-    id: Array[Byte],
+    id: ManifestId,
     manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
   ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
@@ -254,6 +302,12 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 
 object SnapshotProcessor extends StrictLogging {
 
+  def initialize(settings: EncryAppSettings): SnapshotProcessor =
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      logger.info(s"Init snapshot with state dir")
+      create(settings, new File(s"${settings.directory}/state"))
+    } else
+      create(settings, getDirProcessSnapshots(settings))
   def initialize(settings: EncryAppSettings, storageType: StorageType): SnapshotProcessor =
     if (settings.snapshotSettings.enableFastSynchronization)
       create(settings, new File(s"${settings.directory}/state"), storageType)
@@ -267,16 +321,34 @@ object SnapshotProcessor extends StrictLogging {
 
   def create(settings: EncryAppSettings, snapshotsDir: File, storageType: StorageType): SnapshotProcessor = {
     snapshotsDir.mkdirs()
-    val storage: VersionalStorage =
-      storageType match {
-        case VersionalStorage.IODB =>
-          logger.info("Init snapshots holder with iodb storage")
-          IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
-        case VersionalStorage.LevelDB =>
-          logger.info("Init snapshots holder with levelDB storage")
-          val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
-          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+    //todo bug with choosing db for state while fast sync
+    val storage: VersionalStorage = settings.storage.snapshotHolder match {
+      case VersionalStorage.IODB =>
+        logger.info("Init snapshots holder with iodb storage")
+        IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
+      case VersionalStorage.LevelDB =>
+        logger.info("Init snapshots holder with levelDB storage")
+        val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
+    }
+    val wallet: EncryWallet =
+      if (settings.snapshotSettings.enableFastSynchronization)
+        EncryWallet.readOrGenerate(
+          new File(s"${settings.directory}/wallet"),
+          new File(s"${settings.directory}/keys"),
+          settings
+        )
+      else {
+        val wallet = EncryWallet.readOrGenerate(
+          new File(s"${settings.directory}/walletDummy"),
+          new File(s"${settings.directory}/keysDummy"),
+          settings
+        )
+        wallet.close()
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/walletDummy"))
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/keysDummy"))
+        wallet
       }
-    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty)
+    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }
 }

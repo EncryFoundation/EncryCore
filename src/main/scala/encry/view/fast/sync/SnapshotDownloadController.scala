@@ -1,5 +1,7 @@
 package encry.view.fast.sync
 
+import java.io.File
+
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import cats.syntax.either._
@@ -7,20 +9,31 @@ import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
+import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
+import encry.view.fast.sync.FastSyncExceptions._
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
+import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer}
 import encry.view.fast.sync.FastSyncExceptions._
 import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
 import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.network.BasicMessagesRepo.RequestChunkMessage
+import org.encryfoundation.common.utils.Algos
+import org.iq80.leveldb.{DB, Options}
 
 final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
-                                            notYetRequested: List[Array[Byte]],
-                                            requestedChunks: Set[ByteArrayWrapper],
+                                            awaitedChunks: Set[ByteArrayWrapper],
                                             settings: EncryAppSettings,
                                             cp: Option[ConnectedPeer],
-                                            requiredManifestHeight: Int)
-    extends StrictLogging {
+                                            requiredManifestHeight: Int,
+                                            storage: DB,
+                                            batchesSize: Int,
+                                            nextGroupForRequestNumber: Int)
+    extends SnapshotDownloadControllerStorageAPI
+    with StrictLogging
+    with AutoCloseable {
 
   def processManifest(
     manifestProto: SnapshotManifestProtoMessage,
@@ -35,13 +48,26 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           .asLeft[SnapshotDownloadController]
       case Right(manifest) =>
         logger.info(s"Manifest ${Algos.encode(manifest.manifestId)} is correct.")
+        val groups: List[List[ChunkId]] =
+          manifest.chunksKeys.grouped(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod).toList
+        val batchesSize: Int = insertMany(groups) match {
+          case Left(error) =>
+            logger.info(s"Error ${error.getCause} has occurred while processing new manifest.")
+            throw new Exception(s"Error ${error.getCause} has occurred while processing new manifest.")
+          case Right(_) =>
+            val batchesCount: Int = groups.size
+            logger.info(s"New chunks ids successfully inserted into db. Number of batches is $batchesCount.")
+            batchesCount
+        }
         SnapshotDownloadController(
           requiredManifestId,
-          manifest.chunksKeys,
           Set.empty[ByteArrayWrapper],
           settings,
           remote.some,
-          requiredManifestHeight
+          requiredManifestHeight,
+          storage,
+          batchesSize,
+          0
         ).asRight[SnapshotDownloadControllerException]
     }
   }
@@ -58,9 +84,9 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
           .asLeft[(SnapshotDownloadController, SnapshotChunk)]
       case Right(chunk) =>
         val chunkId: ByteArrayWrapper = ByteArrayWrapper(chunk.id)
-        if (requestedChunks.contains(chunkId)) {
-          logger.debug(s"Got valid chunk ${Algos.encode(chunk.id)}.")
-          (this.copy(requestedChunks = requestedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
+        if (awaitedChunks.contains(chunkId)) {
+          logger.info(s"Got valid chunk ${Algos.encode(chunk.id)}.")
+          (this.copy(awaitedChunks = awaitedChunks - chunkId), chunk).asRight[InvalidChunkBytes]
         } else {
           logger.info(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
           UnexpectedChunkMessage(s"Got unexpected chunk ${Algos.encode(chunk.id)}.")
@@ -69,44 +95,26 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
     }
   }
 
-  def processManifestHasChangedMessage(
-    newManifest: SnapshotManifestProtoMessage,
-    remote: ConnectedPeer
-  ): Either[ProcessManifestHasChangedMessageException, SnapshotDownloadController] = {
-    logger.info(
-      s"Got message Manifest has changed from ${remote.socketAddress}. " +
-        s"New manifest id is ${Algos.encode(newManifest.manifestId.toByteArray)}"
-    )
-    Either.fromTry(SnapshotManifestSerializer.fromProto(newManifest)) match {
-      case Left(error) =>
-        ProcessManifestHasChangedMessageException(
-          s"New manifest after manifest has changed was parsed with error ${error.getCause}."
-        ).asLeft[SnapshotDownloadController]
-      case Right(newManifest) =>
-        logger.info(s"Manifest ${Algos.encode(newManifest.manifestId)} contains correct root node.")
-        SnapshotDownloadController(
-          newManifest.manifestId,
-          newManifest.chunksKeys,
-          Set.empty[ByteArrayWrapper],
-          settings,
-          remote.some,
-          requiredManifestHeight
-        ).asRight[ProcessManifestHasChangedMessageException]
-    }
-  }
+  def getNextBatchAndRemoveItFromController
+    : Either[FastSyncExceptions.FastSyncException, (SnapshotDownloadController, List[RequestChunkMessage])] =
+    (for {
+      nextBatch                                       <- getNextForRequest(nextGroupForRequestNumber)
+      serializedToDownload: List[RequestChunkMessage] = nextBatch.map(id => RequestChunkMessage(id))
+    } yield {
+      val newGroupNumber: Int   = nextGroupForRequestNumber + 1
+      val lastsBatchesSize: Int = batchesSize - 1
+      logger.info(
+        s"Successfully got group with number $nextGroupForRequestNumber." +
+          s" New group number is $newGroupNumber. Lasts batches size is $lastsBatchesSize"
+      )
+      this.copy(
+        awaitedChunks = nextBatch.map(ByteArrayWrapper(_)).toSet,
+        batchesSize = lastsBatchesSize,
+        nextGroupForRequestNumber = newGroupNumber
+      ) -> serializedToDownload
+    }).leftMap(l => ChunksIdsToDownloadException(l.getMessage))
 
-  def chunksIdsToDownload: (SnapshotDownloadController, List[NetworkMessage]) = {
-    val newToRequest: Set[ByteArrayWrapper] = notYetRequested
-      .take(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
-      .map(ByteArrayWrapper(_))
-      .toSet
-    val updatedToRequest: List[Array[Byte]] =
-      notYetRequested.drop(settings.snapshotSettings.chunksNumberPerRequestWhileFastSyncMod)
-    val serializedToDownload: List[RequestChunkMessage] = newToRequest
-      .map(id => RequestChunkMessage(id.data))
-      .toList
-    this.copy(notYetRequested = updatedToRequest, requestedChunks = newToRequest) -> serializedToDownload
-  }
+  def isBatchesSizeEmpty: Boolean = batchesSize == 0
 
   def checkManifestValidity(manifestId: Array[Byte], history: History): Boolean =
     history.getBestHeaderAtHeight { requiredManifestHeight }.exists { header =>
@@ -116,10 +124,38 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
   def canNewManifestBeProcessed: Boolean = cp.isEmpty
 
   def canChunkBeProcessed(remote: ConnectedPeer): Boolean = cp.exists(_.socketAddress == remote.socketAddress)
+
+  def reInitFastSync: SnapshotDownloadController =
+    try {
+      storage.close()
+      val dir: File = SnapshotDownloadController.getChunksStorageDir(settings)
+      import org.apache.commons.io.FileUtils
+      FileUtils.deleteDirectory(dir)
+      SnapshotDownloadController
+        .empty(settings)
+        .copy(
+          requiredManifestHeight = this.requiredManifestHeight,
+          requiredManifestId = this.requiredManifestId
+        )
+    } catch {
+      case err: Throwable =>
+        logger.info(s"Error ${err.getMessage} has occurred")
+        throw new Exception(s"Error ${err.getMessage} has occurred")
+    }
+
+  def close(): Unit = storage.close()
 }
 
 object SnapshotDownloadController {
 
-  def empty(settings: EncryAppSettings): SnapshotDownloadController =
-    SnapshotDownloadController(Array.emptyByteArray, List.empty, Set.empty, settings, none, 0)
+  def getChunksStorageDir(settings: EncryAppSettings): File = {
+    val dir: File = new File(s"${settings.directory}/chunksStorage")
+    dir.mkdirs()
+    dir
+  }
+
+  def empty(settings: EncryAppSettings): SnapshotDownloadController = {
+    val levelDBInit = LevelDbFactory.factory.open(getChunksStorageDir(settings), new Options)
+    SnapshotDownloadController(Array.emptyByteArray, Set.empty, settings, none, 0, levelDBInit, 0, 0)
+  }
 }

@@ -117,14 +117,31 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
     (isValidSize, isValidWords).mapN { case (_, mnemonic) => mnemonic }
   }.toEither
 
-  override def close(): Unit = walletStorage.close()
+  override def close(): Unit = {
+    walletStorage.close()
+    accountStore.close()
+  }
 }
 
 object EncryWallet extends StrictLogging {
 
-  def getWalletDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/wallet")
+  def getWalletDir(settings: EncryAppSettings): File =
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      logger.info(s"Init wallet on nvh with wallet tmp dir")
+      new File(s"${settings.directory}/walletTmp")
+    } else {
+      logger.info(s"Init wallet on nvh with wallet dir")
+      new File(s"${settings.directory}/wallet")
+    }
 
-  def getKeysDir(settings: EncryAppSettings): File = new File(s"${settings.directory}/keys")
+  def getKeysDir(settings: EncryAppSettings): File =
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      logger.info(s"Init wallet on nvh with keys tmp dir")
+      new File(s"${settings.directory}/keysTmp")
+    } else {
+      logger.info(s"Init wallet on nvh with keys dir")
+      new File(s"${settings.directory}/keys")
+    }
 
   def scanTree(node: Node[StorageKey, StorageValue],
                storage: VersionalStorage,
@@ -152,10 +169,8 @@ object EncryWallet extends StrictLogging {
     case _ => List.empty[MonetaryBox]
   }
 
-  def readOrGenerate(settings: EncryAppSettings): EncryWallet = {
-    val walletDir: File = getWalletDir(settings)
+  def readOrGenerate(walletDir: File, keysDir: File, settings: EncryAppSettings): EncryWallet = {
     walletDir.mkdirs()
-    val keysDir: File = getKeysDir(settings)
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes

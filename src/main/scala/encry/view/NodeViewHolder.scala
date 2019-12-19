@@ -84,14 +84,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)
       sender() ! newAccount
-    case FastSyncFinished(state) =>
+    case FastSyncFinished(state, wallet) =>
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
       nodeView.state.tree.storage.close()
+      nodeView.wallet.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
       logger.info(s"Updated best block in fast sync mod. Updated state height.")
-      logger.info(s"Start wallet scanning")
-      val wallet = nodeView.wallet.scanWalletFromUtxo(state, nodeView.wallet.propositions)
-      logger.info(s"Finished wallet scanning")
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
         override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
         override val historyStorage: HistoryStorage = nodeView.history.historyStorage
@@ -384,7 +384,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: UtxoState = UtxoState.genesis(stateDir, settings)
     val history: History = History.readOrGenerate(settings, timeProvider)
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+    val wallet: EncryWallet =
+      EncryWallet.readOrGenerate(EncryWallet.getWalletDir(settings), EncryWallet.getKeysDir(settings), settings)
     NodeView(history, state, wallet)
   }
 
@@ -393,7 +394,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val stateDir: File = UtxoState.getStateDir(settings)
       stateDir.mkdirs()
       val history: History = History.readOrGenerate(settings, timeProvider)
-      val wallet: EncryWallet = EncryWallet.readOrGenerate(settings)
+      val wallet: EncryWallet =
+        EncryWallet.readOrGenerate(EncryWallet.getWalletDir(settings), EncryWallet.getKeysDir(settings), settings)
       val state: UtxoState = restoreConsistentState(
         UtxoState.create(stateDir, settings), history
       )
