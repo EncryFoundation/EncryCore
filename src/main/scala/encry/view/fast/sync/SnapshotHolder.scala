@@ -2,30 +2,40 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import akka.actor.{ Actor, ActorRef, Cancellable, Props }
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
-import encry.network.{Broadcast, PeerConnectionHandler}
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
+import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
+import encry.network.{ Broadcast, PeerConnectionHandler }
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ChunkId, ManifestId}
-import encry.view.fast.sync.SnapshotHolder.{BroadcastManifestRequestMessage, CheckDelivery, DropProcessedCount, FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequestNextChunks, RequiredManifestHeightAndId, SnapshotManifestSerializer, TreeChunks}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ ChunkId, ManifestId }
+import encry.view.fast.sync.SnapshotHolder.{
+  BroadcastManifestRequestMessage,
+  CheckDelivery,
+  DropProcessedCount,
+  FastSyncDone,
+  FastSyncFinished,
+  HeaderChainIsSynced,
+  RequestNextChunks,
+  RequiredManifestHeightAndId,
+  SnapshotManifestSerializer,
+  TreeChunks
+}
 import encry.view.history.History
 import encry.view.state.UtxoState
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
+import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import supertagged.TaggedType
-
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -107,7 +117,7 @@ class SnapshotHolder(settings: EncryAppSettings,
                            }
           } yield (newProcessor, controller)) match {
             case Left(err: UnexpectedChunkMessage) =>
-              logger.info(s"Error has occurred ${err.error}.")
+              logger.info(s"Error has occurred ${err.error} with peer $remote")
             case Left(error) =>
               logger.info(s"Error has occurred: $error")
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
@@ -153,8 +163,6 @@ class SnapshotHolder(settings: EncryAppSettings,
               peer.handlerRef ! msg
             }
           }
-          val timer: Option[Cancellable] =
-            context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
           context.become(fastSyncMod(history, timer).orElse(commonMessages))
       }
 
@@ -177,8 +185,6 @@ class SnapshotHolder(settings: EncryAppSettings,
       }.foreach { msg =>
         snapshotDownloadController.cp.foreach(peer => peer.handlerRef ! msg)
       }
-      val timer: Option[Cancellable] =
-        context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
       context.become(fastSyncMod(history, timer).orElse(commonMessages))
 
     case FastSyncDone =>
@@ -196,7 +202,7 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def awaitManifestMod(
-    scheduler: Option[Cancellable],
+    responseManifestTimeout: Option[Cancellable],
     history: History
   ): Receive = {
     case BroadcastManifestRequestMessage =>
@@ -231,11 +237,11 @@ class SnapshotHolder(settings: EncryAppSettings,
                 nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
               case Right((controller, processor)) =>
                 logger.debug(s"Request manifest message successfully processed.")
-                scheduler.foreach(_.cancel())
+                responseManifestTimeout.foreach(_.cancel())
                 snapshotDownloadController = controller
                 snapshotProcessor = processor
                 self ! RequestNextChunks
-                logger.debug("Manifest processed")
+                logger.debug("Manifest processed successfully.")
                 context.become(fastSyncMod(history, none))
             }
           } else if (!isValidManifest) {
@@ -250,7 +256,7 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case msg @ RequiredManifestHeightAndId(_, _) =>
       self ! msg
-      scheduler.foreach(_.cancel())
+      responseManifestTimeout.foreach(_.cancel())
       logger.info(s"Got RequiredManifestHeightAndId while awaitManifestMod")
       context.become(fastSyncMod(history, none))
   }
@@ -313,6 +319,9 @@ class SnapshotHolder(settings: EncryAppSettings,
     snapshotDownloadController = snapshotDownloadController.reInitFastSync
     snapshotProcessor = snapshotProcessor.reInitStorage
   }
+
+  def timer: Option[Cancellable] =
+    context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
 }
 
 object SnapshotHolder {
