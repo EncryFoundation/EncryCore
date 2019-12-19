@@ -1,17 +1,12 @@
 package encry.view.fast.sync
 
 import java.io.File
-
 import cats.syntax.either._
 import com.google.common.primitives.Ints
-
-import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
-import encry.view.state.UtxoState
-import org.encryfoundation.common.modifiers.history.Block
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{ EncryAppSettings, LevelDBSettings }
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
+import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.view.fast.sync.FastSyncExceptions._
@@ -35,31 +30,9 @@ import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 import org.iq80.leveldb.{ DB, Options }
-import cats.syntax.either._
-
 import scorex.utils.Random
-
 import scala.collection.immutable.{ HashMap, HashSet }
 import scala.language.postfixOps
-import com.google.common.primitives.Ints
-import encry.view.fast.sync.FastSyncExceptions.{
-  ApplicableChunkIsAbsent,
-  BestHeaderAtHeightIsAbsent,
-  ChunkApplyError,
-  ChunkValidationError,
-  EmptyHeightKey,
-  EmptyRootNodeError,
-  FastSyncException,
-  InconsistentChunkId,
-  InitializeHeightAndRootKeysException,
-  ProcessNewBlockError,
-  ProcessNewSnapshotError,
-  UtxoCreationError
-}
-import encry.view.history.History
-import org.encryfoundation.common.utils.TaggedTypes.Height
-
-import scala.collection.immutable.{ HashMap, HashSet }
 import scala.util.{ Failure, Success }
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
@@ -109,7 +82,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       FileUtils.deleteDirectory(stateDir)
       FileUtils.deleteDirectory(walletDir)
       FileUtils.deleteDirectory(keysDir)
-      SnapshotProcessor.initialize(settings)
+      SnapshotProcessor.initialize(settings, settings.storage.state)
     } catch {
       case err: Throwable =>
         throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
@@ -152,7 +125,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
             case Failure(_) => toInsert
             case Success(box) if wallet.propositions.exists(_.contractHash sameElements box.proposition.contractHash) =>
               box :: toInsert
-            case Success(box) => toInsert
+            case Success(_) => toInsert
           }
         case (toInsert, l: LeafNode[StorageKey, StorageValue]) =>
           StateModifierSerializer.parseBytes(l.value, l.key.head) match {
@@ -302,12 +275,6 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
 
 object SnapshotProcessor extends StrictLogging {
 
-  def initialize(settings: EncryAppSettings): SnapshotProcessor =
-    if (settings.snapshotSettings.enableFastSynchronization) {
-      logger.info(s"Init snapshot with state dir")
-      create(settings, new File(s"${settings.directory}/state"))
-    } else
-      create(settings, getDirProcessSnapshots(settings))
   def initialize(settings: EncryAppSettings, storageType: StorageType): SnapshotProcessor =
     if (settings.snapshotSettings.enableFastSynchronization)
       create(settings, new File(s"${settings.directory}/state"), storageType)
@@ -321,16 +288,17 @@ object SnapshotProcessor extends StrictLogging {
 
   def create(settings: EncryAppSettings, snapshotsDir: File, storageType: StorageType): SnapshotProcessor = {
     snapshotsDir.mkdirs()
-    //todo bug with choosing db for state while fast sync
-    val storage: VersionalStorage = settings.storage.snapshotHolder match {
-      case VersionalStorage.IODB =>
-        logger.info("Init snapshots holder with iodb storage")
-        IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        logger.info("Init snapshots holder with levelDB storage")
-        val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, LevelDBSettings(300), keySize = 32))
-    }
+    val storage: VersionalStorage =
+      storageType match {
+        case VersionalStorage.IODB =>
+          logger.info("Init snapshots holder with iodb storage")
+          IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
+        case VersionalStorage.LevelDB =>
+          logger.info("Init snapshots holder with levelDB storage")
+          val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+      }
+
     val wallet: EncryWallet =
       if (settings.snapshotSettings.enableFastSynchronization)
         EncryWallet.readOrGenerate(
