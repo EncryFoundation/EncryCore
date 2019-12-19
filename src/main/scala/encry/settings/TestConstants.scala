@@ -59,7 +59,7 @@ case object TestConstants extends Constants {
 
   val PreGenesisHeight: Height = Height @@ (GenesisHeight - 1)
 
-  val MaxRollbackDepth: Int = 20
+  val MaxRollbackDepth: Int = 5
 
   val MaxTimeDrift: Long = 2.hours.toMillis
 
