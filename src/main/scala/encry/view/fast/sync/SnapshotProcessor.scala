@@ -300,13 +300,13 @@ object SnapshotProcessor extends StrictLogging {
         )
       else {
         val wallet = EncryWallet.readOrGenerate(
-          new File(s"${settings.directory}/walletDummy"),
-          new File(s"${settings.directory}/keysDummy"),
+          new File(s"${settings.directory}/walletTmp"),
+          new File(s"${settings.directory}/keysTmp"),
           settings
         )
         wallet.close()
-        FileUtils.deleteDirectory(new File(s"${settings.directory}/walletDummy"))
-        FileUtils.deleteDirectory(new File(s"${settings.directory}/keysDummy"))
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
         wallet
       }
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)

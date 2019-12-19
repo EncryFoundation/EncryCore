@@ -66,7 +66,6 @@ case class AccountManager private(store: Store, password: String, mandatoryAccou
 object AccountManager {
 
   def init(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
-    if (settings.snapshotSettings.enableFastSynchronization) {
       val keysTmpDir: File = new File(s"${settings.directory}/keysTmp")
       val keysDir: File = new File(s"${settings.directory}/keys")
       keysDir.mkdirs()
@@ -77,14 +76,6 @@ object AccountManager {
       val tmpAccount = AccountManager.apply(accountTmpManagerStore, pass, mnemonicKey, 0.toByte)
       account.store.close()
       tmpAccount.store.close()
-    }
-    else {
-      val keysDir: File = getKeysDir(settings)
-      keysDir.mkdirs()
-      val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
-      val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
-      account.store.close()
-    }
   }
 
   val AccountPrefix: Byte = 0x05
