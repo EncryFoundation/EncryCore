@@ -212,9 +212,9 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
       }
       val insertionsByThisVersion =
-        splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve))).map(VersionalLevelDbKey @@ _)
+        splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve), readOptions)).map(VersionalLevelDbKey @@ _)
       insertionsByThisVersion.foreach { elemKey =>
-        val elemInfo = db.get(userKey(elemKey))
+        val elemInfo = db.get(userKey(elemKey), readOptions)
         if (elemInfo == null) {
           logger.info(s"NULL at key: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
         }
@@ -276,7 +276,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       var buffer: List[VersionalLevelDbKey] = List.empty[VersionalLevelDbKey]
       while (iter.hasNext && (maxQty == -1 || buffer.length < maxQty)) {
         val nextKey = iter.next().getKey
-        if (nextKey.head == USER_KEY_PREFIX && db.get(nextKey).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
+        if (nextKey.head == USER_KEY_PREFIX && db.get(nextKey, readOptions).headOption.contains(ACCESSIBLE_KEY_PREFIX)) {
           buffer ::= VersionalLevelDbKey @@ nextKey.drop(1)
         }
       }
