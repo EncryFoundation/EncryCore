@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.GetBannedPeersHelperAPI
+import encry.api.http.DataHolderForApi.GetBannedPeersHelper
 import encry.api.http.ScriptHelper
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.settings.RESTApiSettings
@@ -22,7 +22,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
 ) extends EncryBaseApiRoute with StrictLogging {
 
   def peersAllF: Future[Seq[(InetAddress, (BanReason, BanTime, BanType))]] =
-    (dataHolder ? GetBannedPeersHelperAPI).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
+    (dataHolder ? GetBannedPeersHelper).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
 
   def peerScript(peers: Seq[(InetAddress, (BanReason, BanTime, BanType))] ): Text.TypedTag[String] = {
 

@@ -22,7 +22,6 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeerFromAPI
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.NodeViewHolder.CurrentView
 import encry.view.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, GetDataFromCurrentView}
 import encry.view.history.History
 import encry.view.state.{UtxoState, UtxoStateReader}
@@ -223,9 +222,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         }
       }
 
-    case GetBannedPeersHelper => sender() ! blackList.map(_.toString)
-
-    case GetBannedPeersHelperAPI => sender() ! blackList
+    case GetBannedPeersHelper => sender() ! blackList
 
     case GetConnectedPeersHelper => sender() ! connectedPeers
       .map(
@@ -372,8 +369,6 @@ object DataHolderForApi { //scalastyle:ignore
   case object GetAllPeers
 
   case object GetBannedPeersHelper
-
-  case object GetBannedPeersHelperAPI
 
   case object GetAllInfo
 

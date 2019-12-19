@@ -1,18 +1,18 @@
 package encry.api.http.routes
 
-import java.net.InetSocketAddress
+import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
 import encry.api.http.DataHolderForApi._
 import encry.api.http.routes.PeersApiRoute.PeerInfoResponse
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.settings.RESTApiSettings
 import io.circe.Encoder
 import io.circe.generic.semiauto._
 import io.circe.syntax._
-import io.circe.Json._
 import scala.util.{Failure, Success, Try}
 
 case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: ActorRef)(
@@ -37,7 +37,8 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
   }
 
   def bannedList: Route = (path("banned") & get) {
-    (dataHolder ? GetBannedPeersHelper).mapTo[Seq[String]].map(_.map(_.toString).asJson).okJson()
+    (dataHolder ? GetBannedPeersHelper).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
+    .map(_.map(_.toString).asJson).okJson()
   }
 
   def connectPeer: Route = path("add") {

@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import java.io.File
-
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.crypto.encryption.AES
@@ -13,7 +12,6 @@ import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-
 import scala.util.Try
 
 case class AccountManager private(store: Store, password: String, mandatoryAccount: PrivateKey25519, number: Byte) extends StrictLogging {
@@ -68,11 +66,25 @@ case class AccountManager private(store: Store, password: String, mandatoryAccou
 object AccountManager {
 
   def init(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
-    val keysDir: File = getKeysDir(settings)
-    keysDir.mkdirs()
-    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
-    val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
-    account.store.close()
+    if (settings.snapshotSettings.enableFastSynchronization) {
+      val keysTmpDir: File = new File(s"${settings.directory}/keysTmp")
+      val keysDir: File = new File(s"${settings.directory}/keys")
+      keysDir.mkdirs()
+      keysTmpDir.mkdirs()
+      val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
+      val accountTmpManagerStore: LSMStore = new LSMStore(keysTmpDir, keepVersions = 0, keySize = 34)
+      val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
+      val tmpAccount = AccountManager.apply(accountTmpManagerStore, pass, mnemonicKey, 0.toByte)
+      account.store.close()
+      tmpAccount.store.close()
+    }
+    else {
+      val keysDir: File = getKeysDir(settings)
+      keysDir.mkdirs()
+      val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
+      val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
+      account.store.close()
+    }
   }
 
   val AccountPrefix: Byte = 0x05
