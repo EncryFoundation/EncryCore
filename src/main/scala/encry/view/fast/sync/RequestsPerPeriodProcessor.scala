@@ -7,12 +7,10 @@ import org.encryfoundation.common.utils.Algos
 
 final case class RequestsPerPeriodProcessor(handledRequests: Int, settings: EncryAppSettings) extends StrictLogging {
 
-  def canBeProcessed(processor: SnapshotProcessor, remote: ConnectedPeer, manifestId: Array[Byte]): Boolean = {
-    logger.info(
-      s"Requested id ${Algos.encode(manifestId)}, current manifest id " +
-        s"${processor.actualManifest.map(l => Algos.encode(l.manifestId))}."
-    )
-    processor.actualManifest.exists(_.manifestId.sameElements(manifestId))
+  def canBeProcessed(processor: SnapshotProcessor, manifestId: Array[Byte]): Boolean = {
+    val actualManifestID: Option[Array[Byte]] = processor.actualManifestId
+    logger.info(s"Requested id ${Algos.encode(manifestId)}, current manifest id ${actualManifestID.map(Algos.encode)}.")
+    actualManifestID.exists(_.sameElements(manifestId))
   }
 
   def canProcessRequest(remote: ConnectedPeer): Boolean = handledRequests <= settings.snapshotSettings.requestsPerTime

@@ -2,40 +2,30 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{ Actor, ActorRef, Cancellable, Props }
+import akka.actor.{Actor, ActorRef, Cancellable, Props}
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason._
-import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, SemanticallySuccessfulModifier }
-import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
-import encry.network.{ Broadcast, PeerConnectionHandler }
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
+import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
+import encry.network.{Broadcast, PeerConnectionHandler}
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ ChunkId, ManifestId }
-import encry.view.fast.sync.SnapshotHolder.{
-  BroadcastManifestRequestMessage,
-  CheckDelivery,
-  DropProcessedCount,
-  FastSyncDone,
-  FastSyncFinished,
-  HeaderChainIsSynced,
-  RequestNextChunks,
-  RequiredManifestHeightAndId,
-  SnapshotManifestSerializer,
-  TreeChunks
-}
+import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ChunkId, ManifestId}
+import encry.view.fast.sync.SnapshotHolder.{BroadcastManifestRequestMessage, CheckDelivery, DropProcessedCount, FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RemoveRedundantManifestIds, RequestNextChunks, RequiredManifestHeightAndId, SnapshotManifestSerializer, TreeChunks}
 import encry.view.history.History
 import encry.view.state.UtxoState
-import encry.view.state.avlTree.{ Node, NodeSerilalizer }
+import encry.view.state.avlTree.{Node, NodeSerilalizer}
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import supertagged.TaggedType
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -263,7 +253,6 @@ class SnapshotHolder(settings: EncryAppSettings,
 
   def workMod(history: History): Receive = {
     case TreeChunks(chunks, id) =>
-      //todo add collection with potentialManifestsIds to NVH
       val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
       if (!manifestIds.exists(_.sameElements(id))) {
         snapshotProcessor.createNewSnapshot(ManifestId @@ id, manifestIds, chunks)
@@ -279,12 +268,13 @@ class SnapshotHolder(settings: EncryAppSettings,
         case Right(newProcessor) =>
           snapshotProcessor = newProcessor
           requestsProcessor = RequestsPerPeriodProcessor.empty(settings)
+          nodeViewHolder ! RemoveRedundantManifestIds
       }
 
     case DataFromPeer(message, remote) =>
       message match {
         case RequestManifestMessage(requiredManifestId)
-            if requestsProcessor.canBeProcessed(snapshotProcessor, remote, requiredManifestId) =>
+            if requestsProcessor.canBeProcessed(snapshotProcessor, requiredManifestId) =>
           snapshotProcessor.actualManifest.foreach { m =>
             logger.info(s"Sent to remote actual manifest with id ${Algos.encode(requiredManifestId)}")
             remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
@@ -325,6 +315,8 @@ class SnapshotHolder(settings: EncryAppSettings,
 }
 
 object SnapshotHolder {
+
+  case object RemoveRedundantManifestIds
 
   final case object BroadcastManifestRequestMessage
 
