@@ -104,7 +104,6 @@ object AccountManager {
       Blake2b256.hash(Mnemonic.seedFromMnemonic(seed))
     )
     saveAccount(store, password, number, privateKey, publicKey)
-    println(this(store, password, PrivateKey25519(privateKey, publicKey), number))
     this(store, password, PrivateKey25519(privateKey, publicKey), number)
   }
 
