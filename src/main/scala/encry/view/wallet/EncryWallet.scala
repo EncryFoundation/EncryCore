@@ -1,15 +1,13 @@
 package encry.view.wallet
 
 import java.io.File
-
-import cats.data.{NonEmptyChain, Validated}
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.apply._
-import cats.syntax.validated._
 import cats.data.NonEmptyChain._
-import cats.syntax.foldable._
+import cats.data.{NonEmptyChain, Validated}
 import cats.instances.string._
+import cats.syntax.apply._
+import cats.syntax.either._
+import cats.syntax.foldable._
+import cats.syntax.validated._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
@@ -17,21 +15,19 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Mnemonic
-import io.iohk.iodb.{LSMStore, Store}
-import encry.view.state.{UtxoState, UtxoStateReader}
+import encry.view.state.UtxoStateReader
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
+import io.iohk.iodb.{LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
-
-import scala.util.{Failure, Success}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
   extends StrictLogging with AutoCloseable with Settings {
