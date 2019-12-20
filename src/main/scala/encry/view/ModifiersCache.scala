@@ -77,7 +77,6 @@ object ModifiersCache extends StrictLogging {
             case headerKey if isApplicable(headerKey) => headerKey
           }
         case None =>
-          logger.debug(s"Can't find headers at height $height in cache")
           List.empty[Key]
       }
     }

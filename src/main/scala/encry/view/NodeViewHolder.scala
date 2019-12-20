@@ -288,7 +288,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           } else u
         }
         uf.failedMod match {
-          case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
+          case Some(_) =>
+            uf.history.updateIdsForSyncInfo()
+            updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
           case None => (uf.history, uf.state, uf.suffix)
         }
       case Failure(e) =>
@@ -308,6 +310,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case Right((historyBeforeStUpdate, progressInfo)) =>
             logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
             logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+            if (pmod.modifierTypeId == Header.modifierTypeId) historyBeforeStUpdate.updateIdsForSyncInfo()
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)
               val isHeader: Boolean = pmod match {
