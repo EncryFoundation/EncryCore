@@ -261,7 +261,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                       stateAfterApply.tree.storage
                     )
                   nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
-                  potentialManifestIds = potentialManifestId :: potentialManifestIds
+                  potentialManifestIds = ManifestId @@ potentialManifestId :: potentialManifestIds
                   logger.info(s"State tree successfully processed for snapshot. " +
                     s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
                 }
