@@ -15,9 +15,6 @@ import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-
-import scala.annotation.tailrec
-import scala.collection.immutable.HashSet
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging {
@@ -38,18 +35,28 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
                          vSer: Serializer[V],
                          kM: Monoid[K],
                          vM: Monoid[V]): AvlTree[K, V] = {
+    val deleteStartTime = System.currentTimeMillis()
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDeleteKey) =>
         deleteKey(toDeleteKey, prevRoot)
     }
+    logger.info(s"avl delete time: ${(System.currentTimeMillis() - deleteStartTime)/1000L}")
+    val insertStartTime = System.currentTimeMillis()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
-    val notChangedKeys = getNewNodesWithFirstUnchanged(newRoot)
-    val insertedNodes   = takeUntil(newRoot, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
-    val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
+    logger.info(s"avl insert time: ${(System.currentTimeMillis() - insertStartTime)/1000L}")
+    val notChangedKeysStart = System.currentTimeMillis()
+    val notChangedKeys = getNewNodesWithFirstUnchanged(newRoot).toSet
+    logger.info(s"avl notChangedKeysStart: ${(System.currentTimeMillis() - notChangedKeysStart)/1000L}")
+    val flattenNewNodesStart = System.currentTimeMillis()
+    val insertedNodes   = flattenNewNodes(newRoot)
+    logger.info(s"avl flattenNewNodes: ${(System.currentTimeMillis() - flattenNewNodesStart)/1000L}")
+    val takeUntilTime = System.currentTimeMillis()
+    val deletedNodes    = toDeleteKeys(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
+    logger.info(s"avl deletedNodes: ${(System.currentTimeMillis() - takeUntilTime)/1000L}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
     storage.insert(
@@ -58,19 +65,15 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         case (key, value) =>
           //logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
           StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
-      } ++
-        insertedNodes.map { node =>
-            StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
-        }.toList ++
+      } ++ insertedNodes ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
-      deletedNodes.map(key => {
-        StorageKey @@ key.hash
-      }) ++ toDelete.map(key => {
+      deletedNodes ++ toDelete.map(key => {
         //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
+    logger.info(s"avl insertion time: ${(System.currentTimeMillis() - startInsertTime)/1000L}")
     //logger.info("newRoot:" + newRoot)
     AvlTree(shadowedRoot, storage)
   }
@@ -93,16 +96,31 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       else List.empty
   }
 
-  private def takeUntil(node: Node[K, V], predicate: Node[K, V] => Boolean): List[Node[K, V]] = node match {
+  private def flattenNewNodes(node: Node[K, V])(implicit kSer: Serializer[K],
+                                                vSer: Serializer[V],
+                                                kM: Monoid[K],
+                                                vM: Monoid[V]): List[(StorageKey, StorageValue)] = node match {
+    case internalNode: InternalNode[K, V] =>
+      val internal =
+        List(StorageKey @@ internalNode.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(internalNode)))
+      val left = internalNode.leftChild.map(flattenNewNodes).getOrElse(List.empty)
+      val right = internalNode.rightChild.map(flattenNewNodes).getOrElse(List.empty)
+      internal ++ left ++ right
+    case leafNode: LeafNode[K, V] =>
+      List(StorageKey @@ leafNode.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(leafNode)))
+    case _ => List.empty
+  }
+
+  private def toDeleteKeys(node: Node[K, V], predicate: Node[K, V] => Boolean): List[StorageKey] = node match {
     case shadowNode: ShadowNode[K, V] if predicate(shadowNode) =>
       val restored = shadowNode.restoreFullNode(storage)
-      takeUntil(restored, predicate)
+      toDeleteKeys(restored, predicate)
     case internalNode: InternalNode[K, V] if predicate(internalNode) =>
-      internalNode :: internalNode.leftChild.map(takeUntil(_, predicate)).getOrElse(List.empty) :::
-        internalNode.rightChild.map(takeUntil(_, predicate)).getOrElse(List.empty)
+      (StorageKey @@ internalNode.hash) :: internalNode.leftChild.map(toDeleteKeys(_, predicate)).getOrElse(List.empty) :::
+        internalNode.rightChild.map(toDeleteKeys(_, predicate)).getOrElse(List.empty)
     case leafNode: LeafNode[K, V] if predicate(leafNode) =>
-      List(leafNode)
-    case emptyNode: EmptyNode[K, V] => List(emptyNode)
+      List(StorageKey @@ leafNode.hash)
+    case emptyNode: EmptyNode[K, V] => List(StorageKey @@ emptyNode.hash)
     case _ => List.empty
   }
 
