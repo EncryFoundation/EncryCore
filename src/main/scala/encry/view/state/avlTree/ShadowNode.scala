@@ -13,7 +13,9 @@ import org.encryfoundation.common.utils.Algos
 import scala.util.Try
 
 //represent node, that stored in db, without all fields, except hash, height, balance
-case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Array[Byte], height: Int, balance: Int)
+case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Array[Byte],
+                                                              height: Int,
+                                                              balance: Int)
                                                              (implicit kM: Monoid[K], vM: Monoid[V]) extends Node[K, V] with StrictLogging {
 
   override val key: K = kM.empty
@@ -31,6 +33,9 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Arra
     )
   }
 
+  def tryRestore(storage: VersionalStorage): Option[Node[K, V]] =
+    Try(restoreFullNode(storage)).toOption
+
   override def toString: String = s"ShadowNode(Hash:${Algos.encode(hash)}, height: ${height}, balance: ${balance})"
 
   override def selfInspection = this
@@ -41,11 +46,34 @@ object ShadowNode {
   def childsToShadowNode[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Node[K, V] = node match {
     case internal: InternalNode[K, V] =>
       internal.copy(
-        leftChild = internal.leftChild.map(node => ShadowNode[K, V](nodeHash = node.hash, height = node.height, balance = node.balance)),
-        rightChild = internal.rightChild.map(node => ShadowNode[K, V](nodeHash = node.hash, height = node.height, balance = node.balance))
+        leftChild = internal.leftChild.map(node =>
+          ShadowNode[K, V](
+            nodeHash = node.hash,
+            height = node.height,
+            balance = node.balance,
+          )),
+        rightChild = internal.rightChild.map(node =>
+          ShadowNode[K, V](
+            nodeHash = node.hash,
+            height = node.height,
+            balance = node.balance,
+          )
+        )
       )
     case _ => node
   }
+
+  def getLeftChildHash[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Option[Array[Byte]] =
+    node match {
+      case internalNode: InternalNode[K, V] =>internalNode.leftChild.map(_.hash)
+      case _ => None
+    }
+
+  def getRightChildHash[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Option[Array[Byte]] =
+    node match {
+      case internalNode: InternalNode[K, V] => internalNode.rightChild.map(_.hash)
+      case _ => None
+    }
 
   def toProto[K, V](node: ShadowNode[K, V]): ShadowNodeProto = ShadowNodeProto()
     .withHeight(node.height)
@@ -56,7 +84,7 @@ object ShadowNode {
     ShadowNode(
       nodeHash = protoNode.hash.toByteArray,
       height = protoNode.height,
-      balance = protoNode.balance
+      balance = protoNode.balance,
     )
   }
 }

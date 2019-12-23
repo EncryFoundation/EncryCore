@@ -17,6 +17,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
 
 import scala.annotation.tailrec
+import scala.collection.immutable.HashSet
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage: VersionalStorage) extends AutoCloseable with StrictLogging {
@@ -46,8 +47,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
-    val (insertedNodesInTree, notChangedKeys) = getNewNodesWithFirstUnchanged(newRoot)
-    val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
+    val notChangedKeys = getNewNodesWithFirstUnchanged(newRoot)
+    val insertedNodes   = takeUntil(newRoot, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
     val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
@@ -58,9 +59,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
           //logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
           StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
       } ++
-        insertedNodes.map {
-          case (key, node) =>
-            StorageKey @@ key -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
+        insertedNodes.map { node =>
+            StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
@@ -75,23 +75,22 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     AvlTree(shadowedRoot, storage)
   }
 
-  private def getNewNodesWithFirstUnchanged(node: Node[K, V]): (List[Node[K, V]], List[ByteArrayWrapper]) = node match {
+  private def getNewNodesWithFirstUnchanged(node: Node[K, V]): List[ByteArrayWrapper] = node match {
     case shadowNode: ShadowNode[K, V] =>
-      val restored = shadowNode.restoreFullNode(storage)
-      getNewNodesWithFirstUnchanged(restored)
+      shadowNode.tryRestore(storage).map(getNewNodesWithFirstUnchanged).getOrElse(
+        List(ByteArrayWrapper(shadowNode.hash))
+      )
     case internal: InternalNode[K, V] =>
-      storage.get(StorageKey @@ internal.hash) match {
-        case Some(_) => List.empty[Node[K, V]] -> (ByteArrayWrapper(internal.hash) :: Nil)
-        case None =>
-          val leftScan = internal.leftChild.map(getNewNodesWithFirstUnchanged).getOrElse(List.empty -> List.empty)
-          val rightScan = internal.rightChild.map(getNewNodesWithFirstUnchanged).getOrElse(List.empty -> List.empty)
-          (internal :: leftScan._1 ::: rightScan._1) -> (leftScan._2 ::: rightScan._2)
+      if (storage.contains(StorageKey @@ internal.hash)) {
+        List(ByteArrayWrapper(internal.hash))
+      } else {
+        val leftScan = internal.leftChild.map(getNewNodesWithFirstUnchanged).getOrElse(List.empty)
+        val rightScan = internal.rightChild.map(getNewNodesWithFirstUnchanged).getOrElse(List.empty)
+        leftScan ::: rightScan
       }
     case leafNode: LeafNode[K, V] =>
-      storage.get(StorageKey @@ leafNode.hash) match {
-        case Some(_) => List.empty[Node[K, V]] -> (ByteArrayWrapper(leafNode.hash) :: Nil)
-        case None => List(leafNode) -> List.empty
-      }
+      if (storage.contains(StorageKey @@ leafNode.hash)) ByteArrayWrapper(leafNode.hash) :: Nil
+      else List.empty
   }
 
   private def takeUntil(node: Node[K, V], predicate: Node[K, V] => Boolean): List[Node[K, V]] = node match {
