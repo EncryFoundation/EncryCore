@@ -35,7 +35,7 @@ case class WalletRoute(settings: RESTApiSettings,
    pubKeys <- pubKeysF
  } yield (wallet, pubKeys)
 
- def walletScript(balances: Map[String, List[(String, Amount)]], pubKeysList: List[String]): Text.TypedTag[String] = {
+ def walletScript(balances: Map[String, List[(String, Amount)]]): Text.TypedTag[String] = {
 
    html(
      scalatags.Text.all.head(
@@ -767,8 +767,8 @@ case class WalletRoute(settings: RESTApiSettings,
                         )
                       ),
                       tbody(
-                        if(pubKeysList.nonEmpty) {
-                          for (p <- pubKeysList) yield {
+                        if(balances.keys.nonEmpty) {
+                          for (p <- balances.keys.toList) yield {
                             tr(th(attr("scope") := "row", p))
                           }
                         } else {
@@ -831,7 +831,7 @@ case class WalletRoute(settings: RESTApiSettings,
       WebRoute.authRoute(
         onComplete(info) {
           case Success(info) =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1).render))
         }, settings
       )
   }
