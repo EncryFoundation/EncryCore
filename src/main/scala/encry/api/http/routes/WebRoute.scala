@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetMinerStatus, GetNodePass}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetMinerStatus, GetNodePassHashAndSalt}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
@@ -19,7 +19,7 @@ import pdi.jwt.{JwtAlgorithm, JwtClaim, JwtSprayJson}
 import scalatags.Text
 import scalatags.Text.all.{div, td, _}
 import scorex.utils.Random
-import scala.concurrent.{Await, Future}
+import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
@@ -45,7 +45,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
-  def getPass: Future[Either[Throwable, String]] = (dataHolder ? GetNodePass).mapTo[Either[Throwable, String]]
+  def getPass: Future[String => Boolean] =
+    (dataHolder ? GetNodePassHashAndSalt).mapTo[String => Boolean]
 
   def signUp: Text.TypedTag[String] = html(
     scalatags.Text.all.head(
@@ -156,22 +157,18 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   def loginRoute: Route =
     (path("token") & post) {
       onComplete(getPass) {
-        case Success(pass) =>
+        case Success(verifyPass) =>
           entity(as[String]) { urlPass =>
               val decodedStr = URLDecoder.decode(urlPass, "UTF-8")
               val receivedPass = decodedStr.substring(9)
-              val dbPass: String = pass match {
-                case Right(password) => password
-                case Left(err) => throw new Exception(err)
-              }
-              if (dbPass == receivedPass) {
+              if (verifyPass(receivedPass)) {
                 val token = WebRoute.createToken(receivedPass, 1)
                 respondWithHeader(RawHeader("Access-Token", token)) {
                   setCookie(HttpCookie("JWT", value = token)) {
                     redirect("/web", StatusCodes.PermanentRedirect)
                   }
                 }
-              } else complete(s"Incorrect password: $dbPass / ${URLDecoder.decode(urlPass, "UTF-8")}")
+              } else complete(s"Incorrect password: $receivedPass / ${URLDecoder.decode(urlPass, "UTF-8")}")
           }
         case Failure(exception) => complete(exception)
       }

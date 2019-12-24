@@ -4,23 +4,29 @@ import java.io.File
 import cats.syntax.either._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
+import encry.storage.VersionalStorage.StorageKey
 import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.{DB, Options}
+import scorex.utils.Random
+import supertagged.TaggedType
 
 trait AccStorage extends StrictLogging with AutoCloseable {
 
   val storage: DB
 
-  def getPassword: Either[Throwable, String] =
-    Either.catchNonFatal {
-      new String(storage.get(AccStorage.PasswordKey)).mkString
-    }
+  val verifyPassword: String => Boolean = pass => {
+    val salt = storage.get(AccStorage.SaltKey)
+    val passHash = storage.get(AccStorage.PasswordHashKey)
+    Algos.hash(pass.getBytes() ++ salt) sameElements passHash
+  }
 
-  def putPassword(pass: String): Either[Throwable, Unit] = {
+  def setPassword(pass: String): Either[Throwable, Unit] = {
     val batch = storage.createWriteBatch()
+    val salt = Random.randomBytes()
     try {
-      batch.put(AccStorage.PasswordKey, pass.getBytes())
+      batch.put(AccStorage.PasswordHashKey, Algos.hash(pass.getBytes() ++ salt))
+      batch.put(AccStorage.SaltKey, salt)
       storage.write(batch).asRight[Throwable]
     } catch {
       case err: Throwable => err.asLeft[Unit]
@@ -35,7 +41,15 @@ trait AccStorage extends StrictLogging with AutoCloseable {
 }
 
 object AccStorage extends StrictLogging {
-  val PasswordKey: Array[Byte] = Algos.hash("Password_Key")
+
+  object PasswordHash extends TaggedType[Array[Byte]]
+  object PasswordSalt extends TaggedType[Array[Byte]]
+
+  type PasswordHash = PasswordHash.Type
+  type PasswordSalt = PasswordSalt.Type
+
+  val PasswordHashKey: StorageKey = StorageKey @@ Algos.hash("Password_Key")
+  val SaltKey: StorageKey = StorageKey @@ Algos.hash("Salt_Key")
 
   def getDirStorage(settings: EncryAppSettings): File = new File(s"${settings.directory}/userKeys")
 

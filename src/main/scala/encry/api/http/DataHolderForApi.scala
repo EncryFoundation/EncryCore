@@ -55,7 +55,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PassForStorage(_) =>
       stash()
-    case GetNodePass => sender() ! storage.getPassword
+    case GetNodePassHashAndSalt => sender() ! storage.verifyPassword
   }
 
   def workingCycle(nvhRef: ActorRef,
@@ -83,9 +83,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case GetNodePass => sender() ! storage.getPassword
+    case GetNodePassHashAndSalt => sender() ! storage.verifyPassword
 
-    case PassForStorage(pass) => storage.putPassword(pass)
+    case PassForStorage(pass) => storage.setPassword(pass)
 
     case ConnectedPeersConnectionHelper(info) =>
       context.become(
@@ -340,7 +340,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class CreateAccountManagerFromSeedHelper(seed: String)
 
-  case object GetNodePass
+  case object GetNodePassHashAndSalt
 
   case object GetViewPrintAddress
 
