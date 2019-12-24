@@ -429,7 +429,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                             coinI <- balances.toList
                                             coinIds <- coinI._2
                                           } yield {
-                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
+                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2/100000000})" else coinIds._1)
                                           }
                                         )
                                       ),
@@ -687,7 +687,7 @@ case class WalletRoute(settings: RESTApiSettings,
                                         select(cls := "form-control", id :="coin", name:="coin",
                                           if (balances.nonEmpty) {
                                             balances.values.flatten.toList.map( coinIds =>
-                                              option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
+                                              option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2/100000000})" else coinIds._1)
                                             )
                                           } else {
                                             option(value := "", "")
@@ -731,7 +731,7 @@ case class WalletRoute(settings: RESTApiSettings,
                             tr(
                               th(mapKeyValue._1),
                               th(tknStr),
-                              th(tokenAmount._2)
+                              if (tokenAmount._1 == EttTokenId ) th(tokenAmount._2/100000000) else th(tokenAmount._2)
                             )
                           }).toList
                         } else {
