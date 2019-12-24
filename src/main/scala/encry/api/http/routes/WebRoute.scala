@@ -205,16 +205,16 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
         meta(name := "author", content := "Creative Tim"),
         script(
           raw("""function shutdown(){
-    window.alert("The node was disconnected...");
     var request = new XMLHttpRequest();
-    request.open('GET', "http://localhost:9051/node/shutdown");
+    request.open('GET', "/node/shutdown");
     request.send();
+    window.alert("The node was disconnected...");
   }""")
         ),
         script(
           raw("""function start(){
     var request = new XMLHttpRequest();
-    request.open('GET', "http://localhost:9051/node/startMining");
+    request.open('GET', "/node/startMining");
     request.send();
     setTimeout(location.reload.bind(location), 5000);
     window.alert("Start mining... \n Reloading page in 5s.");
@@ -223,7 +223,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
         script(
           raw("""function stop(){
     var request = new XMLHttpRequest();
-    request.open('GET', "http://localhost:9051/node/stopMining");
+    request.open('GET', "/node/stopMining");
     request.send();
     setTimeout(location.reload.bind(location), 5000);
     window.alert("Stop mining... \n Reloading page in 5s.");

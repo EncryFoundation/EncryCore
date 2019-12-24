@@ -294,7 +294,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.system.eventStream.publish(DisableMining)
     case ShutdownNode =>
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
-    case msg@GetDataFromCurrentView(f) => (nvhRef ? msg).pipeTo(sender)
+    case msg@GetDataFromCurrentView(_) => (nvhRef ? msg).pipeTo(sender)
     case GetAllInfo =>
       sender() ! (
         connectedPeers,
