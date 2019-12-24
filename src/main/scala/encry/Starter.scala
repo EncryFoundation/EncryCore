@@ -3,10 +3,11 @@ package encry
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
-import akka.actor.{Actor, ActorRef}
+
+import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{NonEmptyChain, Validated}
+import cats.data.{ Chain, NonEmptyChain, Validated }
 import cats.instances.future._
 import cats.instances.option._
 import cats.instances.string._
@@ -18,18 +19,19 @@ import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{StartListening, prompt}
+import encry.cli.ConsoleListener.{ prompt, StartListening }
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
 import encry.settings._
-import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.utils.{ Mnemonic, NetworkTimeProvider }
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
+
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
@@ -58,9 +60,9 @@ class Starter(settings: EncryAppSettings,
                  startNonEmptyNode
     } yield result) match {
       case Left(_) =>
-        println(s"Node start with http api.")
+        println(s"Node is started with http api.")
       case Right(res) =>
-        println("Node config was read successfully!")
+        println("Configuration set up successfully!")
         self ! res
     }
 
@@ -88,7 +90,9 @@ class Starter(settings: EncryAppSettings,
     for {
       answer <- {
         println(preview)
-        println("Would you like to start your node with http api help or with cli? Enter 'yes' for http api or 'no' for CLI:")
+        println(
+          "Would you like to start node with http api helper or with cli helper? Enter 'yes' for http api or 'no' for CLI:"
+        )
         readAnswer
       }
       result <- if (answer) startWithHttpApi else startWithCli
@@ -104,7 +108,7 @@ class Starter(settings: EncryAppSettings,
         if (result == "yes") true.asRight[Throwable]
         else if (result == "no") false.asRight[Throwable]
         else {
-          println("Your answer is not matched with yes/no answer. Please, enter it again")
+          println("Your answer doesn't match with yes/no answer. Please, enter it again:")
           readAnswer
       }
 
@@ -124,7 +128,11 @@ class Starter(settings: EncryAppSettings,
       val validatedData = validationFunction(result)
       if (validatedData.isValid) result.asRight[Throwable]
       else {
-        println(s"Your input is incorrect cause: ${validatedData.show}")
+        validatedData.toEither.leftMap { errors: NonEmptyChain[String] =>
+          println(s"Your input is incorrect cause: ${errors.toChain.foldLeft("") {
+            case (res, nextErr) => nextErr + ". " + res
+          }}")
+        }
         readAndValidateInput(validationFunction)
       }
     }
@@ -141,10 +149,10 @@ class Starter(settings: EncryAppSettings,
     def validateMnemonicKey(mnemonic: String): Validated[NonEmptyChain[String], String] = {
       val words: Array[String] = mnemonic.split(" ")
       val isValidSize: Validated[NonEmptyChain[String], String] =
-        if (words.length == 12) mnemonic.validNec else "Wrong words size".invalidNec
+        if (words.length == 12) mnemonic.validNec else "Wrong words number".invalidNec
       val isValidWords: Validated[NonEmptyChain[String], String] =
         if (words.forall(word => Mnemonic.getWords.contains(word))) mnemonic.validNec
-        else "Several words don't contain in available words".invalidNec
+        else "Some words don't contain in the list of available".invalidNec
       (isValidSize, isValidWords).mapN { case (_, _) => mnemonic }
     }
 
@@ -181,74 +189,87 @@ class Starter(settings: EncryAppSettings,
       loop(List.empty[InetSocketAddress])
     }
 
-    def readDeclaredAddress: Either[Throwable, List[InetSocketAddress]] = {
-      def loop(peers: List[InetSocketAddress]): Either[Throwable, List[InetSocketAddress]] = {
-        def handleError: Throwable => Either[Throwable, List[InetSocketAddress]] = (ex: Throwable) => {
+    def readDeclaredAddress(
+      validationFunction: InetSocketAddress => Boolean
+    ): Either[Throwable, InetSocketAddress] = {
+        def handleError: Throwable => Either[Throwable, InetSocketAddress] = (ex: Throwable) => {
           println(s"You entered incorrect input cause: ${ex.getMessage}. Enter it again")
-          loop(peers)
+          readDeclaredAddress(validationFunction)
         }
-        def handleResult: InetSocketAddress => Either[Throwable, List[InetSocketAddress]] =
-          (peer: InetSocketAddress) => {(peers :+ peer).asRight[Throwable]
-          }
+        def handleResult: InetSocketAddress => Either[Throwable, InetSocketAddress] =
+          (peer: InetSocketAddress) => { peer.asRight[Throwable] }
         Either.catchNonFatal {
           val addr = StdIn.readLine(prompt)
           Try {
             val split = addr.split(':')
             (split(0), split(1).toInt)
           } match {
-            case Success((host, port)) =>
+            case Success((host, port)) if validationFunction(new InetSocketAddress(host, port)) =>
               new InetSocketAddress(host, port)
+            case Success((_, _)) =>
+              throw new Exception("Declared address's port is not the same as bind address's port. " +
+                "Reenter address, please!")
             case Failure(_) =>
               throw new Exception("Invalid address")
           }
         }.fold(handleError, handleResult)
-      }
-
-      loop(List.empty[InetSocketAddress])
     }
 
     for {
-      walletPassword <- { println("Please, enter wallet password:"); readAndValidateInput(validatePassword) }
+      walletPassword <- {
+        println("Please, enter wallet password. Password has to be specified.")
+        readAndValidateInput(validatePassword)
+      }
       mnemonicKeyAnswer <- {
-        println("Would you like to enter your mnemonic key or generate new one? yes - if your own otherwise no")
+        println("Would you like to enter your mnemonic key or generate a new one?")
+        println("If you want to start the node with an existing mnemonic key - enter 'yes', otherwise - 'no':")
         readAnswer
       }
       mnemonicKey <- if (mnemonicKeyAnswer) {
-                      println("Enter your mnemonic key:")
+                      println(
+                        "Enter your mnemonic key. " +
+                          "It has to contain 16 words and all these words have to exist in specified dictionary:"
+                      )
                       readAndValidateInput(validateMnemonicKey)
                     } else {
                       val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-                      println(s"\nYour new mnemonic code is:\n<$phrase> \nPlease, save it and don't show to anyone!")
+                      println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
                       phrase.asRight[Throwable]
                     }
       startOwnChain <- {
-        println("\nWould you like to start your own chain? yes - if start your own, otherwise no")
+        println("Would you like to start your chain? If you want - enter 'yes', otherwise no:")
         readAnswer
       }
       enableFastSync <- if (startOwnChain) false.asRight[Throwable]
                        else {
-                         println("Would you like to enable fast sync? yes or no")
+                         println("Would you like to enable fast sync? yes or no") //???
                          readAnswer
                        }
       answerPeers <- {
         if (startOwnChain) false.asRight[Throwable]
         else {
-          println("Would you like to enter peers to connect with? yes or no")
+          println("Would you like to enter peers to connect with? yes or no") //???
           readAnswer
         }
       }
       peers <- if (answerPeers) readPeersToConnect else List.empty[InetSocketAddress].asRight[Throwable]
       connectWithOnlyKnownPeers <- {
-        println("Do you want to connect only with known peers? Yes or no")
+        println("Do you want to connect only with known peers? Enter 'yes' or 'no':")
         readAnswer
       }
       declaredAddress <- {
-        println("Please set up your declared address:")
-        readDeclaredAddress
+        println(
+          "Please, set up your declared address. " +
+            "The declared address is an address which represents the node in a network:"
+        )
+        readDeclaredAddress(_ => true)
       }
       bindAddress <- {
-        println("Please set your bind address:")
-        readDeclaredAddress
+        println(
+          "Please, set your bind address. The bind address in a local machine address. " +
+            "Bind address's port has to be the same as the declared address's port."
+        )
+        readDeclaredAddress((add: InetSocketAddress) => add.getPort == declaredAddress.getPort)
       }
     } yield
       InitNodeResult(
@@ -260,8 +281,8 @@ class Starter(settings: EncryAppSettings,
         connectWithOnlyKnownPeers,
         nodePass = "",
         nodeName = "Default",
-        declaredAddress.headOption,
-        bindAddress.headOption.getOrElse(new InetSocketAddress("0.0.0.0", 9001))
+        declaredAddress.some,
+        bindAddress
       )
   }
 
