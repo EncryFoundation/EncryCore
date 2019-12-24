@@ -481,7 +481,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                           td(attr("scope") := "row", nodeInfo.right.get.stateVersion)
                         ),
                         tr(th(attr("scope") := "row", "uptime"),
-                          td(attr("scope") := "row", nodeInfo.right.get.uptime)
+                          td(attr("scope") := "row", WebRoute.mills2Time(nodeInfo.right.get.uptime))
                         ),
                         tr(th(attr("scope") := "row", "isConnectedWithKnownPeers"),
                           td(attr("scope") := "row", nodeInfo.right.get.isConnectedWithKnownPeers.toString())
@@ -555,6 +555,10 @@ object WebRoute  {
 
   val algorithm = JwtAlgorithm.HS256
   val secretKey = new String(Random.randomBytes())
+
+  def mills2Time(millis: Long): String = s" ${TimeUnit.MILLISECONDS.toDays(millis)} days, " +
+    s"${TimeUnit.MILLISECONDS.toMinutes(millis) - TimeUnit.DAYS.toMinutes(TimeUnit.MILLISECONDS.toDays(millis))} minutes, " +
+    s"${TimeUnit.MILLISECONDS.toSeconds(millis) - TimeUnit.MINUTES.toSeconds(TimeUnit.MILLISECONDS.toMinutes(millis))} seconds"
 
   def createToken(username: String, expirationPeriodInDays: Int): String = {
       val claims = JwtClaim(

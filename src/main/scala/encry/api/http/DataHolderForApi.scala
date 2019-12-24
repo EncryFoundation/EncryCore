@@ -49,6 +49,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
   override def postStop(): Unit = storage.storage.close()
 
+  val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
+
   def awaitNVHRef: Receive = {
     case UpdatedHistory(history) =>
       unstashAll()
@@ -250,8 +252,6 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       val getAddress: Seq[InetSocketAddress] = settings.network.knownPeers
 
       val getConnectionWithPeers: Boolean = settings.network.connectOnlyWithKnownPeers.getOrElse(false)
-
-      val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
 
       val askAllF = (
         connectedPeers,
