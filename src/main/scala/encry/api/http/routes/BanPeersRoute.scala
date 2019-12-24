@@ -293,7 +293,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   }
 
   override def route: Route = (path("bannedPeers") & get) {
-    WebRoute.extractIp(
+    WebRoute.authRoute(
       onComplete(peersAllF) {
         case Success(info) =>
           complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))

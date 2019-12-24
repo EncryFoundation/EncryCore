@@ -202,7 +202,7 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
   }
 
   override def route: Route = (path("allPeers") & get) {
-    WebRoute.extractIp(
+    WebRoute.authRoute(
         onComplete(peersAllF) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))

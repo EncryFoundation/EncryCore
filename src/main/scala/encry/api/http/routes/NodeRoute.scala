@@ -10,9 +10,7 @@ case class NodeRoute(dataHolder: ActorRef, settings: RESTApiSettings)(implicit v
     extends EncryBaseApiRoute {
 
   override def route: Route = pathPrefix("node") {
-    WebRoute.authRoute(
-      WebRoute.extractIp(
-      nodeStartMiningR ~ nodeStopMiningR ~ nodeShutdownR, settings))
+    WebRoute.authRoute(nodeStartMiningR ~ nodeStopMiningR ~ nodeShutdownR, settings)
   }
 
   def nodeStartMiningR: Route = (path("startMining") & get) {

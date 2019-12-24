@@ -179,14 +179,12 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def authenticatedRoute: Route =
     path("web") {
-      WebRoute.extractIp(
         WebRoute.authRoute(
           onComplete(currentInfoF) {
             case Success(info) =>
               complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2).render))
             case Failure(exception) => complete(exception)
-          }),
-        settings)
+          }, settings)
     }
 
   //  JWT
@@ -579,7 +577,10 @@ object WebRoute  {
 
   def isTokenValid(token: String): Boolean = JwtSprayJson.isValid(token, secretKey, Seq(algorithm))
 
-  def authRoute(onSuccess: Route): Route = {
+  def authRoute(pingedRoute: Route, restApi: RESTApiSettings): Route =
+    routeWithJWT(extractIp(pingedRoute, restApi))
+
+  private def routeWithJWT(onSuccess: Route): Route = {
     optionalCookie("JWT") {
       case Some(token) =>
         val tokenValidity: Boolean = isTokenValid(token.value)

@@ -14,8 +14,7 @@ case class TransactionsApiRoute(dataHolder: ActorRef, memoryPoolRef: ActorRef, s
     with FailFastCirceSupport {
 
   override val route: Route = pathPrefix("transactions") {
-    WebRoute.authRoute(
-      WebRoute.extractIp(defaultTransferTransactionR, settings))
+    WebRoute.authRoute(defaultTransferTransactionR, settings)
   }
 
   def defaultTransferTransactionR: Route = path("send") {

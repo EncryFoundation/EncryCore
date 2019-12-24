@@ -491,7 +491,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
   }
 
   def configR: Route = (path("config") & get) {
-    WebRoute.extractIp(complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript().render)), settings)
+    complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript().render))
   }
 
   override def route: Route = configR ~ sendAllInfo

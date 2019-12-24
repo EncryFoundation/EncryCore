@@ -43,12 +43,11 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
       printPubKeysR ~
       getBalanceR ~
     WebRoute.authRoute(
-      WebRoute.extractIp(
         createKeyR ~
         transferR ~
         transferContractR ~
         createTokenR ~
-        dataTransactionR, settings)
+        dataTransactionR, settings
     )
   }
 

@@ -828,15 +828,12 @@ case class WalletRoute(settings: RESTApiSettings,
   }
 
   override def route: Route = path("webWallet") {
-    WebRoute.extractIp(
       WebRoute.authRoute(
         onComplete(info) {
           case Success(info) =>
             complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1, info._2).render))
-        }
-      ),
-      settings
-    )
+        }, settings
+      )
   }
 
 }

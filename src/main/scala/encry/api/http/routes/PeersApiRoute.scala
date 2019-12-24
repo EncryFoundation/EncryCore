@@ -20,9 +20,7 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
 ) extends EncryBaseApiRoute {
 
   override lazy val route: Route = pathPrefix("peers") {
-    connectedPeers ~ allPeers ~ bannedList ~ WebRoute.authRoute(
-      WebRoute.extractIp(connectPeer ~ removeFromBan, settings)
-    )
+    connectedPeers ~ allPeers ~ bannedList ~ WebRoute.authRoute(connectPeer ~ removeFromBan, settings)
   }
 
   def allPeers: Route = (path("all") & get) {
