@@ -287,10 +287,10 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case GetConnections        => sender() ! connectedPeersCollection
     case PeerBanHelper(peer, msg) =>
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
-    case StartMiner =>
+    case StartMinerApiMessage =>
       context.system.eventStream.publish(EnableMining)
       context.system.eventStream.publish(StartMining)
-    case StopMiner =>
+    case StopMinerApiMessage =>
       context.system.eventStream.publish(DisableMining)
     case ShutdownNode =>
       EncryApp.forceStopApplication(errorMessage = "Stopped by cli command")
@@ -356,9 +356,9 @@ object DataHolderForApi { //scalastyle:ignore
 
   case object GetAllInfoHelper
 
-  case object StartMiner
+  case object StartMinerApiMessage
 
-  case object StopMiner
+  case object StopMinerApiMessage
 
   case object ShutdownNode
 

@@ -3,7 +3,7 @@ package encry.cli.commands
 import akka.actor.ActorRef
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import encry.api.http.DataHolderForApi.StartMiner
+import encry.api.http.DataHolderForApi.StartMinerApiMessage
 import encry.cli.Response
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -20,7 +20,7 @@ object StartMining extends Command {
                        dataHolder: ActorRef,
                        nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
-    dataHolder ! StartMiner
+    dataHolder ! StartMinerApiMessage
     Future.successful(Some(Response("Mining is started.")))
   }
 }

@@ -2,7 +2,7 @@ package encry.cli.commands
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor.ActorRef
-import encry.api.http.DataHolderForApi.StopMiner
+import encry.api.http.DataHolderForApi.StopMinerApiMessage
 import encry.cli.Response
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -19,7 +19,7 @@ object StopMining extends Command {
                        dataHolder: ActorRef,
                        nodeId: Array[Byte],
                        networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
-    dataHolder ! StopMiner
+    dataHolder ! StopMinerApiMessage
     Future.successful(Some(Response("Mining is stopped.")))
   }
 }

@@ -14,12 +14,12 @@ case class NodeRoute(dataHolder: ActorRef, settings: RESTApiSettings)(implicit v
   }
 
   def nodeStartMiningR: Route = (path("startMining") & get) {
-    dataHolder ! StartMiner
+    dataHolder ! StartMinerApiMessage
     withCors(complete(StatusCodes.OK))
   }
 
   def nodeStopMiningR: Route = (path("stopMining") & get) {
-    dataHolder ! StopMiner
+    dataHolder ! StopMinerApiMessage
     withCors(complete(StatusCodes.OK))
   }
 

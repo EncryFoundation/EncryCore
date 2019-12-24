@@ -3,41 +3,36 @@ package encry
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
-
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{NonEmptyChain, Validated}
+import cats.data.{ NonEmptyChain, Validated }
 import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
-import encry.EncryApp.{settings, system}
+import encry.EncryApp.system
 import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{StartListening, prompt}
+import encry.cli.ConsoleListener.{ prompt, StartListening }
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
 import encry.settings._
 import encry.stats.StatsSender
-import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.utils.{ Mnemonic, NetworkTimeProvider }
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
-
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
-class Starter(settings: EncryAppSettings,
-              timeProvider: NetworkTimeProvider,
-              nodeId: Array[Byte])
-    extends Actor {
+class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nodeId: Array[Byte]) extends Actor {
 
   import context.dispatcher
 
@@ -219,7 +214,11 @@ class Starter(settings: EncryAppSettings,
 
     for {
       walletPassword <- {
-        println("Please, enter wallet password. Password has to be specified.")
+        println(
+          "Please, enter wallet password. Password has to be specified. \n" +
+            "This password is used for keys encryption in local machine storage. \n" +
+            "Password example: Nd<+IE937-pc}mYd1-Nwldnfwq-cj1s_Q%x"
+        )
         readAndValidateInput(validatePassword)
       }
       mnemonicKeyAnswer <- {
@@ -244,32 +243,48 @@ class Starter(settings: EncryAppSettings,
       }
       enableFastSync <- if (startOwnChain) false.asRight[Throwable]
                        else {
-                         println("Would you like to enable fast sync? yes or no") //???
+                         println(
+                           "Would you like to enable fast sync? This is the mod while you download blocks without \n" +
+                             "validation by state and next download state with a snapshot. \n" +
+                             "After finishing such process, the node is guaranteed to have a valid state and history. \n" +
+                             "Enter 'yes' or 'no':"
+                         )
                          readAnswer
                        }
       answerPeers <- {
         if (startOwnChain) false.asRight[Throwable]
         else {
-          println("Would you like to enter peers to connect with? yes or no") //???
+          println(
+            "Would you like to enter peers to connect with? \n" +
+              "These are peers that you want to connect with. \n" +
+              "Peer example is: '172.168.1.1:9032'.\n " +
+              "Enter 'yes' or 'no':"
+          )
           readAnswer
         }
       }
       peers <- if (answerPeers) readPeersToConnect else List.empty[InetSocketAddress].asRight[Throwable]
       connectWithOnlyKnownPeers <- {
-        println("Do you want to connect only with known peers? Enter 'yes' or 'no':")
+        println(
+          "Do you want to connect only with known peers? \n" +
+            "This means that you allow connecting with you only to peers in your 'connect with' list. \n" +
+            "Enter 'yes' or 'no':"
+        )
         readAnswer
       }
       declaredAddress <- {
         println(
-          "Please, set up your declared address. " +
-            "The declared address is an address which represents the node in a network:"
+          "Please, set up your declared address. \n" +
+            "The declared address is an address which represents the node in a network. \n" +
+            "Peer example is: '172.168.1.1:9032':"
         )
         readDeclaredAddress(_ => true)
       }
       bindAddress <- {
         println(
-          "Please, set your bind address. The bind address in a local machine address. " +
-            "Bind address's port has to be the same as the declared address's port."
+          "Please, set your bind address. The bind address is a local machine address. \n" +
+            "Bind address's port has to be the same as the declared address's port. \n" +
+            "Peer example is: '0.0.0.0:9032':"
         )
         readDeclaredAddress((add: InetSocketAddress) => add.getPort == declaredAddress.getPort)
       }
@@ -311,6 +326,7 @@ class Starter(settings: EncryAppSettings,
       import scala.concurrent.duration._
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
+      else AccountManager.tmpInit(mnemonic, password, settings)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings =
@@ -358,7 +374,8 @@ class Starter(settings: EncryAppSettings,
 
       if (newSettings.node.mining) miner ! StartMining
       if (newSettings.node.useCli) {
-        context.system.actorOf(ConsoleListener.props(newSettings, dataHolderForApi, nodeId, timeProvider), "cliListener")
+        context.system
+          .actorOf(ConsoleListener.props(newSettings, dataHolderForApi, nodeId, timeProvider), "cliListener")
         context.system.actorSelection("/user/cliListener") ! StartListening
       }
 
