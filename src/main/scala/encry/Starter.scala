@@ -3,14 +3,12 @@ package encry
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
-
 import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{ Chain, NonEmptyChain, Validated }
+import cats.data.{ NonEmptyChain, Validated }
 import cats.instances.future._
 import cats.instances.option._
-import cats.instances.string._
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
@@ -28,7 +26,6 @@ import encry.utils.{ Mnemonic, NetworkTimeProvider }
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
-
 import scala.concurrent.Future
 import scala.io.StdIn
 import scala.util.{ Failure, Success, Try }
@@ -192,27 +189,29 @@ class Starter(settings: EncryAppSettings,
     def readDeclaredAddress(
       validationFunction: InetSocketAddress => Boolean
     ): Either[Throwable, InetSocketAddress] = {
-        def handleError: Throwable => Either[Throwable, InetSocketAddress] = (ex: Throwable) => {
-          println(s"You entered incorrect input cause: ${ex.getMessage}. Enter it again")
-          readDeclaredAddress(validationFunction)
+      def handleError: Throwable => Either[Throwable, InetSocketAddress] = (ex: Throwable) => {
+        println(s"You entered incorrect input cause: ${ex.getMessage}. Enter it again")
+        readDeclaredAddress(validationFunction)
+      }
+      def handleResult: InetSocketAddress => Either[Throwable, InetSocketAddress] =
+        (peer: InetSocketAddress) => { peer.asRight[Throwable] }
+      Either.catchNonFatal {
+        val addr = StdIn.readLine(prompt)
+        Try {
+          val split = addr.split(':')
+          (split(0), split(1).toInt)
+        } match {
+          case Success((host, port)) if validationFunction(new InetSocketAddress(host, port)) =>
+            new InetSocketAddress(host, port)
+          case Success((_, _)) =>
+            throw new Exception(
+              "Declared address's port is not the same as bind address's port. " +
+                "Reenter address, please!"
+            )
+          case Failure(_) =>
+            throw new Exception("Invalid address")
         }
-        def handleResult: InetSocketAddress => Either[Throwable, InetSocketAddress] =
-          (peer: InetSocketAddress) => { peer.asRight[Throwable] }
-        Either.catchNonFatal {
-          val addr = StdIn.readLine(prompt)
-          Try {
-            val split = addr.split(':')
-            (split(0), split(1).toInt)
-          } match {
-            case Success((host, port)) if validationFunction(new InetSocketAddress(host, port)) =>
-              new InetSocketAddress(host, port)
-            case Success((_, _)) =>
-              throw new Exception("Declared address's port is not the same as bind address's port. " +
-                "Reenter address, please!")
-            case Failure(_) =>
-              throw new Exception("Invalid address")
-          }
-        }.fold(handleError, handleResult)
+      }.fold(handleError, handleResult)
     }
 
     for {
