@@ -480,7 +480,7 @@ case class WalletRoute(settings: RESTApiSettings,
    });
  }
               setInputFilter(document.getElementById("datafee"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) >= 0);
               });
             """.stripMargin)
                                           )
@@ -545,7 +545,7 @@ case class WalletRoute(settings: RESTApiSettings,
   });
 }
              setInputFilter(document.getElementById("tokenfee"), function(value) {
-               return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
+               return /^\d*$/.test(value) && (value === "" || parseInt(value) >= 0);
              });
            """.stripMargin)
                                           )
@@ -677,7 +677,7 @@ case class WalletRoute(settings: RESTApiSettings,
    });
  }
               setInputFilter(document.getElementById("transferamount"), function(value) {
-                return /^\d*$/.test(value) && (value === "" || parseInt(value) >= 0);
+                return /^\d*$/.test(value) && (value === "" || parseInt(value) > 0);
               });
             """.stripMargin)
                                           ),
