@@ -3,36 +3,39 @@ package encry
 import java.io.File
 import java.net.InetSocketAddress
 import java.nio.file.Files
-import akka.actor.{ Actor, ActorRef }
+
+import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{NonEmptyChain, Validated}
 import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
+import encry.EncryApp.{settings, system}
 import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{ prompt, StartListening }
+import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
 import encry.settings._
-import encry.utils.{ Mnemonic, NetworkTimeProvider }
+import encry.stats.StatsSender
+import encry.utils.{Mnemonic, NetworkTimeProvider}
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
+
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
-              influxRef: Option[ActorRef],
               nodeId: Array[Byte])
     extends Actor {
 
@@ -75,7 +78,7 @@ class Starter(settings: EncryAppSettings,
         walletPassword,
         settings.node.offlineGeneration,
         fastSync = false,
-        settings.network.knownPeers.toList,
+        settings.network.knownPeers,
         settings.network.connectOnlyWithKnownPeers.getOrElse(false),
         "",
         settings.network.nodeName.getOrElse(""),
@@ -316,12 +319,17 @@ class Starter(settings: EncryAppSettings,
                               nodeName = nodeName.some,
                               declaredAddress = declaredAddr,
                               bindAddress = bindAddr)
+
       val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
       val newSettings = settings.copy(
         wallet = walletSettings,
         node = nodeSettings,
         network = networkSettings,
         snapshotSettings = snapshotSettings
+      )
+      val influxRef: Option[ActorRef] = newSettings.influxDB.map(
+        influxSettings =>
+          system.actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       )
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
@@ -348,9 +356,9 @@ class Starter(settings: EncryAppSettings,
         "nodeViewSynchronizer"
       )
 
-      if (settings.node.mining) miner ! StartMining
-      if (settings.node.useCli) {
-        context.system.actorOf(ConsoleListener.props(settings, dataHolderForApi, nodeId, timeProvider), "cliListener")
+      if (newSettings.node.mining) miner ! StartMining
+      if (newSettings.node.useCli) {
+        context.system.actorOf(ConsoleListener.props(newSettings, dataHolderForApi, nodeId, timeProvider), "cliListener")
         context.system.actorSelection("/user/cliListener") ! StartListening
       }
 

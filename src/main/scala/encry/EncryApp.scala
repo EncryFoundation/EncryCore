@@ -1,6 +1,7 @@
 package encry
 
 import java.net.InetAddress
+
 import akka.actor.SupervisorStrategy.Restart
 import akka.actor.{ ActorRef, ActorSystem, OneForOneStrategy, Props }
 import akka.http.scaladsl.Http
@@ -8,21 +9,22 @@ import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.{ ApiRoute, CompositeHttpService }
 import encry.api.http.routes._
+import encry.api.http.{ ApiRoute, CompositeHttpService }
 import encry.settings.EncryAppSettings
-import encry.stats.{ StatsSender, Zombie }
+import encry.stats.Zombie
 import encry.utils.NetworkTimeProvider
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.utils.Algos
-import scala.concurrent.{ Await, ExecutionContextExecutor, Future }
+
 import scala.concurrent.duration._
+import scala.concurrent.{ Await, ExecutionContextExecutor, Future }
 import scala.io.Source
 import scala.language.postfixOps
 
-object EncryApp extends App with StrictLogging  {
+object EncryApp extends App with StrictLogging {
 
   implicit val system: ActorSystem             = ActorSystem()
   implicit val ec: ExecutionContextExecutor    = system.dispatcher
@@ -39,12 +41,7 @@ object EncryApp extends App with StrictLogging  {
     )
     .take(5)
 
-  val influxRef: Option[ActorRef] = settings.influxDB.map(
-    influxSettings =>
-      system.actorOf(StatsSender.props(influxSettings, settings.network, settings.constants), "statsSender")
-  )
-
-  val starter = system.actorOf(Props(new Starter(settings, timeProvider, influxRef, nodeId)))
+  val starter = system.actorOf(Props(new Starter(settings, timeProvider, nodeId)))
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
     Kamon.addReporter(new InfluxDBReporter())
