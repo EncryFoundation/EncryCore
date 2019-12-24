@@ -137,6 +137,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)
+      val bxsUnlockStartTime = System.currentTimeMillis()
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => tree.get(StorageKey !@@ input.boxId)
         .map(bytes => StateModifierSerializer.parseBytes(bytes, input.boxId.head))
         .map(_.toOption -> input))
@@ -155,6 +156,10 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             case _ => acc
           }
         }
+
+      logger.info(s"Bxs unlocking time(inputs size: ${tx.inputs.length}): ${(System.currentTimeMillis() - bxsUnlockStartTime)/1000L} s")
+
+      val validBalanceStartTime = System.currentTimeMillis()
 
       val validBalance: Boolean = {
         val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs, constants.IntrinsicTokenId).map {
@@ -175,6 +180,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         }
       }
 
+      logger.info(s"Validating balance: ${(System.currentTimeMillis() - validBalanceStartTime)/1000L} s")
+
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
         Invalid(Seq(MalformedModifierError(s"Non-positive balance in $tx"))).asLeft[Transaction]
@@ -187,6 +194,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     } else tx.semanticValidity.errors.headOption
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
+
 
   def close(): Unit = tree.close()
 }
