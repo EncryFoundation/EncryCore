@@ -686,13 +686,9 @@ case class WalletRoute(settings: RESTApiSettings,
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
                                           if (balances.nonEmpty) {
-                                            for {
-                                              coinI <- balances.values.toList
-                                              coinIds <- coinI
-                                            }
-                                              yield {
-                                                option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
-                                              }
+                                            balances.values.flatten.toList.map( coinIds =>
+                                              option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2})" else coinIds._1)
+                                            )
                                           } else {
                                             option(value := "", "")
                                           }
