@@ -142,26 +142,24 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         val parseBytesStartTime = System.currentTimeMillis()
         val bx = StateModifierSerializer.parseBytes(bytes, input.boxId.head)
         logger.info(s"bx deser time: ${(System.currentTimeMillis() - parseBytesStartTime) / 1000L}")
-        bx.toOption
-      })
-        .flatMap { bxOpt =>
-          val bxCanUnlockStartTime = System.currentTimeMillis()
-          val res = (bxOpt, tx.defaultProofOpt) match {
-            // If no `proofs` provided, then `defaultProof` is used.
-            case (bx, defaultProofOpt) if input.proofs.nonEmpty =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-                defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) Some(bx) else None
-            case (bx, Some(defaultProof)) =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition,
-                Context(tx, bx, stateView), input.contract, Seq(defaultProof))) Some(bx) else None
-            case (bx, defaultProofOpt) =>
-              if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
-                defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) Some(bx) else None
-            case _ => None
-          }
-          logger.info(s"bx unlocking time: ${(System.currentTimeMillis() - bxCanUnlockStartTime)/1000L}")
-          res
-        }).toIndexedSeq.flatten
+        val bxOpt = bx.toOption
+        val bxCanUnlockStartTime = System.currentTimeMillis()
+        val res = (bxOpt, tx.defaultProofOpt) match {
+          // If no `proofs` provided, then `defaultProof` is used.
+          case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
+            if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
+              defaultProofOpt.map(input.proofs :+ _).getOrElse(input.proofs))) Some(bx) else None
+          case (Some(bx), Some(defaultProof)) =>
+            if (EncryPropositionFunctions.canUnlock(bx.proposition,
+              Context(tx, bx, stateView), input.contract, Seq(defaultProof))) Some(bx) else None
+          case (Some(bx), defaultProofOpt) =>
+            if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
+              defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) Some(bx) else None
+          case _ => None
+        }
+        logger.info(s"bx unlocking time: ${(System.currentTimeMillis() - bxCanUnlockStartTime)/1000L}")
+        res
+      })).toIndexedSeq.flatten
 
       logger.info(s"" +
         s"Bxs unlocking time(inputs size: ${tx.inputs.length}): ${(System.currentTimeMillis() - bxsUnlockingStartTime)/1000L} s")
