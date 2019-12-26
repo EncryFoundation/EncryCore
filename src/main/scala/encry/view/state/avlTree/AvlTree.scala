@@ -64,13 +64,13 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       toInsert.map {
         case (key, value) =>
           //logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
-          StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
+          StorageKey @@ kSer.toBytes(key) -> StorageValue @@ vSer.toBytes(value)
       } ++ insertedNodes ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
       deletedNodes ++ toDelete.map(key => {
         //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
-        StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
+        StorageKey @@ kSer.toBytes(key)
       })
     )
     logger.info(s"avl insertion time: ${(System.currentTimeMillis() - startInsertTime)/1000L}")
@@ -143,10 +143,10 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
   }
 
   def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] =
-    storage.get(StorageKey !@@ Algos.hash(kSer.toBytes(k).reverse)).map(vSer.fromBytes)
+    storage.get(StorageKey !@@ kSer.toBytes(k)).map(vSer.fromBytes)
 
   def contains(k: K)(implicit kSer: Serializer[K]): Boolean =
-    storage.get(StorageKey !@@ Algos.hash(kSer.toBytes(k).reverse)).isDefined
+    storage.get(StorageKey !@@ kSer.toBytes(k)).isDefined
 
   def getInTree(k: K)(implicit kSer: Serializer[K]): Option[V] = getK(k, rootNode)
 
