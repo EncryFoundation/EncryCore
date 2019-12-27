@@ -20,6 +20,7 @@ import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor}
@@ -79,6 +80,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     nodeView.history.closeStorage()
   }
 
+  var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
+
   override def receive: Receive = {
     case CreateAccountManagerFromSeed(seed) =>
       val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
@@ -105,6 +108,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         updatedVault = Some(wallet)
       )
       nodeViewSynchronizer ! FastSyncDone
+    case RemoveRedundantManifestIds => potentialManifestIds = List.empty
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -233,38 +237,36 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               val newHis: History = history.reportModifierIsValid(modToApply)
               modToApply match {
                 case header: Header =>
-                  val requiredHeight: Int = header.height - settings.levelDB.maxVersions
+                  val requiredHeight: Int = header.height - settings.constants.MaxRollbackDepth
                   if (requiredHeight % settings.snapshotSettings.newSnapshotCreationHeight == 0) {
-                    newHis.getBestHeaderAtHeight(header.height - settings.levelDB.maxVersions).foreach { h =>
-                      newHis.lastAvailableManifestHeight = requiredHeight
-                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${
-                        newHis.lastAvailableManifestHeight
-                      }")
-                    }
+                    newHis.lastAvailableManifestHeight = requiredHeight
+                    logger.info(s"heightOfLastAvailablePayloadForRequest -> ${newHis.lastAvailableManifestHeight}")
                   }
                 case _ =>
               }
-              if (settings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
-                newHis.getBestBlock.exists { block =>
-                block.header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0 &&
-                  block.header.height != settings.constants.GenesisHeight }) {
-                val startTime = System.currentTimeMillis()
-                logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
-                import encry.view.state.avlTree.utils.implicits.Instances._
-                newHis.getBestBlock.foreach { b =>
+              newHis.getHeaderOfBestBlock.foreach { header: Header =>
+                val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ header.id)
+                val isManifestExists: Boolean = potentialManifestIds.exists(_.sameElements(potentialManifestId))
+                val isCorrectCreationHeight: Boolean =
+                  header.height % settings.snapshotSettings.newSnapshotCreationHeight == 0
+                val isGenesisHeader: Boolean = header.height == settings.constants.GenesisHeight
+                if (settings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
+                  !isManifestExists && isCorrectCreationHeight && !isGenesisHeader) {
+                  val startTime = System.currentTimeMillis()
+                  logger.info(s"Start chunks creation for new snapshot")
+                  import encry.view.state.avlTree.utils.implicits.Instances._
                   val chunks: List[SnapshotChunk] =
                     AvlTree.getChunks(
                       stateAfterApply.tree.rootNode,
                       currentChunkHeight = settings.snapshotSettings.chunkDepth,
                       stateAfterApply.tree.storage
                     )
-                  val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
                   nodeViewSynchronizer ! TreeChunks(chunks, potentialManifestId)
+                  potentialManifestIds = ManifestId @@ potentialManifestId :: potentialManifestIds
+                  logger.info(s"State tree successfully processed for snapshot. " +
+                    s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
                 }
-                logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
-                logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
               }
-
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
