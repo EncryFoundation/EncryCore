@@ -65,8 +65,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     logger.info(s"avl deletedNodes: ${(System.currentTimeMillis() - takeUntilTime)/1000L}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
-    toInsert.foreach { case (key, _) => logger.info(s"toInsert: ${Algos.encode(key.asInstanceOf[Array[Byte]])}")}
-    insertedNodes.foreach { case (key, _) => logger.info(s"insertNodes: ${Algos.encode(key)}") }
     storage.insert(
       version,
       toInsert.map {
@@ -86,8 +84,12 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     AvlTree(shadowedRoot, storage)
   }
 
-  def getDeletedNodesHashes: List[StorageKey] = toDeleteNodes.collect{case hash if storage.contains(StorageKey @@ hash.data) => StorageKey @@ hash.data}
-    .toList
+  def getDeletedNodesHashes: List[StorageKey] = {
+    val toDelete = toDeleteNodes.collect{case hash if storage.contains(StorageKey @@ hash.data) => StorageKey @@ hash.data}
+      .toList
+    toDeleteNodes = HashSet.empty
+    toDelete
+  }
 
   private def getNewNodesWithFirstUnchanged(node: Node[K, V]): List[ByteArrayWrapper] = node match {
     case shadowNode: ShadowNode[K, V] =>
