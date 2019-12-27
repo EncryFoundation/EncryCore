@@ -206,10 +206,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   private def updateState(history: History,
                           state: UtxoState,
                           progressInfo: ProgressInfo,
-                          suffixApplied: IndexedSeq[PersistentModifier]):
+                          suffixApplied: IndexedSeq[PersistentModifier],
+                          isLocallyGenerated: Boolean = false):
   (History, UtxoState, Seq[PersistentModifier]) = {
     logger.info(s"\nStarting updating state in updateState function!")
-    progressInfo.toApply.foreach {
+    if (!isLocallyGenerated) progressInfo.toApply.foreach {
       case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
     }
@@ -290,7 +291,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           } else u
         }
         uf.failedMod match {
-          case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
+          case Some(_) =>
+            uf.history.updateIdsForSyncInfo()
+            updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix, isLocallyGenerated)
           case None => (uf.history, uf.state, uf.suffix)
         }
       case Failure(e) =>
@@ -310,6 +313,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case Right((historyBeforeStUpdate, progressInfo)) =>
             logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
             logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+            if (pmod.modifierTypeId == Header.modifierTypeId) historyBeforeStUpdate.updateIdsForSyncInfo()
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)
               val isHeader: Boolean = pmod match {
@@ -335,7 +339,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
               val startPoint: Long = System.currentTimeMillis()
               val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
-                updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+                updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq(), isLocallyGenerated)
               if (newHistory.isHeadersChainSynced) nodeViewSynchronizer ! HeaderChainIsSynced
               if (settings.influxDB.isDefined)
                 context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
