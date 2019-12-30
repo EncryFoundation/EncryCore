@@ -71,7 +71,7 @@ libraryDependencies ++= Seq(
   // JWT
   "com.pauldijou" %% "jwt-spray-json" % "4.2.0",
   "org.bouncycastle" % "bcpkix-jdk15on" % "1.60",
-  "org.encry" %% "encry-common" % "0.9.2",
+  "org.encry" %% "encry-common" % "0.9.3",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
