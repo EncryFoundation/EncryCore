@@ -211,7 +211,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             ),
                             //1.
                             //2. Declared address
-                            h3("2. Set up your declared address (required)"),
+                            h3("2. Set up your declared address"),
                             p("The address at which other nodes connect to yours."),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
