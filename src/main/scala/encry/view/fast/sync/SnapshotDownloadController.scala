@@ -13,8 +13,12 @@ import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
 import encry.view.fast.sync.FastSyncExceptions._
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
 import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer}
+import encry.view.fast.sync.FastSyncExceptions._
+import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
+import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.network.BasicMessagesRepo.RequestChunkMessage
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.{DB, Options}

@@ -12,7 +12,6 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
@@ -27,6 +26,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   var blocksCacheIndexes: Map[Int, Seq[ModifierId]] = Map.empty[Int, Seq[ModifierId]]
 
   var blocksCache: Map[ByteArrayWrapper, Block] = Map.empty[ByteArrayWrapper, Block]
+
+  private var lastSyncInfo: SyncInfo = SyncInfo(Seq.empty[ModifierId])
 
   lazy val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
 
@@ -84,9 +85,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       .orElse(getHeaderByIdDB(id))
   )
 
-  def getBestHeaderAtHeight(h: Int): Option[Header] = headersCacheIndexes.get(h)
-    .flatMap(_.headOption).flatMap(id => headersCache.get(ByteArrayWrapper(id)))
-    .orElse(getBestHeaderAtHeightDB(h))
+  def getBestHeaderAtHeight(h: Int): Option[Header] = getBestHeaderAtHeightDB(h)
 
   def getBlockByPayload(payload: Payload): Option[Block] = headersCache
     .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
@@ -204,16 +203,16 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
   }
 
-  def syncInfo: SyncInfo =
-    if (getBestHeaderId.isEmpty) SyncInfo(Seq.empty)
-    else SyncInfo(
-      getBestHeader.map(header =>
-        ((header.height - settings.network.maxInvObjects + 1) to header.height)
-          .flatMap(height => headerIdsAtHeight(height).headOption)
-      ).getOrElse(Seq.empty))
+  def syncInfo: SyncInfo = lastSyncInfo
 
+  def updateIdsForSyncInfo(): Unit =
+    lastSyncInfo = SyncInfo(getBestHeader.map { header: Header =>
+      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
+        headerIdsAtHeight(height).headOption
+      }.toList
+    }.getOrElse(List.empty))
 
-  def compare(si: SyncInfo): HistoryComparisonResult = getBestHeaderId match {
+  def compare(si: SyncInfo): HistoryComparisonResult = lastSyncInfo.lastHeaderIds.lastOption match {
     //Our best header is the same as other history best header
     case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
     //Our best header is in other history best chain, but not at the last position
@@ -262,6 +261,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
                               header2: Header): (HeaderChain, HeaderChain) = {
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
+    @scala.annotation.tailrec
     def loop(numberBack: Int, otherChain: HeaderChain): (HeaderChain, HeaderChain) = {
       val chains: (HeaderChain, HeaderChain) = commonBlockThenSuffixes(otherChain, header1, numberBack + heightDelta)
       if (chains._1.head == chains._2.head) chains

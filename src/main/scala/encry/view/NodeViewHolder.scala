@@ -24,6 +24,7 @@ import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RequiredManifestHeightAndId, SnapshotChunk, TreeChunks}
 import encry.view.state.{UtxoState, _}
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor}
@@ -87,6 +88,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     nodeView.history.closeStorage()
   }
 
+  var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
+
   override def receive: Receive = {
     case CreateAccountManagerFromSeed(seed) =>
       val newAccount = nodeView.wallet.addAccount(seed, encrySettings.wallet.map(_.password).get, nodeView.state)
@@ -115,6 +118,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         updatedVault = Some(wallet)
       )
       system.actorSelection("/user/nodeViewSynchronizer") ! FastSyncDone
+    case RemoveRedundantManifestIds => potentialManifestIds = List.empty
     case ModifierFromRemote(mod) =>
       val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
       val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
@@ -212,10 +216,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   private def updateState(history: History,
                           state: UtxoState,
                           progressInfo: ProgressInfo,
-                          suffixApplied: IndexedSeq[PersistentModifier]):
+                          suffixApplied: IndexedSeq[PersistentModifier],
+                          isLocallyGenerated: Boolean = false):
   (History, UtxoState, Seq[PersistentModifier]) = {
     logger.info(s"\nStarting updating state in updateState function!")
-    progressInfo.toApply.foreach {
+    if (!isLocallyGenerated) progressInfo.toApply.foreach {
       case header: Header => requestDownloads(progressInfo, Some(header.id))
       case _ => requestDownloads(progressInfo, None)
     }
@@ -243,38 +248,36 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               dataHolder ! DataHolderForApi.BlockAndHeaderInfo(newHis.getBestHeader, newHis.getBestBlock)
               modToApply match {
                 case header: Header =>
-                  val requiredHeight: Int = header.height - encrySettings.levelDB.maxVersions
+                  val requiredHeight: Int = header.height - encrySettings.constants.MaxRollbackDepth
                   if (requiredHeight % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0) {
-                    newHis.getBestHeaderAtHeight(header.height - encrySettings.levelDB.maxVersions).foreach { h =>
-                      newHis.lastAvailableManifestHeight = requiredHeight
-                      logger.info(s"newHis.heightOfLastAvailablePayloadForRequest -> ${
-                        newHis.lastAvailableManifestHeight
-                      }")
-                    }
+                    newHis.lastAvailableManifestHeight = requiredHeight
+                    logger.info(s"heightOfLastAvailablePayloadForRequest -> ${newHis.lastAvailableManifestHeight}")
                   }
                 case _ =>
               }
-              if (encrySettings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
-                newHis.getBestBlock.exists { block =>
-                block.header.height % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0 &&
-                  block.header.height != encrySettings.constants.GenesisHeight }) {
-                val startTime = System.currentTimeMillis()
-                logger.info(s"\n<<<<<<<||||||||START tree assembly on NVH||||||||||>>>>>>>>>>")
-                import encry.view.state.avlTree.utils.implicits.Instances._
-                newHis.getBestBlock.foreach { b =>
+              newHis.getHeaderOfBestBlock.foreach { header: Header =>
+                val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ header.id)
+                val isManifestExists: Boolean = potentialManifestIds.exists(_.sameElements(potentialManifestId))
+                val isCorrectCreationHeight: Boolean =
+                  header.height % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0
+                val isGenesisHeader: Boolean = header.height == encrySettings.constants.GenesisHeight
+                if (encrySettings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
+                  !isManifestExists && isCorrectCreationHeight && !isGenesisHeader) {
+                  val startTime = System.currentTimeMillis()
+                  logger.info(s"Start chunks creation for new snapshot")
+                  import encry.view.state.avlTree.utils.implicits.Instances._
                   val chunks: List[SnapshotChunk] =
                     AvlTree.getChunks(
                       stateAfterApply.tree.rootNode,
                       currentChunkHeight = encrySettings.snapshotSettings.chunkDepth,
                       stateAfterApply.tree.storage
                     )
-                  val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ b.id)
                   system.actorSelection("/user/nodeViewSynchronizer") ! TreeChunks(chunks, potentialManifestId)
+                  potentialManifestIds = ManifestId @@ potentialManifestId :: potentialManifestIds
+                  logger.info(s"State tree successfully processed for snapshot. " +
+                    s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
                 }
-                logger.info(s"Processing time ${(System.currentTimeMillis() - startTime) / 1000}s")
-                logger.info(s"<<<<<<<||||||||FINISH tree assembly on NVH||||||||||>>>>>>>>>>\n")
               }
-
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
@@ -299,7 +302,9 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           } else u
         }
         uf.failedMod match {
-          case Some(_) => updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix)
+          case Some(_) =>
+            uf.history.updateIdsForSyncInfo()
+            updateState(uf.history, uf.state, uf.alternativeProgressInfo.get, uf.suffix, isLocallyGenerated)
           case None => (uf.history, uf.state, uf.suffix)
         }
       case Failure(e) =>
@@ -319,6 +324,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           case Right((historyBeforeStUpdate, progressInfo)) =>
             logger.info(s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history.")
             logger.debug(s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}")
+            if (pmod.modifierTypeId == Header.modifierTypeId) historyBeforeStUpdate.updateIdsForSyncInfo()
             influxRef.foreach { ref =>
               ref ! EndOfApplyingModifier(pmod.id)
               val isHeader: Boolean = pmod match {
@@ -344,7 +350,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               logger.info(s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}")
               val startPoint: Long = System.currentTimeMillis()
               val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
-                updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq())
+                updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq(), isLocallyGenerated)
               if (newHistory.isHeadersChainSynced) system.actorSelection("/user/nodeViewSynchronizer") ! HeaderChainIsSynced
               if (encrySettings.influxDB.isDefined)
                 context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
