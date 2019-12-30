@@ -61,6 +61,9 @@ case object TestConstants extends Constants {
 
   val MaxRollbackDepth: Int = 100
 
+  // creationHeight must be bigger than maxVersions
+  val SnapshotCreationHeight: Int = 5000
+
   val MaxTimeDrift: Long = 2.hours.toMillis
 
   val n: Char = 96
