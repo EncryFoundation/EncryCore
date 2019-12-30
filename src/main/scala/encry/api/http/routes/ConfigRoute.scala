@@ -223,7 +223,7 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
                             //2.
                             //3. Bind address
                             h3("3. Set up your bind address"),
-                            p("The address on which the node starts on the local machine."),
+                            p("The address on which the node starts on the local machine. (required)"),
                             div(cls := "form-group",
                               div(cls := "input-group input-group-alternative",
                                 div(cls := "input-group-prepend",
