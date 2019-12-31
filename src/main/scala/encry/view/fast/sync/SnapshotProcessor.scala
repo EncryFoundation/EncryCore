@@ -8,7 +8,7 @@ import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.view.fast.sync.FastSyncExceptions._
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder.{
@@ -21,19 +21,19 @@ import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree._
 import encry.view.state.avlTree.utils.implicits.Instances._
-import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import encry.view.wallet.{AccountManager, EncryWallet}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
-import org.iq80.leveldb.{ DB, Options }
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.iq80.leveldb.{DB, Options}
 import scorex.utils.Random
-import scala.collection.immutable.{ HashMap, HashSet }
+import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.postfixOps
-import scala.util.{ Failure, Success }
+import scala.util.{Failure, Success}
 
 final case class SnapshotProcessor(settings: EncryAppSettings,
                                    storage: VersionalStorage,
@@ -77,11 +77,9 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       wallet.close()
       val stateDir: File  = new File(s"${settings.directory}/state")
       val walletDir: File = new File(s"${settings.directory}/wallet")
-      val keysDir: File   = new File(s"${settings.directory}/keys")
       import org.apache.commons.io.FileUtils
       FileUtils.deleteDirectory(stateDir)
       FileUtils.deleteDirectory(walletDir)
-      FileUtils.deleteDirectory(keysDir)
       SnapshotProcessor.initialize(settings, settings.storage.state)
     } catch {
       case err: Throwable =>
@@ -308,13 +306,13 @@ object SnapshotProcessor extends StrictLogging {
         )
       else {
         val wallet = EncryWallet.readOrGenerate(
-          new File(s"${settings.directory}/walletDummy"),
-          new File(s"${settings.directory}/keysDummy"),
+          new File(s"${settings.directory}/walletTmp"),
+          new File(s"${settings.directory}/keysTmp"),
           settings
         )
         wallet.close()
-        FileUtils.deleteDirectory(new File(s"${settings.directory}/walletDummy"))
-        FileUtils.deleteDirectory(new File(s"${settings.directory}/keysDummy"))
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
+        FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
         wallet
       }
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)

@@ -11,7 +11,7 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 
 trait HistoryModifiersValidator extends HistoryApi {
 
-  val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
+  lazy val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
     settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =

@@ -13,8 +13,7 @@ object Mnemonic {
     Algos.hash(mnemonicCode + "mnemonic=" + passPhrase)
 
   def entropyToMnemonicCode(entropy: Array[Byte]): String = {
-    val words: Array[String] =
-      Source.fromInputStream(getClass.getResourceAsStream("/languages/english/words.txt")).getLines.toArray
+    val words: Array[String] = getWords
     val checkSum: BitVector = BitVector(Algos.hash(entropy))
     val entropyWithCheckSum: BitVector = BitVector(entropy) ++ checkSum.take(4)
 

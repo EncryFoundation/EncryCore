@@ -1,26 +1,28 @@
 package encry.cli.commands
 
+import akka.actor.ActorRef
 import akka.pattern._
 import akka.util.Timeout
 import encry.EncryApp._
+import encry.api.http.DataHolderForApi.GetViewCreateKey
 import encry.cli.Response
 import encry.settings.EncryAppSettings
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import encry.view.history.History
-import encry.view.state.UtxoState
-import encry.view.wallet.EncryWallet
-
+import encry.utils.NetworkTimeProvider
+import org.encryfoundation.common.crypto.PrivateKey25519
 import scala.concurrent.Future
-import scala.util.Try
 
 object CreateKey extends Command {
 
-  override def execute(args: Command.Args, settings: EncryAppSettings): Future[Option[Response]] = Try {
+  /**
+    * Command "wallet createKey"
+    */
+  override def execute(args: Command.Args,
+                       settings: EncryAppSettings,
+                       dataHolder: ActorRef,
+                       nodeId: Array[Byte],
+                       networkTimeProvider: NetworkTimeProvider): Future[Option[Response]] = {
     implicit val timeout: Timeout = Timeout(settings.restApi.timeout)
-    nodeViewHolder ?
-      GetDataFromCurrentView[History, UtxoState, EncryWallet, Unit] { view =>
-        if (view.vault.accountManagers.head.accounts.isEmpty) view.vault.accountManagers.head.mandatoryAccount
-        else view.vault.accountManagers.head.createAccount(None)
-      }
-  }.map(_ => Future(Some(Response("OK")))).getOrElse(Future(Some(Response("Operation failed"))))
+    (dataHolder ? GetViewCreateKey).mapTo[PrivateKey25519]
+    Future.successful(Some(Response("Key was created")))
+  }
 }

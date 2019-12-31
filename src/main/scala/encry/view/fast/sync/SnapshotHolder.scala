@@ -7,7 +7,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason._
+import encry.network.BlackList.BanReason.{InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
 import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
@@ -16,7 +16,7 @@ import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ChunkId, ManifestId}
-import encry.view.fast.sync.SnapshotHolder.{BroadcastManifestRequestMessage, CheckDelivery, DropProcessedCount, FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RemoveRedundantManifestIds, RequestNextChunks, RequiredManifestHeightAndId, SnapshotManifestSerializer, TreeChunks}
+import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{Node, NodeSerilalizer}
@@ -25,7 +25,6 @@ import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import supertagged.TaggedType
-
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,

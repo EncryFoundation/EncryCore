@@ -24,8 +24,8 @@ class AccountManagerSpec extends PropSpec with Matchers with MockitoSugar {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(Blake2b256(seed))
     PrivateKey25519(privateKey, publicKey)
   }
-  val seed = Some("seeeeeeed")
-  val alsoSeed = Some("seeed")
+  val seed = "seeeeeeed"
+  val alsoSeed = "seeed"
 
   def accountKey(i: Byte): ByteArrayWrapper = ByteArrayWrapper(Array(MetaInfoPrefix, i) ++ Algos.hash("account"))
   def dataKey(i: Byte, pubBytes: PublicKey): ByteArrayWrapper = ByteArrayWrapper(Array(AccountManager.AccountPrefix, i) ++ pubBytes)
@@ -81,7 +81,7 @@ class AccountManagerSpec extends PropSpec with Matchers with MockitoSugar {
 
   property("Create new accounts") {
     val account: AccountManager = AccountManager(storageMock, storagePassword, seed, 0.toByte)
-    account.createAccount(seed)
+    account.createAccount(Some(seed))
 
     val keyToStore =
       ByteArrayWrapper(Array(AccountManager.AccountPrefix, 0.toByte) ++ account.mandatoryAccount.publicKeyBytes) ->
@@ -98,7 +98,7 @@ class AccountManagerSpec extends PropSpec with Matchers with MockitoSugar {
       val numberOfAccountToCreate = 3
       val accountManager = AccountManager(accountManagerStore, storagePassword, seed, 0.toByte)
 
-      val (privateKeyFromSeed: PrivateKey, publicKeyFromSeed: PublicKey) = Curve25519.createKeyPair(Blake2b256(Mnemonic.seedFromMnemonic(seed.get)))
+      val (privateKeyFromSeed: PrivateKey, publicKeyFromSeed: PublicKey) = Curve25519.createKeyPair(Blake2b256(Mnemonic.seedFromMnemonic(seed)))
 
       val createdAccounts = (1 to numberOfAccountToCreate).map { i =>
         accountManager.createAccount(Some(i.toString))

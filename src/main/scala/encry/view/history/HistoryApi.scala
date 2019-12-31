@@ -4,6 +4,7 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus._
 import encry.consensus._
 import encry.modifiers.history._
+import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.history.ValidationError.HistoryApiError
 import io.iohk.iodb.ByteArrayWrapper
@@ -32,15 +33,25 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   var isHeadersChainSyncedVar: Boolean = false
 
+  final case class FastSyncProcessor(localSettings: EncryAppSettings) {
+    var fastSyncVal: Boolean = settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
+  }
+
   var lastAvailableManifestHeight: Int = 0
 
-  var fastSyncInProgress: Boolean =
-    settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
+  lazy val fastSyncInProgress: FastSyncProcessor = FastSyncProcessor(settings)
 
   def getHeaderById(id: ModifierId): Option[Header] = headersCache
     .get(ByteArrayWrapper(id))
     .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
     .orElse(getHeaderByIdDB(id))
+
+  def getBlockByHeaderId(id: ModifierId): Option[Block] =
+    blocksCache
+    .get(ByteArrayWrapper(id))
+    .orElse(headersCache.get(ByteArrayWrapper(id))
+    .flatMap(h => getPayloadByIdDB(h.payloadId).map(p => Block(h, p))))
+    .orElse(getBlockByHeaderIdDB(id))
 
   def getBlockByHeader(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
@@ -117,7 +128,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
-      else if (height > lastAvailableManifestHeight && fastSyncInProgress) acc
+      else if (height > lastAvailableManifestHeight && fastSyncInProgress.fastSyncVal) acc
       else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
         case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
           continuation(height + 1, acc :+ h.payloadId)

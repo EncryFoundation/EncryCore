@@ -37,7 +37,9 @@ import org.encryfoundation.common.utils.constants.TestNetConstants
 import scala.collection._
 import scala.concurrent.duration._
 
-class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSettings) extends Actor with StrictLogging {
+class Miner(dataHolder: ActorRef,
+            influx: Option[ActorRef],
+            settings: EncryAppSettings) extends Actor with StrictLogging {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -56,12 +58,13 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
+    context.system.eventStream.subscribe(self, classOf[ClIMiner])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
       influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
     )
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
-      logger.info(s"data holder: ${dataHolder}. Context: ${context}")
+      logger.info(s"data holder: $dataHolder. Context: $context")
       dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
     }
@@ -82,7 +85,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
       self ! StartMining
     case StartMining if syncingDone =>
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
-        Props(classOf[Worker], i, numberOfWorkers).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
+        Props(classOf[Worker], i, numberOfWorkers, self).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
         case Some(candidateBlock) =>
           logger.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
@@ -94,6 +97,12 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
     case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
+      println(s"Miner -> Disable mining context.children.nonEmpty")
+      killAllWorkers()
+      candidateOpt = None
+      context.become(miningDisabled)
+    case DisableMining =>
+      println(s"Miner -> Disable mining")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
@@ -102,7 +111,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      nodeViewHolder ! LocallyGeneratedModifier(block)
+      context.actorSelection("/user/nodeViewHolder") ! LocallyGeneratedModifier(block)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
@@ -206,7 +215,7 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
   }
 
   def produceCandidate(): Unit =
-    nodeViewHolder ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
+    context.actorSelection("/user/nodeViewHolder") ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
       nodeView =>
         val producingStartTime: Time = System.currentTimeMillis()
         startTime = producingStartTime
@@ -234,11 +243,13 @@ class Miner(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSe
 
 object Miner {
 
-  case object DisableMining
+  sealed trait ClIMiner
 
-  case object EnableMining
+  case object DisableMining extends ClIMiner
 
-  case object StartMining
+  case object EnableMining extends ClIMiner
+
+  case object StartMining extends ClIMiner
 
   case class MinedBlock(block: Block, workerIdx: Int)
 

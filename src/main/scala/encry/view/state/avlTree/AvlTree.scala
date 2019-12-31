@@ -47,8 +47,11 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     }
     val (insertedNodesInTree, notChanged) = getNewNodesWithFirstUnchanged(newRoot)
     val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
+//    logger.debug(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
     val notChangedKeys  = notChanged.map{node => ByteArrayWrapper(node.hash)}.toSet
+//    logger.debug(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
     val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
+//    logger.debug(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
     storage.insert(
@@ -249,12 +252,12 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
   def rollbackTo(to: StorageVersion)
                 (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
     Try {
-      logger.debug(s"Rollback avl to version: ${Algos.encode(to)}")
-      storage.rollbackTo(to)
-      val newRootNode =
-        NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
-      AvlTree[K, V](newRootNode, storage)
-    }
+    logger.debug(s"Rollback avl to version: ${Algos.encode(to)}")
+    storage.rollbackTo(to)
+    val newRootNode =
+      NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
+    AvlTree[K, V](newRootNode, storage)
+  }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>

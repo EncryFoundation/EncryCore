@@ -121,7 +121,7 @@ object Utils extends Settings with StrictLogging {
       R.nextLong(),
       Difficulty @@ BigInt(1),
       EquihashSolution(Seq(1, 3)),
-      Random.randomBytes()
+      Array.emptyByteArray
     )
     Block(header, Payload(header.id, transactions))
   }
@@ -427,6 +427,7 @@ object Utils extends Settings with StrictLogging {
     new History {
       override  val historyStorage: HistoryStorage = storage
       override  val timeProvider: NetworkTimeProvider = ntp
+      override val settings: EncryAppSettings = settings
     }
   }
 
