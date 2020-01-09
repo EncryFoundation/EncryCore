@@ -337,7 +337,6 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
                         nodeName,
                         declaredAddr,
                         bindAddr) =>
-      println(s"offlineGeneration -> ${offlineGeneration}")
       import scala.concurrent.duration._
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
@@ -362,7 +361,6 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
       )
       val influxRef: Option[ActorRef] = newSettings.influxDB.map {
         influxSettings =>
-          println("Start influx actor")
           context.system
             .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       }
