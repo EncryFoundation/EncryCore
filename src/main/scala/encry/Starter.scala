@@ -13,7 +13,6 @@ import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
-import encry.EncryApp.system
 import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
@@ -73,6 +72,7 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
         walletPassword,
         settings.node.offlineGeneration,
         fastSync = false,
+        settings.snapshotSettings.enableSnapshotCreation,
         settings.network.knownPeers,
         settings.network.connectOnlyWithKnownPeers.getOrElse(false),
         "",
@@ -251,6 +251,11 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
                          )
                          readAnswer
                        }
+      enableSnapshotCreation <- {
+        println(s"Would you like to start snapshot creation? With this mod your node provides fast sync for others. " +
+          s"Enter 'yes' or 'no':")
+        readAnswer
+      }
       answerPeers <- {
         if (startOwnChain) false.asRight[Throwable]
         else {
@@ -294,6 +299,7 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
         walletPassword,
         startOwnChain,
         enableFastSync,
+        enableSnapshotCreation,
         peers,
         connectWithOnlyKnownPeers,
         nodePass = "",
@@ -317,6 +323,7 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
                         password,
                         offlineGeneration,
                         fastSync,
+                        snapshotCreation,
                         peers,
                         connectWithOnlyKnownPeers,
                         nodePass,
@@ -335,7 +342,10 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
                               declaredAddress = declaredAddr,
                               bindAddress = bindAddr)
 
-      val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
+      val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(
+        enableFastSynchronization = fastSync,
+        enableSnapshotCreation = snapshotCreation
+      )
       val newSettings = settings.copy(
         wallet = walletSettings,
         node = nodeSettings,
@@ -344,7 +354,8 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
       )
       val influxRef: Option[ActorRef] = newSettings.influxDB.map(
         influxSettings =>
-          system.actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
+          context.system
+            .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       )
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
@@ -387,6 +398,7 @@ object Starter {
                                   walletPassword: String,
                                   offlineGeneration: Boolean,
                                   fastSync: Boolean,
+                                  snapshotCreation: Boolean,
                                   peers: List[InetSocketAddress],
                                   connectWithOnlyKnownPeers: Boolean,
                                   nodePass: String = "",
