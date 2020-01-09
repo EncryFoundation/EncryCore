@@ -282,8 +282,21 @@ object SnapshotProcessor extends StrictLogging {
     else
       create(settings, getDirProcessSnapshots(settings), storageType)
 
-  def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotProcessor =
-    create(settings, getDirProcessSnapshots(settings), settings.storage.snapshotHolder)
+  def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotProcessor = {
+    val snapshotStorage = getDirProcessSnapshots(settings)
+    snapshotStorage.mkdirs()
+    val storage: VersionalStorage =
+      settings.storage.snapshotHolder match {
+        case VersionalStorage.IODB =>
+          logger.info("Init snapshots holder with iodb storage")
+          IODBWrapper(new LSMStore(snapshotStorage, keepVersions = settings.constants.DefaultKeepVersions))
+        case VersionalStorage.LevelDB =>
+          logger.info("Init snapshots holder with levelDB storage")
+          val levelDBInit: DB = LevelDbFactory.factory.open(snapshotStorage, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+      }
+    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, none[EncryWallet])
+  }
 
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
@@ -310,6 +323,7 @@ object SnapshotProcessor extends StrictLogging {
           )
           .some
       else none[EncryWallet]
+
     new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }
 }

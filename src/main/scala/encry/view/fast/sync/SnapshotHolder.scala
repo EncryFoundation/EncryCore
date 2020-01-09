@@ -180,9 +180,9 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
+        logger.info(s"Snapshot holder context.become to snapshot processing")
         snapshotProcessor = SnapshotProcessor.recreateAfterFastSyncIsDone(settings)
         snapshotDownloadController.storage.close()
-        logger.info(s"Snapshot holder context.become to snapshot processing")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
         context.become(workMod(history).orElse(commonMessages))
@@ -306,7 +306,7 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def restartFastSync(history: History): Unit = {
-    logger.info(s"Restart fast sync!")
+    println(s"Restart fast sync!")
     snapshotDownloadController = snapshotDownloadController.reInitFastSync
     snapshotProcessor = snapshotProcessor.reInitStorage
   }
