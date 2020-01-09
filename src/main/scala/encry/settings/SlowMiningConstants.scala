@@ -64,6 +64,8 @@ case object SlowMiningConstants extends Constants {
 
   val MaxTimeDrift: Long = 2.hours.toMillis
 
+  val SnapshotCreationHeight: Int = 5000 // creationHeight must be bigger than maxVersions
+
   val n: Char = 96
 
   val k: Char = 5

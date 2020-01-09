@@ -48,7 +48,7 @@ class SnapshotHolder(settings: EncryAppSettings,
   var requestsProcessor: RequestsPerPeriodProcessor          = RequestsPerPeriodProcessor.empty(settings)
 
   override def preStart(): Unit =
-    if (settings.snapshotSettings.newSnapshotCreationHeight <= settings.constants.MaxRollbackDepth ||
+    if (settings.constants.SnapshotCreationHeight <= settings.constants.MaxRollbackDepth ||
         (!settings.snapshotSettings.enableFastSynchronization && !settings.snapshotSettings.enableSnapshotCreation)) {
       logger.info(s"Stop self(~_~)SnapshotHolder(~_~)")
       context.stop(self)
@@ -260,7 +260,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
       logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")
       val condition: Int =
-        (block.header.height - settings.constants.MaxRollbackDepth) % settings.snapshotSettings.newSnapshotCreationHeight
+        (block.header.height - settings.constants.MaxRollbackDepth) % settings.constants.SnapshotCreationHeight
       logger.info(s"condition = $condition")
       if (condition == 0) snapshotProcessor.processNewBlock(block, history) match {
         case Left(_) =>

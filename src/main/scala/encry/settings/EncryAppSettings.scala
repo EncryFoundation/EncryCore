@@ -112,7 +112,6 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 
 final case class SnapshotSettings(enableSnapshotCreation: Boolean,
                                   enableFastSynchronization: Boolean,
-                                  newSnapshotCreationHeight: Int,
                                   chunksNumberPerRequestWhileFastSyncMod: Int,
                                   responseTimeout: FiniteDuration,
                                   requestsPerTime: Int,

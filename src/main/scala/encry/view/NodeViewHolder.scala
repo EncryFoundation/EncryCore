@@ -249,7 +249,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
               modToApply match {
                 case header: Header =>
                   val requiredHeight: Int = header.height - encrySettings.constants.MaxRollbackDepth
-                  if (requiredHeight % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0) {
+                  if (requiredHeight % encrySettings.constants.SnapshotCreationHeight == 0) {
                     newHis.lastAvailableManifestHeight = requiredHeight
                     logger.info(s"heightOfLastAvailablePayloadForRequest -> ${newHis.lastAvailableManifestHeight}")
                   }
@@ -259,7 +259,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 val potentialManifestId: Array[Byte] = Algos.hash(stateAfterApply.tree.rootHash ++ header.id)
                 val isManifestExists: Boolean = potentialManifestIds.exists(_.sameElements(potentialManifestId))
                 val isCorrectCreationHeight: Boolean =
-                  header.height % encrySettings.snapshotSettings.newSnapshotCreationHeight == 0
+                  header.height % encrySettings.constants.SnapshotCreationHeight == 0
                 val isGenesisHeader: Boolean = header.height == encrySettings.constants.GenesisHeight
                 if (encrySettings.snapshotSettings.enableSnapshotCreation && newHis.isFullChainSynced &&
                   !isManifestExists && isCorrectCreationHeight && !isGenesisHeader) {
