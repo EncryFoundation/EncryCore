@@ -58,6 +58,7 @@ class Miner(dataHolder: ActorRef,
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
+    println("Init miner")
     context.system.eventStream.subscribe(self, classOf[ClIMiner])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
