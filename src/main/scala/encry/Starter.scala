@@ -139,6 +139,9 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
   def validatePassword(password: String): Validated[NonEmptyChain[String], String] =
     if (password.nonEmpty) password.validNec else "Password is empty".invalidNec
 
+  def validateNodeName(nodeName: String): Validated[NonEmptyChain[String], String] =
+    if (nodeName.nonEmpty) nodeName.validNec else "Node name is empty".invalidNec
+
   def startWithCli: Either[Throwable, InitNodeResult] = {
 
     def validateMnemonicKey(mnemonic: String): Validated[NonEmptyChain[String], String] = {
@@ -237,6 +240,10 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
                       println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
                       phrase.asRight[Throwable]
                     }
+      nameNode <- {
+        println(s"Enter node name:")
+        readAndValidateInput(validateNodeName)
+      }
       startOwnChain <- {
         println("Would you like to start your chain? If you want - enter 'yes', otherwise no:")
         readAnswer
@@ -302,8 +309,8 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
         enableSnapshotCreation,
         peers,
         connectWithOnlyKnownPeers,
-        nodePass = "",
-        nodeName = "Default",
+        nodePass = "", //todo incorrect?
+        nodeName = nameNode,
         declaredAddress.some,
         bindAddress
       )
@@ -352,11 +359,12 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
         network = networkSettings,
         snapshotSettings = snapshotSettings
       )
-      val influxRef: Option[ActorRef] = newSettings.influxDB.map(
+      val influxRef: Option[ActorRef] = newSettings.influxDB.map {
         influxSettings =>
+          println("Start influx actor")
           context.system
             .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
-      )
+      }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
       lazy val miner: ActorRef =

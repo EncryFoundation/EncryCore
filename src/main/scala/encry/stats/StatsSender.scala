@@ -50,6 +50,7 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
         ))
 
     case HeightStatistics(bestHeaderHeight, bestBlockHeight) =>
+      println(s"HeightStatistics")
       influxDB.write(
         influxDBSettings.udpPort,
         s"chainStat,nodeName=$nodeName value=$bestHeaderHeight,bestBlockHeight=$bestBlockHeight"

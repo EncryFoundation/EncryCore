@@ -283,7 +283,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
                   )) newHis.isFullChainSynced = true
               influxRef.foreach { ref =>
-                logger.info(s"send info 2. about ${newHis.getBestHeaderHeight} | ${newHis.getBestBlockHeight}")
+                println(s"send info 2. about ${newHis.getBestHeaderHeight} | ${newHis.getBestBlockHeight}")
                 ref ! HeightStatistics(newHis.getBestHeaderHeight, stateAfterApply.height)
                 val isBlock: Boolean = modToApply match {
                   case _: Block => true
