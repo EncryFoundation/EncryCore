@@ -117,12 +117,19 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case _ =>
       }
 
+    case CheckPayloadsToDownload if !history.isHeadersChainSynced =>
+      val nextCheckModsScheduler =
+        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
+      context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsScheduler))
+
     case CheckPayloadsToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
       logger.debug(s"Qty to req: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
+      logger.debug(s"currentQueue.size: ${currentQueue.size}")
+      logger.debug(s"receivedModifiers.size: ${receivedModifiers.size}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
@@ -153,7 +160,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
-        s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager.")
+        s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Ids: ${modifierIds.map(Algos.encode).mkString(",")}. Sending request from local to DeliveryManager.")
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
 
     case RequestForTransactions(peer, modifierTypeId, modifierIds) =>
@@ -263,6 +270,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       modifierIds: Seq[ModifierId],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit = {
+    //logger.info(s"send req for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
     val firstCondition: Boolean = mTypeId == Transaction.modifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.modifierTypeId
     val thirdCondition: Boolean =
@@ -455,9 +463,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               peer: ConnectedPeer,
               isBlockChainSynced: Boolean): Unit =
     if (isExpecting(mId, mTid, peer)) {
-      if (mTid != Transaction.modifierTypeId) {
+      //if (mTid != Transaction.modifierTypeId) {
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
-      }
+      //}
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)

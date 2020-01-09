@@ -67,6 +67,7 @@ libraryDependencies ++= Seq(
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
+  "org.encry" %% "encry-common" % "0.9.3",
   "com.lihaoyi" %% "scalatags" % "0.7.0",
   // JWT
   "com.pauldijou" %% "jwt-spray-json" % "4.2.0",

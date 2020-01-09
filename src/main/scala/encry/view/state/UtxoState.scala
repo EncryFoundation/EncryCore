@@ -43,8 +43,13 @@ import org.iq80.leveldb.Options
 import scorex.crypto.authds.ADKey
 import scorex.crypto.hash.Digest32
 import encry.view.state.avlTree.utils.implicits.Instances._
-import scala.concurrent.ExecutionContextExecutor
-import scala.util.Try
+import monix.eval.Task
+
+import scala.concurrent.duration._
+import monix.execution.Scheduler.Implicits.global
+
+import scala.concurrent.{Await, ExecutionContextExecutor}
+import scala.util.{Failure, Success, Try}
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            height: Height,
@@ -79,13 +84,15 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
-        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
-          if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
-            totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
-          else validate(tx, block.header.timestamp, Height @@ block.header.height)
+        val tasks = block.payload.txs.map(tx => {
+          Task {
+            if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
+              totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
+            else validate(tx, block.header.timestamp, Height @@ block.header.height)
+          }
         }).toList
-          .traverse(Validated.fromEither)
-          .toEither
+        val res: Either[ValidationResult, List[Transaction]] = Await.result(Task.gatherUnordered(tasks).map(_.traverse(Validated.fromEither)
+          .toEither).runAsync, 2 minutes)
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
           err => {
@@ -103,7 +110,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               combinedStateChange.inputsToDb.toList,
               Height @@ block.header.height
             )
-            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}")
+            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}. Root node: ${newTree.rootNode}")
             logger.info(s"block.header.stateRoot ${Algos.encode(block.header.stateRoot)}")
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
               logger.info(s"Invalid state root!")

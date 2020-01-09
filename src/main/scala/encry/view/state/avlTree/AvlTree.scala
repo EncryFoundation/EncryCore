@@ -62,9 +62,11 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     logger.info(s"avl flattenNewNodes: ${(System.currentTimeMillis() - flattenNewNodesStart)/1000L}")
     val takeUntilTime = System.currentTimeMillis()
     //val deletedNodes    = toDeleteKeys(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
-    logger.info(s"avl deletedNodes: ${(System.currentTimeMillis() - takeUntilTime)/1000L}")
+    logger.info(s"avl deletedNoedes: ${(System.currentTimeMillis() - takeUntilTime)/1000L}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
+    val insertedKeys = insertedNodes.map(_._1)
+    //logger.info(s"insertedNodes: ${insertedNodes.map{ case (key, _) => Algos.encode(key)}}")
     storage.insert(
       version,
       toInsert.map {
@@ -74,7 +76,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       } ++ insertedNodes ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
-      getDeletedNodesHashes ++ toDelete.map(key => {
+      getDeletedNodesHashes(insertedKeys) ++ toDelete.map(key => {
         //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
         StorageKey @@ kSer.toBytes(key)
       })
@@ -84,9 +86,11 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     AvlTree(shadowedRoot, storage)
   }
 
-  def getDeletedNodesHashes: List[StorageKey] = {
-    val toDelete = toDeleteNodes.collect{case hash if storage.contains(StorageKey @@ hash.data) => StorageKey @@ hash.data}
-      .toList
+  def getDeletedNodesHashes(inserted: List[StorageKey]): List[StorageKey] = {
+    val insertedHashSet: Set[ByteArrayWrapper] = inserted.map(ByteArrayWrapper.apply).toSet
+    val toDelete = toDeleteNodes.collect {
+      case hash if storage.contains(StorageKey @@ hash.data) && !insertedHashSet.contains(hash) => StorageKey @@ hash.data
+    }.toList
     toDeleteNodes = HashSet.empty
     toDelete
   }
