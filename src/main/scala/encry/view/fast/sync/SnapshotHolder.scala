@@ -306,7 +306,7 @@ class SnapshotHolder(settings: EncryAppSettings,
   }
 
   def restartFastSync(history: History): Unit = {
-    println(s"Restart fast sync!")
+    logger.info(s"Restart fast sync!")
     snapshotDownloadController = snapshotDownloadController.reInitFastSync
     snapshotProcessor = snapshotProcessor.reInitStorage
   }

@@ -170,7 +170,7 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
             }
           }
         Either.catchNonFatal {
-          println("Enter address:")
+          println("Peer example is: '172.168.1.1:9032'. \nEnter address:")
           val addr = StdIn.readLine(prompt)
           Try {
             val split = addr.split(':')
@@ -269,7 +269,6 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
           println(
             "Would you like to enter peers to connect with? \n" +
               "These are peers that you want to connect with. \n" +
-              "Peer example is: '172.168.1.1:9032'. \n" +
               "Enter 'yes' or 'no':"
           )
           readAnswer
