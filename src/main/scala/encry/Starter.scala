@@ -326,7 +326,6 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
       import scala.concurrent.duration._
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
-      else AccountManager.tmpInit(mnemonic, password, settings)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings =
