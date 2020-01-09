@@ -1,13 +1,15 @@
 package encry.view.state
 
 import java.io.File
-
-import akka.actor.ActorRef
-import com.google.common.primitives.{Ints, Longs}
+import cats.data.Validated
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
+import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
-import encry.settings.{EncryAppSettings, LevelDBSettings}
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -18,15 +20,12 @@ import encry.utils.implicits.UTXO._
 import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
-import io.iohk.iodb.LSMStore
-import cats.data.Validated
-import cats.Traverse
-import cats.syntax.traverse._
-import cats.instances.list._
-import cats.syntax.either._
-import cats.syntax.validated._
 import encry.view.state.UtxoState.StateChange
 import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.utils.implicits.Instances._
+import io.iohk.iodb.LSMStore
+import monix.eval.Task
+import monix.execution.Scheduler.Implicits.global
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -40,16 +39,9 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
-import scorex.crypto.authds.ADKey
-import scorex.crypto.hash.Digest32
-import encry.view.state.avlTree.utils.implicits.Instances._
-import monix.eval.Task
-
+import scala.concurrent.Await
 import scala.concurrent.duration._
-import monix.execution.Scheduler.Implicits.global
-
-import scala.concurrent.{Await, ExecutionContextExecutor}
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            height: Height,
@@ -91,7 +83,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
             else validate(tx, block.header.timestamp, Height @@ block.header.height)
           }
         }).toList
-        val res: Either[ValidationResult, List[Transaction]] = Await.result(Task.gatherUnordered(tasks).map(_.traverse(Validated.fromEither)
+        val res: Either[ValidationResult, List[Transaction]] = Await.result(Task.gather(tasks).map(_.traverse(Validated.fromEither)
           .toEither).runAsync, 2 minutes)
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
@@ -148,11 +140,11 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => {
         val gettingStartTime = System.currentTimeMillis()
         val res = tree.get(StorageKey !@@ input.boxId)
-        logger.info(s"Time of bx bytes getting: ${(System.currentTimeMillis() - gettingStartTime) / 1000L}")
+        //logger.info(s"Time of bx bytes getting: ${(System.currentTimeMillis() - gettingStartTime) / 1000L}")
         res.flatMap(bytes => {
           val parseBytesStartTime = System.currentTimeMillis()
           val bx = StateModifierSerializer.parseBytes(bytes, input.boxId.head)
-          logger.info(s"bx deser time: ${(System.currentTimeMillis() - parseBytesStartTime) / 1000L}")
+          //logger.info(s"bx deser time: ${(System.currentTimeMillis() - parseBytesStartTime) / 1000L}")
           val bxOpt = bx.toOption
           val bxCanUnlockStartTime = System.currentTimeMillis()
           val res = (bxOpt, tx.defaultProofOpt) match {
@@ -168,13 +160,13 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) Some(bx) else None
             case _ => None
           }
-          logger.info(s"bx unlocking time: ${(System.currentTimeMillis() - bxCanUnlockStartTime) / 1000L}")
+          //logger.info(s"bx unlocking time: ${(System.currentTimeMillis() - bxCanUnlockStartTime) / 1000L}")
           res
         })
       })
 
-      logger.info(s"" +
-        s"Bxs unlocking time(inputs size: ${tx.inputs.length}): ${(System.currentTimeMillis() - bxsUnlockingStartTime)/1000L} s")
+//      logger.info(s"" +
+//        s"Bxs unlocking time(inputs size: ${tx.inputs.length}): ${(System.currentTimeMillis() - bxsUnlockingStartTime)/1000L} s")
 
       val validBalanceStartTime = System.currentTimeMillis()
 
@@ -197,7 +189,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         }
       }
 
-      logger.info(s"Validating balance: ${(System.currentTimeMillis() - validBalanceStartTime)/1000L} s")
+      //logger.info(s"Validating balance: ${(System.currentTimeMillis() - validBalanceStartTime)/1000L} s")
 
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
