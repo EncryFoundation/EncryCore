@@ -34,6 +34,8 @@ final case class ConnectedPeersCollection(private val peers: Map[InetSocketAddre
     .collect { case (peer, info) if p(peer, info) => f(peer, info) }
     .toSeq
 
+  def getAll: Map[InetSocketAddress, PeerInfo] = peers
+
   private def updateK[T](elems: Map[InetSocketAddress, T], f: (PeerInfo, T) => PeerInfo): Map[InetSocketAddress, PeerInfo] = {
     val newValue: Map[InetSocketAddress, PeerInfo] = for {
       (key, value) <- elems

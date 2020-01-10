@@ -2,7 +2,7 @@ package encry.local.miner
 
 import java.util.Date
 
-import akka.actor.Actor
+import akka.actor.{Actor, ActorRef}
 import encry.EncryApp._
 
 import scala.concurrent.duration._
@@ -14,7 +14,7 @@ import java.text.SimpleDateFormat
 import com.typesafe.scalalogging.StrictLogging
 import org.encryfoundation.common.utils.constants.TestNetConstants
 
-class Worker(myIdx: Int, numberOfWorkers: Int) extends Actor with StrictLogging {
+class Worker(myIdx: Int, numberOfWorkers: Int, miner: ActorRef) extends Actor with StrictLogging {
 
   val sdf: SimpleDateFormat = new SimpleDateFormat("HH:mm:ss")
   var challengeStartTime: Date = new Date(System.currentTimeMillis())

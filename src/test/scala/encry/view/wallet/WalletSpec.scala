@@ -2,22 +2,21 @@ package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.settings.{EncryAppSettings, LevelDBSettings, Settings}
+import encry.settings.{LevelDBSettings, Settings}
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
+import encry.view.state.UtxoStateReader
 import encry.view.state.avlTree.{AvlTree, LeafNode}
-import encry.view.state.avlTree.utils.implicits.Hashable
-import encry.view.state.{UtxoState, UtxoStateReader}
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, DataBox, DataBoxSerializer, EncryProposition, MonetaryBox}
+import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
-import org.scalatest.{Matchers, PropSpec}
 import org.mockito.Mockito._
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.{Matchers, PropSpec}
 
 class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryGenerator with StrictLogging with Settings with MockitoSugar {
 
@@ -27,10 +26,15 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val dir = FileHelper.getRandomTempDir
 
+    val aM = AccountManager.init(
+      "boat culture ribbon wagon deposit decrease maid speak equal thunder have beauty",
+      "encry",
+      settings.copy(directory = dir.getAbsolutePath))
+
     val wallet: EncryWallet = EncryWallet.readOrGenerate(
       FileHelper.getRandomTempDir,
-      FileHelper.getRandomTempDir,
-      settings
+      EncryWallet.getKeysDir(settings.copy(directory = dir.getAbsolutePath)),
+      settings.copy(directory = dir.getAbsolutePath)
     )
 
     val accountManager: AccountManager = wallet.accountManagers.head
@@ -78,9 +82,16 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val blockHeader: Header = genHeader
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(FileHelper.getRandomTempDir,
+    val aM = AccountManager.init(
+      "another accuse index island little scissors insect little absurd island keep valid",
+      "encry",
+      settings.copy(directory = dir.getAbsolutePath))
+
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(
       FileHelper.getRandomTempDir,
-      settings)
+      EncryWallet.getKeysDir(settings.copy(directory = dir.getAbsolutePath)),
+      settings.copy(directory = dir.getAbsolutePath)
+    )
 
     val keyManager: AccountManager = wallet.accountManagers.head
 
@@ -113,13 +124,20 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     val dir = FileHelper.getRandomTempDir
 
+    val aM = AccountManager.init(
+      "another accuse index island little scissors insect little insect island keep valid",
+      "encry",
+      settings.copy(directory = dir.getAbsolutePath))
+
     val txsQty: Int = 4
 
     val blockHeader: Header = genHeader
 
-    val wallet: EncryWallet = EncryWallet.readOrGenerate(FileHelper.getRandomTempDir,
+    val wallet: EncryWallet = EncryWallet.readOrGenerate(
       FileHelper.getRandomTempDir,
-      settings)
+      EncryWallet.getKeysDir(settings.copy(directory = dir.getAbsolutePath)),
+      settings.copy(directory = dir.getAbsolutePath)
+    )
       .addAccount(seed, settings.wallet.map(_.password).get, stateMock).toOption.get
 
     val keyManagerOne = wallet.accountManagers.head

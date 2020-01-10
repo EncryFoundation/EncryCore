@@ -8,17 +8,20 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import encry.settings.EncryAppSettings
+import encry.settings.{EncryAppSettings, MemoryPoolSettings}
 import encry.utils.NetworkTimeProvider
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
+import scala.concurrent.duration._
 import scala.collection.IndexedSeq
-import encry.EncryApp.nodeViewSynchronizer
 import cats.syntax.either._
+import encry.EncryApp.system
 import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
+
+import scala.concurrent.duration.FiniteDuration
 
 class MemoryPool(settings: EncryAppSettings,
                  networkTimeProvider: NetworkTimeProvider,
@@ -33,6 +36,7 @@ class MemoryPool(settings: EncryAppSettings,
 
   override def preStart(): Unit = {
     logger.debug(s"Starting MemoryPool. Initializing all schedulers")
+    context.system.eventStream.subscribe(self, classOf[NewTransaction])
     context.system.scheduler.schedule(
       settings.mempool.bloomFilterCleanupInterval,
       settings.mempool.bloomFilterCleanupInterval, self, CleanupBloomFilter)
@@ -64,7 +68,7 @@ class MemoryPool(settings: EncryAppSettings,
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
-        Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
+        Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + 1
@@ -92,7 +96,7 @@ class MemoryPool(settings: EncryAppSettings,
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
-        Either.catchNonFatal(nodeViewSynchronizer ! StopTransactionsValidation)
+        Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StopTransactionsValidation)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
@@ -107,7 +111,7 @@ class MemoryPool(settings: EncryAppSettings,
       logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
         s"Transit to a transactionsProcessor state.")
       if (state == NotProcessingNewTransactions)
-        Either.catchNonFatal(nodeViewSynchronizer ! StartTransactionsValidation)
+        Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StartTransactionsValidation)
       context.become(continueProcessing(currentNumberOfProcessedTransactions = 0))
 
     case SemanticallySuccessfulModifier(_) =>
@@ -156,7 +160,7 @@ class MemoryPool(settings: EncryAppSettings,
 
 object MemoryPool {
 
-  final case class NewTransaction(tx: Transaction) extends AnyVal
+  final case class NewTransaction(tx: Transaction)
 
   final case class RolledBackTransactions(txs: IndexedSeq[Transaction]) extends AnyVal
 
@@ -192,7 +196,10 @@ object MemoryPool {
 
   }
 
-  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, minerRef: ActorRef, influx: Option[ActorRef]): Props =
+  def props(settings: EncryAppSettings,
+            ntp: NetworkTimeProvider,
+            minerRef: ActorRef,
+            influx: Option[ActorRef]): Props =
     Props(new MemoryPool(settings, ntp, minerRef, influx))
 
   class MemoryPoolPriorityQueue(settings: ActorSystem.Settings, config: Config)

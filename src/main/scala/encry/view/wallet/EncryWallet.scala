@@ -1,15 +1,13 @@
 package encry.view.wallet
 
 import java.io.File
-
-import cats.data.{NonEmptyChain, Validated}
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.apply._
-import cats.syntax.validated._
 import cats.data.NonEmptyChain._
-import cats.syntax.foldable._
+import cats.data.{NonEmptyChain, Validated}
 import cats.instances.string._
+import cats.syntax.apply._
+import cats.syntax.either._
+import cats.syntax.foldable._
+import cats.syntax.validated._
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.{EncryAppSettings, Settings}
 import encry.storage.VersionalStorage
@@ -17,21 +15,19 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Mnemonic
-import io.iohk.iodb.{LSMStore, Store}
-import encry.view.state.{UtxoState, UtxoStateReader}
+import encry.view.state.UtxoStateReader
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
+import io.iohk.iodb.{LSMStore, Store}
 import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
-
-import scala.util.{Failure, Success}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
   extends StrictLogging with AutoCloseable with Settings {
@@ -40,7 +36,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def addAccount(seed: String, password: String, state: UtxoStateReader): Either[String, EncryWallet] = validateMnemonicKey(seed) match {
     case Right(_) if accountManagers.map(_.number).max < Byte.MaxValue =>
-      val newAccount = AccountManager(accountStore, password, seed.some, (accountManagers.map(_.number).max + 1).toByte)
+      val newAccount = AccountManager(accountStore, password, seed, (accountManagers.map(_.number).max + 1).toByte)
       val newAccPropositions = newAccount.publicAccounts.map(pk => EncryProposition.pubKeyLocked(pk.pubKeyBytes)).toSet
       scanWalletFromUtxo(state, newAccPropositions)
       this.copy(accountManagers = accountManagers :+ newAccount).asRight[String]
@@ -174,13 +170,10 @@ object EncryWallet extends StrictLogging {
     keysDir.mkdirs()
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
-    val walletStorage = WalletVersionalLevelDBCompanion(db, settings.levelDB)
+    val walletStorage: WalletVersionalLevelDB = WalletVersionalLevelDBCompanion(db, settings.levelDB)
     val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
-    val restoredAccounts = AccountManager.restoreAccounts(accountManagerStore, password)
-    val resultingAccounts =
-      if (restoredAccounts.nonEmpty) restoredAccounts
-      else Seq(AccountManager(accountManagerStore, password, settings.wallet.flatMap(_.seed), 0.toByte))
+    val restoredAccounts: Seq[AccountManager] = AccountManager.restoreAccounts(accountManagerStore, password)
     //init keys
-    EncryWallet(walletStorage, resultingAccounts, accountManagerStore)
+    EncryWallet(walletStorage, restoredAccounts, accountManagerStore)
   }
 }

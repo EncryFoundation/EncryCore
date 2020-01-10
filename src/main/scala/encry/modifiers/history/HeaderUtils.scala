@@ -21,12 +21,12 @@ object HeaderUtils {
   def preSemanticValidation(header: Header, history: History, settings: EncryAppSettings): Either[PreSemanticValidationException, Unit] =
     for {
       _ <- Either.cond(
-            history.getBestHeaderHeight - settings.levelDB.maxVersions <= header.height,
+            history.getBestHeaderHeight - settings.constants.MaxRollbackDepth <= header.height,
             (),
             IllegalHeight(
               s"Height of received header is ${header.height}. " +
                 s"Current best header height is ${history.getBestHeaderHeight}. " +
-                s"Max possible height is ${history.getBestHeaderHeight - settings.levelDB.maxVersions}"
+                s"Max possible height is ${history.getBestHeaderHeight - settings.constants.MaxRollbackDepth}"
             )
           )
     } yield ()

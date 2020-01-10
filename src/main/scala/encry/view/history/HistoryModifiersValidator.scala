@@ -1,18 +1,17 @@
 package encry.view.history
 
+import cats.syntax.either._
+import encry.consensus.EquihashPowScheme
 import encry.view.history.ValidationError.FatalValidationError._
 import encry.view.history.ValidationError.NonFatalValidationError._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import org.encryfoundation.common.validation.ModifierSemanticValidity
-import cats.syntax.either._
-import encry.consensus.EquihashPowScheme
-import encry.settings.Settings
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
+import org.encryfoundation.common.validation.ModifierSemanticValidity
 
 trait HistoryModifiersValidator extends HistoryApi {
 
-  val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
+  lazy val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
     settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =

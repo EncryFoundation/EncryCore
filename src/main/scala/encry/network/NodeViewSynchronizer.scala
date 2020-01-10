@@ -1,15 +1,14 @@
 package encry.network
 
 import HeaderProto.HeaderProtoMessage
+import java.net.InetSocketAddress
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.cli.commands.AddPeer.PeerFromCli
-import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
 import encry.consensus.HistoryConsensus._
-import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.local.miner.Miner.{DisableMining, ClIMiner, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
@@ -20,6 +19,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.settings.EncryAppSettings
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.Utils._
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._
@@ -46,6 +46,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   val peersKeeper: ActorRef = context.system.actorOf(PeersKeeper.props(settings, self, dataHolder)
     .withDispatcher("peers-keeper-dispatcher"), "PeersKeeper")
+
 
   val networkController: ActorRef = context.system.actorOf(NetworkController.props(settings.network, peersKeeper, self)
     .withDispatcher("network-dispatcher"), "NetworkController")
@@ -79,6 +80,8 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ModificationOutcome])
+    context.system.eventStream.subscribe(self, classOf[ClIMiner])
+    context.system.eventStream.subscribe(self, classOf[CLIPeer])
     nodeViewHolderRef ! GetNodeViewChanges(history = true, state = false, vault = false)
   }
 
@@ -270,6 +273,11 @@ object NodeViewSynchronizer {
     final case class RequestFromLocal(source: ConnectedPeer,
                                       modifierTypeId: ModifierTypeId,
                                       modifierIds: Seq[ModifierId])
+    sealed trait CLIPeer
+
+    final case class PeerFromCli(address: InetSocketAddress) extends CLIPeer
+
+    final case class RemovePeerFromBlackList(address: InetSocketAddress) extends CLIPeer
 
     trait NodeViewHolderEvent
 

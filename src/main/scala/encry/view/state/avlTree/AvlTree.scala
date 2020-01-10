@@ -47,38 +47,32 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     }
     val (insertedNodesInTree, notChanged) = getNewNodesWithFirstUnchanged(newRoot)
     val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
-    logger.debug(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
+//    logger.debug(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
     val notChangedKeys  = notChanged.map{node => ByteArrayWrapper(node.hash)}.toSet
-    logger.debug(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
+//    logger.debug(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
     val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
-    logger.debug(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
+//    logger.debug(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
     storage.insert(
       version,
       toInsert.map {
         case (key, value) =>
-          //logger.info(s"insert key: ${Algos.encode(kSer.toBytes(key))}")
           StorageKey @@ Algos.hash(kSer.toBytes(key).reverse) -> StorageValue @@ vSer.toBytes(value)
       } ++
         insertedNodes.map {
           case (key, node) =>
-            logger.debug(s"insert node: ${Algos.encode(key)} -> Node[${ShadowNode.childsToShadowNode(node)}]")
             StorageKey @@ key -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
       deletedNodes.map(key => {
-        logger.debug(s"Delete node: ${Algos.encode(key.hash)}")
         StorageKey @@ key.hash
       }) ++ toDelete.map(key => {
-        //logger.info(s"Delete key: ${Algos.encode(kSer.toBytes(key))}")
         StorageKey @@ Algos.hash(kSer.toBytes(key).reverse)
       })
     )
     logger.debug(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
-    //logger.info("newRoot:" + newRoot)
-    logger.debug("shadow root: " + shadowedRoot)
     AvlTree(shadowedRoot, storage)
   }
 
@@ -118,17 +112,14 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     toInsert: List[(K, V)],
     toDelete: List[K],
   )(implicit kSer: Serializer[K], vSer: Serializer[V], kM: Monoid[K], vM: Monoid[V]): Try[Array[Byte]] = Try {
-    //logger.info(s"root node in getOperationsRootHash: ${rootNode}")
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDelete) =>
         deleteKey(toDelete, prevRoot)
     }
-    //logger.info(s"After deleting rootNode: ${rootAfterDelete}")
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         insert(keyToInsert, valueToInsert, prevRoot)
     }
-    //logger.info(s"new root should be: ${newRoot}")
     newRoot.hash
   }
 
@@ -197,7 +188,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         Some(balancedRoot)
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
-        //logger.info(s"theClosestValue for node ${internalNode} is ${theClosestValue._1._1}")
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
             val newLeftChild = internalNode.leftChild
@@ -220,7 +210,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
           case ((_, _), EMPTY) => internalNode
         }
         Some(balance(newNode))
-        //logger.info(s"after deleting: ${balancedNode}")
       }
   }
 
@@ -263,18 +252,12 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
   def rollbackTo(to: StorageVersion)
                 (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
     Try {
-      logger.debug(s"Rollback avl to version: ${Algos.encode(to)}")
-      logger.debug(s"Versions in storage: ${storage.versions.map(Algos.encode).mkString(",")}")
-      logger.debug(s"Before rollback node key: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
-      logger.debug(s"Before rollback root node: ${rootNode}")
-      storage.rollbackTo(to)
-      logger.debug(s"Storage success rolled back")
-      logger.debug(s"rootNodeKey: ${Algos.encode(storage.get(AvlTree.rootNodeKey).get)}")
-      val newRootNode =
-        NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
-      logger.debug(s"root node after rollback: ${newRootNode}")
-      AvlTree[K, V](newRootNode, storage)
-    }
+    logger.debug(s"Rollback avl to version: ${Algos.encode(to)}")
+    storage.rollbackTo(to)
+    val newRootNode =
+      NodeSerilalizer.fromBytes[K, V](storage.get(StorageKey !@@ storage.get(AvlTree.rootNodeKey).get).get)
+    AvlTree[K, V](newRootNode, storage)
+  }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
@@ -304,7 +287,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       node match {
         case shadowNode: ShadowNode[K, V] =>
           val restoredNode = shadowNode.restoreFullNode(storage)
-          logger.debug(s"Insert. Restored node: ${restoredNode}")
           insert(newKey, newValue, restoredNode)
         case _: EmptyNode[K, V] => LeafNode[K, V](newKey, newValue)
         case leafNode: LeafNode[K, V] =>
@@ -513,7 +495,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     val keys: Set[ByteArrayWrapper] = loop(List(rootNode), List.empty).map(ByteArrayWrapper(_)).toSet
     val allKeysFromDB: Set[ByteArrayWrapper] = storage.getAllKeys(-1)
       .map(ByteArrayWrapper(_)).toSet - ByteArrayWrapper(UtxoState.bestHeightKey) - ByteArrayWrapper(AvlTree.rootNodeKey)
-    logger.debug(s"${keys.map(l => Algos.encode(l.data))}")
     (allKeysFromDB -- keys).isEmpty
   }
 

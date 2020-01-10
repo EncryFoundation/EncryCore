@@ -2,7 +2,7 @@ package encry.view.history
 
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.settings.{EncryAppSettings, Settings}
+import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.StorageKey
 import encry.view.history.storage.HistoryStorage
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -12,13 +12,15 @@ import scorex.crypto.hash.Digest32
 
 import scala.reflect.ClassTag
 
-trait HistoryDBApi extends StrictLogging with Settings {
+trait HistoryDBApi extends StrictLogging {
+
+  val settings: EncryAppSettings
 
   val historyStorage: HistoryStorage
 
-  val BestHeaderKey: StorageKey =
+  lazy val BestHeaderKey: StorageKey =
     StorageKey @@ Array.fill(settings.constants.DigestLength)(Header.modifierTypeId.untag(ModifierTypeId))
-  val BestBlockKey: StorageKey =
+  lazy val BestBlockKey: StorageKey =
     StorageKey @@ Array.fill(settings.constants.DigestLength)(-1: Byte)
 
   private def getModifierById[T: ClassTag](id: ModifierId): Option[T] = historyStorage

@@ -1,15 +1,16 @@
 package encry.view.wallet
 
+import java.io.File
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.crypto.encryption.AES
+import encry.settings.EncryAppSettings
 import encry.utils.Mnemonic
-import io.iohk.iodb.{ByteArrayWrapper, Store}
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore, Store}
 import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.utils.Algos
 import scorex.crypto.hash.Blake2b256
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
-
 import scala.util.Try
 
 case class AccountManager private(store: Store, password: String, mandatoryAccount: PrivateKey25519, number: Byte) extends StrictLogging {
@@ -62,6 +63,20 @@ case class AccountManager private(store: Store, password: String, mandatoryAccou
 }
 
 object AccountManager {
+
+  def init(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
+      val keysTmpDir: File = new File(s"${settings.directory}/keysTmp")
+      val keysDir: File = new File(s"${settings.directory}/keys")
+      keysDir.mkdirs()
+      keysTmpDir.mkdirs()
+      val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
+      val accountTmpManagerStore: LSMStore = new LSMStore(keysTmpDir, keepVersions = 0, keySize = 34)
+      val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
+      val tmpAccount = AccountManager.apply(accountTmpManagerStore, pass, mnemonicKey, 0.toByte)
+      account.store.close()
+      tmpAccount.store.close()
+  }
+
   val AccountPrefix: Byte = 0x05
   val MetaInfoPrefix: Byte = 0x15
 
@@ -84,19 +99,9 @@ object AccountManager {
       }
     }._1
 
-  private[wallet] def apply(store: Store, password: String, seedOpt: Option[String], number: Byte): AccountManager = {
+  private[wallet] def apply(store: Store, password: String, seed: String, number: Byte): AccountManager = {
     val (privateKey: PrivateKey, publicKey: PublicKey) = Curve25519.createKeyPair(
-      Blake2b256.hash(
-        seedOpt
-          .map {
-            Mnemonic.seedFromMnemonic(_)
-          }
-          .getOrElse {
-            val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-            println(s"\nMnemonic code is:\n$phrase")
-            Mnemonic.seedFromMnemonic(phrase)
-          }
-      )
+      Blake2b256.hash(Mnemonic.seedFromMnemonic(seed))
     )
     saveAccount(store, password, number, privateKey, publicKey)
     this(store, password, PrivateKey25519(privateKey, publicKey), number)

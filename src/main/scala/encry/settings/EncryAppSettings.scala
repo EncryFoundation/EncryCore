@@ -112,10 +112,8 @@ object EncryAppSettings extends SettingsReaders with NodeSettingsReader with Str
 
 final case class SnapshotSettings(enableSnapshotCreation: Boolean,
                                   enableFastSynchronization: Boolean,
-                                  newSnapshotCreationHeight: Int,
                                   chunksNumberPerRequestWhileFastSyncMod: Int,
                                   responseTimeout: FiniteDuration,
-                                  reRequestAttempts: Int,
                                   requestsPerTime: Int,
                                   updateRequestsPerTime: FiniteDuration,
                                   liveConnectionTimeout: FiniteDuration,
@@ -129,13 +127,14 @@ final case class LevelDBSettings(maxVersions: Int, versionKeySize: Int = 32, key
 final case class MonitoringSettings(kamonEnabled: Boolean)
 final case class RESTApiSettings(enabled: Option[Boolean],
                                  bindAddress: InetSocketAddress,
+                                 allowedPeers: List[String],
                                  corsAllowedOrigin: Option[String],
                                  timeout: FiniteDuration)
 final case class NetworkSettings(nodeName: Option[String],
                                  addedMaxDelay: Option[FiniteDuration],
                                  networkChunkSize: Int,
                                  localOnly: Option[Boolean],
-                                 knownPeers: Seq[InetSocketAddress],
+                                 knownPeers: List[InetSocketAddress],
                                  bindAddress: InetSocketAddress,
                                  maxConnections: Int,
                                  connectionTimeout: FiniteDuration,

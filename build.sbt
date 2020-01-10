@@ -10,8 +10,8 @@ val settings: Seq[Def.Setting[String]] = Seq(
 
 val encry = (project in file(".")).settings(settings: _*)
 
-val akkaVersion = "2.5.13"
-val akkaHttpVersion = "10.0.9"
+val akkaVersion = "2.5.23"
+val akkaHttpVersion = "10.1.10"
 val doobieVersion = "0.5.2"
 val logbackVersion = "1.2.3"
 val kamonVersion = "1.1.0"
@@ -52,21 +52,26 @@ lazy val monitoringDependencies = Seq(
   "io.kamon" %% "kamon-influxdb" % "1.0.1"
 )
 
-libraryDependencies ++= (Seq(
+libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % akkaVersion,
   "com.typesafe.akka" %% "akka-stream" % akkaVersion,
   "com.typesafe.akka" %% "akka-persistence" % akkaVersion,
+  "com.typesafe.akka" %% "akka-http-spray-json" % akkaHttpVersion,
   "org.fusesource.leveldbjni" % "leveldbjni-all" % "1.8",
   "org.iq80.leveldb" % "leveldb" % "0.9",
   "javax.xml.bind" % "jaxb-api" % "2.3.0",
   "com.iheart" %% "ficus" % "1.4.2",
   "com.typesafe" % "config" % "1.3.3",
-  "org.bouncycastle" % "bcprov-jdk15on" % "1.58",
+//  "org.bouncycastle" % "bcprov-jdk15on" % "1.60" % Provided,
   "org.whispersystems" % "curve25519-java" % "0.5.0",
   "org.rudogma" %% "supertagged" % "1.4",
   "org.scorexfoundation" %% "iodb" % "0.3.2",
   "io.spray" %% "spray-json" % "1.3.3",
-  "org.encry" %% "encry-common" % "0.9.2",
+  "com.lihaoyi" %% "scalatags" % "0.7.0",
+  // JWT
+  "com.pauldijou" %% "jwt-spray-json" % "4.2.0",
+  "org.bouncycastle" % "bcpkix-jdk15on" % "1.60",
+  "org.encry" %% "encry-common" % "0.9.3",
   "org.scalatest" %% "scalatest" % "3.0.5",
   "org.scalactic" %% "scalactic" % "3.0.5",
   "de.heikoseeberger" %% "akka-http-circe" % "1.20.1",
@@ -89,8 +94,7 @@ libraryDependencies ++= (Seq(
   "org.typelevel" % "cats-macros_2.12" % "2.0.0",
   "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf",
   "com.google.guava" % "guava" % "27.1-jre"
-) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies)
-
+) ++ databaseDependencies ++ apiDependencies ++ loggingDependencies ++ testingDependencies ++ monitoringDependencies
 
 resolvers ++= Seq("Sonatype Releases" at "https://oss.sonatype.org/content/repositories/releases/",
   "SonaType" at "https://oss.sonatype.org/content/groups/public",
@@ -126,7 +130,7 @@ outputStrategy := Some(StdoutOutput)
 
 connectInput in run := true
 
-assemblyJarName in assembly := "EncryCore.jar"
+assemblyJarName in assembly := "Encry.jar"
 
 mainClass in assembly := Some("encry.EncryApp")
 
@@ -143,6 +147,8 @@ assemblyMergeStrategy in assembly := {
   case PathList("reference.conf") => MergeStrategy.concat
   case _ => MergeStrategy.first
 }
+
+unmanagedResourceDirectories in Compile += { baseDirectory.value / "src/main/resources" }
 
 sourceGenerators in Compile += Def.task {
   val versionFile = (sourceManaged in Compile).value / "encry" / "Version.scala"

@@ -1,13 +1,12 @@
 package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{UpdatingPeersInfo}
-import encry.cli.commands.AddPeer.PeerFromCli
-import encry.cli.commands.RemoveFromBlackList.RemovePeerFromBlackList
+import encry.api.http.DataHolderForApi.{ConnectedPeersConnectionHelper, UpdatingPeersInfo}
 import encry.consensus.HistoryConsensus.HistoryComparisonResult
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
@@ -23,6 +22,7 @@ import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatu
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.{HighPriority, InitialPriority}
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.network.BasicMessagesRepo._
+
 import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
@@ -54,9 +54,11 @@ class PeersKeeper(settings: EncryAppSettings,
       self ! SendToNetwork(GetPeersNetworkMessage, SendToRandom)
     )
     context.system.scheduler.schedule(600.millis, settings.blackList.cleanupTime){blackList = blackList.cleanupBlackList}
+    context.system.scheduler.schedule(10.seconds, 5.seconds) (dataHolder ! ConnectedPeersConnectionHelper(connectedPeers))
     context.system.scheduler.schedule(10.seconds, 5.seconds)(
       nodeViewSync ! UpdatedPeersCollection(connectedPeers.collect(getAllPeers, getPeersForDM).toMap)
     )
+    context.system.eventStream.subscribe(self, classOf[PeerCommandHelper])
     context.system.scheduler.schedule(5.seconds, 5.seconds){
       dataHolder ! UpdatingPeersInfo(
         knownPeers.keys.toSeq,
@@ -176,12 +178,14 @@ class PeersKeeper(settings: EncryAppSettings,
 
       case GetPeersNetworkMessage =>
         def findPeersForRemote(add: InetSocketAddress, info: PeerInfo): Boolean =
-          if (remote.socketAddress.getAddress.isSiteLocalAddress) true
-          else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
+          Try {
+            if (remote.socketAddress.getAddress.isSiteLocalAddress) true
+            else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
+          }.getOrElse(false)
 
         val peers: Seq[InetSocketAddress] = connectedPeers.collect(findPeersForRemote, getPeersForRemote)
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
-        logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+        logger.info(s"Remote is side local: ${remote.socketAddress} : ${Try(remote.socketAddress.getAddress.isSiteLocalAddress)}")
         remote.handlerRef ! PeersNetworkMessage(peers)
     }
   }
@@ -240,6 +244,10 @@ class PeersKeeper(settings: EncryAppSettings,
       logger.info(s"Banning peer: ${peer.socketAddress} for $reason.")
       blackList = blackList.banPeer(reason, peer.socketAddress.getAddress)
       peer.handlerRef ! CloseConnection
+
+    case BanPeerFromAPI(peer, reason) =>
+      logger.info(s"Got msg from API... Removing peer: $peer, reason: $reason")
+      blackList = blackList.banPeer(reason, peer.getAddress)
   }
 
   //todo NPE in InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress)
@@ -284,6 +292,8 @@ class PeersKeeper(settings: EncryAppSettings,
 
 object PeersKeeper {
 
+  sealed trait PeerCommandHelper
+
   final case class VerifyConnection(peer: InetSocketAddress,
                                     remoteConnection: ActorRef)
 
@@ -311,6 +321,8 @@ object PeersKeeper {
   final case class UpdatedPeersCollection(peers: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
 
   final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
+
+  final case class BanPeerFromAPI(peer: InetSocketAddress, reason: BanReason) extends PeerCommandHelper
 
   case object GetKnownPeers
 

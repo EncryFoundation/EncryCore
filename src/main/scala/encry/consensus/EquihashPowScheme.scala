@@ -8,7 +8,6 @@ import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import scorex.crypto.hash.Digest32
-
 import scala.math.BigInt
 import cats.syntax.either._
 import encry.crypto.equihash.EquihashValidationErrors._

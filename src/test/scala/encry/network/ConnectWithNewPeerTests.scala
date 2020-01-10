@@ -27,7 +27,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
   val knowPeersSettings = testNetSettings.copy(
     network = testNetSettings.network.copy(
-      knownPeers = Seq(new InetSocketAddress("172.16.11.11", 9001)),
+      knownPeers = List(new InetSocketAddress("172.16.11.11", 9001)),
       connectOnlyWithKnownPeers = Some(true)
     ),
     blackList = testNetSettings.blackList.copy(

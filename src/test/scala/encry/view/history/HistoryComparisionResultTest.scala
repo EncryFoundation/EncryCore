@@ -22,6 +22,7 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
@@ -37,6 +38,7 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.take(50).foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
@@ -52,6 +54,7 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
@@ -68,6 +71,7 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = blocks.foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
@@ -87,6 +91,7 @@ class HistoryComparisionResultTest extends WordSpecLike
 
       val updatedHistory: History = fork._1.take(30).foldLeft(history) { case (hst, block) =>
         hst.append(block.header)
+        hst.updateIdsForSyncInfo()
         hst.append(block.payload)
         hst.reportModifierIsValid(block)
       }
