@@ -178,12 +178,14 @@ class PeersKeeper(settings: EncryAppSettings,
 
       case GetPeersNetworkMessage =>
         def findPeersForRemote(add: InetSocketAddress, info: PeerInfo): Boolean =
-          if (remote.socketAddress.getAddress.isSiteLocalAddress) true
-          else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
+          Try {
+            if (remote.socketAddress.getAddress.isSiteLocalAddress) true
+            else add.getAddress.isSiteLocalAddress && add != remote.socketAddress
+          }.getOrElse(false)
 
         val peers: Seq[InetSocketAddress] = connectedPeers.collect(findPeersForRemote, getPeersForRemote)
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
-        logger.info(s"Remote is side local: ${remote.socketAddress} : ${remote.socketAddress.getAddress.isSiteLocalAddress}")
+        logger.info(s"Remote is side local: ${remote.socketAddress} : ${Try(remote.socketAddress.getAddress.isSiteLocalAddress)}")
         remote.handlerRef ! PeersNetworkMessage(peers)
     }
   }

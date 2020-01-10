@@ -77,15 +77,6 @@ object AccountManager {
       tmpAccount.store.close()
   }
 
-  def tmpInit(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
-    val keysTmpDir: File = new File(s"${settings.directory}/keysTmp")
-    println("keysTmp")
-    keysTmpDir.mkdirs()
-    val accountTmpManagerStore: LSMStore = new LSMStore(keysTmpDir, keepVersions = 0, keySize = 34)
-    val tmpAccount = AccountManager.apply(accountTmpManagerStore, pass, mnemonicKey, 0.toByte)
-    tmpAccount.store.close()
-  }
-
   val AccountPrefix: Byte = 0x05
   val MetaInfoPrefix: Byte = 0x15
 

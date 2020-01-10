@@ -119,7 +119,9 @@ class SnapshotHolder(settings: EncryAppSettings,
               processor.assembleUTXOState match {
                 case Right(state) =>
                   logger.info(s"Tree is valid on Snapshot holder!")
-                  (nodeViewHolder ! FastSyncFinished(state, processor.wallet)).asRight[FastSyncException]
+                  processor.wallet.foreach { wallet: EncryWallet =>
+                    (nodeViewHolder ! FastSyncFinished(state, wallet)).asRight[FastSyncException]
+                  }
                 case _ =>
                   nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
                   restartFastSync(history).asLeft[Unit]
@@ -178,9 +180,9 @@ class SnapshotHolder(settings: EncryAppSettings,
 
     case FastSyncDone =>
       if (settings.snapshotSettings.enableSnapshotCreation) {
+        logger.info(s"Snapshot holder context.become to snapshot processing")
         snapshotProcessor = SnapshotProcessor.recreateAfterFastSyncIsDone(settings)
         snapshotDownloadController.storage.close()
-        logger.info(s"Snapshot holder context.become to snapshot processing")
         context.system.scheduler
           .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
         context.become(workMod(history).orElse(commonMessages))
