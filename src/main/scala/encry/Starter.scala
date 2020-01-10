@@ -32,7 +32,11 @@ import scala.concurrent.Future
 import scala.io.StdIn
 import scala.util.{ Failure, Success, Try }
 
-class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nodeId: Array[Byte]) extends Actor {
+class Starter(settings: EncryAppSettings,
+              timeProvider: NetworkTimeProvider,
+              nodeId: Array[Byte],
+              isStateExists: Boolean,
+              conf: Option[String]) extends Actor {
 
   import context.dispatcher
 
@@ -49,8 +53,10 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
 
   def startNode(): Unit =
     (for {
-      result <- if (!Files.exists(new File(s"${settings.directory}/state").toPath))
+      result <- if (conf.isEmpty && !isStateExists)
                  startEmptyNode
+               else if (conf.nonEmpty && !isStateExists)
+                 startFromConf
                else
                  startNonEmptyNode
     } yield result) match {
@@ -308,6 +314,24 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
     initHttpApiServer = EncryApp.configServer(self).some
     println(s"Server started at: http://0.0.0.0:9051/config")
     new Exception("Node started with http api").asLeft[InitNodeResult]
+  }
+
+  def startFromConf: Either[Throwable, InitNodeResult] = {
+    println("Node will start from config")
+    for {
+      walletPassword <- { println("Please, enter wallet password:"); readAndValidateInput(validatePassword) }
+      nodePass <- {println("Please, enter node password:"); readAndValidateInput(validatePassword)}
+    } yield InitNodeResult(
+      settings.wallet.flatMap(_.seed).getOrElse(""),
+      walletPassword,
+      settings.node.offlineGeneration,
+      settings.snapshotSettings.enableFastSynchronization,
+      settings.network.knownPeers,
+      settings.network.connectOnlyWithKnownPeers.getOrElse(false),
+      nodePass,
+      "",
+      settings.network.declaredAddress,
+      settings.network.bindAddress)
   }
 
   override def preStart(): Unit = startNode()
