@@ -259,8 +259,7 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
                          readAnswer
                        }
       enableSnapshotCreation <- {
-        println(s"Would you like to start snapshot creation? With this mod your node provides fast sync for others. " +
-          s"Enter 'yes' or 'no':")
+        println(s"Would you like to start snapshot creation? Enter 'yes' or 'no':")
         readAnswer
       }
       answerPeers <- {
