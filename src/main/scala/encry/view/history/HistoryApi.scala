@@ -11,7 +11,7 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, Height, ModifierId, ModifierTypeId }
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
@@ -41,61 +41,85 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   lazy val fastSyncInProgress: FastSyncProcessor = FastSyncProcessor(settings)
 
-  def getHeaderById(id: ModifierId): Option[Header] = headersCache
-    .get(ByteArrayWrapper(id))
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-    .orElse(getHeaderByIdDB(id))
-
-  def getBlockByHeaderId(id: ModifierId): Option[Block] =
-    blocksCache
-    .get(ByteArrayWrapper(id))
-    .orElse(headersCache.get(ByteArrayWrapper(id))
-    .flatMap(h => getPayloadByIdDB(h.payloadId).map(p => Block(h, p))))
-    .orElse(getBlockByHeaderIdDB(id))
-
-  def getBlockByHeader(header: Header): Option[Block] = blocksCache
-    .get(ByteArrayWrapper(header.id))
-    .orElse(getPayloadByIdDB(header.payloadId).map(p => Block(header, p)))
-
-  def getBestHeader: Option[Header] = getBestHeaderId.flatMap(id =>
+  def getHeaderById(id: ModifierId): Option[Header] =
     headersCache
       .get(ByteArrayWrapper(id))
       .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
       .orElse(getHeaderByIdDB(id))
-  )
 
-  def getBestHeaderHeight: Int = getBestHeaderId.flatMap(id =>
-    headersCache.get(ByteArrayWrapper(id)).map(_.height)
-      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
-      .orElse(getHeightByHeaderId(id))
-  ).getOrElse(settings.constants.PreGenesisHeight)
-
-  def getBestBlock: Option[Block] = getBestBlockId.flatMap(id =>
-    blocksCache.get(ByteArrayWrapper(id))
+  def getBlockByHeaderId(id: ModifierId): Option[Block] =
+    blocksCache
+      .get(ByteArrayWrapper(id))
+      .orElse(
+        headersCache
+          .get(ByteArrayWrapper(id))
+          .flatMap(h => getPayloadByIdDB(h.payloadId).map(p => Block(h, p)))
+      )
       .orElse(getBlockByHeaderIdDB(id))
-  )
 
-  def getBestBlockHeight: Int = getBestBlockId
-    .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header.height).orElse(getHeightByHeaderId(id)))
-    .getOrElse(settings.constants.PreGenesisHeight)
+  def getBlockByHeader(header: Header): Option[Block] =
+    blocksCache
+      .get(ByteArrayWrapper(header.id))
+      .orElse(getPayloadByIdDB(header.payloadId).map(p => Block(header, p)))
 
-  def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(id =>
-    headersCache.get(ByteArrayWrapper(id))
-      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-      .orElse(getHeaderByIdDB(id))
-  )
+  def getBestHeader: Option[Header] =
+    getBestHeaderId.flatMap(
+      id =>
+        headersCache
+          .get(ByteArrayWrapper(id))
+          .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+          .orElse(getHeaderByIdDB(id))
+    )
+
+  def getBestHeaderHeight: Int =
+    getBestHeaderId
+      .flatMap(
+        id =>
+          headersCache
+            .get(ByteArrayWrapper(id))
+            .map(_.height)
+            .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
+            .orElse(getHeightByHeaderId(id))
+      )
+      .getOrElse(settings.constants.PreGenesisHeight)
+
+  def getBestBlock: Option[Block] =
+    getBestBlockId.flatMap(
+      id =>
+        blocksCache
+          .get(ByteArrayWrapper(id))
+          .orElse(getBlockByHeaderIdDB(id))
+    )
+
+  def getBestBlockHeight: Int =
+    getBestBlockId
+      .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header.height).orElse(getHeightByHeaderId(id)))
+      .getOrElse(settings.constants.PreGenesisHeight)
+
+  def getHeaderOfBestBlock: Option[Header] =
+    getBestBlockId.flatMap(
+      id =>
+        headersCache
+          .get(ByteArrayWrapper(id))
+          .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
+          .orElse(getHeaderByIdDB(id))
+    )
 
   def getBestHeaderAtHeight(h: Int): Option[Header] = getBestHeaderAtHeightDB(h)
 
-  def getBlockByPayload(payload: Payload): Option[Block] = headersCache
-    .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
-    .orElse(blocksCache.get(ByteArrayWrapper(payload.headerId)))
-    .orElse(getHeaderById(payload.headerId).flatMap(h => Some(Block(h, payload))))
+  def getBlockByPayload(payload: Payload): Option[Block] =
+    headersCache
+      .get(ByteArrayWrapper(payload.headerId))
+      .map(h => Block(h, payload))
+      .orElse(blocksCache.get(ByteArrayWrapper(payload.headerId)))
+      .orElse(getHeaderById(payload.headerId).flatMap(h => Some(Block(h, payload))))
 
-  def getHeightByHeaderId(id: ModifierId): Option[Int] = headersCache
-    .get(ByteArrayWrapper(id)).map(_.height)
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
-    .orElse(getHeightByHeaderIdDB(id))
+  def getHeightByHeaderId(id: ModifierId): Option[Int] =
+    headersCache
+      .get(ByteArrayWrapper(id))
+      .map(_.height)
+      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
+      .orElse(getHeightByHeaderIdDB(id))
 
   def isBestBlockDefined: Boolean =
     getBestBlockId.map(id => blocksCache.contains(ByteArrayWrapper(id))).isDefined ||
@@ -110,33 +134,39 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       isModifierDefined(id)
 
   def getBestHeaderIdAtHeight(h: Int): Option[ModifierId] = getBestHeaderIdAtHeightDB(h)
-  def headerIdsAtHeight(height: Int): Seq[ModifierId] = headerIdsAtHeightDB(height)
-    .getOrElse(Seq.empty[ModifierId])
+  def headerIdsAtHeight(height: Int): Seq[ModifierId] =
+    headerIdsAtHeightDB(height)
+      .getOrElse(Seq.empty[ModifierId])
 
-  def modifierBytesById(id: ModifierId): Option[Array[Byte]] = headersCache
-    .get(ByteArrayWrapper(id)).map(h => HeaderProtoSerializer.toProto(h).toByteArray)
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(b => BlockProtoSerializer.toProto(b).toByteArray))
-    .orElse(modifierBytesByIdDB(id))
+  def modifierBytesById(id: ModifierId): Option[Array[Byte]] =
+    headersCache
+      .get(ByteArrayWrapper(id))
+      .map(h => HeaderProtoSerializer.toProto(h).toByteArray)
+      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(b => BlockProtoSerializer.toProto(b).toByteArray))
+      .orElse(modifierBytesByIdDB(id))
 
-  def lastHeaders(count: Int): HeaderChain = getBestHeader
-    .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
-    .getOrElse(HeaderChain.empty)
+  def lastHeaders(count: Int): HeaderChain =
+    getBestHeader
+      .map(bestHeader => headerChainBack(count, bestHeader, _ => false))
+      .getOrElse(HeaderChain.empty)
 
-  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = (offset until (count + offset))
-    .flatMap(getBestHeaderIdAtHeight)
+  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] =
+    (offset until (count + offset))
+      .flatMap(getBestHeaderIdAtHeight)
 
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): Seq[ModifierId] = {
     @tailrec def continuation(height: Int, acc: Seq[ModifierId]): Seq[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else if (height > lastAvailableManifestHeight && fastSyncInProgress.fastSyncVal) acc
-      else getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
-        case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
-          continuation(height + 1, acc :+ h.payloadId)
-        case Some(_) =>
-          continuation(height + 1, acc)
-        case None =>
-          acc
-      }
+      else
+        getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
+          case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
+            continuation(height + 1, acc :+ h.payloadId)
+          case Some(_) =>
+            continuation(height + 1, acc)
+          case None =>
+            acc
+        }
 
     (for {
       bestBlockId             <- getBestBlockId
@@ -166,41 +196,50 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     } else none
 
   def headerChainBack(limit: Int, startHeader: Header, until: Header => Boolean): HeaderChain = {
-    @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] = {
+    @tailrec def loop(header: Header, acc: Seq[Header]): Seq[Header] =
       if (acc.length == limit || until(header)) acc
-      else getHeaderById(header.parentId) match {
-        case Some(parent: Header)         => loop(parent, acc :+ parent)
-        case None if acc.contains(header) => acc
-        case _                            => acc :+ header
-      }
-    }
+      else
+        getHeaderById(header.parentId) match {
+          case Some(parent: Header)         => loop(parent, acc :+ parent)
+          case None if acc.contains(header) => acc
+          case _                            => acc :+ header
+        }
 
     if (getBestHeaderId.isEmpty || (limit == 0)) HeaderChain(Seq.empty)
     else HeaderChain(loop(startHeader, Seq(startHeader)).reverse)
   }
 
-  @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
-    .find(p)
-    .flatMap(getHeaderById) match {
-      case h@Some(_)                                       => h
+  @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] =
+    headerIdsAtHeight(height)
+      .find(p)
+      .flatMap(getHeaderById) match {
+      case h @ Some(_)                                       => h
       case None if height > settings.constants.GenesisHeight => loopHeightDown(height - 1, p)
-      case n@None                                          => n
-  }
+      case n @ None                                          => n
+    }
 
   def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
-    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(Height @@ (parent.height + 1),
-      settings.constants.EpochLength, settings.constants.RetargetingEpochsQty)
+    val requiredHeights: Seq[Height] = PowLinearController.getHeightsForRetargetingAt(
+      Height @@ (parent.height + 1),
+      settings.constants.EpochLength,
+      settings.constants.RetargetingEpochsQty
+    )
     for {
-      _ <- Either.cond(requiredHeights.lastOption.contains(parent.height), (),
-        HistoryApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
+      _ <- Either.cond(requiredHeights.lastOption.contains(parent.height),
+                       (),
+                       HistoryApiError("Incorrect heights sequence in requiredDifficultyAfter function"))
       chain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
       requiredHeaders = (requiredHeights.min to requiredHeights.max)
         .zip(chain.headers)
         .filter(p => requiredHeights.contains(p._1))
-      _ <- Either.cond(requiredHeights.length == requiredHeaders.length, (),
-        HistoryApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
-    } yield PowLinearController.getDifficulty(requiredHeaders, settings.constants.EpochLength,
-      settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
+      _ <- Either.cond(requiredHeights.length == requiredHeaders.length,
+                       (),
+                       HistoryApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}"))
+    } yield
+      PowLinearController.getDifficulty(requiredHeaders,
+                                        settings.constants.EpochLength,
+                                        settings.constants.DesiredBlockInterval,
+                                        settings.constants.InitialDifficulty)
   }
 
   def syncInfo: SyncInfo = lastSyncInfo
@@ -219,7 +258,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
     /* Other history is empty, or our history contains last id from other history */
     case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isHeaderDefined) => Younger
-    case Some(_) =>
+    case Some(_)                                                                                    =>
       //Our history contains some ids from other history
       if (si.lastHeaderIds.exists(isHeaderDefined)) Fork
       //Unknown comparison result
@@ -238,7 +277,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
         startId     <- headerIdsAtHeight(heightFrom).headOption
         startHeader <- getHeaderById(startId)
       } yield headerChainBack(size, startHeader, _ => false)) match {
-        case Some(value) if value.headers.exists(_.height == settings.constants.GenesisHeight) => value.headers.map(_.id)
+        case Some(value) if value.headers.exists(_.height == settings.constants.GenesisHeight) =>
+          value.headers.map(_.id)
         case _ => Seq.empty
       }
     } else {
@@ -246,19 +286,18 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       (for {
         lastHeaderInOurBestChain <- ids.view.reverse.find(m => isInBestChain(m))
         theirHeight              <- heightOf(lastHeaderInOurBestChain)
-        heightFrom = Math.min(getBestHeaderHeight, theirHeight + size)
+        heightFrom               = Math.min(getBestHeaderHeight, theirHeight + size)
         startId                  <- headerIdsAtHeight(heightFrom).headOption
         startHeader              <- getHeaderById(startId)
-      } yield headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
-          .headers
+      } yield
+        headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain).headers
           .map(_.id)) match {
-            case Some(value) => value
-            case None        => Seq.empty
+        case Some(value) => value
+        case None        => Seq.empty
       }
     }
 
-  def commonBlockThenSuffixes(header1: Header,
-                              header2: Header): (HeaderChain, HeaderChain) = {
+  def commonBlockThenSuffixes(header1: Header, header2: Header): (HeaderChain, HeaderChain) = {
     val heightDelta: Int = Math.max(header1.height - header2.height, 0)
 
     @scala.annotation.tailrec
@@ -284,13 +323,13 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     loop(2, HeaderChain(Seq(header2)))
   }
 
-  def getChainToHeader(fromHeaderOpt: Option[Header],
-                       toHeader: Header): (Option[ModifierId], HeaderChain) = fromHeaderOpt match {
-    case Some(h1) =>
-      val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
-      (prevChain.headOption.map(_.id), newChain.tail)
-    case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
-  }
+  def getChainToHeader(fromHeaderOpt: Option[Header], toHeader: Header): (Option[ModifierId], HeaderChain) =
+    fromHeaderOpt match {
+      case Some(h1) =>
+        val (prevChain, newChain) = commonBlockThenSuffixes(h1, toHeader)
+        (prevChain.headOption.map(_.id), newChain.tail)
+      case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
+    }
 
   def isNewHeader(header: Header): Boolean =
     timeProvider.estimatedTime - header.timestamp <
@@ -298,18 +337,16 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
-  def continuationHeaderChains(header: Header,
-                               filterCond: Header => Boolean): Seq[Seq[Header]] = {
+  def continuationHeaderChains(header: Header, filterCond: Header => Boolean): Seq[Seq[Header]] = {
     @tailrec def loop(currentHeight: Int, acc: Seq[Seq[Header]]): Seq[Seq[Header]] = {
-      val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1)
-        .view
+      val nextHeightHeaders: Seq[Header] = headerIdsAtHeight(currentHeight + 1).view
         .flatMap(getHeaderById)
         .filter(filterCond)
         .toList
       if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
       else {
-        val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(h =>
-          acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
+        val updatedChains: Seq[Seq[Header]] = nextHeightHeaders.flatMap(
+          h => acc.find(chain => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
         )
         val nonUpdatedChains: Seq[Seq[Header]] =
           acc.filter(chain => !nextHeightHeaders.exists(_.parentId sameElements chain.head.id))
@@ -345,7 +382,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       logger.debug(s"Should add ${Algos.encode(b.id)} to block cache")
       val newBlocksIdsAtBlockHeight = blocksCacheIndexes.getOrElse(b.header.height, Seq.empty[ModifierId]) :+ b.id
       blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
-      blocksCache = blocksCache + (ByteArrayWrapper(b.id) -> b)
+      blocksCache = blocksCache + (ByteArrayWrapper(b.id)        -> b)
       // cleanup cache if necessary
       if (blocksCacheIndexes.size > settings.constants.MaxRollbackDepth) {
         blocksCacheIndexes.get(getBestBlockHeight - settings.constants.MaxRollbackDepth).foreach { blocksIds =>

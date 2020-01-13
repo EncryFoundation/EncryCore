@@ -2,7 +2,7 @@ package encry.view.history
 
 import cats.syntax.option.none
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import org.encryfoundation.common.modifiers.history.Payload
 
 trait FastSyncProcessor extends HistoryApi {
@@ -18,8 +18,10 @@ trait FastSyncProcessor extends HistoryApi {
         StorageVersion @@ validityKey(block.payload.id).untag(StorageKey),
         List(block.header.id, block.payload.id).map(id => validityKey(id) -> StorageValue @@ Array(1.toByte))
       )
-      logger.info(s"Finished processing block ${block.encodedId}. " +
-        s"Processing time is ${(System.currentTimeMillis() - startTime) / 1000} s")
+      logger.info(
+        s"Finished processing block ${block.encodedId}. " +
+          s"Processing time is ${(System.currentTimeMillis() - startTime) / 1000} s"
+      )
     }
     ProgressInfo(none, Seq.empty, Seq.empty, none)
   }
