@@ -38,12 +38,12 @@ trait HistoryModifiersValidator { historyApi: HistoryApi =>
 
   private def isSemanticallyValid(modifierId: ModifierId): ModifierSemanticValidity = historyStorage
     .get(validityKey(modifierId)) match {
-    case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
-    case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
-    case None if isModifierDefined(modifierId)          => ModifierSemanticValidity.Unknown
-    case None                                           => ModifierSemanticValidity.Absent
-    case mod                                            => logger.error(s"Incorrect validity status: $mod")
-                                                           ModifierSemanticValidity.Absent
+      case Some(mod) if mod.headOption.contains(1.toByte) => ModifierSemanticValidity.Valid
+      case Some(mod) if mod.headOption.contains(0.toByte) => ModifierSemanticValidity.Invalid
+      case None if isModifierDefined(modifierId)          => ModifierSemanticValidity.Unknown
+      case None                                           => ModifierSemanticValidity.Absent
+      case mod                                            => logger.error(s"Incorrect validity status: $mod")
+                                                             ModifierSemanticValidity.Absent
   }
 
   private def genesisBlockHeaderValidator(h: Header): Either[ValidationError, Header] = for {
