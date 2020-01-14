@@ -182,9 +182,9 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   @tailrec final def loopHeightDown(height: Int, p: ModifierId => Boolean): Option[Header] = headerIdsAtHeight(height)
     .find(p)
     .flatMap(getHeaderById) match {
-    case h@Some(_)                                       => h
+    case h@Some(_)                                         => h
     case None if height > settings.constants.GenesisHeight => loopHeightDown(height - 1, p)
-    case n@None                                          => n
+    case n@None                                            => n
   }
 
   def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
@@ -252,8 +252,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       } yield headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain)
         .headers
         .map(_.id)) match {
-        case Some(value) => value
-        case None        => Seq.empty
+          case Some(value) => value
+          case None        => Seq.empty
       }
     }
 

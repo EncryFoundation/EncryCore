@@ -43,7 +43,7 @@ trait HistoryModifiersValidator { historyApi: HistoryApi =>
     case None if isModifierDefined(modifierId)          => ModifierSemanticValidity.Unknown
     case None                                           => ModifierSemanticValidity.Absent
     case mod                                            => logger.error(s"Incorrect validity status: $mod")
-      ModifierSemanticValidity.Absent
+                                                           ModifierSemanticValidity.Absent
   }
 
   private def genesisBlockHeaderValidator(h: Header): Either[ValidationError, Header] = for {
