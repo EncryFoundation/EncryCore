@@ -9,7 +9,7 @@ import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, ModifierId }
 
-trait HistoryHeadersProcessor extends HistoryApi {
+trait HistoryHeadersProcessor { historyApi: HistoryApi =>
 
   def processHeader(h: Header): ProgressInfo = getHeaderInfoUpdate(h) match {
     case dataToUpdate: Seq[_] if dataToUpdate.nonEmpty =>

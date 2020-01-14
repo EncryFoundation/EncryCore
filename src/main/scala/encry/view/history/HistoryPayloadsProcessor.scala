@@ -8,7 +8,7 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 
-trait HistoryPayloadsProcessor extends HistoryApi {
+trait HistoryPayloadsProcessor { historyApi: HistoryApi =>
 
   def processPayload(payload: Payload): ProgressInfo =
     getBlockByPayload(payload).flatMap { block =>
@@ -66,7 +66,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
               scoreOf(fullBlock.id)
                 .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
                 .getOrElse(false)
-          )
+            )
         val updatedHeadersAtHeightIds =
           newChain.headers.map(header => updatedBestHeaderAtHeightRaw(header.id, Height @@ header.height)).toList
         updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader, updatedHeadersAtHeightIds)
