@@ -21,7 +21,7 @@ import cats.syntax.either._
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
-trait History extends HistoryModifiersValidator with HistoryApi with AutoCloseable {
+trait History extends HistoryApi with HistoryModifiersValidator  with AutoCloseable {
 
   var isFullChainSynced: Boolean
 
