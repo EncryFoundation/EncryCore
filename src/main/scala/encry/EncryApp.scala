@@ -30,9 +30,9 @@ object EncryApp extends App with StrictLogging {
   implicit val ec: ExecutionContextExecutor    = system.dispatcher
   implicit val materializer: ActorMaterializer = ActorMaterializer()
 
-  val isStateEmpty: Boolean = Files.exists(new File(s"${settings.directory}/state").toPath)
+  val isStateExists: Boolean = Files.exists(new File(s"${settings.directory}/state").toPath)
 
-  lazy val settings: EncryAppSettings   = EncryAppSettings.read(args.headOption, isStateEmpty)
+  lazy val settings: EncryAppSettings   = EncryAppSettings.read(args.headOption, isStateExists)
   val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   val swaggerConfig: String = Source.fromResource("api/openapi.yaml").getLines.mkString("\n")
@@ -43,7 +43,7 @@ object EncryApp extends App with StrictLogging {
     )
     .take(5)
 
-  val starter = system.actorOf(Props(new Starter(settings, timeProvider, nodeId, isStateEmpty, args.headOption)))
+  val starter = system.actorOf(Props(new Starter(settings, timeProvider, nodeId, isStateExists, args.headOption)))
   if (settings.monitoringSettings.exists(_.kamonEnabled)) {
     Kamon.reconfigure(EncryAppSettings.allConfig)
     Kamon.addReporter(new InfluxDBReporter())

@@ -1,12 +1,10 @@
 package encry
 
-import java.io.File
 import java.net.InetSocketAddress
-import java.nio.file.Files
-import akka.actor.{ Actor, ActorRef }
+import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{NonEmptyChain, Validated}
 import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.apply._
@@ -17,25 +15,26 @@ import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{ prompt, StartListening }
+import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
 import encry.settings._
 import encry.stats.StatsSender
-import encry.utils.{ Mnemonic, NetworkTimeProvider }
+import encry.utils.{Mnemonic, NetworkTimeProvider}
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
               nodeId: Array[Byte],
               isStateExists: Boolean,
-              conf: Option[String]) extends Actor {
+              conf: Option[String])
+    extends Actor {
 
   import context.dispatcher
 
@@ -329,21 +328,30 @@ class Starter(settings: EncryAppSettings,
 
   def startFromConf: Either[Throwable, InitNodeResult] = {
     println("Node will start from config")
+    println(settings.network.nodeName)
     for {
       walletPassword <- { println("Please, enter wallet password:"); readAndValidateInput(validatePassword) }
-      nodePass <- {println("Please, enter node password:"); readAndValidateInput(validatePassword)}
-    } yield InitNodeResult(
-      settings.wallet.flatMap(_.seed).getOrElse(""),
-      walletPassword,
-      settings.node.offlineGeneration,
-      settings.snapshotSettings.enableFastSynchronization,
-      settings.snapshotSettings.enableSnapshotCreation,
-      settings.network.knownPeers,
-      settings.network.connectOnlyWithKnownPeers.getOrElse(false),
-      nodePass,
-      "",
-      settings.network.declaredAddress,
-      settings.network.bindAddress)
+      nodePass       <- { println("Please, enter node password:"); readAndValidateInput(validatePassword) }
+      frontName <- {
+        if (settings.network.nodeName.contains("")) {
+          println("Please, enter node name:")
+          readAndValidateInput(validateNodeName)
+        } else settings.network.nodeName.get.asRight
+      }
+    } yield
+      InitNodeResult(
+        settings.wallet.flatMap(_.seed).getOrElse(""),
+        walletPassword,
+        settings.node.offlineGeneration,
+        settings.snapshotSettings.enableFastSynchronization,
+        settings.snapshotSettings.enableSnapshotCreation,
+        settings.network.knownPeers,
+        settings.network.connectOnlyWithKnownPeers.getOrElse(false),
+        nodePass,
+        frontName,
+        settings.network.declaredAddress,
+        settings.network.bindAddress
+      )
   }
 
   override def preStart(): Unit = startNode()
@@ -382,10 +390,9 @@ class Starter(settings: EncryAppSettings,
         network = networkSettings,
         snapshotSettings = snapshotSettings
       )
-      val influxRef: Option[ActorRef] = newSettings.influxDB.map {
-        influxSettings =>
-          context.system
-            .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
+      val influxRef: Option[ActorRef] = newSettings.influxDB.map { influxSettings =>
+        context.system
+          .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
