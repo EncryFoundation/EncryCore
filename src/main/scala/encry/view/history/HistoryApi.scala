@@ -46,13 +46,6 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
     .orElse(getHeaderByIdDB(id))
 
-  def getBlockByHeaderId(id: ModifierId): Option[Block] =
-    blocksCache
-    .get(ByteArrayWrapper(id))
-    .orElse(headersCache.get(ByteArrayWrapper(id))
-    .flatMap(h => getPayloadByIdDB(h.payloadId).map(p => Block(h, p))))
-    .orElse(getBlockByHeaderIdDB(id))
-
   def getBlockByHeader(header: Header): Option[Block] = blocksCache
     .get(ByteArrayWrapper(header.id))
     .orElse(getPayloadByIdDB(header.payloadId).map(p => Block(header, p)))
