@@ -13,7 +13,6 @@ import cats.syntax.apply._
 import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
-import encry.EncryApp.system
 import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
@@ -79,6 +78,7 @@ class Starter(settings: EncryAppSettings,
         walletPassword,
         settings.node.offlineGeneration,
         fastSync = false,
+        settings.snapshotSettings.enableSnapshotCreation,
         settings.network.knownPeers,
         settings.network.connectOnlyWithKnownPeers.getOrElse(false),
         "",
@@ -145,6 +145,9 @@ class Starter(settings: EncryAppSettings,
   def validatePassword(password: String): Validated[NonEmptyChain[String], String] =
     if (password.nonEmpty) password.validNec else "Password is empty".invalidNec
 
+  def validateNodeName(nodeName: String): Validated[NonEmptyChain[String], String] =
+    if (nodeName.nonEmpty) nodeName.validNec else "Node name is empty".invalidNec
+
   def startWithCli: Either[Throwable, InitNodeResult] = {
 
     def validateMnemonicKey(mnemonic: String): Validated[NonEmptyChain[String], String] = {
@@ -173,7 +176,7 @@ class Starter(settings: EncryAppSettings,
             }
           }
         Either.catchNonFatal {
-          println("Enter address:")
+          println("Peer example is: '172.168.1.1:9032'. \nEnter address:")
           val addr = StdIn.readLine(prompt)
           Try {
             val split = addr.split(':')
@@ -243,6 +246,10 @@ class Starter(settings: EncryAppSettings,
                       println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
                       phrase.asRight[Throwable]
                     }
+      nameNode <- {
+        println(s"Enter node name:")
+        readAndValidateInput(validateNodeName)
+      }
       startOwnChain <- {
         println("Would you like to start your chain? If you want - enter 'yes', otherwise no:")
         readAnswer
@@ -257,13 +264,16 @@ class Starter(settings: EncryAppSettings,
                          )
                          readAnswer
                        }
+      enableSnapshotCreation <- {
+        println(s"Would you like to start snapshot creation? Enter 'yes' or 'no':")
+        readAnswer
+      }
       answerPeers <- {
         if (startOwnChain) false.asRight[Throwable]
         else {
           println(
             "Would you like to enter peers to connect with? \n" +
               "These are peers that you want to connect with. \n" +
-              "Peer example is: '172.168.1.1:9032'.\n " +
               "Enter 'yes' or 'no':"
           )
           readAnswer
@@ -300,10 +310,11 @@ class Starter(settings: EncryAppSettings,
         walletPassword,
         startOwnChain,
         enableFastSync,
+        enableSnapshotCreation,
         peers,
         connectWithOnlyKnownPeers,
-        nodePass = "",
-        nodeName = "Default",
+        nodePass = "", //todo incorrect?
+        nodeName = nameNode,
         declaredAddress.some,
         bindAddress
       )
@@ -341,6 +352,7 @@ class Starter(settings: EncryAppSettings,
                         password,
                         offlineGeneration,
                         fastSync,
+                        snapshotCreation,
                         peers,
                         connectWithOnlyKnownPeers,
                         nodePass,
@@ -350,7 +362,6 @@ class Starter(settings: EncryAppSettings,
       import scala.concurrent.duration._
       Functor[Option].compose[Future].map(initHttpApiServer)(_.terminate(3.seconds))
       if (mnemonic.nonEmpty) AccountManager.init(mnemonic, password, settings)
-      else AccountManager.tmpInit(mnemonic, password, settings)
       val walletSettings: Option[WalletSettings] = settings.wallet.map(_.copy(password = password))
       val nodeSettings: NodeSettings             = settings.node.copy(offlineGeneration = offlineGeneration)
       val networkSettings: NetworkSettings =
@@ -360,17 +371,21 @@ class Starter(settings: EncryAppSettings,
                               declaredAddress = declaredAddr,
                               bindAddress = bindAddr)
 
-      val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(enableFastSynchronization = fastSync)
+      val snapshotSettings: SnapshotSettings = settings.snapshotSettings.copy(
+        enableFastSynchronization = fastSync,
+        enableSnapshotCreation = snapshotCreation
+      )
       val newSettings = settings.copy(
         wallet = walletSettings,
         node = nodeSettings,
         network = networkSettings,
         snapshotSettings = snapshotSettings
       )
-      val influxRef: Option[ActorRef] = newSettings.influxDB.map(
+      val influxRef: Option[ActorRef] = newSettings.influxDB.map {
         influxSettings =>
-          system.actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
-      )
+          context.system
+            .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
+      }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
       lazy val miner: ActorRef =
@@ -412,6 +427,7 @@ object Starter {
                                   walletPassword: String,
                                   offlineGeneration: Boolean,
                                   fastSync: Boolean,
+                                  snapshotCreation: Boolean,
                                   peers: List[InetSocketAddress],
                                   connectWithOnlyKnownPeers: Boolean,
                                   nodePass: String = "",

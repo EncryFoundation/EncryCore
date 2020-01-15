@@ -485,7 +485,19 @@ case class ConfigRoute(settings: RESTApiSettings, starter: ActorRef)(
           case Failure(_) => new InetSocketAddress("0.0.0.0", 9001)
         }
 
-        starter ! InitNodeResult(mnemonic, password, chainR, syncR, peerR, cwpR, nodePass, nodeName, declared, bind)
+        starter ! InitNodeResult(
+          mnemonic,
+          password,
+          chainR,
+          syncR,
+          snapshotCreation = false, //todo incorrect
+          peerR,
+          connectWithOnlyKnownPeers = cwpR,
+          nodePass,
+          nodeName,
+          declared,
+          bind
+        )
         complete("OK")
     }
   }
