@@ -333,14 +333,20 @@ class Starter(settings: EncryAppSettings,
       walletPassword <- { println("Please, enter wallet password:"); readAndValidateInput(validatePassword) }
       nodePass       <- { println("Please, enter node password:"); readAndValidateInput(validatePassword) }
       frontName <- {
-        if (settings.network.nodeName.contains("")) {
+        if (settings.network.nodeName.exists(_.isEmpty)) {
           println("Please, enter node name:")
           readAndValidateInput(validateNodeName)
         } else settings.network.nodeName.get.asRight
       }
+    mnemonic <- {if (settings.wallet.flatMap(_.seed).exists(_.isEmpty)) {
+      val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+      println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
+      phrase.asRight[Throwable]
+      } else settings.wallet.flatMap(_.seed).get.asRight
+    }
     } yield
       InitNodeResult(
-        settings.wallet.flatMap(_.seed).getOrElse(""),
+        mnemonic,
         walletPassword,
         settings.node.offlineGeneration,
         settings.snapshotSettings.enableFastSynchronization,
