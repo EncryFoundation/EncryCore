@@ -12,7 +12,7 @@ import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.storage.levelDb.versionalLevelDB._
 import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider}
-import encry.view.history.History
+import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor}
 import encry.view.history.storage.HistoryStorage
 import encry.view.state.avlTree.AvlTree
 import encry.view.state.{BoxHolder, UtxoState}
@@ -424,9 +424,9 @@ object Utils extends Settings with StrictLogging {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
-    new History {
-      override  val historyStorage: HistoryStorage = storage
-      override  val timeProvider: NetworkTimeProvider = ntp
+    new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+      override val historyStorage: HistoryStorage = storage
+      override val timeProvider: NetworkTimeProvider = ntp
       override val settings: EncryAppSettings = settings
     }
   }

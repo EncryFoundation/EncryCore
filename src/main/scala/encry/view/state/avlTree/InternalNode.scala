@@ -15,8 +15,8 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
                                                                                       value: V,
                                                                                       height: Int,
                                                                                       balance: Int,
-                                                                                      leftChild: Option[Node[K, V]],
-                                                                                      rightChild: Option[Node[K, V]])
+                                                                                      leftChild: Node[K, V],
+                                                                                      rightChild: Node[K, V])
     extends Node[K, V] {
 
   override lazy val hash: Array[Byte] = {
@@ -27,48 +27,40 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
         serV.toBytes(value),
         Ints.toByteArray(height),
         Ints.toByteArray(balance),
-        leftChild.map(_.hash).getOrElse(Array.emptyByteArray),
-        rightChild.map(_.hash).getOrElse(Array.emptyByteArray)
+        leftChild.hash,
+        rightChild.hash
       )
     )
   }
 
-  override def selfInspection: Node[K, V] =
-    if (leftChild.isEmpty & rightChild.isEmpty) LeafNode(key, value)
-    else this
+  override def selfInspection: Node[K, V] = (leftChild, rightChild) match {
+    case (_: EmptyNode[K, V], _: EmptyNode[K, V]) => LeafNode(key, value)
+    case (_, _) => this
+  }
 
-  def updateChilds(newLeftChild: Option[Node[K, V]] = leftChild,
-                   newRightChild: Option[Node[K, V]] = rightChild): Node[K, V] = {
+  def updateChilds(newLeftChild: Node[K, V] = leftChild,
+                   newRightChild: Node[K, V] = rightChild): Node[K, V] = {
     val hashK = implicitly[Hashable[K]]
-    val newLeftChildAfterInspect =
-      newLeftChild.map { node =>
-        val resOp = node.selfInspection
-        Some(resOp)
-      }.getOrElse(Option.empty[Node[K, V]])
-    val newRightChildAfterInspect =
-      newRightChild.map { node =>
-        val resOp = node.selfInspection
-        Some(resOp)
-      }.getOrElse(Option.empty[Node[K, V]])
+    val newLeftChildAfterInspect = newLeftChild.selfInspection
+    val newRightChildAfterInspect = newRightChild.selfInspection
     this.copy(
       leftChild = newLeftChildAfterInspect,
       rightChild = newRightChildAfterInspect,
-      balance = newLeftChildAfterInspect
-        .map(_.height)
-        .getOrElse(-1) - newRightChildAfterInspect.map(_.height).getOrElse(-1),
-      height = Math.max(newLeftChildAfterInspect.map(_.height).getOrElse(-1),
-                        newRightChildAfterInspect.map(_.height).getOrElse(0)) + 1
+      balance = newLeftChildAfterInspect.height - newRightChildAfterInspect.height,
+      height = Math.max(
+        newLeftChildAfterInspect.height,
+        if (newRightChildAfterInspect.height == -1) 0 else newRightChildAfterInspect.height
+      ) + 1
     )
   }
 
   override def toString: String =
-    s"[($key," +
-      s" $value," +
+    s"[(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}," +
+      s" ${Algos.encode(implicitly[Serializer[V]].toBytes(value))}," +
       s" height: $height," +
       s" balance $balance, " +
       s" hash: ${Algos.encode(hash)}) \n-> LeftChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}):" +
-      s"${leftChild.map(_.toString)}, \n-> RightChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}): ${rightChild
-        .map(_.toString)}]"
+      s"${leftChild}, \n-> RightChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}): ${rightChild}]"
 }
 
 object InternalNode {
@@ -79,14 +71,18 @@ object InternalNode {
       .withHeight(node.height)
       .withKey(ByteString.copyFrom(kSer.toBytes(node.key)))
       .withValue(ByteString.copyFrom(vSer.toBytes(node.value)))
-    val withLeftChild = node.leftChild.map { leftChild =>
-      val child: NodeProtoMsg = NodeSerilalizer.toProto(leftChild)
-      msg.withLeftChild(child)
-    }.getOrElse(msg)
-    node.rightChild.map { rightChild =>
-      val child: NodeProtoMsg = NodeSerilalizer.toProto(rightChild)
-      withLeftChild.withRightChild(child)
-    }.getOrElse(withLeftChild)
+    val withLeftChild = node.leftChild match {
+      case _: EmptyNode[K, V] => msg
+      case nonEmpty: Node[K, V] =>
+        val child: NodeProtoMsg = NodeSerilalizer.toProto(nonEmpty)
+        msg.withLeftChild(child)
+    }
+    node.rightChild match {
+      case _: EmptyNode[K, V] => withLeftChild
+      case nonEmpty: Node[K, V] =>
+        val child: NodeProtoMsg = NodeSerilalizer.toProto(nonEmpty)
+        withLeftChild.withRightChild(child)
+    }
   }
 
   def fromProto[K: Monoid: Hashable, V: Monoid](
@@ -97,13 +93,13 @@ object InternalNode {
       value = vSer.fromBytes(protoInternal.value.toByteArray),
       height = protoInternal.height,
       balance = protoInternal.balance,
-      leftChild = protoInternal.leftChild.map(elem => NodeSerilalizer.fromProto[K, V](elem)),
-      rightChild = protoInternal.rightChild.map(elem => NodeSerilalizer.fromProto[K, V](elem))
+      leftChild = protoInternal.leftChild.map(elem => NodeSerilalizer.fromProto[K, V](elem)).getOrElse(EmptyNode[K, V]),
+      rightChild = protoInternal.rightChild.map(elem => NodeSerilalizer.fromProto[K, V](elem)).getOrElse(EmptyNode[K, V])
     )
   }
 
   def apply[K: Serializer: Monoid, V: Serializer: Monoid](key: K, value: V, height: Int, balance: Int)(
     implicit hash: Hashable[K]
   ): InternalNode[K, V] =
-    new InternalNode(key, value, height, balance, None, None)
+    new InternalNode(key, value, height, balance, EmptyNode[K, V], EmptyNode[K, V])
 }

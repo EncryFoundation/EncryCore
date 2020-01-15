@@ -53,6 +53,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
+    logger.info(s"new root: $newRoot")
     logger.info(s"avl insert time: ${(System.currentTimeMillis() - insertStartTime)/1000L}")
     val notChangedKeysStart = System.currentTimeMillis()
     //val notChangedKeys = getNewNodesWithFirstUnchanged(newRoot).toSet
@@ -104,13 +105,14 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       if (storage.contains(StorageKey @@ internal.hash)) {
         List(ByteArrayWrapper(internal.hash))
       } else {
-        val leftScan = internal.leftChild.map(getNewNodesWithFirstUnchanged).getOrElse(List.empty)
-        val rightScan = internal.rightChild.map(getNewNodesWithFirstUnchanged).getOrElse(List.empty)
+        val leftScan = getNewNodesWithFirstUnchanged(internal.leftChild)
+        val rightScan = getNewNodesWithFirstUnchanged(internal.rightChild)
         leftScan ::: rightScan
       }
     case leafNode: LeafNode[K, V] =>
       if (storage.contains(StorageKey @@ leafNode.hash)) ByteArrayWrapper(leafNode.hash) :: Nil
       else List.empty
+    case emptyNode: EmptyNode[K, V] => List.empty
   }
 
   private def flattenNewNodes(node: Node[K, V])(implicit kSer: Serializer[K],
@@ -120,8 +122,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     case internalNode: InternalNode[K, V] =>
       val internal =
         List(StorageKey @@ internalNode.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(internalNode)))
-      val left = internalNode.leftChild.map(flattenNewNodes).getOrElse(List.empty)
-      val right = internalNode.rightChild.map(flattenNewNodes).getOrElse(List.empty)
+      val left = flattenNewNodes(internalNode.leftChild)
+      val right = flattenNewNodes(internalNode.rightChild)
       internal ++ left ++ right
     case leafNode: LeafNode[K, V] =>
       List(StorageKey @@ leafNode.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(leafNode)))
@@ -133,8 +135,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       val restored = shadowNode.restoreFullNode(storage)
       toDeleteKeys(restored, predicate)
     case internalNode: InternalNode[K, V] if predicate(internalNode) =>
-      (StorageKey @@ internalNode.hash) :: internalNode.leftChild.map(toDeleteKeys(_, predicate)).getOrElse(List.empty) :::
-        internalNode.rightChild.map(toDeleteKeys(_, predicate)).getOrElse(List.empty)
+      (StorageKey @@ internalNode.hash) :: toDeleteKeys(internalNode.leftChild, predicate) :::
+        toDeleteKeys(internalNode.rightChild, predicate)
     case leafNode: LeafNode[K, V] if predicate(leafNode) =>
       List(StorageKey @@ leafNode.hash)
     case emptyNode: EmptyNode[K, V] => List(StorageKey @@ emptyNode.hash)
@@ -181,26 +183,23 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       getK(key, restoredNode)
     case internalNode: InternalNode[K, V] =>
       if (internalNode.key === key) Some(internalNode.value)
-      else if (internalNode.key > key) internalNode.leftChild.flatMap(child => getK(key, child))
-      else internalNode.rightChild.flatMap(child => getK(key, child))
+      else if (internalNode.key > key) getK(key, internalNode.leftChild)
+      else getK(key, internalNode.rightChild)
     case leafNode: LeafNode[K, V] => if (leafNode.key === key) Some(leafNode.value) else None
   }
 
   def deleteKey(key: K, node: Node[K, V])(implicit m: Monoid[K],
                                           v: Monoid[V],
                                           kSer: Serializer[K],
-                                          vSer: Serializer[V]): Node[K, V] = {
-    val delResult = delete(node, key)
-    if (delResult.isEmpty) EmptyNode[K, V]()
-    else delResult.get
-  }
+                                          vSer: Serializer[V]): Node[K, V] = delete(node, key)
 
   private def delete(node: Node[K, V], key: K)(
     implicit m: Monoid[K],
     v: Monoid[V],
     kSer: Serializer[K],
     vSer: Serializer[V]
-  ): (Option[Node[K, V]]) = node match {
+  ): Node[K, V] = node match {
+    case emptyNode: EmptyNode[K, V] => emptyNode
     case shadowNode: ShadowNode[K, V] =>
       val restoredNode = shadowNode.restoreFullNode(storage)
       delete(restoredNode, key)
@@ -208,85 +207,77 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       if (leafNode.key === key) {
         //logger.info(s"DELETE1: add ${Algos.encode(leafNode.hash)}")
         addToStat(deletedNodeHash = StorageKey @@ leafNode.hash)
-        None
+        EmptyNode[K, V]
       }
-      else Some(leafNode)
+      else leafNode
     case internalNode: InternalNode[K, V] =>
       //logger.info(s"DELETE2: add ${Algos.encode(internalNode.hash)}")
       addToStat(deletedNodeHash = StorageKey @@ internalNode.hash)
       if (internalNode.key > key) {
-        val newLeftChild = internalNode.leftChild
-          .map(node => delete(node, key))
-          .getOrElse((Option.empty[Node[K, V]]))
+        val newLeftChild = delete(internalNode.leftChild, key)
         val childUpdated = internalNode.updateChilds(newLeftChild = newLeftChild)
         val newNode      = childUpdated.selfInspection
         val balancedRoot = balance(newNode)
         addToStat(
           newNodeHash = StorageKey @@ balancedRoot.hash,
-          deletedNodeHash = StorageKey @@ internalNode.leftChild.map(_.hash).getOrElse(Array.emptyByteArray)
+          deletedNodeHash = StorageKey @@ internalNode.leftChild.hash
         )
         addToStat(
-          newNodeHash = StorageKey @@ newLeftChild.map(_.hash).getOrElse(Array.emptyByteArray),
+          newNodeHash = StorageKey @@ newLeftChild.hash,
           deletedNodeHash = StorageKey @@ internalNode.hash
         )
-        Some(balancedRoot)
+        balancedRoot
       } else if (internalNode.key < key) {
-        val newRightChild = internalNode.rightChild
-          .map(node => delete(node, key))
-          .getOrElse(Option.empty[Node[K, V]])
+        val newRightChild = delete(internalNode.rightChild, key)
         val childUpdated = internalNode.updateChilds(newRightChild = newRightChild)
         val newNode      = childUpdated.selfInspection
         val balancedRoot = balance(newNode)
         addToStat(
           newNodeHash = StorageKey @@ balancedRoot.hash,
-          deletedNodeHash = StorageKey @@ internalNode.rightChild.map(_.hash).getOrElse(Array.emptyByteArray)
+          deletedNodeHash = StorageKey @@ internalNode.rightChild.hash
         )
         addToStat(
-          newNodeHash = StorageKey @@ newRightChild.map(_.hash).getOrElse(Array.emptyByteArray),
+          newNodeHash = StorageKey @@ newRightChild.hash,
           deletedNodeHash = StorageKey @@ internalNode.hash
         )
-        Some(balancedRoot)
+        balancedRoot
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
         //logger.info(s"theClosestValue for node ${internalNode} is ${theClosestValue._1._1}")
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
-            val newLeftChild = internalNode.leftChild
-              .map(node => delete(node, newKey))
-              .getOrElse(Option.empty[Node[K, V]])
+            val newLeftChild = delete(internalNode.leftChild, newKey)
             val newNode = internalNode
               .copy(key = newKey, value = newValue)
               .updateChilds(newLeftChild = newLeftChild)
               .selfInspection
             addToStat(
               newNodeHash = StorageKey @@ newNode.hash,
-              deletedNodeHash = StorageKey @@ internalNode.leftChild.map(_.hash).getOrElse(Array.emptyByteArray)
+              deletedNodeHash = StorageKey @@ internalNode.leftChild.hash
             )
             addToStat(
-              newNodeHash = StorageKey @@ newLeftChild.map(_.hash).getOrElse(Array.emptyByteArray),
+              newNodeHash = StorageKey @@ newLeftChild.hash,
               deletedNodeHash = StorageKey @@ internalNode.hash
             )
             newNode
           case ((newKey, newValue), RIGHT) =>
-            val newRightChild = internalNode.rightChild
-              .map(node => delete(node, newKey))
-              .getOrElse(Option.empty[Node[K, V]])
+            val newRightChild = delete(internalNode.rightChild, newKey)
             val newNode = internalNode
               .copy(key = newKey, value = newValue)
               .updateChilds(newRightChild = newRightChild)
               .selfInspection
             addToStat(
               newNodeHash = StorageKey @@ newNode.hash,
-              deletedNodeHash = StorageKey @@ internalNode.rightChild.map(_.hash).getOrElse(Array.emptyByteArray)
+              deletedNodeHash = StorageKey @@ internalNode.rightChild.hash
             )
             addToStat(
-              newNodeHash = StorageKey @@ newRightChild.map(_.hash).getOrElse(Array.emptyByteArray),
+              newNodeHash = StorageKey @@ newRightChild.hash,
               deletedNodeHash = StorageKey @@ internalNode.hash
             )
             newNode
           case ((_, _), EMPTY) => internalNode
         }
-        Some(balance(newNode))
+        balance(newNode)
         //logger.info(s"after deleting: ${balancedNode}")
       }
   }
@@ -300,8 +291,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         findTheClosestValue(restoredNode, key)
       case leafNode: LeafNode[K, V] => leafNode.key -> leafNode.value -> EMPTY
       case internalNode: InternalNode[K, V] =>
-        val onLeft = internalNode.leftChild.flatMap { node =>
-          val rightPath = getRightPath(node)
+        val onLeft = {
+          val rightPath = getRightPath(internalNode.leftChild)
           rightPath.headOption.map(
             head =>
               rightPath.foldLeft[Node[K, V]](head) {
@@ -310,8 +301,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
           )
         }
         val res = onLeft.orElse {
-          val onRight = internalNode.rightChild.flatMap { node =>
-            val leftPath = getLeftPath(node)
+          val onRight = {
+            val leftPath = getLeftPath(internalNode.rightChild)
             leftPath.headOption.map(
               head =>
                 leftPath.foldLeft[Node[K, V]](head) {
@@ -349,7 +340,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       getRightPath(restoredNode)
     case leafNode: LeafNode[K, V] => List(leafNode)
     case internalNode: InternalNode[K, V] =>
-      internalNode +: internalNode.rightChild.map(getRightPath).getOrElse(List.empty)
+      internalNode +: getRightPath(internalNode.rightChild)
+    case emptyNode: EmptyNode[K, V] => List.empty
   }
 
   private def getLeftPath(node: Node[K, V]): List[Node[K, V]] = node match {
@@ -358,7 +350,8 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       getLeftPath(restoredNode)
     case leafNode: LeafNode[K, V] => List(leafNode)
     case internalNode: InternalNode[K, V] =>
-      internalNode +: internalNode.leftChild.map(getLeftPath).getOrElse(List.empty)
+      internalNode +: getLeftPath(internalNode.leftChild)
+    case emptyNode: EmptyNode[K, V] => List.empty
   }
 
   private def insert(newKey: K, newValue: V, node: Node[K, V])
@@ -367,7 +360,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
                      vMonoid: Monoid[V],
                      vSer: Serializer[V]): Node[K, V] =
     {
-      //println(s"insert: $newKey")
       node match {
         case shadowNode: ShadowNode[K, V] =>
           val restoredNode = shadowNode.restoreFullNode(storage)
@@ -375,7 +367,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         case _: EmptyNode[K, V] => LeafNode[K, V](newKey, newValue)
         case leafNode: LeafNode[K, V] =>
           if (leafNode.key === newKey) {
-            //(s"INSERT2: add ${Algos.encode(leafNode.hash)}")
             addToStat(deletedNodeHash = StorageKey @@ leafNode.hash)
             leafNode.copy(value = newValue)
           }
@@ -390,23 +381,17 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
             newNode
           }
         case internalNode: InternalNode[K, V] =>
-          //logger.info(s"INSERT3: add ${Algos.encode(internalNode.hash)}")
           addToStat(deletedNodeHash = StorageKey @@ internalNode.hash)
           if (internalNode.key > newKey) {
-            val newLeftChild = internalNode.leftChild
-              .map(previousLeftChild => insert(newKey, newValue, previousLeftChild))
-              .getOrElse{ LeafNode(newKey, newValue) }
-            val newNode =
-              internalNode.updateChilds(newLeftChild = Some(newLeftChild))
+            val newLeftChild = insert(newKey, newValue, internalNode.leftChild)
+            val newNode = internalNode.updateChilds(newLeftChild = newLeftChild)
             addToStat(newNodeHash = StorageKey @@ newNode.hash, deletedNodeHash = StorageKey @@ internalNode.hash)
             addToStat(newNodeHash = StorageKey @@ newLeftChild.hash)
             balance(newNode)
           } else {
-            val newRightChild = internalNode.rightChild
-              .map(previousRightChild => insert(newKey, newValue, previousRightChild))
-              .getOrElse {LeafNode(newKey, newValue)}
+            val newRightChild = insert(newKey, newValue, internalNode.rightChild)
             val newNode =
-              internalNode.updateChilds(newRightChild = Some(newRightChild))
+              internalNode.updateChilds(newRightChild = newRightChild)
             addToStat(newNodeHash = StorageKey @@ newNode.hash, deletedNodeHash = StorageKey @@ internalNode.hash)
             addToStat(newNodeHash = StorageKey @@ newRightChild.hash)
             balance(newNode)
@@ -429,24 +414,12 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       case internalNode: InternalNode[K, V] =>
         val newAdditionalInfo = (
           Math.abs(internalNode.balance),
-          internalNode.leftChild.exists(
-            leftChild =>
-              (leftChild.height - internalNode.rightChild.map(_.height).getOrElse(-1) == 2) &&
-                rightSubTreeHeight(leftChild) > leftSubTreeHeight(leftChild)
-          ), //lr
-          internalNode.leftChild.exists(
-            leftChild =>
-              (leftChild.height - internalNode.rightChild.map(_.height).getOrElse(-1) == 2) &&
-                rightSubTreeHeight(leftChild) <= leftSubTreeHeight(leftChild)
-          ), //r
-          internalNode.rightChild.exists(
-            rightChild =>
-              ({
-                rightChild.height - internalNode.leftChild.map(_.height).getOrElse(-1) == 2
-              }) && {
-                leftSubTreeHeight(rightChild) > rightSubTreeHeight(rightChild)
-            }
-          ) //rl
+          (internalNode.leftChild.height - internalNode.rightChild.height == 2) &&
+            rightSubTreeHeight(internalNode.leftChild) > leftSubTreeHeight(internalNode.leftChild), //lr
+          (internalNode.leftChild.height - internalNode.rightChild.height == 2) &&
+            rightSubTreeHeight(internalNode.leftChild) <= leftSubTreeHeight(internalNode.leftChild), //r
+          (internalNode.rightChild.height - internalNode.leftChild.height == 2) &&
+            leftSubTreeHeight(internalNode.rightChild) > rightSubTreeHeight(internalNode.rightChild)
         )
         newAdditionalInfo match {
           case (_, true, _, _) =>
@@ -467,7 +440,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     case shadowNode: ShadowNode[K, V] =>
       val restoredNode = shadowNode.restoreFullNode(storage)
       rightSubTreeHeight(restoredNode)
-    case internalNode: InternalNode[K, V] => internalNode.rightChild.map(_.height).getOrElse(-1)
+    case internalNode: InternalNode[K, V] => internalNode.rightChild.height
     case _                                => -1
   }
 
@@ -475,7 +448,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
     case shadowNode: ShadowNode[K, V] =>
       val restoredNode = shadowNode.restoreFullNode(storage)
       leftSubTreeHeight(restoredNode)
-    case internalNode: InternalNode[K, V] => internalNode.leftChild.map(_.height).getOrElse(-1)
+    case internalNode: InternalNode[K, V] => internalNode.leftChild.height
     case _                                => -1
   }
 
@@ -489,7 +462,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       rightRotation(restoredNode)
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
-      val newRoot = internalNode.leftChild.get match {
+      val newRoot = internalNode.leftChild match {
         case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
         case internalNode: InternalNode[K, V] => internalNode
         case shadowNode: ShadowNode[K, V] =>
@@ -498,18 +471,16 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
             case internalNode: InternalNode[K, V] => internalNode
           }
       }
-      val (newLeftChildForPrevRoot) = {
-        newRoot.rightChild.map(child => child.selfInspection)
-      }
+      val newLeftChildForPrevRoot = newRoot.rightChild.selfInspection
       val prevRootWithUpdatedChildren =
         internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot)
       val prevRoot = prevRootWithUpdatedChildren.selfInspection
       val newUpdatedRoot =
-        newRoot.updateChilds(newRightChild = Some(prevRoot))
+        newRoot.updateChilds(newRightChild = prevRoot)
 //      logger.info(s"RIGHT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
 //        s"${internalNode.leftChild.map(el => Algos.encode(el.hash))})")
       addToStat(newNodeHash = StorageKey @@ newUpdatedRoot.hash, deletedNodeHash = StorageKey @@ internalNode.hash)
-      addToStat(deletedNodeHash = StorageKey @@ internalNode.leftChild.map(_.hash).getOrElse(Array.emptyByteArray))
+      addToStat(deletedNodeHash = StorageKey @@ internalNode.leftChild.hash)
       newUpdatedRoot
   }
 
@@ -523,7 +494,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       leftRotation(restoredNode)
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
-      val newRoot = internalNode.rightChild.get match {
+      val newRoot = internalNode.rightChild match {
         case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
         case internalNode: InternalNode[K, V] => internalNode
         case shadowNode: ShadowNode[K, V] =>
@@ -532,16 +503,15 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
             case internalNode: InternalNode[K, V] => internalNode
           }
       }
-      //println("newRoot:" + newRoot)
-      val (newRightChildForPrevRoot) = {newRoot.leftChild.map(child => child.selfInspection)}
+      val newRightChildForPrevRoot = newRoot.leftChild.selfInspection
       val prevRootWithUpdatedChildren =
         internalNode.updateChilds(newRightChild = newRightChildForPrevRoot)
       val prevRoot       = prevRootWithUpdatedChildren.selfInspection
-      val newUpdatedRoot = newRoot.updateChilds(newLeftChild = Some(prevRoot))
+      val newUpdatedRoot = newRoot.updateChilds(newLeftChild = prevRoot)
 //      logger.info(s"LEFT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
 //        s"${internalNode.rightChild.map(el => Algos.encode(el.hash))})")
       addToStat(newNodeHash = StorageKey @@ newUpdatedRoot.hash, deletedNodeHash = StorageKey @@ internalNode.hash)
-      addToStat(deletedNodeHash = StorageKey @@ internalNode.rightChild.map(_.hash).getOrElse(Array.emptyByteArray))
+      addToStat(deletedNodeHash = StorageKey @@ internalNode.rightChild.hash)
       newUpdatedRoot
   }
 
@@ -555,9 +525,9 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
       rlRotation(restoredNode)
     case leafNode: LeafNode[K, V] => leafNode
     case internalNode: InternalNode[K, V] =>
-      val rotatedRightChild = rightRotation(internalNode.rightChild.get)
+      val rotatedRightChild = rightRotation(internalNode.rightChild)
       val updatedNode =
-        internalNode.updateChilds(newRightChild = Some(rotatedRightChild))
+        internalNode.updateChilds(newRightChild = rotatedRightChild)
       //logger.info(s"RL ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
       addToStat(newNodeHash = StorageKey @@ updatedNode.hash, deletedNodeHash = StorageKey @@ internalNode.hash)
       leftRotation(updatedNode)
@@ -573,60 +543,13 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V], storage
         lrRotation(restoredNode)
       case leafNode: LeafNode[K, V] => leafNode
       case internalNode: InternalNode[K, V] =>
-        val rotatedLeftChild = leftRotation(internalNode.leftChild.get)
+        val rotatedLeftChild = leftRotation(internalNode.leftChild)
         val updatedNode =
-          internalNode.updateChilds(newLeftChild = Some(rotatedLeftChild))
+          internalNode.updateChilds(newLeftChild = rotatedLeftChild)
         //logger.info(s"LR ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
         addToStat(newNodeHash = StorageKey @@ updatedNode.hash, deletedNodeHash = StorageKey @@ internalNode.hash)
         rightRotation(updatedNode)
     }
-
-  def selfInspectionAfterFastSync(implicit kSer: Serializer[K]): Boolean = {
-    @scala.annotation.tailrec
-    def loop(nodesToProcess: List[Node[K, V]], keysToInspect: List[Array[Byte]]): List[Array[Byte]] =
-      if (nodesToProcess.nonEmpty) nodesToProcess.head match {
-        case _: EmptyNode[K, V] => List.empty
-        case s: ShadowNode[K, V] =>
-          val restoredNode: Node[K, V] = s.restoreFullNode(storage)
-          val removedExcess: List[Node[K, V]] = nodesToProcess.drop(1)
-          val newToProcess: List[Node[K, V]] = restoredNode :: removedExcess
-          loop(newToProcess, keysToInspect)
-        case i: InternalNode[K, V] =>
-          val leftChild: Option[(List[Node[K, V]], Node[K, V])] = getLeftChild(i)
-          val rightChild: Option[(List[Node[K, V]], Node[K, V])] = getRightChild(i)
-          val (next: List[Node[K, V]], current: List[Array[Byte]]) = (leftChild :: rightChild :: Nil)
-            .foldLeft(List.empty[Node[K, V]], List.empty[Array[Byte]]) {
-              case ((nextNodes, thisNodes), Some((nextChildren, thisNode))) =>
-                (nextChildren ::: nextNodes, Algos.hash(kSer.toBytes(thisNode.key).reverse) :: thisNode.hash :: thisNodes)
-              case (result, _) => result
-            }
-          val updatedNodeToProcess: List[Node[K, V]] = nodesToProcess.drop(1)
-          loop(updatedNodeToProcess ::: next, Algos.hash(kSer.toBytes(i.key).reverse) :: i.hash :: current ::: keysToInspect)
-        case l: LeafNode[K, V] => loop(nodesToProcess.drop(1), Algos.hash(kSer.toBytes(l.key).reverse) :: l.hash :: keysToInspect)
-      } else keysToInspect
-    val keys: Set[ByteArrayWrapper] = loop(List(rootNode), List.empty).map(ByteArrayWrapper(_)).toSet
-    val allKeysFromDB: Set[ByteArrayWrapper] = storage.getAllKeys(-1)
-      .map(ByteArrayWrapper(_)).toSet - ByteArrayWrapper(UtxoState.bestHeightKey) - ByteArrayWrapper(AvlTree.rootNodeKey)
-    logger.debug(s"${keys.map(l => Algos.encode(l.data))}")
-    (allKeysFromDB -- keys).isEmpty
-  }
-
-  @scala.annotation.tailrec
-  private def handleChild(child: Node[K, V]): (List[Node[K, V]], Node[K, V]) = child match {
-    case s: ShadowNode[K, V] => handleChild(s.restoreFullNode(storage))
-    case i: InternalNode[K, V] => List(i.rightChild, i.leftChild).flatten -> i
-    case l: LeafNode[K, V] => List.empty -> l
-  }
-
-  private def getLeftChild(node: InternalNode[K, V]): Option[(List[Node[K, V]], Node[K, V])] = node.leftChild match {
-    case Some(child) => Some(handleChild(child))
-    case n@None => n
-  }
-
-  private def getRightChild(node: InternalNode[K, V]): Option[(List[Node[K, V]], Node[K, V])] = node.rightChild match {
-    case Some(child) => Some(handleChild(child))
-    case n@None => n
-  }
 
   override def close(): Unit = storage.close()
 
@@ -670,19 +593,18 @@ object AvlTree {
         val newNode = shadowNode.restoreFullNode(storage)
         restoreNodesUntilDepthAndReturnLeafs(depth, newNode)
       case internalNode: InternalNode[StorageKey, StorageValue] if depth != 0 =>
-        val (recoveredLeftChild, leftSubTreeChildren) = internalNode.leftChild
-          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
-          .separate.map(_.getOrElse(List.empty))
-        val (recoveredRightChild, rightSubTreeChildren) = internalNode.rightChild
-          .map(restoreNodesUntilDepthAndReturnLeafs(depth - 1, _))
-          .separate.map(_.getOrElse(List.empty))
+        val (recoveredLeftChild, leftSubTreeChildren) =
+          restoreNodesUntilDepthAndReturnLeafs(depth - 1, internalNode.leftChild)
+        val (recoveredRightChild, rightSubTreeChildren) =
+          restoreNodesUntilDepthAndReturnLeafs(depth - 1, internalNode.rightChild)
         internalNode.copy(
           leftChild = recoveredLeftChild,
           rightChild = recoveredRightChild
         ) -> (rightSubTreeChildren ++ leftSubTreeChildren)
       case internalNode: InternalNode[StorageKey, StorageValue] =>
-        internalNode -> List(internalNode.leftChild, internalNode.rightChild).flatten
+        internalNode -> List(internalNode.leftChild, internalNode.rightChild)
       case leaf: LeafNode[StorageKey, StorageValue] => leaf -> List.empty[Node[StorageKey, StorageValue]]
+      case emptyNode: EmptyNode[StorageKey, StorageValue] => emptyNode -> List.empty
     }
 
     val (rootChunk: Node[StorageKey, StorageValue], rootChunkChildren) = restoreNodesUntilDepthAndReturnLeafs(currentChunkHeight, node)

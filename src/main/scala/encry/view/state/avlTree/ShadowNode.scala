@@ -23,15 +23,14 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Arra
 
   override lazy val hash = nodeHash
 
-  def restoreFullNode(storage: VersionalStorage): Node[K, V] = {
+  def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty)
     NodeSerilalizer.fromBytes[K, V](
       {
         val res = storage.get(StorageKey @@ hash)
         if (res.isEmpty) logger.info(s"Empty node at key: ${Algos.encode(hash)}")
         res.get
       }
-    )
-  }
+    ) else EmptyNode[K, V]()
 
   def tryRestore(storage: VersionalStorage): Option[Node[K, V]] =
     Try(restoreFullNode(storage)).toOption
@@ -46,34 +45,17 @@ object ShadowNode {
   def childsToShadowNode[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Node[K, V] = node match {
     case internal: InternalNode[K, V] =>
       internal.copy(
-        leftChild = internal.leftChild.map(node =>
-          ShadowNode[K, V](
-            nodeHash = node.hash,
-            height = node.height,
-            balance = node.balance,
-          )),
-        rightChild = internal.rightChild.map(node =>
-          ShadowNode[K, V](
-            nodeHash = node.hash,
-            height = node.height,
-            balance = node.balance,
-          )
-        )
+        leftChild = ShadowNode[K, V](
+            nodeHash = internal.leftChild.hash,
+            height = internal.leftChild.height,
+            balance = internal.leftChild.balance),
+        rightChild = ShadowNode[K, V](
+          nodeHash = internal.rightChild.hash,
+          height = internal.rightChild.height,
+          balance = internal.rightChild.balance),
       )
     case _ => node
   }
-
-  def getLeftChildHash[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Option[Array[Byte]] =
-    node match {
-      case internalNode: InternalNode[K, V] =>internalNode.leftChild.map(_.hash)
-      case _ => None
-    }
-
-  def getRightChildHash[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Option[Array[Byte]] =
-    node match {
-      case internalNode: InternalNode[K, V] => internalNode.rightChild.map(_.hash)
-      case _ => None
-    }
 
   def toProto[K, V](node: ShadowNode[K, V]): ShadowNodeProto = ShadowNodeProto()
     .withHeight(node.height)

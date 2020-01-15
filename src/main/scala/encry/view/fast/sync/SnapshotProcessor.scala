@@ -90,9 +90,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     case shadowNode: ShadowNode[StorageKey, StorageValue] => shadowNode :: Nil
     case leaf: LeafNode[StorageKey, StorageValue]         => leaf :: Nil
     case internalNode: InternalNode[StorageKey, StorageValue] =>
-      internalNode ::
-        internalNode.leftChild.map(flatten).getOrElse(List.empty[Node[StorageKey, StorageValue]]) :::
-        internalNode.rightChild.map(flatten).getOrElse(List.empty[Node[StorageKey, StorageValue]])
+      internalNode :: flatten(internalNode.leftChild) ::: flatten(internalNode.rightChild)
+    case emptyNode: EmptyNode[StorageKey, StorageValue] => List.empty[Node[StorageKey, StorageValue]]
   }
 
   def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotProcessor] = {
