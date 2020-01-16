@@ -1,10 +1,10 @@
 package encry
 
 import java.net.InetSocketAddress
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{NonEmptyChain, Validated}
+import cats.data.{ NonEmptyChain, Validated }
 import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.apply._
@@ -15,19 +15,19 @@ import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{StartListening, prompt}
+import encry.cli.ConsoleListener.{ prompt, StartListening }
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.NodeViewSynchronizer
 import encry.settings._
 import encry.stats.StatsSender
-import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.utils.{ Mnemonic, NetworkTimeProvider }
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
@@ -337,18 +337,16 @@ class Starter(settings: EncryAppSettings,
         println("Please, enter node password:")
         readAndValidateInput(validatePassword)
       }
-      frontName <-
-      if (settings.network.nodeName.exists(_.isEmpty)) {
-        println("Please, enter node name:")
-        readAndValidateInput(validateNodeName)
-      } else settings.network.nodeName.get.asRight
+      frontName <- if (settings.network.nodeName.exists(_.isEmpty)) {
+                    println("Please, enter node name:")
+                    readAndValidateInput(validateNodeName)
+                  } else settings.network.nodeName.get.asRight
 
-      mnemonic <-
-      if (settings.wallet.flatMap(_.seed).exists(_.isEmpty)) {
-        val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
-        println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
-        phrase.asRight[Throwable]
-      } else settings.wallet.flatMap(_.seed).get.asRight
+      mnemonic <- if (settings.wallet.flatMap(_.seed).exists(_.isEmpty)) {
+                   val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+                   println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
+                   phrase.asRight[Throwable]
+                 } else settings.wallet.flatMap(_.seed).get.asRight
 
     } yield
       InitNodeResult(
