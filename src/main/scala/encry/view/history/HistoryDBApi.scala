@@ -38,7 +38,6 @@ trait HistoryDBApi extends StrictLogging {
   def getBlockByHeaderIdDB(id: ModifierId): Option[Block] = getHeaderByIdDB(id)
     .flatMap(h => getModifierById[Payload](h.payloadId).map(p => Block(h, p)))
 
-  def getBestHeaderId: Option[ModifierId] = historyStorage.get(BestHeaderKey).map(ModifierId @@ _)
   def getBestHeaderDB: Option[Header] = getBestHeaderId.flatMap(getHeaderByIdDB)
   def getBestHeaderHeightDB: Int = getBestHeaderId
     .flatMap(getHeightByHeaderIdDB)

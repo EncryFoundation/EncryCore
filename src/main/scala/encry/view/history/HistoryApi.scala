@@ -41,54 +41,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
 
   lazy val fastSyncInProgress: FastSyncProcessor = FastSyncProcessor(settings)
 
-  def getHeaderById(id: ModifierId): Option[Header] = headersCache
-    .get(ByteArrayWrapper(id))
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-    .orElse(getHeaderByIdDB(id))
-
-  def getBlockByHeader(header: Header): Option[Block] = blocksCache
-    .get(ByteArrayWrapper(header.id))
-    .orElse(getPayloadByIdDB(header.payloadId).map(p => Block(header, p)))
-
-  def getBestHeader: Option[Header] = getBestHeaderId.flatMap(id =>
-    headersCache
-      .get(ByteArrayWrapper(id))
-      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-      .orElse(getHeaderByIdDB(id))
-  )
-
-  def getBestHeaderHeight: Int = getBestHeaderId.flatMap(id =>
-    headersCache.get(ByteArrayWrapper(id)).map(_.height)
-      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
-      .orElse(getHeightByHeaderId(id))
-  ).getOrElse(settings.constants.PreGenesisHeight)
-
-  def getBestBlock: Option[Block] = getBestBlockId.flatMap(id =>
-    blocksCache.get(ByteArrayWrapper(id))
-      .orElse(getBlockByHeaderIdDB(id))
-  )
-
-  def getBestBlockHeight: Int = getBestBlockId
-    .flatMap(id => blocksCache.get(ByteArrayWrapper(id)).map(_.header.height).orElse(getHeightByHeaderId(id)))
-    .getOrElse(settings.constants.PreGenesisHeight)
-
-  def getHeaderOfBestBlock: Option[Header] = getBestBlockId.flatMap(id =>
-    headersCache.get(ByteArrayWrapper(id))
-      .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header))
-      .orElse(getHeaderByIdDB(id))
-  )
-
   def getBestHeaderAtHeight(h: Int): Option[Header] = getBestHeaderAtHeightDB(h)
-
-  def getBlockByPayload(payload: Payload): Option[Block] = headersCache
-    .get(ByteArrayWrapper(payload.headerId)).map(h => Block(h, payload))
-    .orElse(blocksCache.get(ByteArrayWrapper(payload.headerId)))
-    .orElse(getHeaderById(payload.headerId).flatMap(h => Some(Block(h, payload))))
-
-  def getHeightByHeaderId(id: ModifierId): Option[Int] = headersCache
-    .get(ByteArrayWrapper(id)).map(_.height)
-    .orElse(blocksCache.get(ByteArrayWrapper(id)).map(_.header.height))
-    .orElse(getHeightByHeaderIdDB(id))
 
   def isBestBlockDefined: Boolean =
     getBestBlockId.map(id => blocksCache.contains(ByteArrayWrapper(id))).isDefined ||
