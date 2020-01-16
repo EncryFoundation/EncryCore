@@ -128,8 +128,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
     logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
     val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
-    logger.info(s"UTXO -> rollbackTo ->${tree.storage.get(UtxoState.bestHeightKey)} ")
-    val height: Height = Height !@@ Ints.fromByteArray(tree.storage.get(UtxoState.bestHeightKey).get)
+    logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
+    val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants)
   }
 
@@ -213,7 +213,7 @@ object UtxoState extends StrictLogging {
   final case class StateChange(inputsToDb: Vector[StorageKey],
                                outputsToDb: Vector[(StorageKey, StorageValue)])
 
-  val bestHeightKey: StorageKey = StorageKey !@@ Algos.hash("state_height")
+  val bestHeightKey: StorageKey = StorageKey !@@ ((3: Byte) +: Algos.hash("state_height"))
 
   def tx2StateChange(tx: Transaction): StateChange = StateChange(
     tx.inputs.map(input => StorageKey !@@ input.boxId).toVector,
@@ -242,7 +242,7 @@ object UtxoState extends StrictLogging {
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = settings.levelDB.keySize))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
     val height = Height @@ Ints.fromByteArray(versionalStorage.get(UtxoState.bestHeightKey).get)
     logger.info(s"State created.")
@@ -258,15 +258,15 @@ object UtxoState extends StrictLogging {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions, keySize = 33))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
-      initialStateBoxes.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes))
+      initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))
     )
     UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants)
   }

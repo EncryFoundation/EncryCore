@@ -13,7 +13,7 @@ import org.encryfoundation.common.utils.Algos
 import scala.util.Try
 
 //represent node, that stored in db, without all fields, except hash, height, balance
-case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Array[Byte],
+case class ShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: Array[Byte],
                                                               height: Int,
                                                               balance: Int)
                                                              (implicit kM: Monoid[K], vM: Monoid[V]) extends Node[K, V] with StrictLogging {
@@ -26,7 +26,7 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](val nodeHash: Arra
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty)
     NodeSerilalizer.fromBytes[K, V](
       {
-        val res = storage.get(StorageKey @@ hash)
+        val res = storage.get(StorageKey @@ AvlTree.nodeKey(hash))
         if (res.isEmpty) logger.info(s"Empty node at key: ${Algos.encode(hash)}")
         res.get
       }
@@ -57,7 +57,7 @@ object ShadowNode {
     case _ => node
   }
 
-  def toProto[K, V](node: ShadowNode[K, V]): ShadowNodeProto = ShadowNodeProto()
+  def toProto[K: Serializer, V](node: ShadowNode[K, V]): ShadowNodeProto = ShadowNodeProto()
     .withHeight(node.height)
     .withHash(ByteString.copyFrom(node.hash))
     .withBalance(node.balance)
@@ -66,7 +66,7 @@ object ShadowNode {
     ShadowNode(
       nodeHash = protoNode.hash.toByteArray,
       height = protoNode.height,
-      balance = protoNode.balance,
+      balance = protoNode.balance
     )
   }
 }

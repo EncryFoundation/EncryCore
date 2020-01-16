@@ -33,8 +33,8 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
     )
   }
 
-  override def selfInspection: Node[K, V] = (leftChild, rightChild) match {
-    case (_: EmptyNode[K, V], _: EmptyNode[K, V]) => LeafNode(key, value)
+  override def selfInspection: Node[K, V] = (leftChild.height, rightChild.height) match {
+    case (-1, -1) => LeafNode(key, value)
     case (_, _) => this
   }
 

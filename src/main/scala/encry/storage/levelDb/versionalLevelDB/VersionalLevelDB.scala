@@ -66,7 +66,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     assert(newElem.version.length == settings.versionKeySize,
       s"Version length is incorrect! Should be: ${settings.versionKeySize}, but get: ${newElem.version.length}")
     assert(newElem.elemsToInsert.forall(_._1.length == settings.keySize),
-      s"Key length is incorrect! Should be: ${settings.versionKeySize}")
+      s"Key length is incorrect! Should be: ${settings.keySize}")
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
