@@ -15,22 +15,29 @@ import scala.util.Try
 //represent node, that stored in db, without all fields, except hash, height, balance
 case class ShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: Array[Byte],
                                                               height: Int,
-                                                              balance: Int)
+                                                              balance: Int,
+                                                              key: K)
                                                              (implicit kM: Monoid[K], vM: Monoid[V]) extends Node[K, V] with StrictLogging {
 
-  override val key: K = kM.empty
   override val value: V = vM.empty
 
   override lazy val hash = nodeHash
 
-  def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty)
+  def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty) {
+    val nodeValue = storage.get(StorageKey @@ AvlTree.elementKey(implicitly[Serializer[K]].toBytes(key))).get
     NodeSerilalizer.fromBytes[K, V](
       {
         val res = storage.get(StorageKey @@ AvlTree.nodeKey(hash))
         if (res.isEmpty) logger.info(s"Empty node at key: ${Algos.encode(hash)}")
         res.get
       }
-    ) else EmptyNode[K, V]()
+    ) match {
+      case internalNode: InternalNode[K, V] => internalNode.copy(value = implicitly[Serializer[V]].fromBytes(nodeValue))
+      case leafNode: LeafNode[K, V] => leafNode.copy(value = implicitly[Serializer[V]].fromBytes(nodeValue))
+      case emptyNode: EmptyNode[K, V] => emptyNode
+    }
+
+  } else EmptyNode[K, V]()
 
   def tryRestore(storage: VersionalStorage): Option[Node[K, V]] =
     Try(restoreFullNode(storage)).toOption
@@ -48,11 +55,14 @@ object ShadowNode {
         leftChild = ShadowNode[K, V](
             nodeHash = internal.leftChild.hash,
             height = internal.leftChild.height,
-            balance = internal.leftChild.balance),
+            balance = internal.leftChild.balance,
+            key = internal.leftChild.key
+        ),
         rightChild = ShadowNode[K, V](
           nodeHash = internal.rightChild.hash,
           height = internal.rightChild.height,
-          balance = internal.rightChild.balance),
+          balance = internal.rightChild.balance,
+          key = internal.rightChild.key),
       )
     case _ => node
   }
@@ -61,12 +71,14 @@ object ShadowNode {
     .withHeight(node.height)
     .withHash(ByteString.copyFrom(node.hash))
     .withBalance(node.balance)
+    .withKey(ByteString.copyFrom(implicitly[Serializer[K]].toBytes(node.key)))
 
   def fromProto[K: Hashable : Monoid : Serializer, V: Monoid : Serializer](protoNode: ShadowNodeProto): Try[ShadowNode[K, V]] = Try {
     ShadowNode(
       nodeHash = protoNode.hash.toByteArray,
       height = protoNode.height,
-      balance = protoNode.balance
+      balance = protoNode.balance,
+      key = implicitly[Serializer[K]].fromBytes(protoNode.key.toByteArray)
     )
   }
 }

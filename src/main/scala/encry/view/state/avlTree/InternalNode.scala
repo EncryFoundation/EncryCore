@@ -70,7 +70,6 @@ object InternalNode {
       .withBalance(node.balance)
       .withHeight(node.height)
       .withKey(ByteString.copyFrom(kSer.toBytes(node.key)))
-      .withValue(ByteString.copyFrom(vSer.toBytes(node.value)))
     val withLeftChild = node.leftChild match {
       case _: EmptyNode[K, V] => msg
       case nonEmpty: Node[K, V] =>

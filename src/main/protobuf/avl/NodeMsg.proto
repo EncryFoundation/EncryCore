@@ -24,6 +24,7 @@ message NodeProtoMsg {
             bytes hash = 1;
             int32 height = 2;
             int32 balance = 3;
+            bytes key = 4;
         }
 
         message EmptyNodeProto {

@@ -101,8 +101,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         if (possibleMap != null) {
           val accessMap = util.Arrays.copyOfRange(possibleMap, 1, possibleMap.length)
           batch.put(userKey(elemKey), INACCESSIBLE_KEY_PREFIX +: accessMap)
-        } else
-          logger.info(s"trying to delete empty key ${Algos.encode(elemKey)} in ver ${Algos.encode(newElem.version)}")
+        } else logger.info(s"trying to delete empty key ${Algos.encode(elemKey)} in ver ${Algos.encode(newElem.version)}")
       }
       db.write(batch)
       clean()
@@ -142,8 +141,8 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       readOptions.snapshot(db.getSnapshot)
       val writeBatch = db.createWriteBatch()
       try {
-        val insertions = splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve), readOptions))
-        val deletions = splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionDeletionsKey(versionToResolve), readOptions))
+        val insertions = splitValue2elems(settings.keySize, db.get(versionKey(versionToResolve), readOptions))
+        val deletions = splitValue2elems(settings.keySize, db.get(versionDeletionsKey(versionToResolve), readOptions))
         insertions.foreach { elemKey =>
           writeBatch.delete(accessableElementKeyForVersion(versionToResolve, VersionalLevelDbKey @@ elemKey))
           val accessMap = db.get(userKey(VersionalLevelDbKey @@ elemKey), readOptions)
@@ -212,11 +211,11 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
         }
       }
       val insertionsByThisVersion =
-        splitValue2elems(DEFAULT_USER_KEY_SIZE, db.get(versionKey(versionToResolve), readOptions)).map(VersionalLevelDbKey @@ _)
+        splitValue2elems(settings.keySize, db.get(versionKey(versionToResolve), readOptions)).map(VersionalLevelDbKey @@ _)
       insertionsByThisVersion.foreach { elemKey =>
         val elemInfo = db.get(userKey(elemKey), readOptions)
         if (elemInfo == null) {
-          logger.info(s"NULL at key: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
+          logger.info(s"NULL at key [${Algos.encode(userKey(elemKey))}]: ${Algos.encode(elemKey)}. Deletion by ver: ${deletionsByThisVersion.map(Algos.encode).mkString(",")}")
         }
         val elemFlag = elemInfo.head
         val elemMap = util.Arrays.copyOfRange(elemInfo, 1, elemInfo.length + 1)

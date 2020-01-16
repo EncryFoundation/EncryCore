@@ -29,9 +29,7 @@ final case class LeafNode[K: Serializer: Monoid, V: Serializer: Monoid](key: K, 
 
 object LeafNode {
   def toProto[K, V](leaf: LeafNode[K, V])(implicit kSer: Serializer[K], vSer: Serializer[V]): LeafNodeProto =
-    LeafNodeProto()
-      .withKey(ByteString.copyFrom(kSer.toBytes(leaf.key)))
-      .withValue(ByteString.copyFrom(vSer.toBytes(leaf.value)))
+    LeafNodeProto().withKey(ByteString.copyFrom(kSer.toBytes(leaf.key)))
 
   def fromProto[K: Hashable: Monoid, V: Monoid](
     leafProto: LeafNodeProto
