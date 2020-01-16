@@ -76,15 +76,13 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.currentTimeMillis()
-        val tasks = block.payload.txs.map(tx => {
-          Task {
-            if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
-              totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
-            else validate(tx, block.header.timestamp, Height @@ block.header.height)
-          }
+        val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
+          if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
+            totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
+          else validate(tx, block.header.timestamp, Height @@ block.header.height)
         }).toList
-        val res: Either[ValidationResult, List[Transaction]] = Await.result(Task.gather(tasks).map(_.traverse(Validated.fromEither)
-          .toEither).runAsync, 2 minutes)
+          .traverse(Validated.fromEither)
+          .toEither
         logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
         res.fold(
           err => {
