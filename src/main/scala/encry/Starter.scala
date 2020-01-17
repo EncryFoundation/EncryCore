@@ -1,6 +1,8 @@
 package encry
 
+import java.io.File
 import java.net.InetSocketAddress
+import java.nio.file.Files
 import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
@@ -12,7 +14,7 @@ import cats.syntax.either._
 import cats.syntax.option._
 import cats.syntax.validated._
 import encry.Starter.InitNodeResult
-import encry.api.http.DataHolderForApi
+import encry.api.http.{ DataHolderForApi, SettingsStorage }
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
 import encry.cli.ConsoleListener.{ prompt, StartListening }
@@ -65,7 +67,9 @@ class Starter(settings: EncryAppSettings,
         self ! res
     }
 
-  def startNonEmptyNode: Either[Throwable, InitNodeResult] =
+  def startNonEmptyNode: Either[Throwable, InitNodeResult] = {
+    val storage                       = SettingsStorage.init(settings)
+    val newSettings: EncryAppSettings = storage.getSettings.getOrElse(settings)
     for {
       walletPassword <- {
         println("Please, enter wallet password:")
@@ -75,16 +79,17 @@ class Starter(settings: EncryAppSettings,
       InitNodeResult(
         "",
         walletPassword,
-        settings.node.offlineGeneration,
+        newSettings.node.offlineGeneration,
         fastSync = false,
-        settings.snapshotSettings.enableSnapshotCreation,
-        settings.network.knownPeers,
-        settings.network.connectOnlyWithKnownPeers.getOrElse(false),
+        newSettings.snapshotSettings.enableSnapshotCreation,
+        newSettings.network.knownPeers,
+        newSettings.network.connectOnlyWithKnownPeers.getOrElse(false),
         "",
-        settings.network.nodeName.getOrElse(""),
-        settings.network.declaredAddress,
-        settings.network.bindAddress
+        newSettings.network.nodeName.getOrElse(""),
+        newSettings.network.declaredAddress,
+        newSettings.network.bindAddress
       )
+  }
 
   def startEmptyNode: Either[Throwable, InitNodeResult] =
     for {
@@ -400,6 +405,11 @@ class Starter(settings: EncryAppSettings,
         network = networkSettings,
         snapshotSettings = snapshotSettings
       )
+      if (!Files.exists(new File(s"${settings.directory}/state").toPath)) {
+        val storage: SettingsStorage = SettingsStorage.init(newSettings)
+        storage.putSettings(newSettings)
+        storage.close()
+      }
       val influxRef: Option[ActorRef] = newSettings.influxDB.map { influxSettings =>
         context.system
           .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
