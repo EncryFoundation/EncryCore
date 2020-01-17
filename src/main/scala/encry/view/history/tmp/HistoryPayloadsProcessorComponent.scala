@@ -9,10 +9,10 @@ import scala.collection.immutable.HashSet
 trait HistoryPayloadsProcessorComponent {
 
   val processor: PayloadProcessor
+  def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]
 
   trait PayloadProcessor {
     def processPayload(payload: Payload): ProgressInfo
-    def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]
   }
 
 }

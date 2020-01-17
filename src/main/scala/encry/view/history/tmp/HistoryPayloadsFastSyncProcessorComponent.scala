@@ -17,12 +17,43 @@ trait HistoryPayloadsFastSyncProcessorComponent extends HistoryPayloadsProcessor
 
   override val processor: PayloadProcessor = new FastSyncProcessor
 
+  var lastAvailableManifestHeight: Int = 0
+
+  var fastSyncInProgress: Boolean =
+    settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
+
+  override def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId] = {
+    @tailrec def continuation(height: Int, acc: List[ModifierId]): List[ModifierId] =
+      if (acc.lengthCompare(howMany) >= 0) acc
+      else if (height > lastAvailableManifestHeight && fastSyncInProgress) acc
+      else
+        getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
+          case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
+            continuation(height + 1, acc :+ h.payloadId)
+          case Some(_) =>
+            continuation(height + 1, acc)
+          case None =>
+            acc
+        }
+
+    (for {
+      bestBlockId             <- getBestBlockId
+      headerLinkedToBestBlock <- getHeaderById(bestBlockId)
+    } yield headerLinkedToBestBlock) match {
+      case _ if !isHeadersChainSynced =>
+        List.empty
+      case Some(header) if isInBestChain(header) =>
+        continuation(header.height + 1, List.empty)
+      case Some(header) =>
+        lastBestBlockHeightRelevantToBestChain(header.height)
+          .map(height => continuation(height + 1, List.empty))
+          .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, List.empty))
+      case None =>
+        continuation(blockDownloadProcessor.minimalBlockHeightVar, List.empty)
+    }
+  }
+
   class FastSyncProcessor extends PayloadProcessor {
-
-    var lastAvailableManifestHeight: Int = 0
-
-    var fastSyncInProgress: Boolean =
-      settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
 
     override def processPayload(payload: Payload): HistoryConsensus.ProgressInfo =
       getBlockByPayload(payload).flatMap { block =>
@@ -140,37 +171,6 @@ trait HistoryPayloadsFastSyncProcessorComponent extends HistoryPayloadsProcessor
 
     private def isValidFirstBlock(header: Header): Boolean =
       header.height == blockDownloadProcessor.minimalBlockHeight && getBestBlockId.isEmpty
-
-    override def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId] = {
-      @tailrec def continuation(height: Int, acc: List[ModifierId]): List[ModifierId] =
-        if (acc.lengthCompare(howMany) >= 0) acc
-        else if (height > lastAvailableManifestHeight && fastSyncInProgress) acc
-        else
-          getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
-            case Some(h) if !excluding.exists(_.sameElements(h.payloadId)) && !isBlockDefined(h) =>
-              continuation(height + 1, acc :+ h.payloadId)
-            case Some(_) =>
-              continuation(height + 1, acc)
-            case None =>
-              acc
-          }
-
-      (for {
-        bestBlockId             <- getBestBlockId
-        headerLinkedToBestBlock <- getHeaderById(bestBlockId)
-      } yield headerLinkedToBestBlock) match {
-        case _ if !isHeadersChainSynced =>
-          List.empty
-        case Some(header) if isInBestChain(header) =>
-          continuation(header.height + 1, List.empty)
-        case Some(header) =>
-          lastBestBlockHeightRelevantToBestChain(header.height)
-            .map(height => continuation(height + 1, List.empty))
-            .getOrElse(continuation(blockDownloadProcessor.minimalBlockHeightVar, List.empty))
-        case None =>
-          continuation(blockDownloadProcessor.minimalBlockHeightVar, List.empty)
-      }
-    }
   }
 
 }
