@@ -2,20 +2,13 @@ package encry.view.history.tmp
 
 import cats.syntax.either._
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
-import encry.view.history.History
-import encry.view.history.storage.HistoryStorage
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
-import scala.collection.immutable.HashSet
+trait History extends HistoryPrivateApi with AutoCloseable { this: HistoryPayloadsProcessorComponent =>
 
-class History private () extends HistoryPrivateApi with AutoCloseable { this: HistoryPayloadsProcessorComponent =>
-
-  var isFullChainSynced: Boolean
 
   def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] =
     Either.catchNonFatal(modifier match {
@@ -123,11 +116,6 @@ class History private () extends HistoryPrivateApi with AutoCloseable { this: Hi
 
   def closeStorage(): Unit = historyStorage.close()
 
-  override def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId] = ???
-
-  override protected[history] val historyStorage: HistoryStorage = _
-  override protected[history] val settings: EncryAppSettings = _
-  override val processor: History#PayloadProcessor = _
 }
 
 object History {}
