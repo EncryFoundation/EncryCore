@@ -92,7 +92,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           block.payload.txs.length,
           validationTime
         )
-        logger.info(s"Validation time: $validationTime. Txs: ${block.payload.txs}")
+        logger.info(s"Validation time: $validationTime. Txs: ${block.payload.txs.length}")
         res.fold(
           err => {
             logger.info(s"Failed to state cause ${err.message}")
@@ -109,6 +109,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               combinedStateChange.inputsToDb.toList,
               Height @@ block.header.height
             )
+            logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
             logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}. Root node: ${newTree.rootNode}")
             logger.info(s"block.header.stateRoot ${Algos.encode(block.header.stateRoot)}")
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
@@ -130,6 +131,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     logger.info(s"Time of applying mod ${Algos.encode(mod.id)} of type ${mod.modifierTypeId} is (${(System.currentTimeMillis() - startTime) / 1000L} s)")
     result
   }
+
 
   def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
     logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
@@ -270,6 +272,7 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
+    //nitialStateBoxes.map(bx => logger.info(s"Insert ${Algos.encode(AvlTree.elementKey(bx.id))}"))
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))
