@@ -24,7 +24,7 @@ import encry.view.NodeViewHolder._
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor}
+import encry.view.history.History
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree

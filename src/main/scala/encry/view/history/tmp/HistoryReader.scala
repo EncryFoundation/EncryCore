@@ -6,6 +6,7 @@ import encry.view.history.utils.instances.ModifierIdWrapper
 import encry.view.history.utils.syntax.wrapper._
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history._
+import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId, ModifierTypeId }
 import scorex.crypto.hash.Digest32
@@ -65,12 +66,13 @@ trait HistoryReader extends HistoryState {
       .map(ModifierId @@ _)
 
   final def getBestHeader: Option[Header] =
-    getBestHeaderId.flatMap { id: ModifierId =>
-      headersCache
-        .get(id.wrap)
-        .orElse(blocksCache.get(id.wrap).map(_.header))
-        .orElse(getHeaderById(id))
-    }
+    getBestHeaderId.flatMap(
+      (id: ModifierId) =>
+        headersCache
+          .get(id.wrap)
+          .orElse(blocksCache.get(id.wrap).map(_.header))
+          .orElse(getHeaderById(id))
+    )
 
   final def getBestBlock: Option[Block] =
     getBestBlockId.flatMap { id: ModifierId =>
@@ -150,11 +152,6 @@ trait HistoryReader extends HistoryState {
       .orElse(blocksCache.get(id.wrap).map(BlockProtoSerializer.toProto(_).toByteArray))
       .orElse(historyStorage.modifiersBytesById(id))
 
-  final def getHeaderIds(count: Int, offset: Int = 0): List[ModifierId] =
-    (offset until (count + offset))
-      .flatMap(getBestHeaderIdAtHeight)
-      .toList
-
   final def heightOf(id: ModifierId): Option[Height] =
     historyStorage
       .get(headerHeightKey(id))
@@ -182,6 +179,13 @@ trait HistoryReader extends HistoryState {
       headerId <- getBestHeaderIdAtHeight(probablyAt)
       header   <- getHeaderById(headerId) if isModifierDefined(header.payloadId)
     } yield header.height).orElse(lastBestBlockHeightRelevantToBestChain(probablyAt - 1))
+
+  protected[view] def calculateNewSyncInfo(): Unit =
+    lastSyncInfoVariable = SyncInfo(getBestHeader.map { header: Header =>
+      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
+        headerIdsAtHeight(height).headOption
+      }.toList
+    }.getOrElse(List.empty))
 
   final def heightIdsKey(height: Int): StorageKey =
     StorageKey @@ Algos.hash(Ints.toByteArray(height)).untag(Digest32)

@@ -5,29 +5,38 @@ import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
-trait History extends HistoryPrivateApi with AutoCloseable { this: HistoryPayloadsProcessorComponent =>
+trait History extends HistoryPrivateApi with AutoCloseable {
+  this: HistoryPayloadsProcessorComponent with HistoryHeadersProcessor =>
 
-
-  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] =
+  /** Appends modifier to the history if it is applicable. */
+  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
+    logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header =>
+        logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
         (this, processHeader(header))
-      case payload: Payload => (this, processPayload(payload))
+      case payload: Payload => (this, processor.processPayload(payload))
     })
+  }
 
-  def processHeader(h: Header): ProgressInfo
-
-  def processPayload(payload: Payload): ProgressInfo
-
+  /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
     case header: Header   => Some(header)
     case block: Block     => Some(block.header)
     case payload: Payload => getHeaderById(payload.headerId)
   }
 
-  def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) =
+  /**
+   * Marks modifier and all modifiers in child chains as invalid
+   *
+   * @param modifier that is invalid against the State
+   * @return ProgressInfo with next modifier to try to apply
+   */
+  def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) = {
+    logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
         val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
@@ -38,6 +47,7 @@ trait History extends HistoryPrivateApi with AutoCloseable { this: HistoryPayloa
                 .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))
           )
           .toList
+        logger.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
         val bestHeaderIsInvalidated: Boolean =
           getBestHeaderId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         val bestFullIsInvalidated: Boolean =
@@ -92,8 +102,16 @@ trait History extends HistoryPrivateApi with AutoCloseable { this: HistoryPayloa
         )
         this -> ProgressInfo(None, Seq.empty, Seq.empty, None)
     }
+  }
 
-  def reportModifierIsValid(modifier: PersistentModifier): History =
+  /**
+   * Marks modifier as valid
+   *
+   * @param modifier that is valid against the State
+   * @return ProgressInfo with next modifier to try to apply
+   */
+  def reportModifierIsValid(modifier: PersistentModifier): History = {
+    logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     modifier match {
       case block: Block =>
         val nonMarkedIds: Seq[ModifierId] = Seq(block.header.id, block.payload.id)
@@ -111,6 +129,7 @@ trait History extends HistoryPrivateApi with AutoCloseable { this: HistoryPayloa
         )
         this
     }
+  }
 
   override def close(): Unit = historyStorage.close()
 

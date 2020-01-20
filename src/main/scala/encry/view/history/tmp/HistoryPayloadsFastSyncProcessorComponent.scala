@@ -40,7 +40,7 @@ trait HistoryPayloadsFastSyncProcessorComponent extends HistoryPayloadsProcessor
       bestBlockId             <- getBestBlockId
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-      case _ if !isHeadersChainSynced =>
+      case _ if !isHeaderChainSynced =>
         List.empty
       case Some(header) if isInBestChain(header) =>
         continuation(header.height + 1, List.empty)

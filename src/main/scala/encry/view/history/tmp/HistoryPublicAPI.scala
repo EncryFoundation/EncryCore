@@ -1,51 +1,48 @@
 package encry.view.history.tmp
 
-import encry.consensus.HistoryConsensus.{Equal, Fork, HistoryComparisonResult, Older, Unknown, Younger}
+import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.HistoryConsensus.{ Equal, Fork, HistoryComparisonResult, Older, Unknown, Younger }
 import encry.consensus.PowLinearController
 import encry.modifiers.history.HeaderChain
-import encry.view.history.BlockDownloadProcessor
 import encry.view.history.ValidationError.HistoryApiError
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.network.SyncInfo
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
+import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, Height, ModifierId }
 
 import scala.annotation.tailrec
 import scala.collection.immutable
-import scala.collection.immutable.HashSet
 
-trait HistoryPublicAPI extends HistoryReader {
+trait HistoryPublicAPI extends HistoryReader with StrictLogging {
 
-  protected[history] var lastSyncInfo: SyncInfo = SyncInfo(Seq.empty)
+  final def lastHeaders(count: Int): HeaderChain =
+    getBestHeader
+      .map(headerChainBack(count, _, _ => false))
+      .getOrElse(HeaderChain.empty)
 
-  val blockDownloadProcessor: BlockDownloadProcessor = BlockDownloadProcessor(settings.node, settings.constants)
+  final def getHeaderIds(count: Int, offset: Int = 0): List[ModifierId] =
+    (offset until (count + offset))
+      .flatMap(getBestHeaderIdAtHeight)
+      .toList
 
-  final def getSyncInfo: SyncInfo = lastSyncInfo
+  protected[history] final def headerChainBack(
+    limit: Int,
+    startHeader: Header,
+    until: Header => Boolean
+  ): HeaderChain = {
+    @tailrec def loop(
+      header: Header,
+      acc: List[Header]
+    ): List[Header] =
+      if (acc.length == limit || until(header)) acc
+      else
+        getHeaderById(header.parentId) match {
+          case Some(parent: Header)         => loop(parent, acc :+ parent)
+          case None if acc.contains(header) => acc
+          case _                            => acc :+ header
+        }
 
-  def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]
-
-  protected[history] def updateIdsForSyncInfo(): Unit =
-    lastSyncInfo = SyncInfo(getBestHeader.map { header: Header =>
-      ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
-        headerIdsAtHeight(height).headOption
-      }.toList
-    }.getOrElse(List.empty))
-
-  final def compare(si: SyncInfo): HistoryComparisonResult = lastSyncInfo.lastHeaderIds.lastOption match {
-    //Our best header is the same as other history best header
-    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
-    //Our best header is in other history best chain, but not at the last position
-    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
-    /* Other history is empty, or our history contains last id from other history */
-    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isHeaderDefined) => Younger
-    case Some(_)                                                                                    =>
-      //Our history contains some ids from other history
-      if (si.lastHeaderIds.exists(isHeaderDefined)) Fork
-      //Unknown comparison result
-      else Unknown
-    //Both nodes do not keep any blocks
-    case None if si.lastHeaderIds.isEmpty => Equal
-    //Our history is empty, other contain some headers
-    case None => Older
+    if (getBestHeaderId.isEmpty || (limit == 0)) HeaderChain(List.empty)
+    else HeaderChain(loop(startHeader, List(startHeader)).reverse)
   }
 
   final def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
@@ -79,6 +76,34 @@ trait HistoryPublicAPI extends HistoryReader {
         settings.constants.InitialDifficulty
       )
   }
+
+  final def continuationIds(info: SyncInfo, size: Int): List[ModifierId] =
+    if (getBestHeaderId.isEmpty) info.startingPoints.map(_._2).toList
+    else if (info.lastHeaderIds.isEmpty) {
+      val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
+      (for {
+        startId     <- headerIdsAtHeight(heightFrom).headOption
+        startHeader <- getHeaderById(startId)
+      } yield headerChainBack(size, startHeader, _ => false)) match {
+        case Some(value) if value.headers.exists(_.height == settings.constants.GenesisHeight) =>
+          value.headers.map(_.id).toList
+        case _ => List.empty
+      }
+    } else {
+      val ids: Seq[ModifierId] = info.lastHeaderIds
+      (for {
+        lastHeaderInOurBestChain <- ids.view.reverse.find(isInBestChain)
+        theirHeight              <- heightOf(lastHeaderInOurBestChain)
+        heightFrom               = Math.min(getBestHeaderHeight, theirHeight + size)
+        startId                  <- getBestHeaderIdAtHeight(heightFrom)
+        startHeader              <- getHeaderById(startId)
+      } yield
+        headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain).headers
+          .map(_.id)) match {
+        case Some(value) => value.toList
+        case None        => List.empty
+      }
+    }
 
   final def getChainToHeader(
     fromHeaderOpt: Option[Header],
@@ -124,52 +149,21 @@ trait HistoryPublicAPI extends HistoryReader {
     loop(2, HeaderChain(Seq(header2)))
   }
 
-  def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] =
-    if (getBestHeaderId.isEmpty) info.startingPoints.map(_._2)
-    else if (info.lastHeaderIds.isEmpty) {
-      val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
-      (for {
-        startId     <- headerIdsAtHeight(heightFrom).headOption
-        startHeader <- getHeaderById(startId)
-      } yield headerChainBack(size, startHeader, _ => false)) match {
-        case Some(value) if value.headers.exists(_.height == settings.constants.GenesisHeight) =>
-          value.headers.map(_.id)
-        case _ => Seq.empty
-      }
-    } else {
-      val ids: Seq[ModifierId] = info.lastHeaderIds
-      (for {
-        lastHeaderInOurBestChain <- ids.view.reverse.find(m => isInBestChain(m))
-        theirHeight              <- heightOf(lastHeaderInOurBestChain)
-        heightFrom               = Math.min(getBestHeaderHeight, theirHeight + size)
-        startId                  <- headerIdsAtHeight(heightFrom).headOption
-        startHeader              <- getHeaderById(startId)
-      } yield
-        headerChainBack(size, startHeader, h => h.parentId sameElements lastHeaderInOurBestChain).headers
-          .map(_.id)) match {
-        case Some(value) => value
-        case None        => Seq.empty
-      }
-    }
-
-  protected[history] final def headerChainBack(
-    limit: Int,
-    startHeader: Header,
-    until: Header => Boolean
-  ): HeaderChain = {
-    @tailrec def loop(
-      header: Header,
-      acc: List[Header]
-    ): List[Header] =
-      if (acc.length == limit || until(header)) acc
-      else
-        getHeaderById(header.parentId) match {
-          case Some(parent: Header)         => loop(parent, acc :+ parent)
-          case None if acc.contains(header) => acc
-          case _                            => acc :+ header
-        }
-
-    if (getBestHeaderId.isEmpty || (limit == 0)) HeaderChain(Seq.empty)
-    else HeaderChain(loop(startHeader, List(startHeader)).reverse)
+  def compare(si: SyncInfo): HistoryComparisonResult = getLastSyncInfo.lastHeaderIds.lastOption match {
+    //Our best header is the same as other history best header
+    case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
+    //Our best header is in other history best chain, but not at the last position
+    case Some(id) if si.lastHeaderIds.exists(_ sameElements id) => Older
+    /* Other history is empty, or our history contains last id from other history */
+    case Some(_) if si.lastHeaderIds.isEmpty || si.lastHeaderIds.lastOption.exists(isHeaderDefined) => Younger
+    case Some(_)                                                                                    =>
+      //Our history contains some ids from other history
+      if (si.lastHeaderIds.exists(isHeaderDefined)) Fork
+      //Unknown comparison result
+      else Unknown
+    //Both nodes do not keep any blocks
+    case None if si.lastHeaderIds.isEmpty => Equal
+    //Our history is empty, other contain some headers
+    case None => Older
   }
 }
