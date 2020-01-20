@@ -15,10 +15,13 @@ import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import scala.util.Try
 
-final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
-                                                   avlStorage: VersionalStorage) extends AutoCloseable with StrictLogging {
+import scala.util.Try
+import encry.EncryApp.{influxRef, settings}
+import encry.stats.StatsSender.AvlStat
+
+final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
+                                                  avlStorage: VersionalStorage) extends AutoCloseable with StrictLogging {
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]] {
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -37,36 +40,35 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
                          kM: Monoid[K],
                          vM: Monoid[V]): AvlTree[K, V] = {
     //toDeleteNodes = HashSet.empty
-    val deleteStartTime = System.currentTimeMillis()
+    val deleteStartTime = System.nanoTime()
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDeleteKey) =>
         deleteKey(toDeleteKey, prevRoot)
     }
-    logger.info(s"avl delete time: ${(System.currentTimeMillis() - deleteStartTime)/1000L}")
-    val insertStartTime = System.currentTimeMillis()
+    val avlDeleteTime = System.nanoTime() - deleteStartTime
+    logger.info(s"avl delete time: $avlDeleteTime")
+    val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         val res = insert(keyToInsert, valueToInsert, prevRoot)
         res
     }
+    val insertTime = System.nanoTime() - insertStartTime
     //logger.info(s"new root: $newRoot")
-    logger.info(s"avl insert time: ${(System.currentTimeMillis() - insertStartTime)/1000L}")
-    val notChangedKeysStart = System.currentTimeMillis()
-    //val notChangedKeys = getNewNodesWithFirstUnchanged(newRoot).toSet
-    logger.info(s"avl notChangedKeysStart: ${(System.currentTimeMillis() - notChangedKeysStart)/1000L}")
-    val flattenNewNodesStart = System.currentTimeMillis()
+    logger.info(s"avl insert time: $insertTime")
+    val flattenNewNodesStart = System.nanoTime()
     val (insertedNodesInTree, notChanged) = getNewNodesWithFirstUnchanged(newRoot)
-    logger.info(s"FlattenNewNodesStart: ${(System.currentTimeMillis() - flattenNewNodesStart)/1000L}")
+    val flattenNewNodesTime = (System.nanoTime() - flattenNewNodesStart)
     val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
     //logger.info(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
     val notChangedKeys  = notChanged.map{node => ByteArrayWrapper(node.hash)}.toSet
     //logger.info(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
-    val takeUntilTime   = System.currentTimeMillis()
+    val takeUntilStart   = System.nanoTime()
     val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
-    logger.info(s"deletedNodes: ${(System.currentTimeMillis() - takeUntilTime)/1000L}")
+    val takeUntilTime = (System.nanoTime() - takeUntilStart)
     //logger.info(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
-    val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
+    val startInsertTime = System.nanoTime()
     avlStorage.insert(
       version,
       toInsert.map {
@@ -83,7 +85,14 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    logger.info(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
+    val insertDbTime = (System.nanoTime() - startInsertTime)
+    if (settings.influxDB.isDefined) influxRef.get ! AvlStat(
+      takeUntilTime,
+      flattenNewNodesTime,
+      insertDbTime,
+      avlDeleteTime,
+      insertTime
+    )
     AvlTree(shadowedRoot, avlStorage)
   }
 

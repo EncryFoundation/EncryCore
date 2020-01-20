@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import cats.data.Validated
 import cats.instances.list._
 import cats.syntax.either._
@@ -39,9 +40,12 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
+import encry.EncryApp.{influxRef, settings}
+import encry.stats.StatsSender.UtxoStat
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            height: Height,
@@ -75,7 +79,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         logger.info(s"Current root node: ${tree.rootNode}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-        val validstartTime = System.currentTimeMillis()
+        val validstartTime = System.nanoTime()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
           if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
             totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
@@ -83,7 +87,12 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         }).toList
           .traverse(Validated.fromEither)
           .toEither
-        logger.info(s"Validation time: ${(System.currentTimeMillis() - validstartTime) / 1000L} s")
+        val validationTime = System.nanoTime() - validstartTime
+        if (settings.influxDB.isDefined) influxRef.get ! UtxoStat(
+          block.payload.txs.length,
+          validationTime
+        )
+        logger.info(s"Validation time: $validationTime. Txs: ${block.payload.txs}")
         res.fold(
           err => {
             logger.info(s"Failed to state cause ${err.message}")
@@ -108,7 +117,6 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
             } else {
-              logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
               logger.info(s"After applying root node: ${newTree.rootNode}")
               UtxoState(
                 newTree,
