@@ -61,10 +61,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     val flattenNewNodesTime = (System.nanoTime() - flattenNewNodesStart)
     val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
     //logger.info(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
-    val notChangedKeys  = notChanged.map{node => ByteArrayWrapper(node.hash)}.toSet
     //logger.info(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
     val takeUntilStart   = System.nanoTime()
-    val deletedNodes    = takeUntil(rootNode, node => !notChangedKeys.contains(ByteArrayWrapper(node.hash)))
+    val deletedNodes    = takeUntil(rootNode, node => !notChanged.contains(ByteArrayWrapper(node.hash)))
     val takeUntilTime = (System.nanoTime() - takeUntilStart)
     //logger.info(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
@@ -96,24 +95,22 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     AvlTree(shadowedRoot, avlStorage)
   }
 
-  private def getNewNodesWithFirstUnchanged(node: Node[K, V]): (List[Node[K, V]], List[Node[K, V]]) = node match {
-    case shadowNode: ShadowNode[K, V] =>
-      val restored = shadowNode.restoreFullNode(avlStorage)
-      getNewNodesWithFirstUnchanged(restored)
+  private def getNewNodesWithFirstUnchanged(node: Node[K, V]): (List[Node[K, V]], Set[ByteArrayWrapper]) = node match {
+    case shadowNode: ShadowNode[K, V] => List.empty[Node[K, V]] -> Set(ByteArrayWrapper(shadowNode.nodeHash))
     case internal: InternalNode[K, V] =>
       avlStorage.get(StorageKey @@ AvlTree.nodeKey(internal.hash)) match {
-        case Some(_) => List.empty[Node[K, V]] -> (internal :: Nil)
+        case Some(_) => List.empty[Node[K, V]] -> Set(ByteArrayWrapper(internal.hash))
         case None =>
           val leftScan = getNewNodesWithFirstUnchanged(internal.leftChild)
           val rightScan = getNewNodesWithFirstUnchanged(internal.rightChild)
-          (internal :: leftScan._1 ::: rightScan._1) -> (leftScan._2 ::: rightScan._2)
+          (internal :: leftScan._1 ::: rightScan._1) -> (leftScan._2 ++ rightScan._2)
       }
     case leafNode: LeafNode[K, V] =>
       avlStorage.get(StorageKey @@ AvlTree.nodeKey(leafNode.hash)) match {
-        case Some(_) => List.empty[Node[K, V]] -> (leafNode :: Nil)
-        case None => List(leafNode) -> List.empty
+        case Some(_) => List.empty[Node[K, V]] -> Set(ByteArrayWrapper(leafNode.hash))
+        case None => List(leafNode) -> Set.empty
       }
-    case emptyNode: EmptyNode[K, V] => List.empty[Node[K, V]] -> List.empty[Node[K, V]]
+    case emptyNode: EmptyNode[K, V] => List.empty[Node[K, V]] -> Set.empty[ByteArrayWrapper]
   }
 
   private def takeUntil(node: Node[K, V], predicate: Node[K, V] => Boolean): List[Node[K, V]] = node match {
