@@ -64,7 +64,6 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
     //logger.info(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
     val startInsertTime = System.currentTimeMillis()
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
-    logger.info(s"New root: ${newRoot}")
     avlStorage.insert(
       version,
       toInsert.map {
