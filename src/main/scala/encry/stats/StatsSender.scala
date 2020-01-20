@@ -116,11 +116,11 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
 
     case AvlStat(takeUntil: Long, firstUnchanged: Long, storageInsert: Long, avlDeleteTime: Long, avlInsertTime: Long) =>
       influxDB.write(influxDBSettings.udpPort,
-        s"avlStat,nodeName=$nodeName,takeUntil=$takeUntil,firstUnchanged=$firstUnchanged,avlDelete=$avlDeleteTime,insertTime=$avlInsertTime value=$storageInsert"
+        s"avlStat,nodeName=$nodeName takeUntil=$takeUntil,firstUnchanged=$firstUnchanged,avlDelete=$avlDeleteTime,insertTime=$avlInsertTime,value=$storageInsert"
       )
 
     case UtxoStat(txsNumber: Int, validationTime: Long) =>
-      influxDB.write(influxDBSettings.udpPort, s"utxoStat,nodeName=$nodeName,txsNumber=$txsNumber value=$validationTime")
+      influxDB.write(influxDBSettings.udpPort, s"utxoStat,nodeName=$nodeName txsNumber=$txsNumber,value=$validationTime")
 
     case msg: ModifiersDownloadStatistic => msg match {
       case _ if nodeName.exists(_.isDigit) =>
