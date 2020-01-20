@@ -51,7 +51,7 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
         newLeftChildAfterInspect.height,
         if (newRightChildAfterInspect.height == -1) 0 else newRightChildAfterInspect.height
       ) + 1
-    )
+    ).selfInspection
   }
 
   override def toString: String =

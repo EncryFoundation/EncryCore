@@ -216,14 +216,12 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
         val newLeftChild = delete(internalNode.leftChild, key)
         val childUpdated = internalNode.updateChilds(newLeftChild = newLeftChild)
         val newNode      = childUpdated.selfInspection
-        val balancedRoot = balance(newNode)
-        balancedRoot
+        balance(newNode)
       } else if (internalNode.key < key) {
         val newRightChild = delete(internalNode.rightChild, key)
         val childUpdated = internalNode.updateChilds(newRightChild = newRightChild)
         val newNode      = childUpdated.selfInspection
-        val balancedRoot = balance(newNode)
-        balancedRoot
+        balance(newNode)
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
         //logger.info(s"theClosestValue for node ${internalNode} is ${theClosestValue._1._1}")
@@ -357,7 +355,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
     }
 
   private def balance(node: Node[K, V])
-                     (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Node[K, V] =
+                     (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Node[K, V] = {
     node match {
       case shadowNode: ShadowNode[K, V] =>
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
@@ -386,6 +384,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
         }
       case leafNode: LeafNode[K, V] => leafNode
     }
+  }.selfInspection
 
   private def rightSubTreeHeight(node: Node[K, V]): Int = node match {
     case shadowNode: ShadowNode[K, V] =>
@@ -407,83 +406,90 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
                            (implicit kMonoid: Monoid[K],
                             kSer: Serializer[K],
                             vMonoid: Monoid[V],
-                            vSer: Serializer[V]): Node[K, V] = node match {
-    case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(avlStorage)
-      rightRotation(restoredNode)
-    case leafNode: LeafNode[K, V] => leafNode
-    case internalNode: InternalNode[K, V] =>
-      val newRoot = internalNode.leftChild match {
-        case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
-        case internalNode: InternalNode[K, V] => internalNode
-        case shadowNode: ShadowNode[K, V] =>
-          shadowNode.restoreFullNode(avlStorage) match {
-            case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
-            case internalNode: InternalNode[K, V] => internalNode
-          }
-      }
-      val newLeftChildForPrevRoot = newRoot.rightChild.selfInspection
-      val prevRootWithUpdatedChildren =
-        internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot)
-      val prevRoot = prevRootWithUpdatedChildren.selfInspection
-      val newUpdatedRoot =
-        newRoot.updateChilds(newRightChild = prevRoot)
-//      logger.info(s"RIGHT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
-//        s"${internalNode.leftChild.map(el => Algos.encode(el.hash))})")
-      newUpdatedRoot
-  }
+                            vSer: Serializer[V]): Node[K, V] = {
+    node match {
+      case shadowNode: ShadowNode[K, V] =>
+        val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        rightRotation(restoredNode)
+      case leafNode: LeafNode[K, V] => leafNode
+      case internalNode: InternalNode[K, V] =>
+        val newRoot = internalNode.leftChild match {
+          case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
+          case internalNode: InternalNode[K, V] => internalNode
+          case shadowNode: ShadowNode[K, V] =>
+            shadowNode.restoreFullNode(avlStorage) match {
+              case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
+              case internalNode: InternalNode[K, V] => internalNode
+            }
+        }
+        val newLeftChildForPrevRoot = newRoot.rightChild.selfInspection
+        val prevRootWithUpdatedChildren =
+          internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot)
+        val prevRoot = prevRootWithUpdatedChildren.selfInspection
+        val newUpdatedRoot =
+          newRoot.updateChilds(newRightChild = prevRoot)
+        //      logger.info(s"RIGHT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
+        //        s"${internalNode.leftChild.map(el => Algos.encode(el.hash))})")
+        newUpdatedRoot
+    }
+  }.selfInspection
 
   private def leftRotation(node: Node[K, V])
                           (implicit kMonoid: Monoid[K],
                            kSer: Serializer[K],
                            vMonoid: Monoid[V],
-                           vSer: Serializer[V]): Node[K, V] = node match {
-    case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(avlStorage)
-      leftRotation(restoredNode)
-    case leafNode: LeafNode[K, V] => leafNode
-    case internalNode: InternalNode[K, V] =>
-      val newRoot = internalNode.rightChild match {
-        case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
-        case internalNode: InternalNode[K, V] => internalNode
-        case shadowNode: ShadowNode[K, V] =>
-          shadowNode.restoreFullNode(avlStorage) match {
-            case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
-            case internalNode: InternalNode[K, V] => internalNode
-          }
-      }
-      val newRightChildForPrevRoot = newRoot.leftChild.selfInspection
-      val prevRootWithUpdatedChildren =
-        internalNode.updateChilds(newRightChild = newRightChildForPrevRoot)
-      val prevRoot       = prevRootWithUpdatedChildren.selfInspection
-      val newUpdatedRoot = newRoot.updateChilds(newLeftChild = prevRoot)
-//      logger.info(s"LEFT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
-//        s"${internalNode.rightChild.map(el => Algos.encode(el.hash))})")
-      newUpdatedRoot
-  }
+                           vSer: Serializer[V]): Node[K, V] = {
+    node match {
+      case shadowNode: ShadowNode[K, V] =>
+        val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        leftRotation(restoredNode)
+      case leafNode: LeafNode[K, V] => leafNode
+      case internalNode: InternalNode[K, V] =>
+        val newRoot = internalNode.rightChild match {
+          case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
+          case internalNode: InternalNode[K, V] => internalNode
+          case shadowNode: ShadowNode[K, V] =>
+            shadowNode.restoreFullNode(avlStorage) match {
+              case LeafNode(key, value)             => InternalNode(key, value, 0, 0)
+              case internalNode: InternalNode[K, V] => internalNode
+            }
+        }
+        val newRightChildForPrevRoot = newRoot.leftChild.selfInspection
+        val prevRootWithUpdatedChildren =
+          internalNode.updateChilds(newRightChild = newRightChildForPrevRoot)
+        val prevRoot       = prevRootWithUpdatedChildren.selfInspection
+        val newUpdatedRoot = newRoot.updateChilds(newLeftChild = prevRoot)
+        //      logger.info(s"LEFT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
+        //        s"${internalNode.rightChild.map(el => Algos.encode(el.hash))})")
+        newUpdatedRoot
+    }
+  }.selfInspection
 
   private def rlRotation(node: Node[K, V])
                         (implicit kMonoid: Monoid[K],
                          kSer: Serializer[K],
                          vMonoid: Monoid[V],
-                         vSer: Serializer[V]): Node[K, V] = node match {
-    case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(avlStorage)
-      rlRotation(restoredNode)
-    case leafNode: LeafNode[K, V] => leafNode
-    case internalNode: InternalNode[K, V] =>
-      val rotatedRightChild = rightRotation(internalNode.rightChild)
-      val updatedNode =
-        internalNode.updateChilds(newRightChild = rotatedRightChild)
-      //logger.info(s"RL ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
-      leftRotation(updatedNode)
-  }
+                         vSer: Serializer[V]): Node[K, V] = {
+    node match {
+      case shadowNode: ShadowNode[K, V] =>
+        val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        rlRotation(restoredNode)
+      case leafNode: LeafNode[K, V] => leafNode
+      case internalNode: InternalNode[K, V] =>
+        val rotatedRightChild = rightRotation(internalNode.rightChild)
+        val updatedNode =
+          internalNode.updateChilds(newRightChild = rotatedRightChild)
+        //logger.info(s"RL ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
+        leftRotation(updatedNode)
+    }
+  }.selfInspection
 
   private def lrRotation(node: Node[K, V])
                         (implicit kMonoid: Monoid[K],
                          kSer: Serializer[K],
                          vMonoid: Monoid[V],
-                         vSer: Serializer[V]): Node[K, V] = node match {
+                         vSer: Serializer[V]): Node[K, V] = {
+    node match {
       case shadowNode: ShadowNode[K, V] =>
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
         lrRotation(restoredNode)
@@ -495,6 +501,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
         //logger.info(s"LR ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
         rightRotation(updatedNode)
     }
+  }.selfInspection
 
   override def close(): Unit = avlStorage.close()
 
