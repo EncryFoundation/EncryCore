@@ -80,7 +80,7 @@ final case class AvlTree[K : Hashable : Order, V] (rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    logger.debug(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
+    logger.info(s"time of insert in db: ${(System.currentTimeMillis() - startInsertTime)/1000L} s")
     AvlTree(shadowedRoot, avlStorage)
   }
 

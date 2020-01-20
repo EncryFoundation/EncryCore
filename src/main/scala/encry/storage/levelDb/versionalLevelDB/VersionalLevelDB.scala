@@ -67,6 +67,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
       s"Version length is incorrect! Should be: ${settings.versionKeySize}, but get: ${newElem.version.length}")
     assert(newElem.elemsToInsert.forall(_._1.length == settings.keySize),
       s"Key length is incorrect! Should be: ${settings.keySize}")
+    val startTime = System.currentTimeMillis()
     val readOptions = new ReadOptions()
     readOptions.snapshot(db.getSnapshot)
     val batch = db.createWriteBatch()
@@ -108,6 +109,7 @@ case class VersionalLevelDB(db: DB, settings: LevelDBSettings) extends StrictLog
     } finally {
       batch.close()
       readOptions.snapshot().close()
+      logger.info(s"Time of insert in lvdb: ${(System.currentTimeMillis() - startTime)/1000L} s")
     }
   }
 
