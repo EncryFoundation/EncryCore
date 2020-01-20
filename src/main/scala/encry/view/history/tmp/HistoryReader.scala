@@ -1,10 +1,7 @@
 package encry.view.history.tmp
 
-import cats.syntax.option._
 import com.google.common.primitives.Ints
-import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.StorageKey
-import encry.view.history.storage.HistoryStorage
 import encry.view.history.utils.instances.ModifierIdWrapper
 import encry.view.history.utils.syntax.wrapper._
 import io.iohk.iodb.ByteArrayWrapper
@@ -20,7 +17,15 @@ import scala.reflect.ClassTag
  * full history functionality is excessive but some read only operations is needed.
  * Also it is the frame for the history implementation.
  */
-trait HistoryReader {
+trait HistoryReader extends HistoryState {
+
+  //todo was settings.constants.DigestLength, become settings.constants.ModifierIdSize
+  final val BestHeaderKey: StorageKey =
+    StorageKey @@ Array.fill(settings.constants.ModifierIdSize)(Header.modifierTypeId.untag(ModifierTypeId))
+
+  //todo was settings.constants.DigestLength, become settings.constants.ModifierIdSize
+  final val BestBlockKey: StorageKey =
+    StorageKey @@ Array.fill(settings.constants.ModifierIdSize)(-1: Byte)
 
   private final def getModifierById[T: ClassTag](id: ModifierId): Option[T] =
     historyStorage
@@ -47,7 +52,7 @@ trait HistoryReader {
       .get(payload.headerId.wrap)
       .map(Block(_, payload))
       .orElse(blocksCache.get(payload.headerId.wrap))
-      .orElse(getHeaderById(payload.headerId).flatMap(Block(_, payload).some))
+      .orElse(getHeaderById(payload.headerId).map(Block(_, payload)))
 
   final def getBestHeaderId: Option[ModifierId] =
     historyStorage
@@ -74,6 +79,11 @@ trait HistoryReader {
         .orElse(getBlockByHeaderId(id))
     }
 
+  private def getHeightByHeaderIdDB(id: ModifierId): Option[Int] =
+    historyStorage
+      .get(headerHeightKey(id))
+      .map(Ints.fromByteArray)
+
   final def getHeightByHeaderId(id: ModifierId): Option[Int] =
     headersCache
       .get(id.wrap)
@@ -83,11 +93,7 @@ trait HistoryReader {
           .get(id.wrap)
           .map(_.header.height)
       )
-      .orElse(
-        historyStorage
-          .get(headerHeightKey(id))
-          .map(Ints.fromByteArray)
-      )
+      .orElse(getHeightByHeaderIdDB(id))
 
   final def getBestHeaderHeight: Int =
     getBestHeaderId.flatMap { id: ModifierId =>
@@ -163,9 +169,13 @@ trait HistoryReader {
       .flatMap(getBestHeaderIdAtHeight)
       .exists(_.sameElements(id))
 
-  final def scoreOf(id: ModifierId): Option[BigInt] = historyStorage
-    .get(headerScoreKey(id))
-    .map(d => BigInt(d))
+  final def scoreOf(id: ModifierId): Option[BigInt] =
+    historyStorage
+      .get(headerScoreKey(id))
+      .map(d => BigInt(d))
+
+  //todo is getOrElse(BigInt(0)) correct?
+  final def getBestHeadersChainScore: BigInt = getBestHeaderId.flatMap(scoreOf).getOrElse(BigInt(0))
 
   final def lastBestBlockHeightRelevantToBestChain(probablyAt: Int): Option[Int] =
     (for {
@@ -185,6 +195,35 @@ trait HistoryReader {
   final def validityKey(id: Array[Byte]): StorageKey =
     StorageKey @@ Algos.hash("validity".getBytes(Algos.charset) ++ id).untag(Digest32)
 
-}
+  protected[history] final def addHeaderToCacheIfNecessary(h: Header): Unit =
+    if (h.height >= getBestHeaderHeight - settings.constants.MaxRollbackDepth) {
+      val newHeadersIdsAtHeaderHeight: List[ModifierId] =
+        headersCacheIndexes.getOrElse(h.height, List.empty[ModifierId]) :+ h.id
+      headersCacheIndexes = headersCacheIndexes + (h.height -> newHeadersIdsAtHeaderHeight)
+      headersCache = headersCache + (h.id.wrap              -> h)
+      if (headersCacheIndexes.size > settings.constants.MaxRollbackDepth) {
+        headersCacheIndexes.get(getBestHeaderHeight - settings.constants.MaxRollbackDepth).foreach {
+          headersIds: List[ModifierId] =>
+            val wrappedIds = headersIds.map(_.wrap)
+            headersCache = headersCache.filterNot { case (id, _) => wrappedIds.contains(id) }
+        }
+        headersCacheIndexes = headersCacheIndexes - (getBestHeaderHeight - settings.constants.MaxRollbackDepth)
+      }
+    }
 
-object HistoryReader {}
+  protected[history] final def addBlockToCacheIfNecessary(b: Block): Unit =
+    if (!blocksCache.contains(b.id.wrap) && (b.header.height >= getBestBlockHeight - settings.constants.MaxRollbackDepth)) {
+      val newBlocksIdsAtBlockHeight: List[ModifierId] =
+        blocksCacheIndexes.getOrElse(b.header.height, List.empty[ModifierId]) :+ b.id
+      blocksCacheIndexes = blocksCacheIndexes + (b.header.height -> newBlocksIdsAtBlockHeight)
+      blocksCache = blocksCache + (b.id.wrap                     -> b)
+      if (blocksCacheIndexes.size > settings.constants.MaxRollbackDepth) {
+        blocksCacheIndexes.get(getBestBlockHeight - settings.constants.MaxRollbackDepth).foreach {
+          blocksIds: List[ModifierId] =>
+            val wrappedIds: List[ByteArrayWrapper] = blocksIds.map(_.wrap)
+            blocksCache = blocksCache.filterNot { case (id, _) => wrappedIds.contains(id) }
+        }
+        blocksCacheIndexes = blocksCacheIndexes - (getBestBlockHeight - settings.constants.MaxRollbackDepth)
+      }
+    }
+}
