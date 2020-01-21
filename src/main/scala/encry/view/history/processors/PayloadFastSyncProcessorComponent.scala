@@ -7,12 +7,10 @@ import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion
 import encry.view.history.HistoryApi
 import org.encryfoundation.common.modifiers.history.Payload
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
 trait PayloadFastSyncProcessorComponent extends HistoryPayloadProcessorComponent {
-  this: HistoryApi =>
 
   override val payloadProcessor = new PayloadFastSyncProcessor
 

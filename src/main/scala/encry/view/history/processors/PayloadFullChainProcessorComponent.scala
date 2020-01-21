@@ -5,7 +5,6 @@ import cats.syntax.either._
 import encry.consensus.HistoryConsensus
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.modifiers.history.HeaderChain
-import encry.view.history.HistoryApi
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
@@ -13,7 +12,6 @@ import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
 trait PayloadFullChainProcessorComponent extends HistoryPayloadProcessorComponent {
-  this: HistoryApi =>
 
   override val payloadProcessor: PayloadProcessor = new PayloadNormalProcessor
 

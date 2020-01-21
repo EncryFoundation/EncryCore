@@ -6,12 +6,10 @@ import encry.EncryApp.forceStopApplication
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.consensus.{ConsensusSchemeReaders, HistoryConsensus}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.history.HistoryApi
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, ModifierTypeId}
 
 trait HeaderFullChainProcessorComponent extends HistoryHeaderProcessorComponent {
-  this: HistoryApi =>
 
   override val headerProcessor: HeaderProcessor = new HeaderDefaultProcessor
 
