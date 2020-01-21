@@ -9,12 +9,13 @@ import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 
-trait HistoryModifiersValidator { historyApi: HistoryApi =>
+trait HistoryModifiersValidator {
+  historyApi: HistoryApi =>
 
-  lazy val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
+  private lazy val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
     settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
 
-  def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
+  final def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
     (modifier match {
       case header: Header   => validateHeader(header)
       case payload: Payload => validatePayload(payload)
