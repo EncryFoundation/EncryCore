@@ -6,7 +6,7 @@ import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
-import encry.view.history.History
+import encry.view.history.{History, HistoryHeadersDefaultProcessorComponent, HistoryPayloadsNormalSyncProcessorComponent, HistoryPrivateApi}
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -157,7 +157,7 @@ trait InstanceFactory extends Keys with EncryGenerator {
       prevId.getOrElse(history.getBestHeader.map(_.id).getOrElse(Header.GenesisParentId))
     val requiredDifficulty: Difficulty = history.getBestHeader.map(parent =>
       history.requiredDifficultyAfter(parent).getOrElse(Difficulty @@ BigInt(0)))
-      .getOrElse(history.settings.constants.InitialDifficulty)
+      .getOrElse(settings.constants.InitialDifficulty)
     val txs = (if (txsQty != 0) genValidPaymentTxs(Scarand.nextInt(txsQty)) else Seq.empty) ++
       Seq(coinbaseAt(history.getBestHeaderHeight + 1))
     val header = genHeader.copy(
@@ -229,11 +229,10 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+    new History with HistoryPrivateApi with HistoryPayloadsNormalSyncProcessorComponent
+      with HistoryHeadersDefaultProcessorComponent {
       override val settings: EncryAppSettings = settingsEncry
-      override var isFullChainSynced = settings.node.offlineGeneration
       override  val historyStorage: HistoryStorage = storage
-      override  val timeProvider: NetworkTimeProvider = ntp
     }
   }
 }

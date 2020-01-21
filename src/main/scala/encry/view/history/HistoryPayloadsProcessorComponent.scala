@@ -1,14 +1,13 @@
-package encry.view.history.tmp
+package encry.view.history
 
 import encry.consensus.HistoryConsensus.ProgressInfo
 import org.encryfoundation.common.modifiers.history.Payload
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.collection.immutable.HashSet
 
-trait HistoryPayloadsProcessorComponent {
+trait HistoryPayloadsProcessorComponent extends HistoryPrivateApi {
 
-  val processor: PayloadProcessor
+  val payloadProcessor: PayloadProcessor
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]
 
   trait PayloadProcessor {

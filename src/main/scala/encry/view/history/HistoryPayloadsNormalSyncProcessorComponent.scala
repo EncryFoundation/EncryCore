@@ -1,4 +1,4 @@
-package encry.view.history.tmp
+package encry.view.history
 
 import cats.syntax.either._
 import cats.syntax.option._
@@ -7,17 +7,22 @@ import encry.modifiers.history.HeaderChain
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
-
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
 trait HistoryPayloadsNormalSyncProcessorComponent extends HistoryPayloadsProcessorComponent {
   this: HistoryPrivateApi =>
 
-  override val processor: PayloadProcessor = new NormalSyncProcessor
+  override val payloadProcessor: PayloadProcessor = new NormalSyncProcessor
 
-  override def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId] = {
-    @tailrec def continuation(height: Int, acc: List[ModifierId]): List[ModifierId] =
+  override def payloadsIdsToDownload(
+    howMany: Int,
+    excluding: HashSet[ModifierId]
+  ): List[ModifierId] = {
+    @tailrec def continuation(
+      height: Int,
+      acc: List[ModifierId]
+    ): List[ModifierId] =
       if (acc.lengthCompare(howMany) >= 0) acc
       else
         getBestHeaderIdAtHeight(height).flatMap(getHeaderById) match {
@@ -33,7 +38,7 @@ trait HistoryPayloadsNormalSyncProcessorComponent extends HistoryPayloadsProcess
       bestBlockId             <- getBestBlockId
       headerLinkedToBestBlock <- getHeaderById(bestBlockId)
     } yield headerLinkedToBestBlock) match {
-      case _ if !isHeaderChainSynced =>
+      case _ if !isHeadersChainSynced =>
         List.empty
       case Some(header) if isInBestChain(header) =>
         continuation(header.height + 1, List.empty)
@@ -47,11 +52,14 @@ trait HistoryPayloadsNormalSyncProcessorComponent extends HistoryPayloadsProcess
   }
 
   class NormalSyncProcessor extends PayloadProcessor {
-    def processPayload(payload: Payload): ProgressInfo =
-      getBlockByPayload(payload).flatMap { block =>
-        logger.info(s"proc block ${block.header.encodedId}!")
-        processBlock(block).some
+
+    override def processPayload(payload: Payload): ProgressInfo = {
+      logger.info(s"Start processing payload ${payload.encodedId} in normal node mod.")
+      getBlockByPayload(payload).map { block =>
+        logger.info(s"Processing block ${block.header.encodedId}!")
+        processBlock(block)
       }.getOrElse(putToHistory(payload))
+    }
 
     private def processBlock(blockToProcess: Block): ProgressInfo = {
       logger.info(

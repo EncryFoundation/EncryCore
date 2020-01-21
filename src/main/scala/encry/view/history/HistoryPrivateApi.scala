@@ -1,4 +1,4 @@
-package encry.view.history.tmp
+package encry.view.history
 
 import encry.utils.NetworkTimeProvider
 import org.encryfoundation.common.modifiers.history.Header
@@ -8,7 +8,7 @@ import scala.annotation.tailrec
 
 trait HistoryPrivateApi extends HistoryPublicAPI {
 
-  protected[history] val timeProvider: NetworkTimeProvider
+  protected[history] val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
 
   protected[history] final def continuationHeaderChains(
     header: Header,

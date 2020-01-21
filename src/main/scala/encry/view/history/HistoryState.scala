@@ -1,7 +1,6 @@
-package encry.view.history.tmp
+package encry.view.history
 
 import encry.settings.EncryAppSettings
-import encry.view.history.BlockDownloadProcessor
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
@@ -10,17 +9,22 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 trait HistoryState {
 
-  protected[history] val historyStorage: HistoryStorage
+  protected[view] val historyStorage: HistoryStorage
 
-  protected[history] val settings: EncryAppSettings
+  protected[view] val settings: EncryAppSettings
 
-  protected[history] var isHeadersChainSyncedVariable: Boolean
+  protected[view] var isHeadersChainSyncedVariable: Boolean = false
 
-  protected[history] var isFullChainSyncedVariable: Boolean
+  protected[view] var isFullChainSyncedVariable: Boolean = settings.node.offlineGeneration
+
+  protected[view] var lastAvailableManifestHeightVariable: Int = 0
+
+  protected[view] var fastSyncInProgressVariable: Boolean =
+    settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
 
   protected[history] var lastSyncInfoVariable: SyncInfo = SyncInfo(Seq.empty[ModifierId])
 
-  protected[history] val blockDownloadProcessor: BlockDownloadProcessor =
+  protected[view] val blockDownloadProcessor: BlockDownloadProcessor =
     BlockDownloadProcessor(settings.node, settings.constants)
 
   protected[history] final var headersCacheIndexes: Map[Int, List[ModifierId]] =
@@ -35,10 +39,14 @@ trait HistoryState {
   protected[history] final var blocksCache: Map[ByteArrayWrapper, Block] =
     Map.empty[ByteArrayWrapper, Block]
 
-  final def isHeaderChainSynced: Boolean = isHeadersChainSyncedVariable
+  final def isHeadersChainSynced: Boolean = isHeadersChainSyncedVariable
 
   final def isFullChainSynced: Boolean = isFullChainSyncedVariable
 
   final def getLastSyncInfo: SyncInfo = lastSyncInfoVariable
+
+  final def lastAvailableManifestHeight: Int = lastAvailableManifestHeightVariable
+
+  final def fastSyncInProgress: Boolean = fastSyncInProgressVariable
 
 }

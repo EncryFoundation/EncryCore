@@ -1,18 +1,18 @@
-package encry.view.history.tmp
+package encry.view.history
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.HistoryConsensus.{ Equal, Fork, HistoryComparisonResult, Older, Unknown, Younger }
-import encry.consensus.PowLinearController
+import encry.consensus.HistoryConsensus._
 import encry.modifiers.history.HeaderChain
-import encry.view.history.ValidationError.HistoryApiError
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.network.SyncInfo
-import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, Height, ModifierId }
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.annotation.tailrec
-import scala.collection.immutable
+import scala.collection.immutable.HashSet
 
 trait HistoryPublicAPI extends HistoryReader with StrictLogging {
+
+  def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]
 
   final def lastHeaders(count: Int): HeaderChain =
     getBestHeader
@@ -23,59 +23,6 @@ trait HistoryPublicAPI extends HistoryReader with StrictLogging {
     (offset until (count + offset))
       .flatMap(getBestHeaderIdAtHeight)
       .toList
-
-  protected[history] final def headerChainBack(
-    limit: Int,
-    startHeader: Header,
-    until: Header => Boolean
-  ): HeaderChain = {
-    @tailrec def loop(
-      header: Header,
-      acc: List[Header]
-    ): List[Header] =
-      if (acc.length == limit || until(header)) acc
-      else
-        getHeaderById(header.parentId) match {
-          case Some(parent: Header)         => loop(parent, acc :+ parent)
-          case None if acc.contains(header) => acc
-          case _                            => acc :+ header
-        }
-
-    if (getBestHeaderId.isEmpty || (limit == 0)) HeaderChain(List.empty)
-    else HeaderChain(loop(startHeader, List(startHeader)).reverse)
-  }
-
-  final def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = {
-    val requiredHeights: IndexedSeq[Height] = PowLinearController
-      .getHeightsForRetargetingAt(
-        Height @@ (parent.height + 1),
-        settings.constants.EpochLength,
-        settings.constants.RetargetingEpochsQty
-      )
-      .toIndexedSeq
-    for {
-      _ <- Either.cond(
-            requiredHeights.lastOption.contains(parent.height),
-            (),
-            HistoryApiError("Incorrect required heights sequence in requiredDifficultyAfter function.")
-          )
-      chain: HeaderChain = headerChainBack(requiredHeights.max - requiredHeights.min + 1, parent, (_: Header) => false)
-      requiredHeaders: immutable.IndexedSeq[(Int, Header)] = (requiredHeights.min to requiredHeights.max)
-        .zip(chain.headers)
-        .filter(p => requiredHeights.contains(p._1))
-      _ <- Either.cond(
-            requiredHeights.length == requiredHeaders.length,
-            (),
-            HistoryApiError(s"Missed headers: $requiredHeights != ${requiredHeaders.map(_._1)}.")
-          )
-    } yield
-      PowLinearController.getDifficulty(
-        requiredHeaders,
-        settings.constants.EpochLength,
-        settings.constants.DesiredBlockInterval,
-        settings.constants.InitialDifficulty
-      )
-  }
 
   final def continuationIds(info: SyncInfo, size: Int): List[ModifierId] =
     if (getBestHeaderId.isEmpty) info.startingPoints.map(_._2).toList
