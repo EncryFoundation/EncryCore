@@ -10,7 +10,7 @@ import encry.view.history.HistoryApi
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, ModifierTypeId}
 
-trait HeaderDefaultProcessorComponent extends HistoryHeaderProcessorComponent {
+trait HeaderFullChainProcessorComponent extends HistoryHeaderProcessorComponent {
   this: HistoryApi =>
 
   override val headerProcessor: HeaderProcessor = new HeaderDefaultProcessor

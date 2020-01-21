@@ -13,7 +13,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait PayloadNormalProcessorComponent extends HistoryPayloadProcessorComponent {
+trait PayloadFullChainProcessorComponent extends HistoryPayloadProcessorComponent {
   this: HistoryApi =>
 
   override val payloadProcessor: PayloadProcessor = new PayloadNormalProcessor

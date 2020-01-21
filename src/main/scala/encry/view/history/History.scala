@@ -173,14 +173,14 @@ object History extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
-      new History with HeaderDefaultProcessorComponent with PayloadFastSyncProcessorComponent {
+      new History with HeaderFullChainProcessorComponent with PayloadFastSyncProcessorComponent {
         override val settings: EncryAppSettings = settingsEncry
         override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
     else
-      new History with HeaderDefaultProcessorComponent with PayloadNormalProcessorComponent {
+      new History with HeaderFullChainProcessorComponent with PayloadFullChainProcessorComponent {
         override val settings: EncryAppSettings = settingsEncry
         override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
