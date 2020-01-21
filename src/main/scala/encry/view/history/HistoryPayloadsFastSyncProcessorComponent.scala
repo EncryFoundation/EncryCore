@@ -9,7 +9,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
 trait HistoryPayloadsFastSyncProcessorComponent extends HistoryPayloadsProcessorComponent {
-  this: HistoryPrivateApi =>
+  this: HistoryAPI =>
 
   override val payloadProcessor: PayloadProcessor = new FastSyncProcessor
 

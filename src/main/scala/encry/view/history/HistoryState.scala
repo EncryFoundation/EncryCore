@@ -1,9 +1,10 @@
 package encry.view.history
 
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.history.{ Block, Header }
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
@@ -15,16 +16,17 @@ trait HistoryState {
 
   protected[view] var isHeadersChainSyncedVariable: Boolean = false
 
-  protected[view] var isFullChainSyncedVariable: Boolean = settings.node.offlineGeneration
+  protected[view] var isFullChainSyncedVariable: Boolean
 
   protected[view] var lastAvailableManifestHeightVariable: Int = 0
 
-  protected[view] var fastSyncInProgressVariable: Boolean =
-    settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
+  protected[view] var fastSyncInProgressVariable: Boolean
 
   protected[history] var lastSyncInfoVariable: SyncInfo = SyncInfo(Seq.empty[ModifierId])
 
-  protected[view] val blockDownloadProcessor: BlockDownloadProcessor =
+  protected[history] lazy val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settings.ntp)
+
+  protected[view] lazy val blockDownloadProcessor: BlockDownloadProcessor =
     BlockDownloadProcessor(settings.node, settings.constants)
 
   protected[history] final var headersCacheIndexes: Map[Int, List[ModifierId]] =

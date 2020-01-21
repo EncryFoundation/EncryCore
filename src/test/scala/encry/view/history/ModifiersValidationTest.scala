@@ -2,7 +2,7 @@ package encry.view.history
 
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManagerTests.DMUtils.generateBlocks
-import encry.settings.{EncryAppSettings, TestNetSettings}
+import encry.settings.TestNetSettings
 import encry.utils.NetworkTimeProvider
 import org.encryfoundation.common.modifiers.history.Block
 import org.scalatest.{Matchers, OneInstancePerTest, WordSpecLike}
@@ -24,7 +24,9 @@ class ModifiersValidationTest extends WordSpecLike
       val genesisBlock: Block = generateGenesisBlock(testNetSettings.constants.GenesisHeight)
       newValidator.testApplicable(genesisBlock.header).isRight shouldBe true
       newHistory.append(genesisBlock.header)
-      val updatedHistory: History = newHistory.reportModifierIsValid(genesisBlock.header)
+      val h: History = newHistory.reportModifierIsValid(genesisBlock.header)
+      println(h.blockDownloadProcessor.minimalBlockHeight)
+      println(newValidator.blockDownloadProcessor.minimalBlockHeight)
       newValidator.testApplicable(genesisBlock.payload).isRight shouldBe true
     }
     "reject incorrect modifiers" in {

@@ -26,11 +26,11 @@ import scala.reflect.ClassTag
 trait HistoryReader extends HistoryState {
 
   //todo was settings.constants.DigestLength, become settings.constants.ModifierIdSize
-  final val BestHeaderKey: StorageKey =
+  final lazy val BestHeaderKey: StorageKey =
     StorageKey @@ Array.fill(settings.constants.ModifierIdSize)(Header.modifierTypeId.untag(ModifierTypeId))
 
   //todo was settings.constants.DigestLength, become settings.constants.ModifierIdSize
-  final val BestBlockKey: StorageKey =
+  final lazy val BestBlockKey: StorageKey =
     StorageKey @@ Array.fill(settings.constants.ModifierIdSize)(-1: Byte)
 
   private final def getModifierById[T: ClassTag](id: ModifierId): Option[T] =

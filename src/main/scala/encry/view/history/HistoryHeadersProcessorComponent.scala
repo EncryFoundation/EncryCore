@@ -3,7 +3,7 @@ package encry.view.history
 import encry.consensus.HistoryConsensus.ProgressInfo
 import org.encryfoundation.common.modifiers.history.Header
 
-trait HistoryHeadersProcessorComponent extends HistoryPrivateApi {
+trait HistoryHeadersProcessorComponent extends HistoryAPI {
 
   val headersProcessor: HeadersProcessor
 

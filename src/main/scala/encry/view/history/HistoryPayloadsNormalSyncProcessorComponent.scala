@@ -11,7 +11,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
 trait HistoryPayloadsNormalSyncProcessorComponent extends HistoryPayloadsProcessorComponent {
-  this: HistoryPrivateApi =>
+  this: HistoryAPI =>
 
   override val payloadProcessor: PayloadProcessor = new NormalSyncProcessor
 

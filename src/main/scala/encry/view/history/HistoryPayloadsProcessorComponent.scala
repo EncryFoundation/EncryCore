@@ -5,7 +5,7 @@ import org.encryfoundation.common.modifiers.history.Payload
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.immutable.HashSet
 
-trait HistoryPayloadsProcessorComponent extends HistoryPrivateApi {
+trait HistoryPayloadsProcessorComponent extends HistoryAPI {
 
   val payloadProcessor: PayloadProcessor
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]

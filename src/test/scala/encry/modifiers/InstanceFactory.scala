@@ -6,7 +6,7 @@ import encry.modifiers.state.Keys
 import encry.settings.{EncryAppSettings, NodeSettings}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.{EncryGenerator, FileHelper, NetworkTimeProvider, TestHelper}
-import encry.view.history.{History, HistoryHeadersDefaultProcessorComponent, HistoryPayloadsNormalSyncProcessorComponent, HistoryPrivateApi}
+import encry.view.history._
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
@@ -229,10 +229,12 @@ trait InstanceFactory extends Keys with EncryGenerator {
 
     val ntp: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
 
-    new History with HistoryPrivateApi with HistoryPayloadsNormalSyncProcessorComponent
+    new History with HistoryAPI with HistoryPayloadsNormalSyncProcessorComponent
       with HistoryHeadersDefaultProcessorComponent {
       override val settings: EncryAppSettings = settingsEncry
-      override  val historyStorage: HistoryStorage = storage
+      override val historyStorage: HistoryStorage = storage
+      override var isFullChainSyncedVariable: Boolean = false
+      override var fastSyncInProgressVariable: Boolean = settingsEncry.node.offlineGeneration
     }
   }
 }

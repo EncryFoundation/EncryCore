@@ -10,7 +10,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.annotation.tailrec
 import scala.collection.immutable.HashSet
 
-trait HistoryPublicAPI extends HistoryReader with StrictLogging {
+trait HistoryAPI extends HistoryReader with StrictLogging {
 
   def payloadsIdsToDownload(howMany: Int, excluding: HashSet[ModifierId]): List[ModifierId]
 
@@ -95,6 +95,45 @@ trait HistoryPublicAPI extends HistoryReader with StrictLogging {
 
     loop(2, HeaderChain(Seq(header2)))
   }
+
+  protected[history] final def continuationHeaderChains(
+    header: Header,
+    filterCond: Header => Boolean
+  ): List[List[Header]] = {
+    @tailrec def loop(
+      currentHeight: Int,
+      acc: List[List[Header]]
+    ): List[List[Header]] = {
+      val nextHeightHeaders: List[Header] = headerIdsAtHeight(currentHeight + 1).view
+        .flatMap(getHeaderById)
+        .filter(filterCond)
+        .toList
+      if (nextHeightHeaders.isEmpty) acc.map(_.reverse)
+      else {
+        val updatedChains: List[List[Header]] = nextHeightHeaders.flatMap { h: Header =>
+          acc.find((chain: List[Header]) => chain.nonEmpty && (h.parentId sameElements chain.head.id)).map(h +: _)
+        }
+        val nonUpdatedChains: List[List[Header]] =
+          acc.filter((chain: List[Header]) => !nextHeightHeaders.exists(_.parentId sameElements chain.head.id))
+
+        loop(currentHeight + 1, updatedChains ++ nonUpdatedChains)
+      }
+    }
+
+    loop(header.height, List(List(header)))
+  }
+
+  @tailrec protected[history] final def loopHeightDown(
+    height: Int,
+    p: ModifierId => Boolean
+  ): Option[Header] =
+    headerIdsAtHeight(height)
+      .find(p)
+      .flatMap(getHeaderById) match {
+      case h @ Some(_)                                       => h
+      case None if height > settings.constants.GenesisHeight => loopHeightDown(height - 1, p)
+      case n @ None                                          => n
+    }
 
   def compare(si: SyncInfo): HistoryComparisonResult = getLastSyncInfo.lastHeaderIds.lastOption match {
     //Our best header is the same as other history best header

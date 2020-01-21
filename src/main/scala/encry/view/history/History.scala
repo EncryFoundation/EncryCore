@@ -1,7 +1,6 @@
 package encry.view.history
 
 import java.io.File
-
 import cats.syntax.either._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
@@ -19,7 +18,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 
-trait History extends HistoryPrivateApi with AutoCloseable {
+trait History extends HistoryAPI with AutoCloseable {
   this: HistoryPayloadsProcessorComponent with HistoryHeadersProcessorComponent =>
 
   /** Appends modifier to the history if it is applicable. */
@@ -177,15 +176,21 @@ object History extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
-      new History with HistoryPrivateApi with HistoryPayloadsFastSyncProcessorComponent
+      new History with HistoryAPI with HistoryPayloadsFastSyncProcessorComponent
       with HistoryHeadersDefaultProcessorComponent {
         override protected[view] val historyStorage: HistoryStorage = HistoryStorage(versionalDB)
         override protected[view] val settings: EncryAppSettings     = settingsEncry
+        override protected[view] var isFullChainSyncedVariable: Boolean = settings.node.offlineGeneration
+        override protected[view] var fastSyncInProgressVariable: Boolean =
+          settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
       } else
-      new History with HistoryPrivateApi with HistoryPayloadsNormalSyncProcessorComponent
+      new History with HistoryAPI with HistoryPayloadsNormalSyncProcessorComponent
       with HistoryHeadersDefaultProcessorComponent {
         override protected[view] val historyStorage: HistoryStorage = HistoryStorage(versionalDB)
         override protected[view] val settings: EncryAppSettings     = settingsEncry
+        override protected[view] var isFullChainSyncedVariable: Boolean = settings.node.offlineGeneration
+        override protected[view] var fastSyncInProgressVariable: Boolean =
+          settings.snapshotSettings.enableFastSynchronization && !settings.node.offlineGeneration
       }
   }
 }

@@ -24,7 +24,7 @@ import encry.view.NodeViewHolder._
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{History, HistoryHeadersDefaultProcessorComponent, HistoryModifiersValidator, HistoryPayloadsNormalSyncProcessorComponent, HistoryPrivateApi}
+import encry.view.history._
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
@@ -101,14 +101,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/keysTmp"))
       FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/walletTmp"))
       logger.info(s"Updated best block in fast sync mod. Updated state height.")
-      val newHistory = new History with HistoryPrivateApi with HistoryPayloadsNormalSyncProcessorComponent
+      val newHistory = new History with HistoryAPI with HistoryPayloadsNormalSyncProcessorComponent
         with HistoryHeadersDefaultProcessorComponent {
         override val settings: EncryAppSettings = encrySettings
         override val historyStorage: HistoryStorage = nodeView.history.historyStorage
+        override protected[view] var isFullChainSyncedVariable: Boolean = true
+        override protected[view] var fastSyncInProgressVariable: Boolean = false
       }
-      newHistory.fastSyncInProgressVariable = false
       newHistory.blockDownloadProcessor.updateMinimalBlockHeightVar(nodeView.history.blockDownloadProcessor.minimalBlockHeight)
-      newHistory.isHeadersChainSyncedVariable = true
       updateNodeView(
         updatedHistory = Some(newHistory),
         updatedState = Some(state),

@@ -175,4 +175,8 @@ class HistoryModifiersValidator(
             PayloadNonFatalValidationError(s"Too old modifier ${m.encodedId}: ${header.height} < $minimalHeight")
           )
     } yield m
+
+  override protected[view] var isFullChainSyncedVariable: Boolean = false
+
+  override protected[view] var fastSyncInProgressVariable: Boolean = settings.node.offlineGeneration
 }
