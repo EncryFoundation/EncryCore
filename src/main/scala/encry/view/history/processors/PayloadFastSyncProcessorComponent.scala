@@ -4,7 +4,6 @@ import cats.syntax.option.none
 import encry.consensus.HistoryConsensus
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
-import encry.view.history.HistoryApi
 import org.encryfoundation.common.modifiers.history.Payload
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.annotation.tailrec

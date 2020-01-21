@@ -6,7 +6,9 @@ import org.encryfoundation.common.modifiers.history.Payload
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import scala.collection.immutable.HashSet
 
-trait HistoryPayloadProcessorComponent extends HistoryApi {
+trait HistoryPayloadProcessorComponent
+  extends HistoryApi
+{
 
   val payloadProcessor: PayloadProcessor
 

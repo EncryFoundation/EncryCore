@@ -4,10 +4,10 @@ import cats.syntax.option._
 import com.google.common.primitives.Ints
 import encry.EncryApp.forceStopApplication
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.consensus.{ConsensusSchemeReaders, HistoryConsensus}
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import org.encryfoundation.common.modifiers.history.{Header, Payload}
-import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId, ModifierTypeId}
+import encry.consensus.{ ConsensusSchemeReaders, HistoryConsensus }
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import org.encryfoundation.common.modifiers.history.{ Header, Payload }
+import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, ModifierId, ModifierTypeId }
 
 trait HeaderFullChainProcessorComponent extends HistoryHeaderProcessorComponent {
 
@@ -82,7 +82,7 @@ trait HeaderFullChainProcessorComponent extends HistoryHeaderProcessorComponent 
     }
 
     private def toDownload(header: Header): Option[(ModifierTypeId, ModifierId)] =
-    // Already synced and header is not too far back. Download required modifiers
+      // Already synced and header is not too far back. Download required modifiers
       if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
       // Headers chain is synced after this header. Start downloading full blocks
       else if (!isHeadersChainSynced && isNewHeader(header)) {
