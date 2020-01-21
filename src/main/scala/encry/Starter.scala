@@ -1,8 +1,6 @@
 package encry
 
-import java.io.File
 import java.net.InetSocketAddress
-import java.nio.file.Files
 import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
@@ -31,7 +29,12 @@ import scala.concurrent.Future
 import scala.io.StdIn
 import scala.util.{ Failure, Success, Try }
 
-class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nodeId: Array[Byte]) extends Actor {
+class Starter(settings: EncryAppSettings,
+              timeProvider: NetworkTimeProvider,
+              nodeId: Array[Byte],
+              isStateExists: Boolean,
+              conf: Option[String])
+    extends Actor {
 
   import context.dispatcher
 
@@ -48,8 +51,10 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
 
   def startNode(): Unit =
     (for {
-      result <- if (!Files.exists(new File(s"${settings.directory}/state").toPath))
+      result <- if (conf.isEmpty && !isStateExists)
                  startEmptyNode
+               else if (conf.nonEmpty && !isStateExists)
+                 startFromConf
                else
                  startNonEmptyNode
     } yield result) match {
@@ -321,6 +326,44 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
     new Exception("Node started with http api").asLeft[InitNodeResult]
   }
 
+  def startFromConf: Either[Throwable, InitNodeResult] = {
+    println("Node will start from config")
+    for {
+      walletPassword <- {
+        println("Please, enter wallet password:")
+        readAndValidateInput(validatePassword)
+      }
+      nodePass <- {
+        println("Please, enter node password:")
+        readAndValidateInput(validatePassword)
+      }
+      frontName <- if (settings.network.nodeName.exists(_.isEmpty)) {
+                    println("Please, enter node name:")
+                    readAndValidateInput(validateNodeName)
+                  } else settings.network.nodeName.get.asRight
+
+      mnemonic <- if (settings.wallet.flatMap(_.seed).exists(_.isEmpty)) {
+                   val phrase: String = Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16))
+                   println(s"Your new mnemonic code is:\n'$phrase' \nPlease, save it and don't show to anyone!")
+                   phrase.asRight[Throwable]
+                 } else settings.wallet.flatMap(_.seed).get.asRight
+
+    } yield
+      InitNodeResult(
+        mnemonic,
+        walletPassword,
+        settings.node.offlineGeneration,
+        settings.snapshotSettings.enableFastSynchronization,
+        settings.snapshotSettings.enableSnapshotCreation,
+        settings.network.knownPeers,
+        settings.network.connectOnlyWithKnownPeers.getOrElse(false),
+        nodePass,
+        frontName,
+        settings.network.declaredAddress,
+        settings.network.bindAddress
+      )
+  }
+
   override def preStart(): Unit = startNode()
 
   override def receive: Receive = {
@@ -357,10 +400,9 @@ class Starter(settings: EncryAppSettings, timeProvider: NetworkTimeProvider, nod
         network = networkSettings,
         snapshotSettings = snapshotSettings
       )
-      val influxRef: Option[ActorRef] = newSettings.influxDB.map {
-        influxSettings =>
-          context.system
-            .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
+      val influxRef: Option[ActorRef] = newSettings.influxDB.map { influxSettings =>
+        context.system
+          .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
