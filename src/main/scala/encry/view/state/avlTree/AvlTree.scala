@@ -19,7 +19,7 @@ import org.encryfoundation.common.utils.TaggedTypes.Height
 import scala.collection.immutable.HashSet
 import scala.collection.mutable
 import scala.util.Try
-//import encry.EncryApp.{influxRef, settings}
+import encry.EncryApp.{influxRef, settings}
 import encry.stats.StatsSender.AvlStat
 import scala.collection.immutable.{HashMap}
 
