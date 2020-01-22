@@ -4,15 +4,18 @@ import NodeMsg.NodeProtoMsg
 import NodeMsg.NodeProtoMsg.NodeTypes
 import cats.Monoid
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 
-abstract class Node[K: Serializer: Monoid, V: Serializer: Monoid] {
+abstract class Node[K: Serializer: Monoid, V: Serializer: Monoid]{
   val key: K
   val value: V
   val height: Int
   val balance: Int
-  lazy val hash: Array[Byte] = Algos.hash(NodeSerilalizer.toBytes(this))
+  def hash: Array[Byte] = Algos.hash(NodeSerilalizer.toBytes(this))
   def selfInspection: Node[K, V]
+
+  override def hashCode(): Int = ByteArrayWrapper(hash).hashCode()
 }
 
 

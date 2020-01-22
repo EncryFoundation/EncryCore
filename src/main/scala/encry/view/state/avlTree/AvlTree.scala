@@ -16,9 +16,12 @@ import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
 
+import scala.collection.immutable.HashSet
+import scala.collection.mutable
 import scala.util.Try
-import encry.EncryApp.{influxRef, settings}
+//import encry.EncryApp.{influxRef, settings}
 import encry.stats.StatsSender.AvlStat
+import scala.collection.immutable.{HashMap}
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                                                   avlStorage: VersionalStorage) extends AutoCloseable with StrictLogging {
@@ -30,6 +33,14 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   def root: K = rootNode.key
 
   val rootHash: Array[Byte] = rootNode.hash
+
+  var nodesBuffer: List[Node[K, V]] = List.empty
+  var nodesInsertionStat: List[(ByteArrayWrapper, Int)] = List.empty
+  var collectionsTime: Long = 0
+  var bufferTime: Long = 0
+  var balanceTime: Long = 0
+  var restoringTime: Long = 0
+  var updateChilds: Long = 0
 
   def insertAndDeleteMany(version: StorageVersion,
                           toInsert: List[(K, V)],
@@ -43,10 +54,21 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     val deleteStartTime = System.nanoTime()
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDeleteKey) =>
-        deleteKey(toDeleteKey, prevRoot)
+        val res = deleteKey(toDeleteKey, prevRoot)
+        res
     }
     val avlDeleteTime = System.nanoTime() - deleteStartTime
-    logger.info(s"avl delete time: $avlDeleteTime")
+    logger.info(s"Colls: ${(collectionsTime / 1000000)} ms")
+    logger.info(s"Buffer: ${(bufferTime / 1000000)} ms")
+    logger.info(s"Balance: ${(balanceTime / 1000000)} ms")
+    logger.info(s"Restore: ${(restoringTime / 1000000)} ms")
+    logger.info(s"Update childs: ${(updateChilds / 1000000)} ms")
+    logger.info(s"avl delete time: ${avlDeleteTime / 1000000} ms. Elems qty: ${toDelete.length}")
+    balanceTime = 0
+    collectionsTime = 0
+    bufferTime = 0
+    updateChilds = 0
+    restoringTime = 0
     val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
@@ -54,20 +76,49 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         res
     }
     val insertTime = System.nanoTime() - insertStartTime
+    logger.info(s"Colls: ${(collectionsTime / 1000000)} ms")
+    logger.info(s"Balance: ${(balanceTime / 1000000)} ms")
+    logger.info(s"Buffer: ${(bufferTime / 1000000)} ms")
+    logger.info(s"Update childs: ${(updateChilds / 1000000)} ms")
+    logger.info(s"Restore: ${(restoringTime / 1000000)} ms")
     //logger.info(s"new root: $newRoot")
-    logger.info(s"avl insert time: $insertTime")
-    val flattenNewNodesStart = System.nanoTime()
-    val (insertedNodesInTree, notChanged) = getNewNodesWithFirstUnchanged(newRoot)
-    val flattenNewNodesTime = (System.nanoTime() - flattenNewNodesStart)
-    val insertedNodes   = insertedNodesInTree.map(node => node.hash -> node)
-    //logger.info(s"Inserted nodes: ${insertedNodes.map(node => Algos.encode(node._2.hash)).mkString("\n")}")
-    //logger.info(s"Not changed: ${notChanged.map(node => Algos.encode(node.hash)).mkString("\n")}")
-    val takeUntilStart   = System.nanoTime()
-    val deletedNodes    = takeUntil(rootNode, node => !notChanged.contains(ByteArrayWrapper(node.hash)))
-    val takeUntilTime = (System.nanoTime() - takeUntilStart)
-    //logger.info(s"Deleted nodes: ${deletedNodes.map(_.toString).mkString("\n")}")
+    logger.info(s"avl insert time: ${(insertTime / 1000000)} ms. Elems qty: ${toInsert.length}")
     val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
+//    logger.info(s"INSERT ELEMS: ${toInsert.map(elem => Algos.encode(implicitly[Serializer[K]].toBytes(elem._1)))}")
+//    logger.info(s"DELETE ELEMS: ${toDelete.map(elem => Algos.encode(implicitly[Serializer[K]].toBytes(elem)))}")
+//    logger.info(s"INSERTED NODES: ${insertedNodesBuffer.keys.map(elem => Algos.encode(elem.data)).mkString(",")}")
+//    logger.info(s"DELETED NODES: ${deletedNodesBuffer.map(elem => Algos.encode(elem.data)).mkString(",")}")
+    var collectionsUpdate: Long = System.nanoTime()
+    //logger.info(nodesInsertionStat.map {case (key, stat) => s"${Algos.encode(key.data) -> stat}"}.mkString(","))
+    val insertedNodesMap = nodesBuffer.map(node => ByteArrayWrapper(node.hash) -> node).toMap
+    var insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty
+    var deletedNodes: List[ByteArrayWrapper] = List.empty
+    val nodeInsertionMap = nodesInsertionStat.reverse.toMap
+    //logger.info(s"Nodes buffer: ${nodeInsertionMap.map(elem => Algos.encode(elem._1.data) -> elem._2)}")
+    nodesBuffer.foreach { node =>
+      val wrappedHash = ByteArrayWrapper(node.hash)
+      val stat = nodeInsertionMap(wrappedHash)
+      if (stat >= 0 && wrappedHash.size != 0) {
+        insertedNodes = insertedNodes + (wrappedHash -> node)
+      }
+      else if (wrappedHash.size != 0) deletedNodes = wrappedHash :: deletedNodes
+    }
+//    logger.info(s"Inserted nodes: ${insertedNodes.keys.map(elem => Algos.encode(elem.data)).mkString(",")}")
+//    logger.info(s"Deleted node: ${deletedNodes.map(elem => Algos.encode(elem.data)).mkString(",")}")
+//    val (insertedNodesStat, deletedNodesStat) =
+//      nodesInsertionStat.foldLeft(List.empty[(ByteArrayWrapper, Node[K, V])], List.empty[ByteArrayWrapper]) {
+//        case ((toInsert, toDelete), (nodeHash, stat)) =>
+//          if (stat >= 0) ((nodeHash -> insertedNodesMap(nodeHash)) :: toInsert) -> toDelete
+//          else toInsert -> (nodeHash :: toDelete)
+//      }
+    logger.info(s"Coll update: ${(System.nanoTime() - collectionsUpdate)/1000000} ms.")
+//    logger.info(s"Delete nodes: ${deletedNodes.map(elem => Algos.encode(elem.data)).mkString(",")}")
+//    logger.info(s"Inserted nodes: ${insertedNodes.map(elem => Algos.encode(elem._1.data)).mkString(",")}")
     val startInsertTime = System.nanoTime()
+    var nodesToDelete: List[ByteArrayWrapper] = deletedNodes.toSet[ByteArrayWrapper].filterNot(insertedNodes.map(_._1).toSet).toList
+//    logger.info(s"DIFF: ${nodesToDelete.length}")
+//    logger.info(s"Insert nodes: ${insertedNodes.map {case (key, _) => Algos.encode(key.data)}.mkString(",")}")
+//    logger.info(s"Deleted node: ${nodesToDelete.map(key => Algos.encode(key.data)).mkString(",")}")
     avlStorage.insert(
       version,
       toInsert.map {
@@ -76,22 +127,27 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       } ++
         insertedNodes.map {
           case (key, node) =>
-            StorageKey @@ AvlTree.nodeKey(key) -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
+            StorageKey @@ AvlTree.nodeKey(key.data) -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList ++
         List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
-      deletedNodes.map(key => StorageKey @@ AvlTree.nodeKey(key.hash)) ++ toDelete.map(key =>
+      nodesToDelete.distinct.collect {
+        case key if avlStorage.contains(StorageKey @@ AvlTree.nodeKey(key.data)) =>
+          StorageKey @@ AvlTree.nodeKey(key.data)
+      } ++ toDelete.map(key =>
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    val insertDbTime = (System.nanoTime() - startInsertTime)
-    if (settings.influxDB.isDefined) influxRef.get ! AvlStat(
-      takeUntilTime,
-      flattenNewNodesTime,
-      insertDbTime,
-      avlDeleteTime,
-      insertTime
-    )
+//    val insertDbTime = (System.nanoTime() - startInsertTime)
+//    if (settings.influxDB.isDefined) influxRef.get ! AvlStat(
+//      0,
+//      0,
+//      insertDbTime,
+//      avlDeleteTime,
+//      insertTime
+//    )
+    nodesBuffer = List.empty
+    nodesInsertionStat = List.empty
     AvlTree(shadowedRoot, avlStorage)
   }
 
@@ -115,8 +171,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def takeUntil(node: Node[K, V], predicate: Node[K, V] => Boolean): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] if predicate(shadowNode) =>
-      val restored = shadowNode.restoreFullNode(avlStorage)
-      takeUntil(restored, predicate)
+      val startTime = System.nanoTime()
+      val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
+      takeUntil(restoredNode, predicate)
     case internalNode: InternalNode[K, V] if predicate(internalNode) =>
       internalNode :: takeUntil(internalNode.leftChild, predicate) ::: takeUntil(internalNode.rightChild, predicate)
     case leafNode: LeafNode[K, V] if predicate(leafNode) =>
@@ -143,8 +201,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def toDeleteKeys(node: Node[K, V], predicate: Node[K, V] => Boolean): List[StorageKey] = node match {
     case shadowNode: ShadowNode[K, V] if predicate(shadowNode) =>
-      val restored = shadowNode.restoreFullNode(avlStorage)
-      toDeleteKeys(restored, predicate)
+      val startTime = System.nanoTime()
+      val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
+      toDeleteKeys(restoredNode, predicate)
     case internalNode: InternalNode[K, V] if predicate(internalNode) =>
       (StorageKey @@ internalNode.hash) :: toDeleteKeys(internalNode.leftChild, predicate) :::
         toDeleteKeys(internalNode.rightChild, predicate)
@@ -188,7 +248,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def getK(key: K, node: Node[K, V]): Option[V] = node match {
     case shadowNode: ShadowNode[K, V] =>
+      val startTime = System.nanoTime()
       val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
       getK(key, restoredNode)
     case internalNode: InternalNode[K, V] =>
       if (internalNode.key === key) Some(internalNode.value)
@@ -196,6 +258,28 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       else getK(key, internalNode.rightChild)
     case leafNode: LeafNode[K, V] => if (leafNode.key === key) Some(leafNode.value) else None
   }
+
+  def addToStat(inserted: List[Node[K, V]] = List.empty, deleted: List[Node[K, V]] = List.empty): Unit = {
+//    logger.info("=======================================================================")
+//    logger.info(s"Delete: ${deleted.map(node => Algos.encode(node.hash)).mkString(",")}")
+//    logger.info(s"Insert: ${inserted.map(node => Algos.encode(node.hash)).mkString(",")}")
+//    logger.info("=======================================================================")
+    val startBuffetTime = System.nanoTime()
+    nodesBuffer = inserted ::: nodesBuffer
+    bufferTime = bufferTime + (System.nanoTime() - startBuffetTime)
+    val startTime = System.nanoTime()
+    nodesInsertionStat = deleted.map { node =>
+      val wrappedNodeHash = ByteArrayWrapper(node.hash)
+      wrappedNodeHash -> -1
+    } ::: nodesInsertionStat
+    nodesInsertionStat = inserted.map { node =>
+      val wrappedNodeHash = ByteArrayWrapper(node.hash)
+      wrappedNodeHash -> 1
+    } ::: nodesInsertionStat
+    collectionsTime = collectionsTime + (System.nanoTime() - startTime)
+  }
+
+  def addToStat(insert: Node[K, V], deleted: Node[K, V]): Unit = addToStat(List(insert), List(deleted))
 
   def deleteKey(key: K, node: Node[K, V])(implicit m: Monoid[K],
                                           v: Monoid[V],
@@ -210,11 +294,14 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   ): Node[K, V] = node match {
     case emptyNode: EmptyNode[K, V] => emptyNode
     case shadowNode: ShadowNode[K, V] =>
+      val startTime = System.nanoTime()
       val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
       delete(restoredNode, key)
     case leafNode: LeafNode[K, V] =>
       if (leafNode.key === key) {
         //logger.info(s"DELETE1: add ${Algos.encode(leafNode.hash)}")
+        addToStat(deleted = leafNode :: Nil)
         EmptyNode[K, V]
       }
       else leafNode
@@ -222,13 +309,22 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       //logger.info(s"DELETE2: add ${Algos.encode(internalNode.hash)}")
       if (internalNode.key > key) {
         val newLeftChild = delete(internalNode.leftChild, key)
+        var startTime = System.nanoTime()
         val childUpdated = internalNode.updateChilds(newLeftChild = newLeftChild)
-        val newNode      = childUpdated.selfInspection
-        balance(newNode)
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
+        val deletedNodes = List(internalNode.leftChild, internalNode)
+        val newNodes     = List(newLeftChild, childUpdated)
+        addToStat(newNodes, deletedNodes)
+        balance(childUpdated)
       } else if (internalNode.key < key) {
         val newRightChild = delete(internalNode.rightChild, key)
+        var startTime = System.nanoTime()
         val childUpdated = internalNode.updateChilds(newRightChild = newRightChild)
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
         val newNode      = childUpdated.selfInspection
+        val deletedNodes = List(internalNode.rightChild, internalNode)
+        val newNodes     = List(newRightChild, childUpdated)
+        addToStat(newNodes, deletedNodes)
         balance(newNode)
       } else {
         val theClosestValue = findTheClosestValue(internalNode, internalNode.key)
@@ -236,17 +332,27 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         val newNode = theClosestValue match {
           case ((newKey, newValue), LEFT) =>
             val newLeftChild = delete(internalNode.leftChild, newKey)
+            var startTime = System.nanoTime()
             val newNode = internalNode
               .copy(key = newKey, value = newValue)
               .updateChilds(newLeftChild = newLeftChild)
               .selfInspection
+            updateChilds = updateChilds + (System.nanoTime() - startTime)
+            val deletedNodes = List(internalNode.leftChild, internalNode)
+            val newNodes     = List(newNode, newLeftChild)
+            addToStat(newNodes, deletedNodes)
             newNode
           case ((newKey, newValue), RIGHT) =>
             val newRightChild = delete(internalNode.rightChild, newKey)
+            var startTime = System.nanoTime()
             val newNode = internalNode
               .copy(key = newKey, value = newValue)
               .updateChilds(newRightChild = newRightChild)
               .selfInspection
+            updateChilds = updateChilds + (System.nanoTime() - startTime)
+            val deletedNodes = List(internalNode.rightChild, internalNode)
+            val newNodes     = List(newNode, newRightChild)
+            addToStat(newNodes, deletedNodes)
             newNode
           case ((_, _), EMPTY) => internalNode
         }
@@ -260,7 +366,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     val h = implicitly[Order[Node[K, V]]]
     node match {
       case shadowNode: ShadowNode[K, V] =>
+        val startTime = System.nanoTime()
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        restoringTime = restoringTime + (System.nanoTime() - startTime)
         findTheClosestValue(restoredNode, key)
       case leafNode: LeafNode[K, V] => leafNode.key -> leafNode.value -> EMPTY
       case internalNode: InternalNode[K, V] =>
@@ -309,7 +417,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
+      val startTime = System.nanoTime()
       val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
       getRightPath(restoredNode)
     case leafNode: LeafNode[K, V] => List(leafNode)
     case internalNode: InternalNode[K, V] =>
@@ -319,7 +429,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def getLeftPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
+      val startTime = System.nanoTime()
       val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
       getLeftPath(restoredNode)
     case leafNode: LeafNode[K, V] => List(leafNode)
     case internalNode: InternalNode[K, V] =>
@@ -335,7 +447,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     {
       node match {
         case shadowNode: ShadowNode[K, V] =>
+          val startTime = System.nanoTime()
           val restoredNode = shadowNode.restoreFullNode(avlStorage)
+          restoringTime = restoringTime + (System.nanoTime() - startTime)
           insert(newKey, newValue, restoredNode)
         case _: EmptyNode[K, V] => LeafNode[K, V](newKey, newValue)
         case leafNode: LeafNode[K, V] =>
@@ -347,16 +461,23 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
               newValue,
               newInternalNode
             )
+            addToStat(newNode, leafNode)
             newNode
           }
         case internalNode: InternalNode[K, V] =>
           if (internalNode.key > newKey) {
             val newLeftChild = insert(newKey, newValue, internalNode.leftChild)
+            var startTime = System.nanoTime()
             val newNode = internalNode.updateChilds(newLeftChild = newLeftChild)
+            updateChilds = updateChilds + (System.nanoTime() - startTime)
+            addToStat(inserted = List(newNode, newLeftChild), deleted = internalNode :: Nil)
             balance(newNode)
           } else {
             val newRightChild = insert(newKey, newValue, internalNode.rightChild)
+            var startTime = System.nanoTime()
             val newNode = internalNode.updateChilds(newRightChild = newRightChild)
+            updateChilds = updateChilds + (System.nanoTime() - startTime)
+            addToStat(inserted = List(newNode, newRightChild), deleted = internalNode :: Nil)
             balance(newNode)
           }
       }
@@ -364,7 +485,8 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def balance(node: Node[K, V])
                      (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Node[K, V] = {
-    node match {
+    val startTime = System.nanoTime()
+    val res = node match {
       case shadowNode: ShadowNode[K, V] =>
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
         balance(restoredNode)
@@ -392,11 +514,15 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         }
       case leafNode: LeafNode[K, V] => leafNode
     }
+    balanceTime = balanceTime + (System.nanoTime() - startTime)
+    res
   }.selfInspection
 
   private def rightSubTreeHeight(node: Node[K, V]): Int = node match {
     case shadowNode: ShadowNode[K, V] =>
+      val startTime = System.nanoTime()
       val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
       rightSubTreeHeight(restoredNode)
     case internalNode: InternalNode[K, V] => internalNode.rightChild.height
     case _                                => -1
@@ -404,7 +530,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   private def leftSubTreeHeight(node: Node[K, V]): Int = node match {
     case shadowNode: ShadowNode[K, V] =>
+      val startTime = System.nanoTime()
       val restoredNode = shadowNode.restoreFullNode(avlStorage)
+      restoringTime = restoringTime + (System.nanoTime() - startTime)
       leftSubTreeHeight(restoredNode)
     case internalNode: InternalNode[K, V] => internalNode.leftChild.height
     case _                                => -1
@@ -417,7 +545,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                             vSer: Serializer[V]): Node[K, V] = {
     node match {
       case shadowNode: ShadowNode[K, V] =>
+        val startTime = System.nanoTime()
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        restoringTime = restoringTime + (System.nanoTime() - startTime)
         rightRotation(restoredNode)
       case leafNode: LeafNode[K, V] => leafNode
       case internalNode: InternalNode[K, V] =>
@@ -431,13 +561,18 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
             }
         }
         val newLeftChildForPrevRoot = newRoot.rightChild.selfInspection
+        var startTime = System.nanoTime()
         val prevRootWithUpdatedChildren =
           internalNode.updateChilds(newLeftChild = newLeftChildForPrevRoot)
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
         val prevRoot = prevRootWithUpdatedChildren.selfInspection
+        startTime = System.nanoTime()
         val newUpdatedRoot =
           newRoot.updateChilds(newRightChild = prevRoot)
-        //      logger.info(s"RIGHT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
-        //        s"${internalNode.leftChild.map(el => Algos.encode(el.hash))})")
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
+        val newNodes = List(newUpdatedRoot, prevRoot)
+        val deletedNodes = List(internalNode, internalNode.leftChild)
+        addToStat(newNodes, deletedNodes)
         newUpdatedRoot
     }
   }.selfInspection
@@ -449,7 +584,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                            vSer: Serializer[V]): Node[K, V] = {
     node match {
       case shadowNode: ShadowNode[K, V] =>
+        val startTime = System.nanoTime()
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        restoringTime = restoringTime + (System.nanoTime() - startTime)
         leftRotation(restoredNode)
       case leafNode: LeafNode[K, V] => leafNode
       case internalNode: InternalNode[K, V] =>
@@ -463,12 +600,17 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
             }
         }
         val newRightChildForPrevRoot = newRoot.leftChild.selfInspection
+        var startTime = System.nanoTime()
         val prevRootWithUpdatedChildren =
           internalNode.updateChilds(newRightChild = newRightChildForPrevRoot)
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
         val prevRoot       = prevRootWithUpdatedChildren.selfInspection
+        startTime = System.nanoTime()
         val newUpdatedRoot = newRoot.updateChilds(newLeftChild = prevRoot)
-        //      logger.info(s"LEFT ROTATION: (${Algos.encode(newUpdatedRoot.hash)}) (${Algos.encode(internalNode.hash)}, " +
-        //        s"${internalNode.rightChild.map(el => Algos.encode(el.hash))})")
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
+        val newNodes = List(newUpdatedRoot, prevRoot)
+        val deletedNodes = List(internalNode, internalNode.rightChild)
+        addToStat(newNodes, deletedNodes)
         newUpdatedRoot
     }
   }.selfInspection
@@ -480,13 +622,21 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                          vSer: Serializer[V]): Node[K, V] = {
     node match {
       case shadowNode: ShadowNode[K, V] =>
+        val startTime = System.nanoTime()
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        restoringTime = restoringTime + (System.nanoTime() - startTime)
         rlRotation(restoredNode)
       case leafNode: LeafNode[K, V] => leafNode
       case internalNode: InternalNode[K, V] =>
         val rotatedRightChild = rightRotation(internalNode.rightChild)
+        var startTime = System.nanoTime()
         val updatedNode =
           internalNode.updateChilds(newRightChild = rotatedRightChild)
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
+        val newNodes = List(updatedNode)
+        val deletedNodes = List(internalNode, internalNode.rightChild)
+        //logger.info("rl rotat")
+        addToStat(newNodes, deletedNodes)
         //logger.info(s"RL ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
         leftRotation(updatedNode)
     }
@@ -499,13 +649,21 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                          vSer: Serializer[V]): Node[K, V] = {
     node match {
       case shadowNode: ShadowNode[K, V] =>
+        val startTime = System.nanoTime()
         val restoredNode = shadowNode.restoreFullNode(avlStorage)
+        restoringTime = restoringTime + (System.nanoTime() - startTime)
         lrRotation(restoredNode)
       case leafNode: LeafNode[K, V] => leafNode
       case internalNode: InternalNode[K, V] =>
         val rotatedLeftChild = leftRotation(internalNode.leftChild)
+        var startTime = System.nanoTime()
         val updatedNode =
           internalNode.updateChilds(newLeftChild = rotatedLeftChild)
+        updateChilds = updateChilds + (System.nanoTime() - startTime)
+        val newNodes = List(updatedNode)
+        val deletedNodes = List(internalNode, internalNode.leftChild)
+        //logger.info("lr rotat")
+        addToStat(newNodes, deletedNodes)
         //logger.info(s"LR ROTATION: (${Algos.encode(updatedNode.hash)}) (${Algos.encode(internalNode.hash)}")
         rightRotation(updatedNode)
     }

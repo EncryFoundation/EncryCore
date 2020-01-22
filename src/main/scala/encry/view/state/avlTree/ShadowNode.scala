@@ -21,9 +21,10 @@ case class ShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: Array[By
 
   override val value: V = vM.empty
 
-  override lazy val hash = nodeHash
+  override val hash = nodeHash
 
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty) {
+    //val nodeValueBytes
     val nodeValue = storage.get(StorageKey @@ AvlTree.elementKey(implicitly[Serializer[K]].toBytes(key))).get
     NodeSerilalizer.fromBytes[K, V](
       {

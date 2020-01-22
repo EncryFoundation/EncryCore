@@ -199,7 +199,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     } shouldBe true
 
     levelDbElems.head.elemsToDelete.forall{key =>
-      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)).isEmpty
+      vldbInit.db.get(VersionalLevelDBCompanion.elementKeyForVersion(levelDbElems.head.version, key)).isEmpty
     } shouldBe true
   }
 
@@ -284,7 +284,7 @@ class VersionalLevelDBTest extends PropSpec with Matchers with LevelDbUnitsGener
     levelDbElems.foreach(vldbInit.insert)
 
     levelDbElems.head.elemsToInsert.forall{case (key, _) =>
-      vldbInit.db.get(VersionalLevelDBCompanion.accessableElementKeyForVersion(levelDbElems.head.version, key)) == null
+      vldbInit.db.get(VersionalLevelDBCompanion.elementKeyForVersion(levelDbElems.head.version, key)) == null
     } shouldEqual true
 
 

@@ -92,7 +92,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           block.payload.txs.length,
           validationTime
         )
-        logger.info(s"Validation time: $validationTime. Txs: ${block.payload.txs.length}")
+        logger.info(s"Validation time: ${validationTime/1000000} ms. Txs: ${block.payload.txs.length}")
         res.fold(
           err => {
             logger.info(s"Failed to state cause ${err.message}")
