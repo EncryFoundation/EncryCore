@@ -138,14 +138,14 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-//    val insertDbTime = (System.nanoTime() - startInsertTime)
-//    if (settings.influxDB.isDefined) influxRef.get ! AvlStat(
-//      0,
-//      0,
-//      insertDbTime,
-//      avlDeleteTime,
-//      insertTime
-//    )
+    val insertDbTime = (System.nanoTime() - startInsertTime)
+    if (settings.influxDB.isDefined) influxRef.get ! AvlStat(
+      0,
+      0,
+      insertDbTime,
+      avlDeleteTime,
+      insertTime
+    )
     nodesBuffer = List.empty
     nodesInsertionStat = List.empty
     AvlTree(shadowedRoot, avlStorage)
