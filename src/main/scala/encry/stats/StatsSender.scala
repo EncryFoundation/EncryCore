@@ -114,9 +114,9 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
 
     case StateUpdating(time) => influxDB.write(influxDBSettings.udpPort, s"stateUpdatingTime,nodeName=$nodeName value=$time")
 
-    case AvlStat(takeUntil: Long, firstUnchanged: Long, storageInsert: Long, avlDeleteTime: Long, avlInsertTime: Long) =>
+    case AvlStat(storageInsert: Long, avlDeleteTime: Long, avlInsertTime: Long) =>
       influxDB.write(influxDBSettings.udpPort,
-        s"avlStat,nodeName=$nodeName takeUntil=$takeUntil,firstUnchanged=$firstUnchanged,avlDelete=$avlDeleteTime,insertTime=$avlInsertTime,value=$storageInsert"
+        s"avlStat,nodeName=$nodeName avlDelete=$avlDeleteTime,insertTime=$avlInsertTime,value=$storageInsert"
       )
 
     case UtxoStat(txsNumber: Int, validationTime: Long) =>
@@ -164,7 +164,7 @@ object StatsSender {
   sealed trait ModifiersDownloadStatistic
   final case class SerializedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
   final case class ValidatedModifierFromNetwork(modifierTypeId: ModifierTypeId) extends ModifiersDownloadStatistic
-  final case class AvlStat(takeUntil: Long, firstUnchanged: Long, storageInsert: Long, avlDeleteTime: Long, avlInsertTime: Long)
+  final case class AvlStat(storageInsert: Long, avlDeleteTime: Long, avlInsertTime: Long)
   final case class UtxoStat(txsNumber: Int, validationTime: Long)
 
   final case class NewHeightByHistory(height: Int) extends AnyVal

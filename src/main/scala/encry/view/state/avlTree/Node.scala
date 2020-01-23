@@ -24,7 +24,9 @@ object NodeSerilalizer {
     val nodeSer = node match {
       case leaf: LeafNode[K, V]         => NodeTypes().withLeaf(LeafNode.toProto(leaf))
       case internal: InternalNode[K, V] => NodeTypes().withInternal(InternalNode.toProto(internal))
-      case shadow: ShadowNode[K, V]     => NodeTypes().withShadow(ShadowNode.toProto(shadow))
+      case emptyShadowNode: EmptyShadowNode[K, V] => NodeTypes().withEmptyShadowNode(EmptyShadowNode.toProto)
+      case nonEmptyShadowNode: NonEmptyShadowNode[K, V] =>
+        NodeTypes().withNonEmptyShadowNode(NonEmptyShadowNode.toProto(nonEmptyShadowNode))
       case empty: EmptyNode[K, V]       => NodeTypes().withEmptyNode(EmptyNode.toProto(empty))
     }
     NodeProtoMsg().withNode(nodeSer)
@@ -36,8 +38,10 @@ object NodeSerilalizer {
         LeafNode.fromProto[K, V](nodeProto.node.get.nodeProto.leaf.get).get
       case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.Internal(_) =>
         InternalNode.fromProto[K, V](nodeProto.node.get.nodeProto.internal.get).get
-      case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.Shadow(_) =>
-        ShadowNode.fromProto[K, V](nodeProto.node.get.nodeProto.shadow.get).get
+      case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.NonEmptyShadowNode(_) =>
+        NonEmptyShadowNode.fromProto[K, V](nodeProto.node.get.nodeProto.nonEmptyShadowNode.get).get
+      case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.EmptyShadowNode(_) =>
+        EmptyShadowNode.fromProto[K, V](nodeProto.node.get.nodeProto.emptyShadowNode.get)
       case NodeMsg.NodeProtoMsg.NodeTypes.NodeProto.EmptyNode(_) =>
         EmptyNode.fromProto[K, V](nodeProto.node.get.nodeProto.emptyNode.get).get
     }

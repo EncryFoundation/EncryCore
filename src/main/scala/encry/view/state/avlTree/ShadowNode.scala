@@ -12,74 +12,29 @@ import org.encryfoundation.common.utils.Algos
 
 import scala.util.Try
 
-//represent node, that stored in db, without all fields, except hash, height, balance
-case class ShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: Array[Byte],
-                                                              height: Int,
-                                                              balance: Int,
-                                                              key: K)
-                                                             (implicit kM: Monoid[K], vM: Monoid[V]) extends Node[K, V] with StrictLogging {
-
-  override val value: V = vM.empty
-
-  override val hash = nodeHash
-
-  def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty) {
-    //val nodeValueBytes
-    val nodeValue = storage.get(StorageKey @@ AvlTree.elementKey(implicitly[Serializer[K]].toBytes(key))).get
-    NodeSerilalizer.fromBytes[K, V](
-      {
-        val res = storage.get(StorageKey @@ AvlTree.nodeKey(hash))
-        if (res.isEmpty) logger.info(s"Empty node at key: ${Algos.encode(hash)}")
-        res.get
-      }
-    ) match {
-      case internalNode: InternalNode[K, V] => internalNode.copy(value = implicitly[Serializer[V]].fromBytes(nodeValue))
-      case leafNode: LeafNode[K, V] => leafNode.copy(value = implicitly[Serializer[V]].fromBytes(nodeValue))
-      case emptyNode: EmptyNode[K, V] => emptyNode
-    }
-
-  } else EmptyNode[K, V]()
-
-  def tryRestore(storage: VersionalStorage): Option[Node[K, V]] =
-    Try(restoreFullNode(storage)).toOption
-
-  override def toString: String = s"ShadowNode(Hash:${Algos.encode(hash)}, height: ${height}, balance: ${balance})"
-
-  override def selfInspection = this
+abstract class ShadowNode[K: Serializer: Monoid, V: Serializer: Monoid] extends Node[K, V] {
+  def restoreFullNode(storage: VersionalStorage): Node[K, V]
+  final override def selfInspection = this
 }
 
 object ShadowNode {
 
+  def nodeToShadow[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): ShadowNode[K, V] = node match {
+    case internal: InternalNode[K, V] =>
+      NonEmptyShadowNode(internal.hash, internal.height, internal.balance, internal.key)
+    case leaf: LeafNode[K, V] =>
+      NonEmptyShadowNode(leaf.hash, leaf.height, leaf.balance, leaf.key)
+    case _: EmptyNode[K, V] =>
+      new EmptyShadowNode[K, V]
+    case anotherShadow: ShadowNode[K, V] => anotherShadow
+  }
+
   def childsToShadowNode[K: Serializer : Hashable : Monoid, V: Serializer : Monoid](node: Node[K, V]): Node[K, V] = node match {
     case internal: InternalNode[K, V] =>
       internal.copy(
-        leftChild = ShadowNode[K, V](
-            nodeHash = internal.leftChild.hash,
-            height = internal.leftChild.height,
-            balance = internal.leftChild.balance,
-            key = internal.leftChild.key
-        ),
-        rightChild = ShadowNode[K, V](
-          nodeHash = internal.rightChild.hash,
-          height = internal.rightChild.height,
-          balance = internal.rightChild.balance,
-          key = internal.rightChild.key),
+        leftChild = nodeToShadow(internal.leftChild),
+        rightChild = nodeToShadow(internal.rightChild),
       )
     case _ => node
-  }
-
-  def toProto[K: Serializer, V](node: ShadowNode[K, V]): ShadowNodeProto = ShadowNodeProto()
-    .withHeight(node.height)
-    .withHash(ByteString.copyFrom(node.hash))
-    .withBalance(node.balance)
-    .withKey(ByteString.copyFrom(implicitly[Serializer[K]].toBytes(node.key)))
-
-  def fromProto[K: Hashable : Monoid : Serializer, V: Monoid : Serializer](protoNode: ShadowNodeProto): Try[ShadowNode[K, V]] = Try {
-    ShadowNode(
-      nodeHash = protoNode.hash.toByteArray,
-      height = protoNode.height,
-      balance = protoNode.balance,
-      key = implicitly[Serializer[K]].fromBytes(protoNode.key.toByteArray)
-    )
   }
 }
