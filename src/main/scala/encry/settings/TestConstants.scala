@@ -69,5 +69,4 @@ case object TestConstants extends Constants {
   val n: Char = 96
 
   val k: Char = 5
-  override val SnapshotCreationHeight: Int = 300
 }

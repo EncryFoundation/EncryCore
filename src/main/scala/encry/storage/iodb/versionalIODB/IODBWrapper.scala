@@ -3,8 +3,11 @@ package encry.storage.iodb.versionalIODB
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import io.iohk.iodb.Store.{K, V}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.utils.Algos
+
+import scala.collection.mutable
 
 /**
   * Wrapper, which extends VersionalStorage trait
@@ -30,6 +33,18 @@ case class IODBWrapper(store: Store) extends VersionalStorage with StrictLogging
                       toInsert: List[(StorageKey, StorageValue)],
                       toDelete: List[StorageKey] = List.empty): Unit = {
     logger.info(s"Update to version: ${Algos.encode(version)}")
+//    val data = new mutable.TreeMap[ByteArrayWrapper, ByteArrayWrapper]()
+//    for (key <- toDelete.map(ByteArrayWrapper.apply)) {
+//      val old = data.put(key, Store.tombstone)
+//      if (old.isDefined)
+//        throw new IllegalArgumentException("duplicate key in `toRemove`")
+//    }
+//    val toInsertElems = toInsert.map{case (keyToAdd, valToAdd) => ByteArrayWrapper(keyToAdd) -> ByteArrayWrapper(valToAdd)}
+//    for ((key, value) <- toInsertElems) {
+//      val old = data.put(key, value)
+//      if (old.isDefined)
+//        throw new IllegalArgumentException("duplicate key in `toUpdate`")
+//    }
     store.update(
       ByteArrayWrapper(version),
       toDelete.map(ByteArrayWrapper.apply),

@@ -2,6 +2,7 @@ package encry.view.state
 
 import java.io.File
 
+import akka.actor.ActorRef
 import cats.data.Validated
 import cats.instances.list._
 import cats.syntax.either._
@@ -44,12 +45,13 @@ import org.iq80.leveldb.Options
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
-import encry.EncryApp.{influxRef, settings}
+import encry.EncryApp.settings
 import encry.stats.StatsSender.UtxoStat
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            height: Height,
-                           constants: Constants) extends StrictLogging with UtxoStateReader with AutoCloseable {
+                           constants: Constants,
+                           influxRef: Option[ActorRef]) extends StrictLogging with UtxoStateReader with AutoCloseable {
 
   def applyValidModifier(block: Block): UtxoState = {
     logger.info(s"Block validated successfully. Inserting changes to storage.")
@@ -64,6 +66,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       newTree,
       Height @@ block.header.height,
       constants,
+      influxRef
     )
   }
 
@@ -72,7 +75,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     val result = mod match {
       case header: Header =>
         logger.info(s"\n\nStarting to applyModifier as a header: ${Algos.encode(mod.id)} to state at height ${header.height}")
-        UtxoState(tree, height, constants).asRight[List[ModifierApplyError]]
+        UtxoState(tree, height, constants, influxRef).asRight[List[ModifierApplyError]]
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
@@ -123,6 +126,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 newTree,
                 Height @@ block.header.height,
                 constants,
+                influxRef,
               ).asRight[List[ModifierApplyError]]
             }
           }
@@ -138,7 +142,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
     logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
     val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
-    UtxoState(rollbackedAvl, height, constants)
+    UtxoState(rollbackedAvl, height, constants, influxRef)
   }
 
   def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
@@ -242,7 +246,7 @@ object UtxoState extends StrictLogging {
     }
   }
 
-  def create(stateDir: File, settings: EncryAppSettings): UtxoState = {
+  def create(stateDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
@@ -257,11 +261,12 @@ object UtxoState extends StrictLogging {
     UtxoState(
       AvlTree[StorageKey, StorageValue](versionalStorage),
       height,
-      settings.constants
+      settings.constants,
+      influxRef
     )
   }
 
-  def genesis(stateDir: File, settings: EncryAppSettings): UtxoState = {
+  def genesis(stateDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
     //check kind of storage
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
@@ -277,6 +282,6 @@ object UtxoState extends StrictLogging {
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))
     )
-    UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants)
+    UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants, influxRef)
   }
 }

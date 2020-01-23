@@ -190,7 +190,8 @@ object Utils extends Settings with StrictLogging {
                         dir: File,
                         nodeViewHolderRef: Option[ActorRef],
                         settings: EncryAppSettings,
-                        storageType: StorageType): UtxoState = {
+                        storageType: StorageType,
+                        influxRef: Option[ActorRef] = None): UtxoState = {
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
@@ -206,7 +207,7 @@ object Utils extends Settings with StrictLogging {
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants)
+    new UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants, influxRef)
   }
 
   def getRandomTempDir: File = {
@@ -428,6 +429,7 @@ object Utils extends Settings with StrictLogging {
       override val historyStorage: HistoryStorage = storage
       override val timeProvider: NetworkTimeProvider = ntp
       override val settings: EncryAppSettings = settings
+      override var isFullChainSynced: Boolean = true
     }
   }
 
