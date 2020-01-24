@@ -120,25 +120,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   def contains(k: K)(implicit kSer: Serializer[K]): Boolean =
     avlStorage.get(StorageKey !@@ AvlTree.elementKey(kSer.toBytes(k))).isDefined
 
-  def getInTree(k: K)(implicit kSer: Serializer[K]): Option[V] = getK(k, rootNode)
-
-  def containsInTree(k: K)(implicit kSer: Serializer[K]): Boolean = find(k).isDefined
-
-  def find(k: K)(implicit kSer: Serializer[K]): Option[(K, V)] = getK(k, rootNode).map { value =>
-    (k, value)
-  }
-
-  private def getK(key: K, node: Node[K, V]): Option[V] = node match {
-    case shadowNode: ShadowNode[K, V] =>
-      val restoredNode = shadowNode.restoreFullNode(avlStorage)
-      getK(key, restoredNode)
-    case internalNode: InternalNode[K, V] =>
-      if (internalNode.key === key) Some(internalNode.value)
-      else if (internalNode.key > key) getK(key, internalNode.leftChild)
-      else getK(key, internalNode.rightChild)
-    case leafNode: LeafNode[K, V] => if (leafNode.key === key) Some(leafNode.value) else None
-  }
-
   def addToStat(inserted: List[Node[K, V]] = List.empty, deleted: List[Node[K, V]] = List.empty): Unit = {
     nodesBuffer = inserted ::: nodesBuffer
     nodesInsertionStat = deleted.map { node =>
