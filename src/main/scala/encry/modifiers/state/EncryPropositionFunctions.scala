@@ -45,10 +45,7 @@ object EncryPropositionFunctions extends StrictLogging {
           case anotherContract => anotherContract.contract.hash
         }
         if (sameHash(proposition.contractHash, contractHash)) RegularContractEvaluator.eval(rc, ctx, proofs)
-        else {
-          logger.info(s"Contract ${Algos.encode(rc.asInstanceOf[PubKeyLockedContract].pubKey)}. Real hash: ${Algos.encode(rc.contract.hash)}. Calculated: ${Algos.encode(contractHash)}")
-          false
-        }
+        else false
       }
   )
 

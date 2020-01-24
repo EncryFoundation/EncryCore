@@ -117,11 +117,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
         case _ =>
       }
 
-    case CheckPayloadsToDownload if !history.isHeadersChainSynced =>
-      val nextCheckModsScheduler =
-        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
-      context.become(basicMessageHandler(history, isBlockChainSynced, settings.node.mining, nextCheckModsScheduler))
-
     case CheckPayloadsToDownload =>
       val currentQueue: HashSet[ModifierIdAsKey] =
         expectedModifiers.flatMap { case (_, modIds) => modIds.keys }.to[HashSet]
@@ -270,7 +265,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
                       modifierIds: Seq[ModifierId],
                       isBlockChainSynced: Boolean,
                       isMining: Boolean): Unit = {
-    //logger.info(s"send req for mods: ${modifierIds.map(Algos.encode).mkString(",")}")
     val firstCondition: Boolean = mTypeId == Transaction.modifierTypeId && isBlockChainSynced && isMining
     val secondCondition: Boolean = mTypeId != Transaction.modifierTypeId
     val thirdCondition: Boolean =
@@ -463,9 +457,9 @@ class DeliveryManager(influxRef: Option[ActorRef],
               peer: ConnectedPeer,
               isBlockChainSynced: Boolean): Unit =
     if (isExpecting(mId, mTid, peer)) {
-      //if (mTid != Transaction.modifierTypeId) {
+      if (mTid != Transaction.modifierTypeId) {
         logger.debug(s"Got new modifier with type $mTid from: ${peer.socketAddress}. with id ${Algos.encode(mId)}")
-      //}
+      }
       priorityCalculator = priorityCalculator.incrementReceive(peer.socketAddress)
       val peerExpectedModifiers: Map[ModifierIdAsKey, (Cancellable, Int)] = expectedModifiers
         .getOrElse(peer.socketAddress, Map.empty)

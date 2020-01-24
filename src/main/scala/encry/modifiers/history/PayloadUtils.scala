@@ -11,8 +11,8 @@ object PayloadUtils {
       s"Modifier's type id should be ${Payload.modifierTypeId}")
     .demand(payload.headerId.size == modifierIdSize,
       s"Modifier's id should be $modifierIdSize bytes")
-    //todo: Increase payload max size to 2 mb in common
-    .demand(payload.bytes.length <= 2000000, //TestNetConstants.PayloadMaxSize,
+    //todo: Increase payload max size to 5 mb in common
+    .demand(payload.bytes.length <= 5000000, //TestNetConstants.PayloadMaxSize,
                  "Incorrect payload size.")
     .result
 }

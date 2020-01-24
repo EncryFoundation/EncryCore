@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import cats.data.Validated
 import cats.instances.list._
@@ -9,9 +8,11 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp.settings
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.settings.EncryAppSettings
+import encry.stats.StatsSender.UtxoStat
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
@@ -26,8 +27,6 @@ import encry.view.state.UtxoState.StateChange
 import encry.view.state.avlTree.AvlTree
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
-import monix.eval.Task
-import monix.execution.Scheduler.Implicits.global
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
@@ -41,12 +40,7 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
-
-import scala.concurrent.Await
-import scala.concurrent.duration._
 import scala.util.Try
-import encry.EncryApp.settings
-import encry.stats.StatsSender.UtxoStat
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            height: Height,
@@ -148,18 +142,12 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)
-      val bxsUnlockingStartTime = System.currentTimeMillis()
       val bxs: IndexedSeq[EncryBaseBox] = tx.inputs.flatMap(input => {
-        val gettingStartTime = System.currentTimeMillis()
         val res = tree.get(StorageKey !@@ input.boxId)
-        //logger.info(s"Time of bx bytes getting: ${(System.currentTimeMillis() - gettingStartTime) / 1000L}")
         res.flatMap(bytes => {
-          val parseBytesStartTime = System.currentTimeMillis()
           val bx = StateModifierSerializer.parseBytes(bytes, input.boxId.head)
-          //logger.info(s"bx deser time: ${(System.currentTimeMillis() - parseBytesStartTime) / 1000L}")
           val bxOpt = bx.toOption
-          val bxCanUnlockStartTime = System.currentTimeMillis()
-          val res = (bxOpt, tx.defaultProofOpt) match {
+          (bxOpt, tx.defaultProofOpt) match {
             // If no `proofs` provided, then `defaultProof` is used.
             case (Some(bx), defaultProofOpt) if input.proofs.nonEmpty =>
               if (EncryPropositionFunctions.canUnlock(bx.proposition, Context(tx, bx, stateView), input.contract,
@@ -172,15 +160,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 defaultProofOpt.map(Seq(_)).getOrElse(Seq.empty))) Some(bx) else None
             case _ => None
           }
-          //logger.info(s"bx unlocking time: ${(System.currentTimeMillis() - bxCanUnlockStartTime) / 1000L}")
-          res
         })
       })
-
-//      logger.info(s"" +
-//        s"Bxs unlocking time(inputs size: ${tx.inputs.length}): ${(System.currentTimeMillis() - bxsUnlockingStartTime)/1000L} s")
-
-      val validBalanceStartTime = System.currentTimeMillis()
 
       val validBalance: Boolean = {
         val debitB: Map[String, Amount] = BalanceCalculator.balanceSheet(bxs, constants.IntrinsicTokenId).map {
@@ -200,8 +181,6 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           else debitB.getOrElse(tokenId, 0L) >= amount
         }
       }
-
-      //logger.info(s"Validating balance: ${(System.currentTimeMillis() - validBalanceStartTime)/1000L} s")
 
       if (!validBalance) {
         logger.info(s"Tx: ${Algos.encode(tx.id)} invalid. Reason: Non-positive balance in $tx")
@@ -277,7 +256,6 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
-    //nitialStateBoxes.map(bx => logger.info(s"Insert ${Algos.encode(AvlTree.elementKey(bx.id))}"))
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))

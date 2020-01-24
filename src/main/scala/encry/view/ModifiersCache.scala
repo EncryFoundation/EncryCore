@@ -112,7 +112,8 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
-              if ((history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight) ||
+              if ((history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
+                (v.parentId sameElements Header.GenesisParentId) ||
                 history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)

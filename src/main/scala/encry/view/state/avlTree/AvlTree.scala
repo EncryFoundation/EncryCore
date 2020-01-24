@@ -4,7 +4,6 @@ import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-//import encry.EncryApp.{influxRef, settings}
 import encry.stats.StatsSender.AvlStat
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
@@ -17,7 +16,6 @@ import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
@@ -42,7 +40,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                          vSer: Serializer[V],
                          kM: Monoid[K],
                          vM: Monoid[V]): AvlTree[K, V] = {
-    //toDeleteNodes = HashSet.empty
     val deleteStartTime = System.nanoTime()
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDeleteKey) =>
@@ -90,18 +87,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    val insertDbTime = System.nanoTime() - startInsertTime
-//    if (settings.influxDB.isDefined) influxRef.get ! AvlStat(
-//      insertDbTime,
-//      avlDeleteTime,
-//      insertTime
-//    )
     AvlTree(shadowedRoot, avlStorage)
   }
 
   def getOperationsRootHash(
     toInsert: List[(K, V)],
-    toDelete: List[K],
+    toDelete: List[K]
   )(implicit kSer: Serializer[K], vSer: Serializer[V], kM: Monoid[K], vM: Monoid[V]): Try[Array[Byte]] = Try {
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDelete) =>

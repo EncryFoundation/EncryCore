@@ -22,8 +22,6 @@ case class NonEmptyShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: 
   override val hash = nodeHash
 
   def restoreFullNode(storage: VersionalStorage): Node[K, V] = if (nodeHash.nonEmpty) {
-    //val nodeValueBytes
-   // val nodeValue = storage.get(StorageKey @@ AvlTree.elementKey(implicitly[Serializer[K]].toBytes(key))).get
     NodeSerilalizer.fromBytes[K, V](
       {
         val res = storage.get(StorageKey @@ AvlTree.nodeKey(hash))
@@ -31,11 +29,6 @@ case class NonEmptyShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: 
         res.get
       }
     )
-//    match {
-//      case internalNode: InternalNode[K, V] => internalNode.copy(value = implicitly[Serializer[V]].fromBytes(nodeValue))
-//      case leafNode: LeafNode[K, V] => leafNode.copy(value = implicitly[Serializer[V]].fromBytes(nodeValue))
-//    }
-
   } else EmptyNode[K, V]()
 
   def tryRestore(storage: VersionalStorage): Option[Node[K, V]] =
