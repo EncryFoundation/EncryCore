@@ -51,7 +51,11 @@ object AccStorage extends StrictLogging {
   val PasswordHashKey: StorageKey = StorageKey @@ Algos.hash("Password_Key")
   val SaltKey: StorageKey = StorageKey @@ Algos.hash("Salt_Key")
 
-  def getDirStorage(settings: EncryAppSettings): File = new File(s"${settings.directory}/userKeys")
+  def getDirStorage(settings: EncryAppSettings): File = {
+    val dir = new File(s"${settings.directory}/userKeys")
+    dir.mkdirs()
+    dir
+  }
 
   def init(settings: EncryAppSettings): AccStorage = new AccStorage {
     override val storage: DB = LevelDbFactory.factory.open(getDirStorage(settings), new Options)
