@@ -194,7 +194,7 @@ class Miner(dataHolder: ActorRef,
 
     val combinedStateChange: UtxoState.StateChange = combineAll(txs.map(UtxoState.tx2StateChange).toList)
 
-    logger.info(s"Root node before producing candidate: ${view.state.tree.rootNode}")
+    //logger.info(s"Root node before producing candidate: ${view.state.tree.rootNode}")
 
     val newStateRoot = view.state.tree.getOperationsRootHash(
       combinedStateChange.outputsToDb.toList, combinedStateChange.inputsToDb.toList
@@ -202,7 +202,7 @@ class Miner(dataHolder: ActorRef,
 
     logger.info(s"State root should be: ${Algos.encode(newStateRoot)} after applying block")
 
-    logger.info(s"Root node after producing candidate: ${view.state.tree.rootNode}")
+    //logger.info(s"Root node after producing candidate: ${view.state.tree.rootNode}")
 
     val candidate: CandidateBlock =
       CandidateBlock(bestHeaderOpt, TestNetConstants.Version, txs, timestamp, difficulty, newStateRoot)

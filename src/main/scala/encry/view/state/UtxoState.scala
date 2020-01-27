@@ -73,7 +73,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
-        logger.info(s"Current root node: ${tree.rootNode}")
+        //logger.info(s"Current root node: ${tree.rootNode}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.nanoTime()
@@ -107,7 +107,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               Height @@ block.header.height
             )
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
-            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}. Root node: ${newTree.rootNode}")
+            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}.")
             logger.info(s"block.header.stateRoot ${Algos.encode(block.header.stateRoot)}")
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
               logger.info(s"Invalid state root!")
@@ -115,7 +115,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
             } else {
-              logger.info(s"After applying root node: ${newTree.rootNode}")
+              logger.info(s"After applying root node: ${newTree.rootNode.hash}")
               UtxoState(
                 newTree,
                 Height @@ block.header.height,

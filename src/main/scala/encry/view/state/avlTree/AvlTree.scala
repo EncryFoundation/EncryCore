@@ -47,6 +47,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         res
     }
     val avlDeleteTime = System.nanoTime() - deleteStartTime
+    logger.info(s"avlDeleteTime: ${avlDeleteTime/1000000L} s")
     val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
@@ -54,7 +55,8 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         res
     }
     val insertTime = System.nanoTime() - insertStartTime
-    val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
+    logger.info(s"avlInsertTime: ${insertTime/1000000L} s")
+    //val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
     var insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty
     var deletedNodes: List[ByteArrayWrapper] = List.empty
     val nodeInsertionMap = nodesInsertionStat.reverse.toMap
@@ -78,7 +80,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
           case (key, node) =>
             StorageKey @@ AvlTree.nodeKey(key.data) -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
         }.toList ++
-        List(AvlTree.rootNodeKey -> StorageValue @@ shadowedRoot.hash,
+        List(AvlTree.rootNodeKey -> StorageValue @@ newRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
       nodesToDelete.distinct.collect {
         case key if avlStorage.contains(StorageKey @@ AvlTree.nodeKey(key.data)) =>
@@ -87,7 +89,8 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    AvlTree(shadowedRoot, avlStorage)
+
+    AvlTree(newRoot, avlStorage)
   }
 
   def getOperationsRootHash(
@@ -232,7 +235,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       logger.debug(s"Rollback avl to version: ${Algos.encode(to)}")
       logger.debug(s"Versions in storage: ${avlStorage.versions.map(Algos.encode).mkString(",")}")
       logger.debug(s"Before rollback node key: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
-      logger.debug(s"Before rollback root node: ${rootNode}")
+      logger.debug(s"Before rollback root node: ${rootNode.hash}")
       avlStorage.rollbackTo(to)
       logger.debug(s"Storage success rolled back")
       logger.debug(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
