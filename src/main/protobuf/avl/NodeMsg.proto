@@ -24,10 +24,22 @@ message NodeProtoMsg {
             bytes hash = 1;
             int32 height = 2;
             int32 balance = 3;
+            bytes key = 4;
         }
 
         message EmptyNodeProto {
             bool emptyNode = 1;
+        }
+
+        message EmptyShadowNodeProto {
+
+        }
+
+        message NonEmptyShadowNodeProto {
+            bytes hash = 1;
+            int32 height = 2;
+            int32 balance = 3;
+            bytes key = 4;
         }
 
         oneof nodeProto {
@@ -35,6 +47,8 @@ message NodeProtoMsg {
             InternalNodeProto internal = 2;
             ShadowNodeProto shadow = 3;
             EmptyNodeProto emptyNode = 4;
+            EmptyShadowNodeProto emptyShadowNode = 5;
+            NonEmptyShadowNodeProto nonEmptyShadowNode = 6;
         }
     }
 

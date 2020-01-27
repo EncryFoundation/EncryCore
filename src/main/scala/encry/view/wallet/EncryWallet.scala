@@ -74,10 +74,10 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
   }
 
   def scanWalletFromUtxo(state: UtxoStateReader, props: Set[EncryProposition]): EncryWallet = {
-    val bxsToAdd: Seq[EncryBaseBox] = EncryWallet.scanTree(state.tree.rootNode, state.tree.storage, props)
+    val bxsToAdd: Seq[EncryBaseBox] = EncryWallet.scanTree(state.tree.rootNode, state.tree.avlStorage, props)
     if (bxsToAdd.nonEmpty)
       walletStorage.updateWallet(
-        ModifierId !@@ state.tree.storage.currentVersion,
+        ModifierId !@@ state.tree.avlStorage.currentVersion,
         bxsToAdd,
         List.empty,
         settings.constants.IntrinsicTokenId
@@ -148,8 +148,8 @@ object EncryWallet extends StrictLogging {
     case internalNode: InternalNode[StorageKey, StorageValue] =>
       StateModifierSerializer.parseBytes(internalNode.value, internalNode.key.head) match {
         case Success(bx) => collectBx(bx, accounts) :::
-          internalNode.leftChild.map(leftNode => scanTree(leftNode, storage, accounts)).getOrElse(List.empty) :::
-          internalNode.rightChild.map(rightChild => scanTree(rightChild, storage, accounts)).getOrElse(List.empty)
+           scanTree(internalNode.leftChild, storage, accounts) :::
+           scanTree(internalNode.rightChild, storage, accounts)
         case Failure(exception) => throw exception //???????
       }
     case leafNode: LeafNode[StorageKey, StorageValue] =>
@@ -157,6 +157,7 @@ object EncryWallet extends StrictLogging {
         case Success(bx) => collectBx(bx, accounts)
         case Failure(exception) => throw exception //???????
       }
+    case shadowNode: ShadowNode[StorageKey, StorageValue] => List.empty
   }
 
   def collectBx(box: EncryBaseBox, accounts: Set[EncryProposition]): List[EncryBaseBox] = box match {

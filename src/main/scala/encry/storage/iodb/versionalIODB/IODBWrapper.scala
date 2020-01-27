@@ -3,8 +3,11 @@ package encry.storage.iodb.versionalIODB
 import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import io.iohk.iodb.Store.{K, V}
 import io.iohk.iodb.{ByteArrayWrapper, Store}
 import org.encryfoundation.common.utils.Algos
+
+import scala.collection.mutable
 
 /**
   * Wrapper, which extends VersionalStorage trait

@@ -123,6 +123,8 @@ class DeliveryManager(influxRef: Option[ActorRef],
       logger.debug(s"Current queue: ${currentQueue.map(elem => Algos.encode(elem.toArray)).mkString(",")}")
       logger.debug(s"receivedModifiers: ${receivedModifiers.map(id => Algos.encode(id.toArray)).mkString(",")}")
       logger.debug(s"Qty to req: ${settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size}")
+      logger.debug(s"currentQueue.size: ${currentQueue.size}")
+      logger.debug(s"receivedModifiers.size: ${receivedModifiers.size}")
       val newIds: Seq[ModifierId] =
         history.payloadsIdsToDownload(
           settings.network.networkChunkSize - currentQueue.size - receivedModifiers.size,
@@ -153,7 +155,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
 
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
-        s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Sending request from local to DeliveryManager.")
+        s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Ids: ${modifierIds.map(Algos.encode).mkString(",")}. Sending request from local to DeliveryManager.")
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
 
     case RequestForTransactions(peer, modifierTypeId, modifierIds) =>

@@ -11,13 +11,15 @@ import scala.util.Try
 final case class EmptyNode[K: Serializer: Monoid, V: Serializer: Monoid] private (key: K, value: V, height: Int, balance: Int) extends Node[K, V] {
 
   override def selfInspection = this
+
+  override lazy val hash: Array[Byte] = Array.emptyByteArray
 }
 
 object EmptyNode {
   def apply[K, V]()(implicit k: Monoid[K],
                     v: Monoid[V],
                     kSer: Serializer[K],
-                    vSer: Serializer[V]): EmptyNode[K, V] = new EmptyNode(k.empty, v.empty, height = 0, balance = 0)
+                    vSer: Serializer[V]): EmptyNode[K, V] = new EmptyNode(k.empty, v.empty, height = -1, balance = 0)
 
   def toProto[K, V](node: EmptyNode[K, V]): EmptyNodeProto = EmptyNodeProto()
 

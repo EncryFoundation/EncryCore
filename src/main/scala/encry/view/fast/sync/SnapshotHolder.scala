@@ -116,7 +116,7 @@ class SnapshotHolder(settings: EncryAppSettings,
               nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
               restartFastSync(history)
             case Right((processor, controller)) if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty =>
-              processor.assembleUTXOState match {
+              processor.assembleUTXOState() match {
                 case Right(state) =>
                   logger.info(s"Tree is valid on Snapshot holder!")
                   processor.wallet.foreach { wallet: EncryWallet =>

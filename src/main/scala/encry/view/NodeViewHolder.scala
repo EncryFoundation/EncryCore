@@ -51,7 +51,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
 
-  var nodeView: NodeView = restoreState().getOrElse(genesisState)
+  var nodeView: NodeView = restoreState().getOrElse(genesisState(influxRef))
   context.system.actorSelection("/user/nodeViewSynchronizer") ! ChangedHistory(nodeView.history)
 
   dataHolder ! UpdatedHistory(nodeView.history)
@@ -90,7 +90,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       sender() ! newAccount
     case FastSyncFinished(state, wallet) =>
       logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
-      nodeView.state.tree.storage.close()
+      nodeView.state.tree.avlStorage.close()
       nodeView.wallet.close()
       FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/tmpDirState"))
       FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/keysTmp"))
@@ -264,7 +264,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                     AvlTree.getChunks(
                       stateAfterApply.tree.rootNode,
                       currentChunkHeight = encrySettings.snapshotSettings.chunkDepth,
-                      stateAfterApply.tree.storage
+                      stateAfterApply.tree.avlStorage
                     )
                   system.actorSelection("/user/nodeViewSynchronizer") ! TreeChunks(chunks, potentialManifestId)
                   potentialManifestIds = ManifestId @@ potentialManifestId :: potentialManifestIds
@@ -393,18 +393,18 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     case _ => Seq.empty[Transaction]
   }
 
-  def genesisState: NodeView = {
+  def genesisState(influxRef: Option[ActorRef] = None): NodeView = {
     val stateDir: File = UtxoState.getStateDir(encrySettings)
     stateDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: UtxoState = UtxoState.genesis(stateDir, encrySettings)
+    val state: UtxoState = UtxoState.genesis(stateDir, encrySettings, influxRef)
     val history: History = History.readOrGenerate(encrySettings, timeProvider)
     val wallet: EncryWallet =
       EncryWallet.readOrGenerate(EncryWallet.getWalletDir(encrySettings), EncryWallet.getKeysDir(encrySettings), encrySettings)
     NodeView(history, state, wallet)
   }
 
-  def restoreState(): Option[NodeView] = if (History.getHistoryIndexDir(encrySettings).listFiles.nonEmpty)
+  def restoreState(influxRef: Option[ActorRef] = None): Option[NodeView] = if (History.getHistoryIndexDir(encrySettings).listFiles.nonEmpty)
     try {
       val stateDir: File = UtxoState.getStateDir(encrySettings)
       stateDir.mkdirs()
@@ -412,28 +412,30 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val wallet: EncryWallet =
         EncryWallet.readOrGenerate(EncryWallet.getWalletDir(encrySettings), EncryWallet.getKeysDir(encrySettings), encrySettings)
       val state: UtxoState = restoreConsistentState(
-        UtxoState.create(stateDir, encrySettings), history
+        UtxoState.create(stateDir, encrySettings, influxRef), history, influxRef
       )
       Some(NodeView(history, state, wallet))
     } catch {
       case ex: Throwable =>
         logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
         new File(encrySettings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
-        Some(genesisState)
+        Some(genesisState(influxRef))
     } else {
     None
   }
 
-  def getRecreatedState(version: Option[VersionTag] = None, digest: Option[ADDigest] = None): UtxoState = {
+  def getRecreatedState(version: Option[VersionTag] = None,
+                        digest: Option[ADDigest] = None,
+                        influxRef: Option[ActorRef]): UtxoState = {
     val dir: File = UtxoState.getStateDir(encrySettings)
     dir.mkdirs()
     dir.listFiles.foreach(_.delete())
     val stateDir: File = UtxoState.getStateDir(encrySettings)
     stateDir.mkdirs()
-    UtxoState.create(stateDir, encrySettings)
+    UtxoState.create(stateDir, encrySettings, influxRef)
   }
 
-  def restoreConsistentState(stateIn: UtxoState, history: History): UtxoState =
+  def restoreConsistentState(stateIn: UtxoState, history: History, influxRefActor: Option[ActorRef]): UtxoState =
     (stateIn.version, history.getBestBlock, stateIn) match {
       case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
@@ -444,7 +446,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       case (_, None, _) =>
         logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
-        getRecreatedState()
+        getRecreatedState(influxRef = influxRefActor)
       case (stateId, Some(historyBestBlock), state: UtxoState) =>
         val stateBestHeaderOpt = history.getHeaderById(ModifierId !@@ stateId) //todo naming
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
@@ -452,7 +454,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
         val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
-          .getOrElse(getRecreatedState())
+          .getOrElse(getRecreatedState(influxRef = influxRefActor))
         val toApply = newChain.headers.map { h =>
           history.getBlockByHeader(h) match {
             case Some(fb) => fb
