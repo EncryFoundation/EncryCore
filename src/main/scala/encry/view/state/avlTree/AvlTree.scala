@@ -58,36 +58,37 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     logger.info(s"avlInsertTime: ${insertTime/1000000L} ms")
     //val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
     val startPackingTime = System.nanoTime()
-    var insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty
-    var deletedNodes: List[ByteArrayWrapper] = List.empty
-    val nodeInsertionMap = nodesInsertionStat.reverse.toMap
-    nodesBuffer.foreach { node =>
-      val wrappedHash = ByteArrayWrapper(node.hash)
-      val stat = nodeInsertionMap(wrappedHash)
-      if (stat >= 0 && wrappedHash.size != 0) {
-        insertedNodes = insertedNodes + (wrappedHash -> node)
-      }
-      else if (wrappedHash.size != 0) deletedNodes = wrappedHash :: deletedNodes
-    }
+//    var insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty
+//    var deletedNodes: List[ByteArrayWrapper] = List.empty
+//    val nodeInsertionMap = nodesInsertionStat.reverse.toMap
+//    nodesBuffer.foreach { node =>
+//      val wrappedHash = ByteArrayWrapper(node.hash)
+//      val stat = nodeInsertionMap(wrappedHash)
+//      if (stat >= 0 && wrappedHash.size != 0) {
+//        insertedNodes = insertedNodes + (wrappedHash -> node)
+//      }
+//      else if (wrappedHash.size != 0) deletedNodes = wrappedHash :: deletedNodes
+//    }
     logger.info(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
     val startInsertTime = System.nanoTime()
-    val nodesToDelete: List[ByteArrayWrapper] = deletedNodes.toSet[ByteArrayWrapper].filterNot(insertedNodes.keySet).toList
+    //val nodesToDelete: List[ByteArrayWrapper] = deletedNodes.toSet[ByteArrayWrapper].filterNot(insertedNodes.keySet).toList
     avlStorage.insert(
       version,
       toInsert.map {
         case (key, value) =>
           StorageKey @@ AvlTree.elementKey(kSer.toBytes(key)) -> StorageValue @@ vSer.toBytes(value)
       } ++
-        insertedNodes.map {
-          case (key, node) =>
-            StorageKey @@ AvlTree.nodeKey(key.data) -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
-        }.toList ++
+//        insertedNodes.map {
+//          case (key, node) =>
+//            StorageKey @@ AvlTree.nodeKey(key.data) -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node))
+//        }.toList ++
         List(AvlTree.rootNodeKey -> StorageValue @@ newRoot.hash,
           UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(stateHeight)),
-      nodesToDelete.distinct.collect {
-        case key if avlStorage.contains(StorageKey @@ AvlTree.nodeKey(key.data)) =>
-          StorageKey @@ AvlTree.nodeKey(key.data)
-      } ++ toDelete.map(key =>
+//      nodesToDelete.distinct.collect {
+//        case key if avlStorage.contains(StorageKey @@ AvlTree.nodeKey(key.data)) =>
+//          StorageKey @@ AvlTree.nodeKey(key.data)
+//      } ++
+        toDelete.map(key =>
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
@@ -117,15 +118,15 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     avlStorage.get(StorageKey !@@ AvlTree.elementKey(kSer.toBytes(k))).isDefined
 
   def addToStat(inserted: List[Node[K, V]] = List.empty, deleted: List[Node[K, V]] = List.empty): Unit = {
-    nodesBuffer = inserted ::: nodesBuffer
-    nodesInsertionStat = deleted.map { node =>
-      val wrappedNodeHash = ByteArrayWrapper(node.hash)
-      wrappedNodeHash -> -1
-    } ::: nodesInsertionStat
-    nodesInsertionStat = inserted.map { node =>
-      val wrappedNodeHash = ByteArrayWrapper(node.hash)
-      wrappedNodeHash -> 1
-    } ::: nodesInsertionStat
+//    nodesBuffer = inserted ::: nodesBuffer
+//    nodesInsertionStat = deleted.map { node =>
+//      val wrappedNodeHash = ByteArrayWrapper(node.hash)
+//      wrappedNodeHash -> -1
+//    } ::: nodesInsertionStat
+//    nodesInsertionStat = inserted.map { node =>
+//      val wrappedNodeHash = ByteArrayWrapper(node.hash)
+//      wrappedNodeHash -> 1
+//    } ::: nodesInsertionStat
   }
 
   def addToStat(insert: Node[K, V], deleted: Node[K, V]): Unit = addToStat(List(insert), List(deleted))
