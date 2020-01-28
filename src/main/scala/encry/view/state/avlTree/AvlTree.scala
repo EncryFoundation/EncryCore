@@ -47,7 +47,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         res
     }
     val avlDeleteTime = System.nanoTime() - deleteStartTime
-    logger.info(s"avlDeleteTime: ${avlDeleteTime/1000000L} s")
+    logger.info(s"avlDeleteTime: ${avlDeleteTime/1000000L} ms")
     val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
@@ -55,8 +55,9 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         res
     }
     val insertTime = System.nanoTime() - insertStartTime
-    logger.info(s"avlInsertTime: ${insertTime/1000000L} s")
+    logger.info(s"avlInsertTime: ${insertTime/1000000L} ms")
     //val shadowedRoot    = ShadowNode.childsToShadowNode(newRoot)
+    val startPackingTime = System.nanoTime()
     var insertedNodes: Map[ByteArrayWrapper, Node[K, V]] = Map.empty
     var deletedNodes: List[ByteArrayWrapper] = List.empty
     val nodeInsertionMap = nodesInsertionStat.reverse.toMap
@@ -68,6 +69,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       }
       else if (wrappedHash.size != 0) deletedNodes = wrappedHash :: deletedNodes
     }
+    logger.info(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
     val startInsertTime = System.nanoTime()
     val nodesToDelete: List[ByteArrayWrapper] = deletedNodes.toSet[ByteArrayWrapper].filterNot(insertedNodes.keySet).toList
     avlStorage.insert(
@@ -89,7 +91,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-
+    logger.info(s"Insertion time: ${(System.nanoTime() - startInsertTime)/1000000L} ms")
     AvlTree(newRoot, avlStorage)
   }
 
