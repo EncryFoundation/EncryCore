@@ -11,10 +11,10 @@ import org.encryfoundation.common.validation.ModifierSemanticValidity
 
 trait HistoryModifiersValidator extends HistoryApi {
 
-  lazy val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
+  private lazy val powScheme: EquihashPowScheme = EquihashPowScheme(settings.constants.n, settings.constants.k, settings.constants.Version,
     settings.constants.PreGenesisHeight, settings.constants.MaxTarget)
 
-  def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
+  final def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
     (modifier match {
       case header: Header   => validateHeader(header)
       case payload: Payload => validatePayload(payload)
@@ -43,7 +43,7 @@ trait HistoryModifiersValidator extends HistoryApi {
       case None if isModifierDefined(modifierId)          => ModifierSemanticValidity.Unknown
       case None                                           => ModifierSemanticValidity.Absent
       case mod                                            => logger.error(s"Incorrect validity status: $mod")
-                                                              ModifierSemanticValidity.Absent
+                                                             ModifierSemanticValidity.Absent
   }
 
   private def genesisBlockHeaderValidator(h: Header): Either[ValidationError, Header] = for {

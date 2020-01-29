@@ -1,6 +1,7 @@
 package encry.view.history
 
 import java.io.File
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
@@ -10,36 +11,33 @@ import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 import cats.syntax.either._
-import supertagged.@@
+import encry.view.history.processors._
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
-trait History extends HistoryModifiersValidator with AutoCloseable {
+trait History extends HistoryModifiersValidator with HistoryApi with AutoCloseable {
+  this: HistoryHeaderProcessorComponent with HistoryPayloadProcessorComponent =>
 
   var isFullChainSynced: Boolean
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
+  final def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header   =>
         logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
-        (this, processHeader(header))
-      case payload: Payload => (this, processPayload(payload))
+        (this, headerProcessor.processHeader(header))
+      case payload: Payload => (this, payloadProcessor.processPayload(payload))
     })
   }
-
-  def processHeader(h: Header): ProgressInfo
-
-  def processPayload(payload: Payload): ProgressInfo
 
   /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
@@ -54,7 +52,7 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
     * @param modifier that is invalid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
-  def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) = {
+  final def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
@@ -120,7 +118,7 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
     * @param modifier that is valid against the State
     * @return ProgressInfo with next modifier to try to apply
     */
-  def reportModifierIsValid(modifier: PersistentModifier): History = {
+  final def reportModifierIsValid(modifier: PersistentModifier): History = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     modifier match {
       case block: Block =>
@@ -140,9 +138,9 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
     }
   }
 
-  override def close(): Unit = historyStorage.close()
+  override final protected[view]  def close(): Unit = historyStorage.close()
 
-  def closeStorage(): Unit = historyStorage.close()
+  final protected[view] def closeStorage(): Unit = historyStorage.close()
 }
 
 object History extends StrictLogging {
@@ -159,7 +157,7 @@ object History extends StrictLogging {
     dir
   }
 
-  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): History = {
+  def readOrGenerate(settingsEncry: EncryAppSettings, ntp: NetworkTimeProvider): History with HistoryApi = {
     val historyIndexDir: File = getHistoryIndexDir(settingsEncry)
     //Check what kind of storage in settings:
     val vldbInit = settingsEncry.storage.history match {
@@ -175,14 +173,14 @@ object History extends StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settingsEncry.levelDB))
     }
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
-      new History with HistoryHeadersProcessor with FastSyncProcessor {
+      new History with HeaderFullChainProcessorComponent with PayloadFastSyncProcessorComponent {
         override val settings: EncryAppSettings = settingsEncry
         override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
     else
-      new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+      new History with HeaderFullChainProcessorComponent with PayloadFullChainProcessorComponent {
         override val settings: EncryAppSettings = settingsEncry
         override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)

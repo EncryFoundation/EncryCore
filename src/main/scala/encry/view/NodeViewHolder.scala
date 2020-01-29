@@ -23,8 +23,9 @@ import encry.view.NodeViewHolder.ReceivableMessages._
 import encry.view.NodeViewHolder._
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
+import encry.view.history.processors.{HeaderFullChainProcessorComponent, PayloadFullChainProcessorComponent}
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor}
+import encry.view.history.{History, HistoryApi}
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
@@ -96,7 +97,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/keysTmp"))
       FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/walletTmp"))
       logger.info(s"Updated best block in fast sync mod. Updated state height.")
-      val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+      val newHistory = new History with HeaderFullChainProcessorComponent with PayloadFullChainProcessorComponent {
         override val settings: EncryAppSettings = encrySettings
         override var isFullChainSynced: Boolean = settings.node.offlineGeneration
         override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
