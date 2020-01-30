@@ -19,7 +19,8 @@ import org.encryfoundation.common.utils.TaggedTypes.Height
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
-                                                  avlStorage: VersionalStorage) extends AutoCloseable with StrictLogging {
+                                                  avlStorage: VersionalStorage,
+                                                  rootNodes: List[(Node[K, V], StorageVersion)] = List.empty) extends AutoCloseable with StrictLogging {
 
   implicit def nodeOrder(implicit ord: Order[K]): Order[Node[K, V]] = new Order[Node[K, V]] {
     override def compare(x: Node[K, V], y: Node[K, V]): Int = ord.compare(x.key, y.key)
@@ -32,6 +33,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   var nodesBuffer: List[Node[K, V]] = List.empty
   var nodesInsertionStat: List[(ByteArrayWrapper, Int)] = List.empty
   var loggable: Boolean = false
+  val rootNodesRollbackLength = 30
 
   def insertAndDeleteMany(version: StorageVersion,
                           toInsert: List[(K, V)],
@@ -75,6 +77,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     logger.info(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
     val startInsertTime = System.nanoTime()
     //val nodesToDelete: List[ByteArrayWrapper] = deletedNodes.toSet[ByteArrayWrapper].filterNot(insertedNodes.keySet).toList
+    logger.info(s"Insert in avl version ${Algos.encode(version)}")
     avlStorage.insert(
       version,
       toInsert.map {
@@ -96,7 +99,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       )
     )
     logger.info(s"Insertion time: ${(System.nanoTime() - startInsertTime)/1000000L} ms")
-    AvlTree(newRoot, avlStorage)
+    val newrootNodes = if (rootNodes.length > rootNodesRollbackLength) {
+      rootNodes.dropRight(rootNodes.length - rootNodesRollbackLength)
+    } else (rootNode -> version) :: rootNodes
+    AvlTree(newRoot, avlStorage, newrootNodes)
   }
 
   def getOperationsRootHash(
@@ -235,17 +241,19 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   def rollbackTo(to: StorageVersion)
                 (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
     Try {
-      logger.debug(s"Rollback avl to version: ${Algos.encode(to)}")
-      logger.debug(s"Versions in storage: ${avlStorage.versions.map(Algos.encode).mkString(",")}")
-      logger.debug(s"Before rollback node key: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
-      logger.debug(s"Before rollback root node: ${rootNode.hash}")
+      logger.info(s"Rollback avl to version: ${Algos.encode(to)}")
+      logger.info(s"Versions in storage: ${avlStorage.versions.map(Algos.encode).mkString(",")}")
+      logger.info(s"Before rollback node key: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
+      logger.info(s"Before rollback root node: ${rootNode.hash}")
       avlStorage.rollbackTo(to)
-      logger.debug(s"Storage success rolled back")
-      logger.debug(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
-      val newRootNode =
-        NodeSerilalizer.fromBytes[K, V](avlStorage.get(StorageKey !@@ AvlTree.nodeKey(avlStorage.get(AvlTree.rootNodeKey).get)).get)
-      logger.debug(s"root node after rollback: ${newRootNode}")
-      AvlTree[K, V](newRootNode, avlStorage)
+      logger.info(s"Storage success rolled back")
+      logger.info(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
+//      val newRootNode =
+//        NodeSerilalizer.fromBytes[K, V](avlStorage.get(StorageKey !@@ AvlTree.nodeKey(avlStorage.get(AvlTree.rootNodeKey).get)).get)
+      val newrootNodes = rootNodes.dropWhile{ case (_, version) => !(version sameElements to)}
+      val newRootNode = rootNodes.head._1
+      logger.info(s"root node after rollback: ${newRootNode}")
+      AvlTree[K, V](newRootNode, avlStorage, newrootNodes)
     }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
