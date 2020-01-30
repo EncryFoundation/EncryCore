@@ -4,7 +4,6 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
-import akka.io.Tcp.Close
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{ConnectedPeersConnectionHelper, UpdatingPeersInfo}
@@ -87,7 +86,7 @@ class PeersKeeper(settings: EncryAppSettings,
         s"so peer keeper allows to add one more connection. Current available peers are: " +
         s"${newPeers.mkString(",")}. Current black list is: ${
           blackList.collect((_, _, _, _) => true, mapReason).mkString(",")
-        }")
+        }. Current known peers: ${knownPeers.mkString(",")}.")
       logger.info(s"awaitingHandshakeConnections ${awaitingHandshakeConnections.mkString(",")}")
       logger.info(s"connectedPeers.getAll ${connectedPeers.getAll.mkString(",")}")
       val peers = newPeers
@@ -110,7 +109,9 @@ class PeersKeeper(settings: EncryAppSettings,
       logger.info(s"Got request for a new connection but current number of connection is max: ${connectedPeers.size}.")
 
     case VerifyConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isSelf(remote) =>
-      logger.info(s"Peers keeper got request for verifying the connection with remote: $remote.")
+      logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
+        s"remote address is: ${remote}. remote inet address ${remote.getAddress}. " +
+        s"Current knwon: ${knownPeers.mkString(",")}")
       val notConnectedYet: Boolean = !connectedPeers.contains(remote)
       val notBannedPeer: Boolean = !blackList.contains(remote.getAddress)
       if (notConnectedYet && notBannedPeer) {

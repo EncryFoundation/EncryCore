@@ -15,8 +15,8 @@ import scala.util.Try
 
 /**
  * Command "peer addPeer -host=<addr[String]> -port=<addr[String]> -t=<bool[Boolean]>"
- * Example: peer addPeer -host='172.16.11.28' -port=9040 -t=false
- * Example: peer addPeer -host='192.168.1.122' -port=9001
+ * Example: peer addPeer -host='172.16.11.28' -port=9040 -t=true
+ * Example: peer addPeer -host='192.168.1.122' -port=9001 -t=false
  */
 object AddPeer extends Command {
   override def execute(args: Command.Args,
