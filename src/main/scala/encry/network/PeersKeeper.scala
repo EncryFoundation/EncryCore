@@ -124,10 +124,9 @@ class PeersKeeper(settings: EncryAppSettings,
           logger.info(s"connectWithOnlyKnownPeers - true, but connected peer is contained in known peers collection.")
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
-        else if (connectWithOnlyKnownPeers) {
+        else if (connectWithOnlyKnownPeers)
           logger.info(s"Got incoming connection but we can connect only with known peers.")
-          remoteConnection ! Close
-        } else {
+        else {
           logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
@@ -137,7 +136,6 @@ class PeersKeeper(settings: EncryAppSettings,
     case VerifyConnection(remote, remoteConnection) =>
       logger.info(s"Peers keeper got request for verifying the connection but current number of max connection is " +
         s"bigger than possible or isSelf: ${isSelf(remote)}.")
-      remoteConnection ! Close
 
     case HandshakedDone(connectedPeer) =>
       logger.info(s"Peers keeper got approvement about finishing a handshake." +
@@ -239,9 +237,11 @@ class PeersKeeper(settings: EncryAppSettings,
         self ! SendLocalSyncInfo
       }
 
-    case PeerFromCli(peer) =>
+    case PeerFromCli(peer, f) =>
+      println("got peer from cli")
       if (!blackList.contains(peer.getAddress) && !newPeers.contains(peer) && !connectedPeers.contains(peer) && !isSelf(peer)) {
-        newPeers += (peer -> 0)
+        println(s"Handle print")
+        if (f) newPeers += (peer -> 0)
         knownPeers += peer.getAddress
         logger.info(s"Added peer: $peer to known peers. Current newPeers are: ${newPeers.mkString(",")}." +
           s" Current known peers are: ${knownPeers.mkString(",")}.")

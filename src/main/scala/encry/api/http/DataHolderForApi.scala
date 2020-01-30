@@ -175,7 +175,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case UserAddPeer(peer) => context.system.eventStream.publish(PeerFromCli(peer))
+    case UserAddPeer(peer, f) =>
+      println("Publish peer")
+      context.system.eventStream.publish(PeerFromCli(peer, f))
 
     case RemovePeerFromBanList(peer) => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
@@ -322,7 +324,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class RemovePeerFromBanList(peer: InetSocketAddress)
 
-  final case class UserAddPeer(peer: InetSocketAddress)
+  final case class UserAddPeer(peer: InetSocketAddress, flag: Boolean)
 
   final case class GetFullBlockByIdCommand(headerId: Either[String, ModifierId])
 

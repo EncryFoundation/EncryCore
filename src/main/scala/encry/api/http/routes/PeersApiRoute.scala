@@ -47,7 +47,7 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
           (split(0), split(1).toInt)
         } match {
           case Success((host, port)) =>
-            dataHolder ! UserAddPeer(new InetSocketAddress(host, port))
+            dataHolder ! UserAddPeer(new InetSocketAddress(host, port), false)
             StatusCodes.OK
           case Failure(_) =>
             StatusCodes.BadRequest
