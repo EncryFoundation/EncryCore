@@ -341,14 +341,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
             if (loggable) logger.info("left rotation.")
             leftRotation(internalNode)
           case _ =>
-            if (loggable) logger.info(s"no rotation. " +
-              s"Node key: ${Algos.encode(implicitly[Serializer[K]].toBytes(node.key))}. " +
-              s"Balance ${node.balance}. Node height: ${node.height}. Node Hash: ${Algos.encode(node.hash)}.\n " +
-              s"Left node child: ${Algos.encode(implicitly[Serializer[K]].toBytes(internalNode.leftChild.key))}." +
-              s"Balance ${internalNode.leftChild.balance}. Node height: ${internalNode.leftChild.height}. Node Hash: ${Algos.encode(internalNode.leftChild.hash)}.\n " +
-              s"Rgght node child: ${Algos.encode(implicitly[Serializer[K]].toBytes(internalNode.rightChild.key))}." +
-              s"Balance ${internalNode.rightChild.balance}. Node height: ${internalNode.rightChild.height}. Node Hash: ${Algos.encode(internalNode.rightChild.hash)}.\n "
-            )
             internalNode
         }
       case leafNode: LeafNode[K, V] => leafNode
