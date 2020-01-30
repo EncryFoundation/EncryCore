@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import akka.io.Tcp.Close
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{ConnectedPeersConnectionHelper, UpdatingPeersInfo}
@@ -123,18 +124,20 @@ class PeersKeeper(settings: EncryAppSettings,
           logger.info(s"connectWithOnlyKnownPeers - true, but connected peer is contained in known peers collection.")
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
-        else if (connectWithOnlyKnownPeers)
+        else if (connectWithOnlyKnownPeers) {
           logger.info(s"Got incoming connection but we can connect only with known peers.")
-        else {
+          remoteConnection ! Close
+        } else {
           logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
         s" Didn't banned: $notBannedPeer, Didn't connected: $notConnectedYet.")
 
-    case VerifyConnection(remote, _) =>
+    case VerifyConnection(remote, remoteConnection) =>
       logger.info(s"Peers keeper got request for verifying the connection but current number of max connection is " +
         s"bigger than possible or isSelf: ${isSelf(remote)}.")
+      remoteConnection ! Close
 
     case HandshakedDone(connectedPeer) =>
       logger.info(s"Peers keeper got approvement about finishing a handshake." +
