@@ -219,7 +219,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
-    case PeerFromCli(peer) => peersKeeper ! PeerFromCli(peer)
+    case msg@PeerFromCli(peer) => peersKeeper ! msg
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced

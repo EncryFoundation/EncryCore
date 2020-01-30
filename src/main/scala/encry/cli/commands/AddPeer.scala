@@ -6,15 +6,16 @@ import encry.api.http.DataHolderForApi.UserAddPeer
 import akka.actor.ActorRef
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import encry.cli.{ Ast, Response }
+import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 
 import scala.concurrent.Future
+import scala.util.Try
 
 /**
  * Command "peer addPeer -host=<addr[String]> -port=<addr[String]>"
- * Example: peer addPeer -host='172.16.10.57' -port=9020
+ * Example: peer addPeer -host='172.16.10.57' -port=9040
  */
 object AddPeer extends Command {
   override def execute(args: Command.Args,
