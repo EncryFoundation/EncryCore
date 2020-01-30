@@ -312,7 +312,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
     "handle incoming connections correctly while connection with only known peers true" in {
       val networkController = TestProbe()
       val remoteConnectionTestProbe: TestProbe = TestProbe()
-      val remoteAddress: InetSocketAddress = new InetSocketAddress("172.16.11.11", 9001)
+      val remoteAddress: InetSocketAddress = new InetSocketAddress("172.16.11.99", 9001)
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(knowPeersSettings, TestProbe().ref, TestProbe().ref))
 
       networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
