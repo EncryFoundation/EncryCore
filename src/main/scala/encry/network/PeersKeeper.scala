@@ -110,8 +110,8 @@ class PeersKeeper(settings: EncryAppSettings,
 
     case VerifyConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
-        s"remote address is: ${remote}. remote inet address ${remote.getAddress}. " +
-        s"Current knwon: ${knownPeers.mkString(",")}")
+        s"Remote InetSocketAddress is: $remote. Remote InetAddress is ${remote.getAddress}. " +
+        s"Current known peers: ${knownPeers.mkString(",")}")
       val notConnectedYet: Boolean = !connectedPeers.contains(remote)
       val notBannedPeer: Boolean = !blackList.contains(remote.getAddress)
       if (notConnectedYet && notBannedPeer) {
@@ -238,11 +238,9 @@ class PeersKeeper(settings: EncryAppSettings,
         self ! SendLocalSyncInfo
       }
 
-    case PeerFromCli(peer, f) =>
-      println("got peer from cli")
+    case PeerFromCli(peer) =>
       if (!blackList.contains(peer.getAddress) && !newPeers.contains(peer) && !connectedPeers.contains(peer) && !isSelf(peer)) {
-        println(s"Handle print")
-        if (f) newPeers += (peer -> 0)
+        newPeers += (peer -> 0)
         knownPeers += peer.getAddress
         logger.info(s"Added peer: $peer to known peers. Current newPeers are: ${newPeers.mkString(",")}." +
           s" Current known peers are: ${knownPeers.mkString(",")}.")

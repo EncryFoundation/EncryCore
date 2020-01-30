@@ -219,7 +219,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
     case SuccessfulTransaction(tx) => broadcastModifierInv(tx)
     case SemanticallyFailedModification(_, _) =>
     case SyntacticallyFailedModification(_, _) =>
-    case PeerFromCli(peer, f) => peersKeeper ! PeerFromCli(peer, f)
+    case msg@PeerFromCli(peer) => peersKeeper ! msg
     case FullBlockChainIsSynced =>
       chainSynced = true
       deliveryManager ! FullBlockChainIsSynced
@@ -275,7 +275,7 @@ object NodeViewSynchronizer {
                                       modifierIds: Seq[ModifierId])
     sealed trait CLIPeer
 
-    final case class PeerFromCli(address: InetSocketAddress, flag: Boolean) extends CLIPeer
+    final case class PeerFromCli(address: InetSocketAddress) extends CLIPeer
 
     final case class RemovePeerFromBlackList(address: InetSocketAddress) extends CLIPeer
 
