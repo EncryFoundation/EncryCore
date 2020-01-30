@@ -83,6 +83,8 @@ class PeersKeeper(settings: EncryAppSettings,
         s"${knownPeers.mkString(",")}. Current black list is: ${
           blackList.collect((_, _, _, _) => true, mapReason).mkString(",")
         }")
+      logger.info(s"awaitingHandshakeConnections ${awaitingHandshakeConnections.mkString(",")}")
+      logger.info(s"connectedPeers.getAll ${connectedPeers.getAll.mkString(",")}")
       val peers = knownPeers
         .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
       logger.info(s"peers size: ${peers.size}")
