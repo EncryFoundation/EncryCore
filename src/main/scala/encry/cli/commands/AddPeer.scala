@@ -14,7 +14,8 @@ import scala.concurrent.Future
 
 /**
  * Command "peer addPeer -host=<addr[String]> -port=<addr[String]>"
- * Example: peer addPeer -host='172.16.10.57' -port=9020
+ * Example: peer addPeer -host='172.16.11.28' -port=9040
+ * Example: peer addPeer -host='192.168.1.122' -port=9001
  */
 object AddPeer extends Command {
   override def execute(args: Command.Args,

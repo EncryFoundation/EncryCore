@@ -141,6 +141,7 @@ class PeersKeeper(settings: EncryAppSettings,
 
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
+      awaitingHandshakeConnections -= peer
       connectedPeers = connectedPeers.removePeer(peer)
       if (blackList.contains(peer.getAddress)) {
         knownPeers -= peer
