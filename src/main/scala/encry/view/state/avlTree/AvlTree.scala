@@ -33,7 +33,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   var nodesBuffer: List[Node[K, V]] = List.empty
   var nodesInsertionStat: List[(ByteArrayWrapper, Int)] = List.empty
   var loggable: Boolean = false
-  val rootNodesRollbackLength = 30
+  val rootNodesRollbackLength = 15
 
   def insertAndDeleteMany(version: StorageVersion,
                           toInsert: List[(K, V)],
