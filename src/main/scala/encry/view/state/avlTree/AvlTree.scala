@@ -32,7 +32,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 
   var nodesBuffer: List[Node[K, V]] = List.empty
   var nodesInsertionStat: List[(ByteArrayWrapper, Int)] = List.empty
-  var loggable: Boolean = false
   val rootNodesRollbackLength = 15
 
   def insertAndDeleteMany(version: StorageVersion,
@@ -43,21 +42,17 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
                          vSer: Serializer[V],
                          kM: Monoid[K],
                          vM: Monoid[V]): AvlTree[K, V] = {
-    if (stateHeight > 40000) loggable = true
     val deleteStartTime = System.nanoTime()
     val rootAfterDelete = toDelete.foldLeft(rootNode) {
       case (prevRoot, toDeleteKey) =>
-        val res = deleteKey(toDeleteKey, prevRoot)
-        res
+        deleteKey(toDeleteKey, prevRoot)
     }
     val avlDeleteTime = System.nanoTime() - deleteStartTime
     logger.info(s"avlDeleteTime: ${avlDeleteTime/1000000L} ms")
     val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
-        if (loggable) logger.info(s"Insert: ${Algos.encode(implicitly[Serializer[K]].toBytes(keyToInsert))}")
-        val res = insert(keyToInsert, valueToInsert, prevRoot)
-        res
+        insert(keyToInsert, valueToInsert, prevRoot)
     }
     val insertTime = System.nanoTime() - insertStartTime
     logger.info(s"avlInsertTime: ${insertTime/1000000L} ms")
@@ -329,16 +324,12 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         )
         newAdditionalInfo match {
           case (_, true, _, _) =>
-            if (loggable) logger.info("Lr rotation.")
             lrRotation(internalNode)
           case (_, _, _, true) =>
-            if (loggable) logger.info("Rl rotation.")
             rlRotation(internalNode)
           case (_, _, true, _) =>
-            if (loggable) logger.info("right rotation")
             rightRotation(internalNode)
           case (2, _, _, _) =>
-            if (loggable) logger.info("left rotation.")
             leftRotation(internalNode)
           case _ =>
             internalNode
