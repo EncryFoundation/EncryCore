@@ -23,7 +23,10 @@ class RootNodesStorageTest extends PropSpec with InstanceFactory with EncryGener
       val levelDBInit = LevelDbFactory.factory.open(firstDir, new Options)
       VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
-    AvlTree[StorageKey, StorageValue](firstStorage)
+    val dir: File = FileHelper.getRandomTempDir
+    val levelDb: DB = LevelDbFactory.factory.open(dir, new Options)
+    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+    AvlTree[StorageKey, StorageValue](firstStorage, rootNodesStorage)
   }
 
   property("testRollback") {

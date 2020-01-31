@@ -1,13 +1,14 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import akka.actor.ActorRef
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
@@ -27,6 +28,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.iq80.leveldb.{DB, Options}
 import scorex.utils.Random
+
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
@@ -180,7 +182,8 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
     for {
       rootNode <- getRootNode
       height   <- getHeight
-      avlTree  = new AvlTree[StorageKey, StorageValue](rootNode, storage)
+      //todo: remove RootNodesStorage.emptyRootStorage
+      avlTree  = new AvlTree[StorageKey, StorageValue](rootNode, storage, RootNodesStorage.emptyRootStorage)
     } yield UtxoState(avlTree, height, settings.constants, influxRef)
 
   private def getHeight: Either[EmptyHeightKey, Height] =
