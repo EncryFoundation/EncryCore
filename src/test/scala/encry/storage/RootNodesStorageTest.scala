@@ -35,20 +35,24 @@ class RootNodesStorageTest extends PropSpec with InstanceFactory with EncryGener
       (0 to SRandom.nextInt(1000) + 10).foldLeft(rootNodesStorage, avl, List.empty[(Height, (List[(StorageKey, StorageValue)], List[StorageKey]))]) {
       case ((rootStorage, previousAvl, insertionList), height) =>
         val version = StorageVersion @@ Random.randomBytes()
-        val toInsert = List(StorageKey @@ Random.randomBytes() -> StorageValue @@ Random.randomBytes())
+        val toInsert = (0 to SRandom.nextInt(100)).foldLeft(List.empty[(StorageKey, StorageValue)]) {
+          case (list, _) => (StorageKey @@ Random.randomBytes() -> StorageValue @@ Random.randomBytes()) :: list
+        }
+        val previousInsertions = insertionList.lastOption.map(_._2._1).getOrElse(List.empty[(StorageKey, StorageValue)])
+        val deletions = previousInsertions.take(1).map(_._1)
         val newAvl = previousAvl.insertAndDeleteMany(
           version,
           toInsert,
-          List.empty
+          deletions
         )
         val newRootStorage = rootStorage.insert(
           version,
           newAvl.rootNode,
           Height @@ height
         )
-        (newRootStorage, newAvl, insertionList :+ (Height @@ height -> (toInsert -> List.empty)))
+        (newRootStorage, newAvl, insertionList :+ (Height @@ height -> (toInsert -> deletions)))
     }
-    val (_, rootNodeRestored) = rootNodesStorage.rollbackToSafePoint(insertList.dropWhile(_._1 != rootNodesStorage.safePointHeight))
+    val (_, rootNodeRestored) = rootNodesStorage.rollbackToSafePoint(insertList.dropWhile(_._1 != rootNodesStorage.safePointHeight).drop(1))
     (avlAfterInsertions.rootNode.hash sameElements rootNodeRestored.hash) shouldBe true
   }
 
