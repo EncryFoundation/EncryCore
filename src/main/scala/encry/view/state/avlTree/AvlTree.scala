@@ -95,11 +95,18 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     newRoot.hash
   }
 
-  def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] =
-    avlStorage.get(StorageKey !@@ AvlTree.elementKey(kSer.toBytes(k))).map(vSer.fromBytes)
+  def findKey(key: K, node: Node[K, V]): Option[V] = node match {
+    case internalNode: InternalNode[K, V] if key > internalNode.key=> findKey(key, internalNode.rightChild)
+    case internalNode: InternalNode[K, V] if key < internalNode.key=> findKey(key, internalNode.leftChild)
+    case n: Node[K, V] if n.key === key => Some(n.value)
+    case _ => None
+  }
 
-  def contains(k: K)(implicit kSer: Serializer[K]): Boolean =
-    avlStorage.get(StorageKey !@@ AvlTree.elementKey(kSer.toBytes(k))).isDefined
+  def get(k: K)(implicit kSer: Serializer[K], vSer: Serializer[V]): Option[V] = findKey(k, rootNode)
+    //avlStorage.get(StorageKey !@@ AvlTree.elementKey(kSer.toBytes(k))).map(vSer.fromBytes)
+
+  def contains(k: K)(implicit kSer: Serializer[K]): Boolean = findKey(k, rootNode).isDefined
+    //avlStorage.get(StorageKey !@@ AvlTree.elementKey(kSer.toBytes(k))).isDefined
 
   def deleteKey(key: K, node: Node[K, V])(implicit m: Monoid[K],
                                           v: Monoid[V],

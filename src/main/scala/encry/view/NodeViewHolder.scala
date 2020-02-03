@@ -461,8 +461,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
-      case (stateId, Some(historyBestBlock), state: UtxoState) =>
-        val stateBestHeaderOpt = history.getHeaderById(ModifierId !@@ stateId) //todo naming
+      case (stateId, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
+        val stateBestHeaderOpt = history.getBestHeaderAtHeight(safePointHeight) //todo naming
         val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
