@@ -239,7 +239,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
+          val saveRootNodesFlag = (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < encrySettings.constants.MaxRollbackDepth * 2
+          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply, saveRootNodesFlag) match {
             case Right(stateAfterApply) =>
               influxRef.foreach(ref => modToApply match {
                 case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)

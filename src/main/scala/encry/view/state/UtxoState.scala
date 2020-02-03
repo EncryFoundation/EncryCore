@@ -68,7 +68,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     )
   }
 
-  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
+  def applyModifier(mod: PersistentModifier, saveRootNodes: Boolean = false): Either[List[ModifierApplyError], UtxoState] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
@@ -108,7 +108,8 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
               combinedStateChange.inputsToDb.toList,
-              Height @@ block.header.height
+              Height @@ block.header.height,
+              saveRootNodes
             )
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
             logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}.")
