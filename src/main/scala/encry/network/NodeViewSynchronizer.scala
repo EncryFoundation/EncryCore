@@ -170,7 +170,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
           logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
             s" $invData._1. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
             s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
-
         if (invData._1 == Transaction.modifierTypeId && chainSynced && canProcessTransactions)
           memoryPoolRef ! CompareViews(remote, invData._1, invData._2)
         else if (invData._1 == Transaction.modifierTypeId)
