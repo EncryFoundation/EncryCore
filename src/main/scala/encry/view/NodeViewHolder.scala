@@ -450,14 +450,14 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: History, influxRefActor: Option[ActorRef]): UtxoState =
-    (stateIn.version, history.getBestBlock, stateIn) match {
-      case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
+    (stateIn.version, history.getBestBlock, stateIn, stateIn.safePointHeight) match {
+      case (stateId, None, _, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
-      case (stateId, Some(block), _) if stateId sameElements block.id =>
+      case (stateId, Some(block), _, _) if stateId sameElements block.id =>
         logger.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
         stateIn
-      case (_, None, _) =>
+      case (_, None, _, _) =>
         logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
