@@ -102,7 +102,7 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.open('GET', "/wallet/transfer?addr="+addr+"&fee="+fee+"&amount="+amount+"&token="+coin);
                     }
                     request.send();
-                     window.alert("Transaction has been sent successfully");
+                     window.alert("Transaction was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
                   }
                   }""")
@@ -143,7 +143,7 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.open('GET', "/wallet/transferContract?contract="+contract+"&fee="+fee+"&amount="+amount+"&token="+coin);
                     }
                     request.send();
-                     window.alert("Transaction has been sent successfully");
+                     window.alert("Transaction was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
                   }
                   }""")
@@ -172,7 +172,7 @@ case class WalletRoute(settings: RESTApiSettings,
                     var request = new XMLHttpRequest();
                     request.open('GET', "/wallet/createToken?fee="+fee+"&amount="+amount);
                     request.send();
-                     window.alert("Transaction with token creation has been sent successfully");
+                     window.alert("Transaction with token creation was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
                   }
                   }""")
@@ -201,7 +201,7 @@ case class WalletRoute(settings: RESTApiSettings,
                     var request = new XMLHttpRequest();
                     request.open('GET', "/wallet/data?fee="+fee+"&data="+data);
                     request.send();
-                     window.alert("Data transaction has been created successfully");
+                     window.alert("Data transaction was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
                   }
                   }""")
