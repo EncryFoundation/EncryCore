@@ -24,7 +24,7 @@ import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.mempool.MemoryPool.{RequestForTransactions, StartTransactionsValidation, StopTransactionsValidation}
+import encry.view.mempool.MemoryPool.{ StartTransactionsValidation, StopTransactionsValidation }
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo._
@@ -156,9 +156,6 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case RequestFromLocal(peer, modifierTypeId, modifierIds) =>
       if (modifierTypeId != Transaction.modifierTypeId) logger.debug(s"Got RequestFromLocal on NVSH from $sender with " +
         s"ids of type: $modifierTypeId. Number of ids is: ${modifierIds.size}. Ids: ${modifierIds.map(Algos.encode).mkString(",")}. Sending request from local to DeliveryManager.")
-      if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
-
-    case RequestForTransactions(peer, modifierTypeId, modifierIds) =>
       if (modifierIds.nonEmpty) requestModifies(history, peer, modifierTypeId, modifierIds, isBlockChainSynced, isMining)
 
     case DataFromPeer(message, remote) => message match {
@@ -526,6 +523,8 @@ object DeliveryManager {
   class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
+        case RequestFromLocal(_, Transaction.modifierTypeId, _) => 3
+
         case RequestFromLocal(_, _, _) => 0
 
         case StopTransactionsValidation => 2
@@ -543,8 +542,6 @@ object DeliveryManager {
             case ModifiersNetworkMessage((typeId, _)) if typeId != Transaction.modifierTypeId => 1
             case _ => 3
           }
-
-        case RequestForTransactions(_, _, _) => 3
 
         case PoisonPill => 4
 
