@@ -523,6 +523,8 @@ object DeliveryManager {
   class DeliveryManagerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
+        case RequestFromLocal(_, Transaction.modifierTypeId, _) => 3
+
         case RequestFromLocal(_, _, _) => 0
 
         case StopTransactionsValidation => 2
