@@ -167,8 +167,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
 
       case InvNetworkMessage(invData) =>
         if (invData._1 == Transaction.modifierTypeId) {
-          if (chainSynced && canProcessTransactions)
-            memoryPoolRef ! InvMessageWithTransactionsIds(remote, invData._2.toIndexedSeq)
+          if (chainSynced && canProcessTransactions) memoryPoolRef ! CompareViews(remote, invData._1, invData._2)
           else logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}") // do nothing
         }
         else {
@@ -194,7 +193,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       deliveryManager ! msg
     case msg@TreeChunks(l, b) => snapshotHolder ! msg
     case msg@ConnectionStopped(_) => deliveryManager ! msg
-    case msg@RequestForTransactions(_, _, _) => deliveryManager ! msg
     case msg@StartMining => deliveryManager ! msg
     case msg@DisableMining => deliveryManager ! msg
     case msg@BanPeer(_, _) => peersKeeper ! msg

@@ -6,7 +6,7 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SuccessfulTransaction}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.{EncryAppSettings, MemoryPoolSettings}
 import encry.utils.NetworkTimeProvider
@@ -15,10 +15,12 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
+
 import scala.concurrent.duration._
 import scala.collection.IndexedSeq
 import cats.syntax.either._
 import encry.EncryApp.system
+import encry.view.NodeViewHolder.ReceivableMessages.CompareViews
 import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
 
 import scala.concurrent.duration.FiniteDuration
@@ -77,10 +79,10 @@ class MemoryPool(settings: EncryAppSettings,
         context.become(continueProcessing(currentTransactionsNumber))
       }
 
-    case InvMessageWithTransactionsIds(peer, transactions) =>
-      val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions)
+    case CompareViews(peer, _, transactions) =>
+      val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions.toIndexedSeq)
       if (notYetRequestedTransactions.nonEmpty) {
-        sender ! RequestForTransactions(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
+        sender ! RequestFromLocal(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
         logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
           s" Not yet requested ids size is ${notYetRequestedTransactions.size}.")
       } else logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
@@ -160,21 +162,15 @@ class MemoryPool(settings: EncryAppSettings,
 
 object MemoryPool {
 
-  final case class NewTransaction(tx: Transaction)
+  final case class NewTransaction(tx: Transaction) extends AnyVal
 
   final case class RolledBackTransactions(txs: IndexedSeq[Transaction]) extends AnyVal
 
   final case class TransactionsForMiner(txs: Seq[Transaction]) extends AnyVal
 
-  final case class InvMessageWithTransactionsIds(peer: ConnectedPeer, transactions: IndexedSeq[ModifierId])
-
   final case class RequestModifiersForTransactions(peer: ConnectedPeer, txsIds: Seq[ModifierId])
 
   final case class RequestedModifiersForRemote(peer: ConnectedPeer, txs: Seq[Transaction])
-
-  final case class RequestForTransactions(source: ConnectedPeer,
-                                          modifierTypeId: ModifierTypeId,
-                                          modifierIds: Seq[ModifierId])
 
   case object SendTransactionsToMiner
 
@@ -207,7 +203,7 @@ object MemoryPool {
       PriorityGenerator {
         case RemoveExpiredFromPool | CleanupBloomFilter | SendTransactionsToMiner => 0
         case NewTransaction(_) => 1
-        case InvMessageWithTransactionsIds(_, _) | RequestModifiersForTransactions(_, _) => 2
+        case CompareViews(_, _, _) | RequestModifiersForTransactions(_, _) => 2
         case otherwise => 3
       })
 
