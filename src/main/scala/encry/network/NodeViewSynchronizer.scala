@@ -165,20 +165,19 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case RequestModifiersNetworkMessage(requestedIds) =>
         logger.info(s"Request from $remote for ${requestedIds._2.size} modifiers discarded cause to chain isn't synced")
 
+      case InvNetworkMessage(invData) if invData._1 == Transaction.modifierTypeId && chainSynced && canProcessTransactions =>
+        memoryPoolRef ! CompareViews(remote, invData._1, invData._2)
+      case InvNetworkMessage(invData) if invData._1 == Transaction.modifierTypeId =>
+        logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}, but " +
+          s"chainSynced is $chainSynced and canProcessTransactions is $canProcessTransactions.")
+      case InvNetworkMessage(invData) if invData._1 == Payload.modifierTypeId && !history.isFullChainSynced =>
+        logger.info(s"Got inv message with payloads: ${invData._2.map(Algos.encode).mkString(",")}. " +
+          s"But full chain is not synced. Ignore them.")
       case InvNetworkMessage(invData) =>
-        if (invData._1 != Transaction.modifierTypeId)
-          logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
-            s" $invData._1. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
-            s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
-        if (invData._1 == Transaction.modifierTypeId && chainSynced && canProcessTransactions)
-          memoryPoolRef ! CompareViews(remote, invData._1, invData._2)
-        else if (invData._1 == Transaction.modifierTypeId)
-          logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}, but " +
-            s"chainSynced is $chainSynced and canProcessTransactions is $canProcessTransactions.")
-        else if (invData._1 == Payload.modifierTypeId && !history.isFullChainSynced)
-          logger.info(s"Got inv message with payloads: ${invData._2.map(Algos.encode).mkString(",")}. " +
-            s"But full chain is not synced. Ignore them.")
-        else nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
+        logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
+          s" $invData._1. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
+          s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
+        nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
 
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
