@@ -121,7 +121,7 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val storageMock = mock[VersionalStorage]
     val anotherDir: File = FileHelper.getRandomTempDir
     val levelDb: DB = LevelDbFactory.factory.open(anotherDir, new Options)
-    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10, anotherDir)
     val tree = AvlTree(rootNode, storageMock, rootNodesStorage)
     val stateMock = mock[UtxoStateReader](RETURNS_DEEP_STUBS)
     when(stateMock.tree).thenReturn(tree)

@@ -253,7 +253,7 @@ object UtxoState extends StrictLogging {
     }
     val rootStorage = {
       val levelDBInit = LevelDbFactory.factory.open(rootStorageDir, new Options)
-      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth)
+      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth, rootStorageDir)
     }
     val height = Height @@ Ints.fromByteArray(versionalStorage.get(UtxoState.bestHeightKey).get)
     logger.info(s"State created.")
@@ -278,7 +278,7 @@ object UtxoState extends StrictLogging {
     }
     val rootStorage = {
       val levelDBInit = LevelDbFactory.factory.open(rootStorageDir, new Options)
-      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth)
+      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth, rootStorageDir)
     }
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),

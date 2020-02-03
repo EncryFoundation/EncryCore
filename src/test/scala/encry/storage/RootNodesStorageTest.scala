@@ -10,9 +10,10 @@ import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.state.avlTree.AvlTree
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.iq80.leveldb.{DB, Options}
+import org.iq80.leveldb.{DB, Options, ReadOptions}
 import org.scalatest.{FunSuite, Matchers, PropSpec}
 import scorex.utils.Random
+
 import scala.util.{Random => SRandom}
 
 class RootNodesStorageTest extends PropSpec with InstanceFactory with EncryGenerator with Matchers {
@@ -25,15 +26,17 @@ class RootNodesStorageTest extends PropSpec with InstanceFactory with EncryGener
     }
     val dir: File = FileHelper.getRandomTempDir
     val levelDb: DB = LevelDbFactory.factory.open(dir, new Options)
-    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
-    AvlTree[StorageKey, StorageValue](firstStorage, rootNodesStorage)
+    //val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+    AvlTree[StorageKey, StorageValue](firstStorage, RootNodesStorage.emptyRootStorage[StorageKey, StorageValue])
   }
 
   property("testRollback") {
     val avl: AvlTree[StorageKey, StorageValue] = createAvl
     val dir: File = FileHelper.getRandomTempDir
     val levelDb: DB = LevelDbFactory.factory.open(dir, new Options)
-    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+    val batch1 = levelDb.createWriteBatch()
+    val readOptions1 = new ReadOptions()
+    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10, dir)
     val (_, avlAfterInsertions, insertList) =
       (0 to SRandom.nextInt(1000) + 10).foldLeft(rootNodesStorage, avl, List.empty[(Height, (List[(StorageKey, StorageValue)], List[StorageKey]))]) {
       case ((rootStorage, previousAvl, insertionList), height) =>

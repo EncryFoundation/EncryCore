@@ -1,5 +1,8 @@
 package encry.storage
 
+import java.io.{BufferedOutputStream, File, FileOutputStream}
+import java.nio.file.{Files, Paths}
+
 import cats.kernel.{Monoid, Order}
 import com.google.common.primitives.Ints
 import encry.settings.Settings
@@ -27,7 +30,7 @@ trait RootNodesStorage[K, V] {
 object RootNodesStorage {
 
   def apply[K: Serializer : Monoid : Hashable : Order,
-    V: Serializer : Monoid : Hashable](storage: DB, roolbackDepth: Int): RootNodesStorage[K, V] = new RootNodesStorage[K, V] {
+    V: Serializer : Monoid : Hashable](storage: DB, rollbackDepth: Int, rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] {
 
     private def atHeightKey(height: Height): Array[Byte] = Ints.toByteArray(height)
 
@@ -38,19 +41,25 @@ object RootNodesStorage {
     override def insert(version: StorageVersion,
                         rootNode: Node[K, V],
                         height: Height): RootNodesStorage[K, V] =
-      if (height % roolbackDepth != 0) this
+      if (height % rollbackDepth != 0) this
       else {
         val batch = storage.createWriteBatch()
         val readOptions = new ReadOptions()
         readOptions.snapshot(storage.getSnapshot)
+        val fileToAdd = new File(rootsPath.getAbsolutePath ++ s"$height")
+        val bos = new BufferedOutputStream(new FileOutputStream(fileToAdd))
         try {
-          val newSafePointHeight = Math.max(0, height - roolbackDepth)
+          val newSafePointHeight = Math.max(0, height - rollbackDepth)
           val newSafePointSerialized = Ints.toByteArray(newSafePointHeight)
+          val fileToDelete = new File(rootsPath.getAbsolutePath ++ s"${newSafePointHeight - rollbackDepth}")
+          if (fileToDelete.exists()) fileToDelete.delete()
           batch.put(safePointKey, newSafePointSerialized)
-          batch.put(Ints.toByteArray(height), NodeSerilalizer.toBytes(rootNode))
-          batch.delete(Ints.toByteArray(newSafePointHeight - roolbackDepth))
+          bos.write(NodeSerilalizer.toBytes(rootNode))
           storage.write(batch)
+        } finally {
           batch.close()
+          readOptions.snapshot().close()
+          bos.close()
         }
         this
       }
@@ -59,7 +68,8 @@ object RootNodesStorage {
       val batch = storage.createWriteBatch()
       val readOptions = new ReadOptions()
       readOptions.snapshot(storage.getSnapshot)
-      val restoredRootNode: Node[K, V] = NodeSerilalizer.fromBytes(storage.get(Ints.toByteArray(safePointHeight)))
+      val rootNodeFile = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"$safePointHeight"))
+      val restoredRootNode: Node[K, V] = NodeSerilalizer.fromBytes(rootNodeFile)
       val avlTree = new AvlTree[K, V](restoredRootNode, EmptyVersionalStorage(), emptyRootStorage)
       val newRootNode = insertionInfo.foldLeft(avlTree) {
         case (tree, (height, (toInsert, toDelete))) =>
@@ -68,8 +78,8 @@ object RootNodesStorage {
             toInsert,
             toDelete
           )
-          if (height == safePointHeight + roolbackDepth) {
-            batch.put(Ints.toByteArray(safePointHeight + roolbackDepth), NodeSerilalizer.toBytes(newTree.rootNode))
+          if (height == safePointHeight + rollbackDepth) {
+            batch.put(Ints.toByteArray(safePointHeight + rollbackDepth), NodeSerilalizer.toBytes(newTree.rootNode))
           }
           newTree
       }.rootNode
