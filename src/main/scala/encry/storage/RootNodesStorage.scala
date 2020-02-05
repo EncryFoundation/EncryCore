@@ -64,27 +64,32 @@ object RootNodesStorage {
         this
       }
 
-    override def rollbackToSafePoint(insertionInfo: List[(Height, (List[(K, V)], List[K]))]): (RootNodesStorage[K, V], Node[K, V]) = Try {
+    override def rollbackToSafePoint(insertionInfo: List[(Height, (List[(K, V)], List[K]))]): (RootNodesStorage[K, V], Node[K, V]) = {
       val batch = storage.createWriteBatch()
       val readOptions = new ReadOptions()
-      readOptions.snapshot(storage.getSnapshot)
-      val rootNodeFile = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"$safePointHeight"))
-      val restoredRootNode: Node[K, V] = NodeSerilalizer.fromBytes(rootNodeFile)
-      val avlTree = new AvlTree[K, V](restoredRootNode, EmptyVersionalStorage(), emptyRootStorage)
-      val newRootNode = insertionInfo.foldLeft(avlTree) {
-        case (tree, (height, (toInsert, toDelete))) =>
-          val newTree = tree.insertAndDeleteMany(
-            StorageVersion @@ Random.randomBytes(),
-            toInsert,
-            toDelete
-          )
-          if (height == safePointHeight + rollbackDepth) {
-            batch.put(Ints.toByteArray(safePointHeight + rollbackDepth), NodeSerilalizer.toBytes(newTree.rootNode))
-          }
-          newTree
-      }.rootNode
-      this -> newRootNode
-    }.get
+      try {
+        readOptions.snapshot(storage.getSnapshot)
+        val rootNodeFile = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"$safePointHeight"))
+        val restoredRootNode: Node[K, V] = NodeSerilalizer.fromBytes(rootNodeFile)
+        val avlTree = new AvlTree[K, V](restoredRootNode, EmptyVersionalStorage(), emptyRootStorage)
+        val newRootNode = insertionInfo.foldLeft(avlTree) {
+          case (tree, (height, (toInsert, toDelete))) =>
+            val newTree = tree.insertAndDeleteMany(
+              StorageVersion @@ Random.randomBytes(),
+              toInsert,
+              toDelete
+            )
+            if (height == safePointHeight + rollbackDepth) {
+              batch.put(Ints.toByteArray(safePointHeight + rollbackDepth), NodeSerilalizer.toBytes(newTree.rootNode))
+            }
+            newTree
+        }.rootNode
+        this -> newRootNode
+      } finally {
+        batch.close()
+        readOptions.snapshot().close()
+      }
+    }
   }
 
   def emptyRootStorage[K: Serializer: Monoid, V: Serializer : Monoid]: RootNodesStorage[K, V] = new RootNodesStorage[K, V] {
