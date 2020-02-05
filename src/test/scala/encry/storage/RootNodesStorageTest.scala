@@ -26,7 +26,6 @@ class RootNodesStorageTest extends PropSpec with InstanceFactory with EncryGener
     }
     val dir: File = FileHelper.getRandomTempDir
     val levelDb: DB = LevelDbFactory.factory.open(dir, new Options)
-    //val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
     AvlTree[StorageKey, StorageValue](firstStorage, RootNodesStorage.emptyRootStorage[StorageKey, StorageValue])
   }
 
@@ -61,9 +60,4 @@ class RootNodesStorageTest extends PropSpec with InstanceFactory with EncryGener
     val (_, rootNodeRestored) = rootNodesStorage.rollbackToSafePoint(insertList.dropWhile(_._1 != rootNodesStorage.safePointHeight).drop(1))
     (avlAfterInsertions.rootNode.hash sameElements rootNodeRestored.hash) shouldBe true
   }
-
-  property("testInsert") {
-
-  }
-
 }

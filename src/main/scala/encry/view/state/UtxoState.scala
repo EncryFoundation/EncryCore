@@ -77,7 +77,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
-        //logger.info(s"Current root node: ${tree.rootNode}")
+        logger.info(s"Current root node hash: ${tree.rootNode.hash}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.nanoTime()
