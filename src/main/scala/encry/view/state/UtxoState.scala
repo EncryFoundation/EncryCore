@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import cats.data.Validated
 import cats.instances.list._
@@ -13,7 +14,7 @@ import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.UtxoStat
-import encry.storage.VersionalStorage
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
@@ -40,12 +41,15 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
+
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            height: Height,
                            constants: Constants,
                            influxRef: Option[ActorRef]) extends StrictLogging with UtxoStateReader with AutoCloseable {
+
+  def safePointHeight = tree.rootNodesStorage.safePointHeight
 
   def applyValidModifier(block: Block): UtxoState = {
     logger.info(s"Block validated successfully. Inserting changes to storage.")
@@ -64,7 +68,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     )
   }
 
-  def applyModifier(mod: PersistentModifier): Either[List[ModifierApplyError], UtxoState] = {
+  def applyModifier(mod: PersistentModifier, saveRootNodes: Boolean = false): Either[List[ModifierApplyError], UtxoState] = {
     val startTime = System.currentTimeMillis()
     val result = mod match {
       case header: Header =>
@@ -73,7 +77,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
-        logger.info(s"Current root node: ${tree.rootNode}")
+        logger.info(s"Current root node hash: ${tree.rootNode.hash}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.nanoTime()
@@ -104,10 +108,11 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
               StorageVersion !@@ block.id,
               combinedStateChange.outputsToDb.toList,
               combinedStateChange.inputsToDb.toList,
-              Height @@ block.header.height
+              Height @@ block.header.height,
+              saveRootNodes
             )
             logger.info(s"Time of insert: ${(System.currentTimeMillis() - insertTimestart) / 1000L} s")
-            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}. Root node: ${newTree.rootNode}")
+            logger.info(s"newTree.rootNode.hash ${Algos.encode(newTree.rootNode.hash)}.")
             logger.info(s"block.header.stateRoot ${Algos.encode(block.header.stateRoot)}")
             if (!(newTree.rootNode.hash sameElements block.header.stateRoot)) {
               logger.info(s"Invalid state root!")
@@ -115,7 +120,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
             } else {
-              logger.info(s"After applying root node: ${newTree.rootNode}")
+              logger.info(s"After applying root node: ${newTree.rootNode.hash}")
               UtxoState(
                 newTree,
                 Height @@ block.header.height,
@@ -131,9 +136,9 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   }
 
 
-  def rollbackTo(version: VersionTag): Try[UtxoState] = Try{
+  def rollbackTo(version: VersionTag, additionalBlocks: List[Block]): Try[UtxoState] = Try{
     logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
-    val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version).get
+    val rollbackedAvl = tree.rollbackTo(StorageVersion !@@ version, additionalBlocks).get
     logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
     val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants, influxRef)
@@ -225,7 +230,12 @@ object UtxoState extends StrictLogging {
     }
   }
 
-  def create(stateDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
+  def getRootsDir(settings: EncryAppSettings): File = {
+    logger.info(s"Invoke getRootsDir")
+    new File(s"${settings.directory}/roots")
+  }
+
+  def create(stateDir: File, rootStorageDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
@@ -235,17 +245,21 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
+    val rootStorage = {
+      val levelDBInit = LevelDbFactory.factory.open(rootStorageDir, new Options)
+      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth, rootStorageDir)
+    }
     val height = Height @@ Ints.fromByteArray(versionalStorage.get(UtxoState.bestHeightKey).get)
     logger.info(s"State created.")
     UtxoState(
-      AvlTree[StorageKey, StorageValue](versionalStorage),
+      AvlTree[StorageKey, StorageValue](versionalStorage, rootStorage),
       height,
       settings.constants,
       influxRef
     )
   }
 
-  def genesis(stateDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
+  def genesis(stateDir: File, rootStorageDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
     //check kind of storage
     val storage = settings.storage.state match {
       case VersionalStorage.IODB =>
@@ -256,10 +270,14 @@ object UtxoState extends StrictLogging {
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
     }
+    val rootStorage = {
+      val levelDBInit = LevelDbFactory.factory.open(rootStorageDir, new Options)
+      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth, rootStorageDir)
+    }
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))
     )
-    UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants, influxRef)
+    UtxoState(AvlTree[StorageKey, StorageValue](storage, rootStorage), Height @@ 0, settings.constants, influxRef)
   }
 }

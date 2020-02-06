@@ -6,7 +6,7 @@ import akka.actor.ActorRef
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{EncryAppSettings, Settings}
-import encry.storage.VersionalStorage
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
@@ -28,7 +28,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryProposition, MonetaryBox}
 import org.encryfoundation.common.utils.TaggedTypes._
 import org.encryfoundation.prismlang.core.wrapped.BoxedValue
-import org.iq80.leveldb.Options
+import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.hash.{Blake2b256, Digest32}
 import scorex.crypto.signatures.{Curve25519, PrivateKey, PublicKey}
 import scorex.utils.Random
@@ -202,12 +202,16 @@ object Utils extends Settings with StrictLogging {
         VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
     }
 
+    val dirForRoots: File = FileHelper.getRandomTempDir
+    val levelDb: DB = LevelDbFactory.factory.open(dirForRoots, new Options)
+    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
       bh.boxes.values.map(bx => (StorageKey !@@ bx.id, StorageValue @@ bx.bytes)).toList
     )
 
-    new UtxoState(AvlTree[StorageKey, StorageValue](storage), Height @@ 0, settings.constants, influxRef)
+    new UtxoState(AvlTree[StorageKey, StorageValue](storage, rootNodesStorage), Height @@ 0, settings.constants, influxRef)
   }
 
   def getRandomTempDir: File = {

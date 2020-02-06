@@ -222,9 +222,16 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier]@unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
         branchingPointOpt.map { branchPoint =>
-          if (!state.version.sameElements(branchPoint))
-            state.rollbackTo(branchPoint) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
-          else Success(state) -> IndexedSeq()
+          if (!state.version.sameElements(branchPoint)) {
+            val branchPointHeight = history.getHeaderById(ModifierId !@@ branchPoint).get.height
+            val additionalBlocks = (state.safePointHeight to branchPointHeight).foldLeft(List.empty[Block]){
+              case (blocks, height) =>
+                val headerAtHeight = history.getBestHeaderAtHeight(height).get
+                val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
+                blocks :+ blockAtHeight
+            }
+            state.rollbackTo(branchPoint, additionalBlocks) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
+          } else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
       } else Success(state) -> suffixApplied
     stateToApplyTry match {
@@ -232,7 +239,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         context.system.eventStream.publish(RollbackSucceed(branchingPointOpt))
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) { case (u, modToApply) =>
-          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply) match {
+          val saveRootNodesFlag = (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < encrySettings.constants.MaxRollbackDepth * 2
+          if (u.failedMod.isEmpty) u.state.applyModifier(modToApply, saveRootNodesFlag) match {
             case Right(stateAfterApply) =>
               influxRef.foreach(ref => modToApply match {
                 case b: Block if history.isFullChainSynced => ref ! TransactionsInBlock(b.payload.txs.size)
@@ -396,8 +404,10 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   def genesisState(influxRef: Option[ActorRef] = None): NodeView = {
     val stateDir: File = UtxoState.getStateDir(encrySettings)
     stateDir.mkdir()
+    val rootsDir: File = UtxoState.getRootsDir(encrySettings)
+    rootsDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
-    val state: UtxoState = UtxoState.genesis(stateDir, encrySettings, influxRef)
+    val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, encrySettings, influxRef)
     val history: History = History.readOrGenerate(encrySettings, timeProvider)
     val wallet: EncryWallet =
       EncryWallet.readOrGenerate(EncryWallet.getWalletDir(encrySettings), EncryWallet.getKeysDir(encrySettings), encrySettings)
@@ -408,11 +418,13 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     try {
       val stateDir: File = UtxoState.getStateDir(encrySettings)
       stateDir.mkdirs()
+      val rootsDir: File = UtxoState.getRootsDir(encrySettings)
+      rootsDir.mkdir()
       val history: History = History.readOrGenerate(encrySettings, timeProvider)
       val wallet: EncryWallet =
         EncryWallet.readOrGenerate(EncryWallet.getWalletDir(encrySettings), EncryWallet.getKeysDir(encrySettings), encrySettings)
       val state: UtxoState = restoreConsistentState(
-        UtxoState.create(stateDir, encrySettings, influxRef), history, influxRef
+        UtxoState.create(stateDir, rootsDir, encrySettings, influxRef), history, influxRef
       )
       Some(NodeView(history, state, wallet))
     } catch {
@@ -432,28 +444,37 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
     dir.listFiles.foreach(_.delete())
     val stateDir: File = UtxoState.getStateDir(encrySettings)
     stateDir.mkdirs()
-    UtxoState.create(stateDir, encrySettings, influxRef)
+    val rootsDir: File = UtxoState.getRootsDir(encrySettings)
+    rootsDir.mkdir()
+    UtxoState.create(stateDir, rootsDir, encrySettings, influxRef)
   }
 
   def restoreConsistentState(stateIn: UtxoState, history: History, influxRefActor: Option[ActorRef]): UtxoState =
-    (stateIn.version, history.getBestBlock, stateIn) match {
-      case (stateId, None, _) if stateId sameElements Array.emptyByteArray =>
+    (stateIn.version, history.getBestBlock, stateIn, stateIn.safePointHeight) match {
+      case (stateId, None, _, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
-      case (stateId, Some(block), _) if stateId sameElements block.id =>
+      case (stateId, Some(block), _, _) if stateId sameElements block.id =>
         logger.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
         stateIn
-      case (_, None, _) =>
+      case (_, None, _, _) =>
         logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
-      case (stateId, Some(historyBestBlock), state: UtxoState) =>
-        val stateBestHeaderOpt = history.getHeaderById(ModifierId !@@ stateId) //todo naming
-        val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
+      case (stateId, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
+        val headerAtSafePointHeight = history.getBestHeaderAtHeight(safePointHeight)
+        val (rollbackId, newChain) = history.getChainToHeader(headerAtSafePointHeight, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
-        val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id).get)
+        val branchPointHeight = history.getHeaderById(ModifierId !@@ rollbackId.get).get.height
+        val additionalBlocks = (state.safePointHeight to branchPointHeight).foldLeft(List.empty[Block]){
+          case (blocks, height) =>
+            val headerAtHeight = history.getBestHeaderAtHeight(height).get
+            val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
+            blocks :+ blockAtHeight
+        }
+        val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id, additionalBlocks).get)
           .getOrElse(getRecreatedState(influxRef = influxRefActor))
         val toApply = newChain.headers.map { h =>
           history.getBlockByHeader(h) match {
