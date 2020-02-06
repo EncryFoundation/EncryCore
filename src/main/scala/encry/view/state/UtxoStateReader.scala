@@ -17,6 +17,8 @@ trait UtxoStateReader {
 
   def version: VersionTag = VersionTag !@@ tree.avlStorage.currentVersion
 
+  def stateSafePointHeight = tree.rootNodesStorage.safePointHeight
+
   def boxById(boxId: ADKey): Option[EncryBaseBox] = tree.get(StorageKey !@@ boxId)
     .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
 

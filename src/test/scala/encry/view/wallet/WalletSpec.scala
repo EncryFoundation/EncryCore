@@ -1,10 +1,13 @@
 package encry.view.wallet
 
+import java.io.File
+
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
 import encry.settings.{LevelDBSettings, Settings}
-import encry.storage.VersionalStorage
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
+import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
 import encry.utils.TestHelper.Props
 import encry.utils.{EncryGenerator, FileHelper}
 import encry.view.state.UtxoStateReader
@@ -14,6 +17,7 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.iq80.leveldb.{DB, Options}
 import org.mockito.Mockito._
 import org.scalatest.mockito.MockitoSugar
 import org.scalatest.{Matchers, PropSpec}
@@ -115,7 +119,10 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
     val rootNode: LeafNode[StorageKey, StorageValue] =
       LeafNode(StorageKey @@ Array(DataBox.`modifierTypeId`), StorageValue @@ DataBoxSerializer.toBytes(dataBox))
     val storageMock = mock[VersionalStorage]
-    val tree = AvlTree(rootNode, storageMock)
+    val anotherDir: File = FileHelper.getRandomTempDir
+    val levelDb: DB = LevelDbFactory.factory.open(anotherDir, new Options)
+    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10, anotherDir)
+    val tree = AvlTree(rootNode, storageMock, rootNodesStorage)
     val stateMock = mock[UtxoStateReader](RETURNS_DEEP_STUBS)
     when(stateMock.tree).thenReturn(tree)
 
