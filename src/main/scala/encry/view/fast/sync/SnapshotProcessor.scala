@@ -1,7 +1,6 @@
 package encry.view.fast.sync
 
 import java.io.File
-
 import akka.actor.ActorRef
 import cats.syntax.either._
 import cats.syntax.option._
@@ -28,7 +27,6 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 import org.iq80.leveldb.{DB, Options}
 import scorex.utils.Random
-
 import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}

@@ -232,14 +232,7 @@ object UtxoState extends StrictLogging {
 
   def getRootsDir(settings: EncryAppSettings): File = {
     logger.info(s"Invoke getRootsDir")
-    if (settings.snapshotSettings.enableFastSynchronization) {
-      logger.info(s"Start state with tmp folder")
-      new File(s"${settings.directory}/roots")
-    }
-    else {
-      logger.info(s"Start state with main folder")
-      new File(s"${settings.directory}/roots")
-    }
+    new File(s"${settings.directory}/roots")
   }
 
   def create(stateDir: File, rootStorageDir: File, settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {

@@ -4,7 +4,6 @@ import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.stats.StatsSender.AvlStat
 import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.view.fast.sync.SnapshotHolder.SnapshotChunk

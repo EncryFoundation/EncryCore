@@ -223,7 +223,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       if (progressInfo.chainSwitchingNeeded) {
         branchingPointOpt.map { branchPoint =>
           if (!state.version.sameElements(branchPoint)) {
-            val branchPointHeight = history.getHeaderById(ModifierId !@@ branchingPointOpt.get).get.height
+            val branchPointHeight = history.getHeaderById(ModifierId !@@ branchPoint).get.height
             val additionalBlocks = (state.safePointHeight to branchPointHeight).foldLeft(List.empty[Block]){
               case (blocks, height) =>
                 val headerAtHeight = history.getBestHeaderAtHeight(height).get
@@ -462,8 +462,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
       case (stateId, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
-        val stateBestHeaderOpt = history.getBestHeaderAtHeight(safePointHeight) //todo naming
-        val (rollbackId, newChain) = history.getChainToHeader(stateBestHeaderOpt, historyBestBlock.header)
+        val headerAtSafePointHeight = history.getBestHeaderAtHeight(safePointHeight)
+        val (rollbackId, newChain) = history.getChainToHeader(headerAtSafePointHeight, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
