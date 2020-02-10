@@ -55,13 +55,7 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
     ).selfInspection
   }
 
-  override def toString: String =
-    s"[(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}," +
-      s" ${Algos.encode(implicitly[Serializer[V]].toBytes(value))}," +
-      s" height: $height," +
-      s" balance $balance, " +
-      s" hash: ${Algos.encode(hash)}) \n-> LeftChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}):" +
-      s"${leftChild}, \n-> RightChildOf(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}): ${rightChild}]"
+  override def toString: String = ""
 }
 
 object InternalNode {

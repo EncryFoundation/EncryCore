@@ -89,7 +89,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           .traverse(Validated.fromEither)
           .toEither
         val validationTime = System.nanoTime() - validstartTime
-        if (settings.influxDB.isDefined) influxRef.get ! UtxoStat(
+        if (influxRef.isDefined) influxRef.get ! UtxoStat(
           block.payload.txs.length,
           validationTime
         )

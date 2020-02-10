@@ -22,7 +22,7 @@ final case class LeafNode[K: Serializer: Monoid, V: Serializer: Monoid](key: K, 
 
   override val height: Int = 0
 
-  override def toString: String = s"(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}, $value, height: 0, balance: 0, hash: ${Algos.encode(hash)})"
+  override def toString: String = ""
 
   override def selfInspection = this
 }
