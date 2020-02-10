@@ -143,7 +143,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
             })
           case tId => getModsForRemote(unrequestedModifiers).foreach { modifiers =>
             modifiers.foreach(k =>
-              logger.info(s"Response to ${remote.socketAddress} header ${
+              logger.debug(s"Response to ${remote.socketAddress} header ${
                 Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(k._2)))
               }")
             )
