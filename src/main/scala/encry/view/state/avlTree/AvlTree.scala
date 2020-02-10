@@ -4,18 +4,18 @@ import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.view.fast.sync.SnapshotHolder.SnapshotChunk
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
+
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
@@ -204,6 +204,14 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       logger.info(s"root node after rollback: ${newRoot}")
       AvlTree[K, V](newRoot, avlStorage, newStorage)
     }
+
+  def restore(additionalBlocks: List[Block])
+             (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
+  Try {
+    val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
+    logger.info(s"root node after rollback: ${newRoot}")
+    AvlTree[K, V](newRoot, avlStorage, newStorage)
+  }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>

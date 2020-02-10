@@ -144,6 +144,14 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     UtxoState(rollbackedAvl, height, constants, influxRef)
   }
 
+  def restore(additionalBlocks: List[Block]): Try[UtxoState] = Try {
+    logger.info(s"Rollback utxo from storage: ${Algos.encode(version)}")
+    val rollbackedAvl = tree.restore(additionalBlocks).get
+    logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
+    val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
+    UtxoState(rollbackedAvl, height, constants, influxRef)
+  }
+
   def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
     if (tx.semanticValidity.isSuccess) {
       val stateView: EncryStateView = EncryStateView(blockHeight, blockTimeStamp, ADDigest @@ Array.emptyByteArray)

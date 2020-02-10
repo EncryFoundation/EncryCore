@@ -474,7 +474,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
             val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
             blocks :+ blockAtHeight
         }
-        val startState = rollbackId.map(id => state.rollbackTo(VersionTag !@@ id, additionalBlocks).get)
+        val startState = rollbackId.map(_ => state.restore(additionalBlocks).get)
           .getOrElse(getRecreatedState(influxRef = influxRefActor))
         val toApply = newChain.headers.map { h =>
           history.getBlockByHeader(h) match {
