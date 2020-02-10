@@ -9,15 +9,14 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp.settings
 import encry.consensus.EncrySupplyController
 import encry.modifiers.state.{Context, EncryPropositionFunctions}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.UtxoStat
-import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.utils.BalanceCalculator
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.implicits.UTXO._
@@ -49,7 +48,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            constants: Constants,
                            influxRef: Option[ActorRef]) extends StrictLogging with UtxoStateReader with AutoCloseable {
 
-  def safePointHeight: Height = tree.rootNodesStorage.safePointHeight
+  def safePointHeight = tree.rootNodesStorage.safePointHeight
 
   def applyValidModifier(block: Block): UtxoState = {
     logger.info(s"Block validated successfully. Inserting changes to storage.")
@@ -89,10 +88,11 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
           .traverse(Validated.fromEither)
           .toEither
         val validationTime = System.nanoTime() - validstartTime
-        if (influxRef.isDefined) influxRef.get ! UtxoStat(
+        //todo: influx ref doesn't init during restart
+        influxRef.foreach(_ ! UtxoStat(
           block.payload.txs.length,
           validationTime
-        )
+        ))
         logger.info(s"Validation time: ${validationTime/1000000} ms. Txs: ${block.payload.txs.length}")
         res.fold(
           err => {

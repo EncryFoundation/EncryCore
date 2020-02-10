@@ -43,7 +43,7 @@ object RootNodesStorage {
         val batch       = storage.createWriteBatch()
         val readOptions = new ReadOptions()
         readOptions.snapshot(storage.getSnapshot)
-        val fileToAdd = new File(rootsPath.getAbsolutePath ++ s"$height")
+        val fileToAdd = new File(rootsPath.getAbsolutePath ++ s"/$height")
         val bos       = new BufferedOutputStream(new FileOutputStream(fileToAdd))
         try {
           val newSafePointHeight     = Math.max(0, height - rollbackDepth)
