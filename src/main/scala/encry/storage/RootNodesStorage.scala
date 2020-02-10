@@ -29,7 +29,7 @@ object RootNodesStorage {
   def apply[K: Serializer: Monoid: Hashable: Order,
             V: Serializer: Monoid: Hashable](storage: DB,
                                              rollbackDepth: Int,
-                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] {
+                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] with AutoCloseable {
 
     private def atHeightKey(height: Height): Array[Byte] = Ints.toByteArray(height)
 
@@ -90,6 +90,8 @@ object RootNodesStorage {
         readOptions.snapshot().close()
       }
     }
+
+    override def close(): Unit = storage.close()
   }
 
   def emptyRootStorage[K: Serializer: Monoid, V: Serializer: Monoid]: RootNodesStorage[K, V] =
