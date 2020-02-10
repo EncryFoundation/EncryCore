@@ -33,6 +33,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import scorex.crypto.signatures.PublicKey
 
 import scala.concurrent.Future
 
@@ -200,11 +201,9 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[(PublicKey25519, TokenId), Amount]] { view =>
-        val balance: Map[(PublicKey25519, TokenId), Amount] = view.vault.getBalances.map {
-          case ((key, token), amount) => Map((key -> token) -> amount)
-        }.foldLeft(Map.empty[(PublicKey25519, TokenId), Amount]) { case (el1, el2) => el1 ++ el2 }
-        if (balance.isEmpty) Map.empty[(PublicKey25519, TokenId), Amount] else balance
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[(PublicKey, TokenId), Amount]] { view =>
+        val balance: Map[(PublicKey, TokenId), Amount] = view.vault.getBalances.toMap
+        if (balance.isEmpty) Map.empty[(PublicKey, TokenId), Amount] else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>

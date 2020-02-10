@@ -15,7 +15,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.utils.Mnemonic
+import encry.utils.{ByteStr, Mnemonic}
 import encry.view.state.UtxoStateReader
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
 import io.iohk.iodb.{LSMStore, Store}
@@ -27,8 +27,9 @@ import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
-import org.encryfoundation.common.utils.{Algos, TaggedTypes}
-import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.signatures.PublicKey
 
@@ -92,23 +93,19 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
-  def getBalances: Seq[((PublicKey25519, TokenId), Amount)] = {
-    val pubKeys                                = publicKeys
-    val contractHashToKey: Map[String, String] = contractHashesToKeys(pubKeys)
-    val positiveBalance: Map[(PublicKey25519, TokenId), Amount] = walletStorage.getBalances.map {
-      case ((hash, tokenId), amount) =>
-        (hash, tokenId) -> amount
+  def getBalances: Seq[((PublicKey, TokenId), Amount)] = {
+    val pubKeys: Set[PublicKey25519] = publicKeys
+    val contractHashToKey: Map[ByteStr, PublicKey] = pubKeysToContractHashes(pubKeys)
+    val positiveBalance: Map[(PublicKey, TokenId), Amount] = walletStorage.getBalances.map {
+      case ((hash, tokenId), amount) => (contractHashToKey(ByteStr(hash)), tokenId) -> amount
     }
-    (pubKeys -- positiveBalance.keys.map(_._1))
-      .map(l => (l -> settings.constants.IntrinsicTokenId) -> 0L)
-      .toSeq ++ positiveBalance
-  }.sortBy(l => !(l._1._1.pubKeyBytes sameElements accountManagers.head.publicAccounts.head.pubKeyBytes))
+    (pubKeys.map(k => ByteStr(k.pubKeyBytes)) -- positiveBalance.keys.map(l => ByteStr(l._1)))
+      .map(l => (PublicKey @@ l.arr) -> settings.constants.IntrinsicTokenId -> 0L).toSeq ++ positiveBalance
+    }.sortBy(l => !(l._1._1 sameElements accountManagers.head.publicAccounts.head.pubKeyBytes))
 
-  def contractHashesToKeys(pubKeys: Set[PublicKey25519]): Map[String, String] = pubKeys
-    .map(key => Algos.encode(key.pubKeyBytes) -> key.address.address)
-    .map { case (key, addr) =>
-      Algos.encode(EncryProposition.addressLocked(addr).contractHash) -> key
-    }.toMap
+  def pubKeysToContractHashes(pubKeys: Set[PublicKey25519]): Map[ByteStr, PublicKey] = pubKeys
+    .map(key => ByteStr(EncryProposition.addressLocked(key.address.address).contractHash) -> key.pubKeyBytes)
+    .toMap
 
   private def validateMnemonicKey(mnemonic: String): Either[NonEmptyChain[String], String] = {
     val words: Array[String] = mnemonic.split(" ")

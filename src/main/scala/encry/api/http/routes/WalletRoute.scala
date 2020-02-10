@@ -14,6 +14,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
+import scorex.crypto.signatures.PublicKey
 
 import scala.concurrent.Future
 import scala.language.implicitConversions
@@ -27,18 +28,18 @@ case class WalletRoute(settings: RESTApiSettings,
 
   val EttTokenId: String = Algos.encode(encrySettings.constants.IntrinsicTokenId)
 
- def walletF: Future[Map[(PublicKey25519, TokenId), Amount]] =
+ def walletF: Future[Map[(PublicKey, TokenId), Amount]] =
    (dataHolder ? GetViewGetBalance)
-     .mapTo[Map[(PublicKey25519, TokenId), Amount]]
+     .mapTo[Map[(PublicKey, TokenId), Amount]]
 
  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
- def info: Future[(Map[(PublicKey25519, TokenId), Amount], List[String])] = for {
+ def info: Future[(Map[(PublicKey, TokenId), Amount], List[String])] = for {
    wallet <- walletF
    pubKeys <- pubKeysF
  } yield (wallet, pubKeys)
 
- def walletScript(balances: Map[(PublicKey25519, TokenId), Amount]): Text.TypedTag[String] = {
+ def walletScript(balances: Map[(PublicKey, TokenId), Amount]): Text.TypedTag[String] = {
    html(
      scalatags.Text.all.head(
        meta(charset := "utf-8"),
@@ -727,11 +728,11 @@ case class WalletRoute(settings: RESTApiSettings,
                           } yield {
                             val tknStr = mapKeyValue._1._2 match {
                               case tokenId if Algos.encode(tokenId) == EttTokenId => "ETT"
-                              case tokenId => tokenId
+                              case tokenId => Algos.encode(tokenId)
                             }
                             tr(
-                              th(mapKeyValue._1._1.toString()),
-                              th(tknStr.toString),
+                              th(Algos.encode(mapKeyValue._1._1)),
+                              th(tknStr),
                               if (Algos.encode(mapKeyValue._1._2) == EttTokenId ) th(mapKeyValue._2/100000000) else th(mapKeyValue._2)
                             )
                           }).toList

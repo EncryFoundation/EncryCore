@@ -1,5 +1,6 @@
 package encry.storage.levelDb.versionalLevelDB
 
+import cats.Semigroup
 import cats.instances.all._
 import cats.syntax.semigroup._
 import com.google.common.primitives.Longs
@@ -7,17 +8,15 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.settings.LevelDBSettings
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion._
 import encry.utils.{BalanceCalculator, ByteStr}
-import org.encryfoundation.common.crypto.PublicKey25519
-import org.encryfoundation.common.modifiers.mempool.transaction.PubKeyLockedContract
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
+import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.iq80.leveldb.DB
 import scorex.crypto.hash.Digest32
-import scorex.crypto.signatures.PublicKey
 
 import scala.util.Success
 
@@ -49,17 +48,26 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
   def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox],
                    intrinsicTokenId: ADKey): Unit = {
     val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
-    val newBalances: Map[(String, TokenId), Amount] = {
-      val toRemoveFromBalance: Map[(String, TokenId), Amount] = BalanceCalculator.balanceSheet(spentBxs, intrinsicTokenId)
-        .map { case ((publickKey, key), value) => (publickKey, key) -> value * -1 }
-      val toAddToBalance: Map[(String, TokenId), Amount] = BalanceCalculator.balanceSheet(newBxs, intrinsicTokenId)
-        .map { case ((publickKey, key), value) => (publickKey, key) -> value }
-      val prevBalance: Map[(String, TokenId), Amount] = getBalances.map { case ((publicKey, id), value) => (Algos.encode(PubKeyLockedContract(publicKey.pubKeyBytes).contract.hash), id) -> value }
-      (toAddToBalance |+| toRemoveFromBalance |+| prevBalance).map { case ((hash, tokenId), value) => (hash, tokenId) -> value }
+    val newBalances: Map[(ContractHash, TokenId), Amount] = {
+      // (String, String) is a (ContractHash, TokenId)
+      val toRemoveFromBalance: Map[(String, String), Amount] =
+        BalanceCalculator
+          .balanceSheet(spentBxs, intrinsicTokenId)
+          .map { case ((hash, key), value) => (Algos.encode(hash), Algos.encode(key)) -> value * -1 }
+      val toAddToBalance: Map[(String, String), Amount] =
+        BalanceCalculator
+          .balanceSheet(newBxs, intrinsicTokenId)
+          .map { case ((hash, key), value) => (Algos.encode(hash), Algos.encode(key)) -> value }
+      val prevBalance: Map[(String, String), Amount] = getBalances.map {
+        case ((hash, id), value) => (Algos.encode(hash), Algos.encode(id)) -> value
+      }
+      (toRemoveFromBalance |+| toAddToBalance |+| prevBalance).map {
+        case ((hash, tokenId), value) => (Algos.decode(hash).get, Algos.decode(tokenId).get) -> value
+      }
     }
     val newBalanceKeyValue = BALANCE_KEY -> VersionalLevelDbValue @@
       newBalances.foldLeft(Array.emptyByteArray) { case (acc, ((hash, tokenId), balance)) =>
-        acc ++ Algos.decode(hash).get ++ tokenId ++ Longs.toByteArray(balance)
+        acc ++ hash ++ tokenId ++ Longs.toByteArray(balance)
       }
     levelDb.insert(LevelDbDiff(LevelDBVersion @@ modifierId.untag(ModifierId),
       newBalanceKeyValue :: bxsToInsert.map(bx => (VersionalLevelDbKey @@ bx.id.untag(ADKey),
@@ -68,12 +76,11 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
     )
   }
 
-  def getBalances: Map[(PublicKey25519, TokenId), Amount] = {
+  def getBalances: Map[(ContractHash, TokenId), Amount] =
     levelDb.get(BALANCE_KEY)
       .map(_.sliding(72, 72)
-        .map(ch => (PublicKey25519(PublicKey @@ ch.take(32)), ch.slice(32, 64)) -> Longs.fromByteArray(ch.takeRight(8)))
+        .map(ch => (ch.take(32), ch.slice(32, 64)) -> Longs.fromByteArray(ch.takeRight(8)))
         .toMap).getOrElse(Map.empty)
-  }
 
   override def close(): Unit = levelDb.close()
 }
