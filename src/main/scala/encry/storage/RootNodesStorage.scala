@@ -67,7 +67,7 @@ object RootNodesStorage {
       val currentSafePoint = safePointHeight
       try {
         readOptions.snapshot(storage.getSnapshot)
-        val rootNodeFile                 = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"$currentSafePoint"))
+        val rootNodeFile                 = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"/$currentSafePoint"))
         val restoredRootNode: Node[K, V] = NodeSerilalizer.fromBytes(rootNodeFile)
         val avlTree                      = new AvlTree[K, V](restoredRootNode, EmptyVersionalStorage(), emptyRootStorage)
         val newRootNode = insertionInfo
