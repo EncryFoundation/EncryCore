@@ -1,6 +1,7 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.pattern._
 import akka.util.Timeout
@@ -26,11 +27,13 @@ import encry.view.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSee
 import encry.view.history.History
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.wallet.EncryWallet
-import org.encryfoundation.common.crypto.PrivateKey25519
+import org.encryfoundation.common.crypto.{PrivateKey25519, PublicKey25519}
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
@@ -197,11 +200,11 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[String, List[(String, Amount)]]] { view =>
-        val balance: Map[String, List[(String, Amount)]] = view.vault.getBalances.map {
-          case ((key, token), amount) => Map(key -> List((token, amount)))
-        }.foldLeft(Map.empty[String, List[(String, Amount)]]) { case (el1, el2) => el1 |+| el2 }
-        if (balance.isEmpty) Map.empty[String, List[(String, Amount)]] else balance
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[(PublicKey25519, TokenId), Amount]] { view =>
+        val balance: Map[(PublicKey25519, TokenId), Amount] = view.vault.getBalances.map {
+          case ((key, token), amount) => Map((key -> token) -> amount)
+        }.foldLeft(Map.empty[(PublicKey25519, TokenId), Amount]) { case (el1, el2) => el1 ++ el2 }
+        if (balance.isEmpty) Map.empty[(PublicKey25519, TokenId), Amount] else balance
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>

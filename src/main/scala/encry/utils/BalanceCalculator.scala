@@ -10,19 +10,19 @@ object BalanceCalculator {
   def balanceSheet(bxs: Traversable[EncryBaseBox],
                    defaultTokenId: TokenId,
                    excludeTokenIssuance: Boolean = false): Map[(String, TokenId), Amount] =
-    bxs.foldLeft(Map.empty[(String, ByteStr), Amount]) {
+    bxs.foldLeft(Map.empty[(String, TokenId), Amount]) {
       case (cache, bx: AssetBox) =>
-        val tokenId: ByteStr = ByteStr(bx.tokenIdOpt.getOrElse(defaultTokenId))
+        val tokenId: TokenId = bx.tokenIdOpt.getOrElse(defaultTokenId)
         val contractHash = Algos.encode(bx.proposition.contractHash)
         cache.get(contractHash -> tokenId).map { amount =>
           cache.updated(contractHash -> tokenId, amount + bx.amount)
         }.getOrElse(cache.updated(contractHash -> tokenId, bx.amount))
       case (cache, bx: TokenIssuingBox) if !excludeTokenIssuance =>
         val contractHash = Algos.encode(bx.proposition.contractHash)
-        val tokenId: ByteStr = ByteStr(bx.tokenId)
+        val tokenId: TokenId = bx.tokenId
         cache.get(contractHash -> tokenId).map { amount =>
           cache.updated(contractHash -> tokenId, amount + bx.amount)
         }.getOrElse(cache.updated(contractHash -> tokenId, bx.amount))
       case (cache, _) => cache
-    }.map { case ((hash, id), am) => (hash -> id.arr) -> am }
+    }.map { case ((hash, id), am) => (hash -> id) -> am }
 }
