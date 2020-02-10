@@ -46,18 +46,18 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         deleteKey(toDeleteKey, prevRoot)
     }
     val avlDeleteTime = System.nanoTime() - deleteStartTime
-    logger.info(s"avlDeleteTime: ${avlDeleteTime/1000000L} ms")
+    logger.debug(s"avlDeleteTime: ${avlDeleteTime/1000000L} ms")
     val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         insert(keyToInsert, valueToInsert, prevRoot)
     }
     val insertTime = System.nanoTime() - insertStartTime
-    logger.info(s"avlInsertTime: ${insertTime/1000000L} ms")
+    logger.debug(s"avlInsertTime: ${insertTime/1000000L} ms")
     val startPackingTime = System.nanoTime()
-    logger.info(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
+    logger.debug(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
     val startInsertTime = System.nanoTime()
-    logger.info(s"Insert in avl version ${Algos.encode(version)}")
+    logger.debug(s"Insert in avl version ${Algos.encode(version)}")
     avlStorage.insert(
       version,
       toInsert.map {
@@ -70,7 +70,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    logger.info(s"Insertion time: ${(System.nanoTime() - startInsertTime)/1000000L} ms")
+    logger.debug(s"Insertion time: ${(System.nanoTime() - startInsertTime)/1000000L} ms")
     val newRootNodesStorage = if (saveRootNodesFlag || saveRootNodes) rootNodesStorage.insert(
       version,
       newRoot,
@@ -201,7 +201,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 //      val newRootNode =
 //        NodeSerilalizer.fromBytes[K, V](avlStorage.get(StorageKey !@@ AvlTree.nodeKey(avlStorage.get(AvlTree.rootNodeKey).get)).get)
       val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
-      logger.info(s"root node after rollback: ${newRoot}")
+      logger.info(s"root node hash after rollback: ${Algos.encode(newRoot.hash)}")
       AvlTree[K, V](newRoot, avlStorage, newStorage)
     }
 
@@ -209,7 +209,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
              (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
   Try {
     val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
-    logger.info(s"root node after rollback: ${newRoot}")
+    logger.info(s"root node hash after restore: ${Algos.encode(newRoot.hash)}")
     AvlTree[K, V](newRoot, avlStorage, newStorage)
   }
 

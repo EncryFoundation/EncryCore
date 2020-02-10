@@ -48,7 +48,7 @@ object RootNodesStorage {
         try {
           val newSafePointHeight     = Math.max(0, height - rollbackDepth)
           val newSafePointSerialized = Ints.toByteArray(newSafePointHeight)
-          val fileToDelete           = new File(rootsPath.getAbsolutePath ++ s"${newSafePointHeight - rollbackDepth}")
+          val fileToDelete           = new File(rootsPath.getAbsolutePath ++ s"/${newSafePointHeight - rollbackDepth}")
           if (fileToDelete.exists()) fileToDelete.delete()
           batch.put(safePointKey, newSafePointSerialized)
           bos.write(NodeSerilalizer.toBytes(rootNode))

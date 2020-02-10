@@ -454,14 +454,11 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       case (stateId, None, _, _) if stateId sameElements Array.emptyByteArray =>
         logger.info(s"State and history are both empty on startup")
         stateIn
-      case (stateId, Some(block), _, _) if stateId sameElements block.id =>
-        logger.info(s"State and history have the same version ${Algos.encode(stateId)}, no recovery needed.")
-        stateIn
       case (_, None, _, _) =>
         logger.info(s"State and history are inconsistent." +
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
-      case (stateId, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
+      case (_, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
         val headerAtSafePointHeight = history.getBestHeaderAtHeight(safePointHeight)
         val (rollbackId, newChain) = history.getChainToHeader(headerAtSafePointHeight, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
