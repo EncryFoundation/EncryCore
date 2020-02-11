@@ -17,6 +17,7 @@ import encry.local.miner.Miner.{DisableMining, EnableMining, MinerStatus, StartM
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeerFromAPI
@@ -69,7 +70,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
                    blockInfo: BlockAndHeaderInfo = BlockAndHeaderInfo(None, None),
                    allPeers: Seq[InetSocketAddress] = Seq.empty,
-                   connectedPeersCollection: ConnectedPeersCollection = ConnectedPeersCollection()): Receive = {
+                   connectedPeersCollection: ConnectedPeersCollection = ConnectedPeersCollection(),
+                   isSynced: Boolean = false): Receive = {
 
     case UpdatingTransactionsNumberForApi(qty) =>
       context.become(
@@ -282,7 +284,22 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         )).pipeTo(sender())
 
     case GetDataFromHistory     => history.foreach(sender() ! _)
-    case FullBlockChainIsSynced => sender() ! true
+    case FullBlockChainIsSynced =>
+      context.become(
+        workingCycle(
+          nvhRef,
+          blackList,
+          connectedPeers,
+          history,
+          state,
+          transactionsOnMinerActor,
+          minerStatus,
+          blockInfo,
+          allPeers,
+          connectedPeersCollection,
+          isSynced = true
+        ))
+    case GetBlockChainSync      => sender() ! isSynced
     case GetMinerStatus         => sender() ! minerStatus
     case GetAllPeers            => sender() ! allPeers
     case GetConnections         => sender() ! connectedPeersCollection
@@ -343,8 +360,6 @@ object DataHolderForApi { //scalastyle:ignore
 
   case object GetNodePassHashAndSalt
 
-  case object FullBlockChainIsSynced
-
   case object GetViewPrintAddress
 
   case object GetConnectedPeersHelper
@@ -374,6 +389,8 @@ object DataHolderForApi { //scalastyle:ignore
   case object GetBannedPeersHelper
 
   case object GetAllInfo
+
+  case object GetBlockChainSync
 
   case object GetConnections
 

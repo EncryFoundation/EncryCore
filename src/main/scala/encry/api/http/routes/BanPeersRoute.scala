@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{FullBlockChainIsSynced, GetBannedPeersHelper}
+import encry.api.http.DataHolderForApi.{GetBannedPeersHelper, GetBlockChainSync}
 import encry.api.http.ScriptHelper
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.settings.RESTApiSettings
@@ -24,7 +24,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   def peersAllF: Future[Seq[(InetAddress, (BanReason, BanTime, BanType))]] =
     (dataHolder ? GetBannedPeersHelper).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
 
-  def syncIsDoneF: Future[Boolean] = (dataHolder ? FullBlockChainIsSynced).mapTo[Boolean]
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
   val info: Future[(Seq[(InetAddress, (BanReason, BanTime, BanType))], Boolean)] = for {
     peers <- peersAllF

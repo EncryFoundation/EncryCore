@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{FullBlockChainIsSynced, GetAllInfoHelper, GetMinerStatus, GetNodePassHashAndSalt}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetBlockChainSync, GetMinerStatus, GetNodePassHashAndSalt}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
@@ -48,7 +48,7 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
   def getPass: Future[String => Boolean] =
     (dataHolder ? GetNodePassHashAndSalt).mapTo[String => Boolean]
 
-  def syncIsDoneF: Future[Boolean] = (dataHolder ? FullBlockChainIsSynced).mapTo[Boolean]
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
   def signUp: Text.TypedTag[String] = html(
     scalatags.Text.all.head(

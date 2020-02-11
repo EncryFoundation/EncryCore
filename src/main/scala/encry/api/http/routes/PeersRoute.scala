@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{FullBlockChainIsSynced, GetAllPeers}
+import encry.api.http.DataHolderForApi.{GetAllPeers, GetBlockChainSync}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
 import scalatags.Text
@@ -21,7 +21,7 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
 
   def peersAllF: Future[Seq[InetSocketAddress]] = (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]]
 
-  def syncIsDoneF: Future[Boolean] = (dataHolder ? FullBlockChainIsSynced).mapTo[Boolean]
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
   val info: Future[(Seq[InetSocketAddress], Boolean)] = for {
     peers <- peersAllF
