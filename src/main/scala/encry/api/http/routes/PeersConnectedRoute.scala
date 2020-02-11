@@ -24,7 +24,7 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
 
   def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
-  val info: Future[(ConnectedPeersCollection, Boolean)] = for {
+  def info: Future[(ConnectedPeersCollection, Boolean)] = for {
     peers <- connectedPeers
     sync  <- syncIsDoneF
   } yield (peers, sync)

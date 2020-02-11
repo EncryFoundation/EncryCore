@@ -23,7 +23,7 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
 
   def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
-  val info: Future[(Seq[InetSocketAddress], Boolean)] = for {
+  def info: Future[(Seq[InetSocketAddress], Boolean)] = for {
     peers <- peersAllF
     sync <- syncIsDoneF
   } yield (peers, sync)

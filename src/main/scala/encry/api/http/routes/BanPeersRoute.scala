@@ -26,7 +26,7 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
 
   def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
-  val info: Future[(Seq[(InetAddress, (BanReason, BanTime, BanType))], Boolean)] = for {
+  def info: Future[(Seq[(InetAddress, (BanReason, BanTime, BanType))], Boolean)] = for {
     peers <- peersAllF
     sync <- syncIsDoneF
   } yield (peers, sync)
