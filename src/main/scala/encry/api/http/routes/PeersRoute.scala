@@ -220,8 +220,8 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
   override def route: Route = (path("allPeers") & get) {
     WebRoute.authRoute(
         onComplete(info) {
-          case Success(value) =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(value._1, value._2).render))
+          case Success((peers, isSynced)) =>
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(peers, isSynced).render))
           case Failure(_) => complete("Couldn't load page with peers cause of inner system is overloaded. Try it later!")
         },
       settings

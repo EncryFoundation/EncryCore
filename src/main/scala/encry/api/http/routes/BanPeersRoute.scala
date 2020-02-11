@@ -311,8 +311,8 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   override def route: Route = (path("bannedPeers") & get) {
     WebRoute.authRoute(
       onComplete(info) {
-        case Success(value) =>
-          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(value._1, value._2).render))
+        case Success((peers, isSynced)) =>
+          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(peers, isSynced).render))
         case Failure(_) =>
           complete(s"Couldn't load page with banned peers cause inner system is overloaded. Try it later!")
       },

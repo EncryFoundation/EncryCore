@@ -180,8 +180,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     path("web") {
         WebRoute.authRoute(
           onComplete(currentInfoF) {
-            case Success(info) =>
-              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2, info._3).render))
+            case Success((nodeInfo, minerStatus, isSynced)) =>
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(nodeInfo, minerStatus, isSynced).render))
             case Failure(exception) => complete(exception)
           }, settings)
     }

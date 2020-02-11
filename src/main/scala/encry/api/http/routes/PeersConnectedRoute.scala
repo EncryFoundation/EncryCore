@@ -312,7 +312,7 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
 
   override def route: Route = (path("connectedPeers") & get) {
     onComplete(info) {
-      case Success(value) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(value._1, value._2).render))
+      case Success((peers, isSynced)) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(peers, isSynced).render))
       case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection(), false).render))
     }
   }
