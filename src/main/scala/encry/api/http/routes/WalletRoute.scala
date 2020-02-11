@@ -7,15 +7,12 @@ import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{GetViewGetBalance, GetViewPrintPubKeys}
 import encry.settings.{EncryAppSettings, RESTApiSettings}
-import org.encryfoundation.common.crypto.PublicKey25519
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
 import scorex.crypto.signatures.PublicKey
-
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
@@ -685,17 +682,17 @@ case class WalletRoute(settings: RESTApiSettings,
                                           ),
                                         )
                                       ),
-//                                      div(cls := "form-group",
-//                                        select(cls := "form-control", id :="coin", name:="coin",
-//                                          if (balances.nonEmpty) {
-//                                            balances.values.flatten.toList.map( coinIds =>
-//                                              option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2/100000000})" else coinIds._1)
-//                                            )
-//                                          } else {
-//                                            option(value := "", "")
-//                                          }
-//                                        )
-//                                      ),
+                                      div(cls := "form-group",
+                                        select(cls := "form-control", id :="coin", name:="coin",
+                                          if (balances.nonEmpty) {
+                                            balances.toList.map { coinIds =>
+                                              option(value := Algos.encode(coinIds._1._2), if (Algos.encode(coinIds._1._2) == EttTokenId) s"ETT (${coinIds._2 / 100000000})" else Algos.encode(coinIds._1._2))
+                                            }
+                                          } else {
+                                            option(value := "", "")
+                                          }
+                                        )
+                                      ),
                                       div(cls := "text-center",
                                         button(tpe := "button", onclick := "wallet()", cls := "btn btn-primary mt-4", "Send Money")
                                       )
@@ -724,7 +721,6 @@ case class WalletRoute(settings: RESTApiSettings,
                         if (balances.nonEmpty) {
                           (for {
                             mapKeyValue <- balances.toList
-//                            tokenAmount <- mapKeyValue._1
                           } yield {
                             val tknStr = mapKeyValue._1._2 match {
                               case tokenId if Algos.encode(tokenId) == EttTokenId => "ETT"
@@ -756,25 +752,25 @@ case class WalletRoute(settings: RESTApiSettings,
                       )
                     )
                   ),
-//                  div(cls := "table-responsive",
-//                    // Projects table
-//                    table(cls := "table align-items-center table-flush",
-//                      thead(cls := "thead-light",
-//                        tr(
-//                          th(attr("scope") := "col", "Key")
-//                        )
-//                      ),
-//                      tbody(
-//                        if(balances.keys.nonEmpty) {
-//                          for (p <- balances.keys.toList) yield {
-//                            tr(th(attr("scope") := "row", p))
-//                          }
-//                        } else {
-//                          tr()
-//                        }
-//                      )
-//                    )
-//                  )
+                  div(cls := "table-responsive",
+                    // Projects table
+                    table(cls := "table align-items-center table-flush",
+                      thead(cls := "thead-light",
+                        tr(
+                          th(attr("scope") := "col", "Key")
+                        )
+                      ),
+                      tbody(
+                        if(balances.keys.nonEmpty) {
+                          for (p <- balances.toList.map(x => Algos.encode(x._1._1))) yield {
+                            tr(th(attr("scope") := "row", p))
+                          }
+                        } else {
+                          tr()
+                        }
+                      )
+                    )
+                  )
                 )
               )
             )

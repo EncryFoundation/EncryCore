@@ -61,7 +61,8 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
       val prevBalance: Map[(String, String), Amount] = getBalances.map {
         case ((hash, id), value) => (Algos.encode(hash), Algos.encode(id)) -> value
       }
-      (toRemoveFromBalance |+| toAddToBalance |+| prevBalance).map {
+      val res = toRemoveFromBalance |+| toAddToBalance |+| prevBalance
+      res.map {
         case ((hash, tokenId), value) => (Algos.decode(hash).get, Algos.decode(tokenId).get) -> value
       }
     }
