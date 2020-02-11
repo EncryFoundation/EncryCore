@@ -49,7 +49,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                            constants: Constants,
                            influxRef: Option[ActorRef]) extends StrictLogging with UtxoStateReader with AutoCloseable {
 
-  def safePointHeight = tree.rootNodesStorage.safePointHeight
+  def safePointHeight: Height = tree.rootNodesStorage.safePointHeight
 
   def applyValidModifier(block: Block): UtxoState = {
     logger.info(s"Block validated successfully. Inserting changes to storage.")

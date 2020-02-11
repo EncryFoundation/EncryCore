@@ -34,7 +34,7 @@ case class NonEmptyShadowNode[K: Serializer: Hashable, V: Serializer](nodeHash: 
   def tryRestore(storage: VersionalStorage): Option[Node[K, V]] =
     Try(restoreFullNode(storage)).toOption
 
-  override def toString: String = ""
+  override def toString: String = s"ShadowNode(Hash:${Algos.encode(hash)}, height: ${height}, balance: ${balance})"
 }
 
 object NonEmptyShadowNode {
