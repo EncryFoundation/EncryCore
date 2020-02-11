@@ -55,8 +55,6 @@ final case class InternalNode[K: Serializer: Monoid: Hashable, V: Serializer: Mo
     ).selfInspection
   }
 
-  "Internal node. Key: {}. Value: {}. Height: {}. Balance {}. "
-
   override def toString: String =
     s"[(${Algos.encode(implicitly[Serializer[K]].toBytes(key))}," +
     s" ${Algos.encode(implicitly[Serializer[V]].toBytes(value))}," +
