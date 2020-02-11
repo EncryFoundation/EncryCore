@@ -29,13 +29,7 @@ val apiDependencies = Seq(
   "com.typesafe.akka" %% "akka-http" % akkaHttpVersion
 )
 
-val loggingDependencies = Seq(
-  "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
-  "ch.qos.logback" % "logback-classic" % logbackVersion,
-  "ch.qos.logback" % "logback-core" % logbackVersion,
-  "net.logstash.logback" % "logstash-logback-encoder" % "1.0",
-  "com.typesafe.akka" %% "akka-slf4j" % akkaVersion
-)
+val loggingDependencies = Seq("com.typesafe.scala-logging" %% "scala-logging" % "3.9.2")
 
 val testingDependencies = Seq(
   "com.typesafe.akka" %% "akka-testkit" % "2.4.+" % Test,
