@@ -97,12 +97,10 @@ class Miner(dataHolder: ActorRef,
     case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
-      println(s"Miner -> Disable mining context.children.nonEmpty")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
     case DisableMining =>
-      println(s"Miner -> Disable mining")
       killAllWorkers()
       candidateOpt = None
       context.become(miningDisabled)
