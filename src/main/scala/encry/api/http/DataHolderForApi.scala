@@ -281,10 +281,11 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
           settings.constants
         )).pipeTo(sender())
 
-    case GetDataFromHistory    => history.foreach(sender() ! _)
-    case GetMinerStatus        => sender() ! minerStatus
-    case GetAllPeers           => sender() ! allPeers
-    case GetConnections        => sender() ! connectedPeersCollection
+    case GetDataFromHistory     => history.foreach(sender() ! _)
+    case FullBlockChainIsSynced => sender() ! true
+    case GetMinerStatus         => sender() ! minerStatus
+    case GetAllPeers            => sender() ! allPeers
+    case GetConnections         => sender() ! connectedPeersCollection
     case PeerBanHelper(peer, msg) =>
       context.system.eventStream.publish(BanPeerFromAPI(peer, InvalidNetworkMessage(msg)))
     case StartMinerApiMessage =>
@@ -341,6 +342,8 @@ object DataHolderForApi { //scalastyle:ignore
   final case class CreateAccountManagerFromSeedHelper(seed: String)
 
   case object GetNodePassHashAndSalt
+
+  case object FullBlockChainIsSynced
 
   case object GetViewPrintAddress
 

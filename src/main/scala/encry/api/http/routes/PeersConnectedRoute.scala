@@ -5,7 +5,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.GetConnections
+import encry.api.http.DataHolderForApi.{FullBlockChainIsSynced, GetConnections}
 import encry.api.http.ScriptHelper
 import encry.network.ConnectedPeersCollection
 import encry.settings.RESTApiSettings
@@ -16,14 +16,20 @@ import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.{Failure, Success}
 
-
 case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   implicit val context: ActorRefFactory
 ) extends EncryBaseApiRoute with StrictLogging {
 
   def connectedPeers: Future[ConnectedPeersCollection] = (dataHolder ? GetConnections).mapTo[ConnectedPeersCollection]
 
-  def peerScript(peersR: ConnectedPeersCollection): Text.TypedTag[String] = {
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? FullBlockChainIsSynced).mapTo[Boolean]
+
+  val info: Future[(ConnectedPeersCollection, Boolean)] = for {
+    peers <- connectedPeers
+    sync  <- syncIsDoneF
+  } yield (peers, sync)
+
+  def peerScript(peersR: ConnectedPeersCollection, sync: Boolean): Text.TypedTag[String] = {
 
     html(
       scalatags.Text.all.head(
@@ -109,11 +115,20 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                     i(cls := "ni ni-tv-2 text-primary"), "Info"
                   )
                 ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./webWallet",
-                    i(cls := "ni ni-planet text-blue"), "Wallet"
+                if (sync) {
+                  li(cls := "nav-item",
+                    a(tpe := "button", cls := "nav-link", disabled := "disabled",
+                      i(cls := "ni ni-planet text-blue"), "Wallet (n.a during sync)"
+                    )
                   )
-                ),
+                }
+                else {
+                  li(cls := "nav-item",
+                    a(cls := "nav-link", href := "./webWallet",
+                      i(cls := "ni ni-planet text-blue"), "Wallet"
+                    )
+                  )
+                },
                 div(cls := "dropdown",
                   a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
                     i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"
@@ -296,9 +311,9 @@ case class PeersConnectedRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   }
 
   override def route: Route = (path("connectedPeers") & get) {
-    onComplete(connectedPeers) {
-      case Success(info) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
-      case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection()).render))
+    onComplete(info) {
+      case Success(value) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(value._1, value._2).render))
+      case Failure(_) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(ConnectedPeersCollection(), false).render))
     }
   }
 
