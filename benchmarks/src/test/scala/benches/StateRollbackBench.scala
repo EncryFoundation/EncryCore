@@ -29,7 +29,7 @@ class StateRollbackBench {
         val newState = state.applyModifier(block).right.get
         newState -> (rootHashes :+ newState.version)
       }
-      val stateAfterRollback = newState._1.rollbackTo(newState._2.dropRight(1).last).get
+      val stateAfterRollback = newState._1.rollbackTo(newState._2.dropRight(1).last, List.empty).get
       val stateAfterForkBlockApplying = stateAfterRollback.applyModifier(stateBench.forkBlocks.last).right.get
       stateAfterForkBlockApplying.close()
     }
