@@ -61,8 +61,7 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
 
   def updateWallet(modifierId: ModifierId, newBxs: Seq[EncryBaseBox], spentBxs: Seq[EncryBaseBox],
                    intrinsicTokenId: ADKey): Unit = {
-    val bxsToInsert: Seq[EncryBaseBox] = newBxs.filter(bx => !spentBxs.contains(bx))
-    val boxesToInsert: (List[DataBox], List[TokenIssuingBox], List[AssetBox]) =
+    val (dataBoxes: List[DataBox], tokenIssuingBoxes: List[TokenIssuingBox], assetBoxes: List[AssetBox]) =
       newBxs.foldLeft(List.empty[DataBox], List.empty[TokenIssuingBox], List.empty[AssetBox]) {
         case ((dataBoxes, tokenIssuingBoxes, assetBoxes), nextBox: AssetBox) if !spentBxs.contains(nextBox) =>
           (dataBoxes, tokenIssuingBoxes, nextBox :: assetBoxes)
@@ -70,7 +69,8 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
           (dataBoxes, nextBox :: tokenIssuingBoxes, assetBoxes)
         case ((dataBoxes, tokenIssuingBoxes, assetBoxes), nextBox: DataBox) if !spentBxs.contains(nextBox) =>
           (nextBox :: dataBoxes, tokenIssuingBoxes, assetBoxes)
-        case ((dataBoxes, tokenIssuingBoxes, assetBoxes), nextBox) => (dataBoxes, tokenIssuingBoxes, assetBoxes)
+        case ((dataBoxes, tokenIssuingBoxes, assetBoxes), _) =>
+          (dataBoxes, tokenIssuingBoxes, assetBoxes)
     }
     val newBalances: Map[(String, String), Amount] = {
       val toRemoveFromBalance = BalanceCalculator.balanceSheet(spentBxs, intrinsicTokenId)
@@ -87,9 +87,9 @@ case class WalletVersionalLevelDB(db: DB, settings: LevelDBSettings) extends Str
     levelDb.insert(
       LevelDbDiff(
         LevelDBVersion @@ modifierId.untag(ModifierId),
-        newBalanceKeyValue :: bxsToInsert.map((bx: EncryBaseBox) =>
+        newBalanceKeyValue :: (dataBoxes ::: tokenIssuingBoxes ::: assetBoxes).map(bx =>
           (VersionalLevelDbKey @@ bx.id.untag(ADKey), VersionalLevelDbValue @@ bx.bytes)
-        ).toList,
+        ),
         spentBxs.map(elem => VersionalLevelDbKey @@ elem.id.untag(ADKey))
       )
     )
