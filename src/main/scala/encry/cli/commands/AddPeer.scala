@@ -1,17 +1,12 @@
 package encry.cli.commands
 
 import java.net.InetSocketAddress
-
 import encry.api.http.DataHolderForApi.UserAddPeer
 import akka.actor.ActorRef
-
-import scala.concurrent.ExecutionContext.Implicits.global
 import encry.cli.{Ast, Response}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-
 import scala.concurrent.Future
-import scala.util.Try
 
 /**
  * Command "peer addPeer -host=<addr[String]> -port=<addr[String]>"

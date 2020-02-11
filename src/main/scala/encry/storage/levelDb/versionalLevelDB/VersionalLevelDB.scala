@@ -421,7 +421,7 @@ object VersionalLevelDBCompanion {
   val VERSIONS_LIST: VersionalLevelDbKey =
     VersionalLevelDbKey @@ (SERVICE_PREFIX +: Algos.hash("VERSIONS"))
 
-  val DELETION_PREFIX = Algos.hash("DELETION_SET")
+  val DELETION_PREFIX = Algos.hash("DELETION_SET").take(1)
 
   /**
     * Initial keys

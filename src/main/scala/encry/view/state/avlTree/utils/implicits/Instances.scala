@@ -55,6 +55,10 @@ object Instances {
     override def hash(value: StorageKey): Array[Byte] = Algos.hash(value)
   }
 
+  implicit val storValuehash: Hashable[StorageValue] = new Hashable[StorageValue] {
+    override def hash(value: StorageValue): Array[Byte] = Algos.hash(value)
+  }
+
   implicit val storKeyMonoid: Monoid[StorageKey] = new Monoid[StorageKey] {
     override def empty: StorageKey = StorageKey @@ Array.emptyByteArray
 
