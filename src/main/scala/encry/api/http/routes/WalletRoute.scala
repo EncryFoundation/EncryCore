@@ -426,9 +426,9 @@ case class WalletRoute(settings: RESTApiSettings,
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
                                           for {
-                                            coinI <- balances.toList
+                                            walletMap <- balances.toList
                                           } yield {
-                                            option(value := coinI._1._2.toString, if (Algos.encode(coinI._1._2) == EttTokenId) s"ETT (${coinI._2/100000000})" else "something else")
+                                            option(value := walletMap._1._2.toString, if (Algos.encode(walletMap._1._2) == EttTokenId) s"ETT (${walletMap._2/100000000})" else Algos.encode(walletMap._1._2))
                                           }
                                         )
                                       ),

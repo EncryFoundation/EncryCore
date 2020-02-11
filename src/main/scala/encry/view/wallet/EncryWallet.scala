@@ -93,7 +93,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
-  def getBalances: Seq[((PublicKey, TokenId), Amount)] = {
+  def getBalances: List[((PublicKey, TokenId), Amount)] = {
     val pubKeys: Set[PublicKey25519] = publicKeys
     val contractHashToKey: Map[ByteStr, PublicKey] = pubKeysToContractHashes(pubKeys)
     val positiveBalance: Map[(PublicKey, TokenId), Amount] = walletStorage.getBalances.map {
@@ -101,7 +101,7 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
     }
     (pubKeys.map(k => ByteStr(k.pubKeyBytes)) -- positiveBalance.keys.map(l => ByteStr(l._1)))
       .map(l => (PublicKey @@ l.arr) -> settings.constants.IntrinsicTokenId -> 0L).toSeq ++ positiveBalance
-    }.sortBy(l => !(l._1._1 sameElements accountManagers.head.publicAccounts.head.pubKeyBytes))
+    }.sortBy(l => !(l._1._1 sameElements accountManagers.head.publicAccounts.head.pubKeyBytes)).toList
 
   def pubKeysToContractHashes(pubKeys: Set[PublicKey25519]): Map[ByteStr, PublicKey] = pubKeys
     .map(key => ByteStr(EncryProposition.addressLocked(key.address.address).contractHash) -> key.pubKeyBytes)

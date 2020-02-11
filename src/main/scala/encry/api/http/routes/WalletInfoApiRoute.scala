@@ -58,11 +58,26 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, i
       GetDataFromCurrentView[History, UtxoState, EncryWallet, EncryWallet](_.vault))
       .mapTo[EncryWallet]
 
+  private def loopBoxes(input: List[EncryBaseBox],
+                acc: List[AssetBox],
+                totalAmount: Long,
+                requiredAmount: Long): List[AssetBox] =
+    input.headOption match {
+      case Some(value: AssetBox) =>
+        val newAmount = totalAmount + value.amount
+        if (requiredAmount > newAmount) {
+          loopBoxes(input.drop(1), value :: acc, newAmount, requiredAmount)
+        } else value :: acc
+      case Some(_) =>
+        loopBoxes(input.drop(1), acc, totalAmount, requiredAmount)
+      case None => acc
+    }
+
   def infoR: Route = (path("info") & get) {
     getWallet.map { w =>
       Map(
         "balances" -> w.getBalances.map { i =>
-          if (i._1._2 != intrinsicTokenId)
+          if (Algos.encode(i._1._2) != intrinsicTokenId)
             s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${i._2}"
           else
             s"TokenID(${i._1._2}) for contractHash ${i._1._1} : ${BigDecimal(i._2) / 100000000}"
@@ -85,20 +100,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, i
         Try {
           val actualFee: Long         = fee * 100000000
           val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
-          def loopBoxes(input: List[EncryBaseBox],
-                        acc: List[AssetBox],
-                        totalAmount: Long,
-                        requiredAmount: Long): List[AssetBox] =
-            input.headOption match {
-              case Some(value: AssetBox) =>
-                val newAmount = totalAmount + value.amount
-                if (requiredAmount > newAmount) {
-                  loopBoxes(input.drop(1), value :: acc, newAmount, requiredAmount)
-                } else value :: acc
-              case Some(_) =>
-                loopBoxes(input.drop(1), acc, totalAmount, requiredAmount)
-              case None => acc
-            }
           val boxes = loopBoxes(wallet.vault.walletStorage.getAllBoxes().toList, List.empty[AssetBox], 0L, actualFee)
           TransactionFactory.assetIssuingTransactionScratch(
             secret,
@@ -125,20 +126,6 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, i
         Try {
           val secret: PrivateKey25519 = wallet.vault.accountManagers.head.mandatoryAccount
           val actualFee: Long         = fee * 100000000
-          def loopBoxes(input: List[EncryBaseBox],
-                        acc: List[AssetBox],
-                        totalAmount: Long,
-                        requiredAmount: Long): List[AssetBox] =
-            input.headOption match {
-              case Some(value: AssetBox) =>
-                val newAmount = totalAmount + value.amount
-                if (requiredAmount > newAmount) {
-                  loopBoxes(input.drop(1), value :: acc, newAmount, requiredAmount)
-                } else value :: acc
-              case Some(_) =>
-                loopBoxes(input.drop(1), acc, totalAmount, requiredAmount)
-              case None => acc
-            }
           val boxes = loopBoxes(wallet.vault.walletStorage.getAllBoxes().toList, List.empty[AssetBox], 0L, actualFee)
           TransactionFactory.dataTransactionScratch(
             secret,
@@ -173,32 +160,36 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, i
                 case Failure(e)     => throw new RuntimeException(s"Failed to decode tokeId $s. Cause: $e")
             }
           )
-          def loopBoxes(input: List[EncryBaseBox],
-                        acc: List[AssetBox],
-                        totalAmount: Long,
-                        requiredAmount: Long): List[AssetBox] =
-            input.headOption match {
-              case Some(value: AssetBox) =>
-                val newAmount = totalAmount + value.amount
-                if (requiredAmount > newAmount) {
-                  loopBoxes(input.drop(1), value :: acc, newAmount, requiredAmount)
-                } else value :: acc
-              case Some(_) =>
-                loopBoxes(input.drop(1), acc, totalAmount, requiredAmount)
-              case None => acc
-            }
-
-          val boxes = loopBoxes(wallet.vault.walletStorage.getAllBoxes().toList,
-                                List.empty[AssetBox],
-                                0L,
-                                actualAmount + actualFee)
-          TransactionFactory.defaultPaymentTransaction(secret,
-                                                       fee,
-                                                       System.currentTimeMillis(),
-                                                       boxes.map(_ -> None),
-                                                       addr,
-                                                       actualAmount,
-                                                       decodedTokenOpt)
+          val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
+            .getAllBoxes()
+            .collect {
+              case ab: AssetBox if ab.tokenIdOpt.isEmpty || ab.tokenIdOpt === decodedTokenOpt => ab
+              case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
+            }.foldLeft(List.empty[MonetaryBox]) {
+            case (seq, box) if decodedTokenOpt.isEmpty && seq.map(_.amount).sum < (actualAmount + actualFee) => seq :+ box
+            case (seq, _) if decodedTokenOpt.isEmpty => seq
+            case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
+              if (seq.collect { case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < actualFee) seq :+ box else seq
+            case (seq, box: AssetBox) =>
+              val totalAmount =
+                seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
+                  seq.collect { case tib: TokenIssuingBox => tib.amount }.sum
+              if (totalAmount < actualAmount) seq :+ box else seq
+            case (seq, box: TokenIssuingBox) =>
+              val totalAmount =
+                seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
+                  seq.collect { case tib: TokenIssuingBox => tib.amount }.sum
+              if (totalAmount < actualAmount) seq :+ box else seq
+          }.toIndexedSeq
+          TransactionFactory.defaultPaymentTransaction(
+            secret,
+            actualFee,
+            System.currentTimeMillis(),
+            boxes.map(_ -> None),
+            addr,
+            actualAmount,
+            decodedTokenOpt
+          )
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>
@@ -222,34 +213,38 @@ case class WalletInfoApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, i
                 case Failure(_)     => throw new RuntimeException(s"Failed to decode tokeId $s")
             }
           )
-          def loopBoxes(input: List[EncryBaseBox],
-                        acc: List[AssetBox],
-                        totalAmount: Long,
-                        requiredAmount: Long): List[AssetBox] =
-            input.headOption match {
-              case Some(value: AssetBox) =>
-                val newAmount = totalAmount + value.amount
-                if (requiredAmount > newAmount) {
-                  loopBoxes(input.drop(1), value :: acc, newAmount, requiredAmount)
-                } else value :: acc
-              case Some(_) =>
-                loopBoxes(input.drop(1), acc, totalAmount, requiredAmount)
-              case None => acc
-            }
           val actualFee    = fee * 100000000
           val actualAmount = amount * 100000000
-          val boxes = loopBoxes(wallet.vault.walletStorage.getAllBoxes().toList,
-                                List.empty[AssetBox],
-                                0L,
-                                actualAmount + actualFee)
-
-          TransactionFactory.defaultContractTransaction(secret,
-                                                        fee,
-                                                        System.currentTimeMillis(),
-                                                        boxes.map(_ -> None),
-                                                        contract,
-                                                        amount,
-                                                        decodedTokenOpt)
+          val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
+            .getAllBoxes()
+            .collect {
+              case ab: AssetBox if ab.tokenIdOpt.isEmpty || ab.tokenIdOpt === decodedTokenOpt => ab
+              case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
+            }.foldLeft(List.empty[MonetaryBox]) {
+            case (seq, box) if decodedTokenOpt.isEmpty =>
+              if (seq.map(_.amount).sum < (actualAmount + actualFee)) seq :+ box else seq
+            case (seq, box: AssetBox) if box.tokenIdOpt.isEmpty =>
+              if (seq.collect { case ab: AssetBox if ab.tokenIdOpt.isEmpty => ab.amount }.sum < actualFee) seq :+ box else seq
+            case (seq, box: AssetBox) =>
+              val totalAmount =
+                seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
+                  seq.collect { case tib: TokenIssuingBox => tib.amount }.sum
+              if (totalAmount < actualAmount) seq :+ box else seq
+            case (seq, box: TokenIssuingBox) =>
+              val totalAmount =
+                seq.collect { case ab: AssetBox if ab.tokenIdOpt.nonEmpty => ab.amount }.sum +
+                  seq.collect { case tib: TokenIssuingBox => tib.amount }.sum
+              if (totalAmount < actualAmount) seq :+ box else seq
+          }.toIndexedSeq
+          TransactionFactory.defaultContractTransaction(
+            secret,
+            actualFee,
+            System.currentTimeMillis(),
+            boxes.map(_ -> None),
+            contract,
+            actualAmount,
+            decodedTokenOpt
+          )
         }.toOption
       }).flatMap {
         case Some(tx: Transaction) =>

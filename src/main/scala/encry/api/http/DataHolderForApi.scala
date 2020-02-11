@@ -201,10 +201,8 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[(PublicKey, TokenId), Amount]] { view =>
-        val balance: Map[(PublicKey, TokenId), Amount] = view.vault.getBalances.toMap
-        if (balance.isEmpty) Map.empty[(PublicKey, TokenId), Amount] else balance
-      }).pipeTo(sender)
+      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[(PublicKey, TokenId), Amount]]
+        (_.vault.getBalances.toMap)).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
       (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, String] { view =>
