@@ -209,7 +209,10 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       .getOrElse(tx.asRight[ValidationResult])
 
 
-  def close(): Unit = tree.close()
+  def close(): Unit = {
+    logger.info("Close state!")
+    tree.close()
+  }
 }
 
 object UtxoState extends StrictLogging {

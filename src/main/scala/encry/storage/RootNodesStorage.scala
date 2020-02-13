@@ -14,7 +14,7 @@ import org.iq80.leveldb.{ DB, ReadOptions }
 import scorex.utils.Random
 import scala.util.Try
 
-trait RootNodesStorage[K, V] {
+trait RootNodesStorage[K, V] extends AutoCloseable {
 
   def safePointHeight: Height
 
@@ -104,6 +104,8 @@ object RootNodesStorage {
         insertionInfo: List[(Height, (List[(K, V)], List[K]))]
       ): (RootNodesStorage[K, V], Node[K, V]) =
         this -> EmptyNode[K, V]()
+
+      override def close(): Unit = ()
     }
 
   def blocks2InsInfo[K, V](blocks: List[Block])

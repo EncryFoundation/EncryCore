@@ -400,7 +400,11 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     }
   }.selfInspection
 
-  override def close(): Unit = avlStorage.close()
+  override def close(): Unit = {
+    logger.info("Close Tree!")
+    avlStorage.close()
+    rootNodesStorage.close()
+  }
 
   override def toString: String = rootNode.toString
 }

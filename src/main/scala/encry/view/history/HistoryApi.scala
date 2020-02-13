@@ -212,9 +212,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     lastSyncInfo = SyncInfo(getBestHeader.map { header: Header =>
       logger.info(s"Best header for sync info is: ${header}")
       ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
-        val res = headerIdsAtHeight(height).headOption
-        logger.info(s"Best header at height $height is $res")
-        res
+        headerIdsAtHeight(height).headOption
       }.toList
     }.getOrElse(List.empty))
 

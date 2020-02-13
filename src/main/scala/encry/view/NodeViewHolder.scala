@@ -1,7 +1,6 @@
 package encry.view
 
 import java.io.File
-
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -36,7 +35,6 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -428,6 +426,8 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         UtxoState.create(stateDir, rootsDir, encrySettings, influxRef), history, influxRef
       )
       history.updateIdsForSyncInfo()
+      logger.info(s"History best block height: ${history.getBestBlockHeight}")
+      logger.info(s"History best header height: ${history.getBestHeaderHeight}")
       Some(NodeView(history, state, wallet))
     } catch {
       case ex: Throwable =>
@@ -461,20 +461,29 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
       case (_, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
+        logger.info(s"History best header height during restore: ${history.getBestHeaderHeight}")
+        logger.info(s"History best block height during restore: ${history.getBestBlockHeight}")
         val headerAtSafePointHeight = history.getBestHeaderAtHeight(safePointHeight)
         val (rollbackId, newChain) = history.getChainToHeader(headerAtSafePointHeight, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
-        val branchPointHeight = history.getHeaderById(ModifierId !@@ rollbackId.get).get.height
-        val additionalBlocks = (state.safePointHeight to branchPointHeight).foldLeft(List.empty[Block]){
+        val additionalBlocks = (state.safePointHeight to historyBestBlock.header.height).foldLeft(List.empty[Block]){
           case (blocks, height) =>
             val headerAtHeight = history.getBestHeaderAtHeight(height).get
             val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
             blocks :+ blockAtHeight
         }
+        logger.info(s"Qty of additional blocks: ${additionalBlocks.length}")
         rollbackId.map(_ => state.restore(additionalBlocks).get)
           .getOrElse(getRecreatedState(influxRef = influxRefActor))
+//        val toApply = newChain.headers.map { h =>
+//          history.getBlockByHeader(h) match {
+//            case Some(fb) => fb
+//            case None => throw new Exception(s"Failed to get full block for header $h")
+//          }
+//        }
+//        toApply.foldLeft(startState) { (s, m) => s.applyValidModifier(m) }
     }
 
   override def close(): Unit = {
