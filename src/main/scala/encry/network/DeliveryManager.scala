@@ -174,6 +174,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (typeId != Transaction.modifierTypeId) influxRef
           .foreach(ref => (0 to filteredModifiers.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
         //todo check this logic
+        logger.info(s"Type of mod: ${typeId}. canProcessTransactions: ${canProcessTransactions}")
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
 
@@ -186,10 +187,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
-    case PeersForSyncInfo(peers) =>
-      logger.info(s"History: ${history.getBestHeaderHeight}")
-      logger.info(s"Sync info: ${history.syncInfo}")
-      sendSync(history.syncInfo, peers)
+    case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
 
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining, checkModScheduler))
 
