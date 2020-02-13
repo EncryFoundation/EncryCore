@@ -4,18 +4,18 @@ import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.view.fast.sync.SnapshotHolder.SnapshotChunk
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree.Direction
 import encry.view.state.avlTree.AvlTree.Directions.{EMPTY, LEFT, RIGHT}
 import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
+
 import scala.util.Try
 
 final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
@@ -46,18 +46,18 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         deleteKey(toDeleteKey, prevRoot)
     }
     val avlDeleteTime = System.nanoTime() - deleteStartTime
-    logger.info(s"avlDeleteTime: ${avlDeleteTime/1000000L} ms")
+    logger.debug(s"avlDeleteTime: ${avlDeleteTime/1000000L} ms")
     val insertStartTime = System.nanoTime()
     val newRoot = toInsert.foldLeft(rootAfterDelete) {
       case (prevRoot, (keyToInsert, valueToInsert)) =>
         insert(keyToInsert, valueToInsert, prevRoot)
     }
     val insertTime = System.nanoTime() - insertStartTime
-    logger.info(s"avlInsertTime: ${insertTime/1000000L} ms")
+    logger.debug(s"avlInsertTime: ${insertTime/1000000L} ms")
     val startPackingTime = System.nanoTime()
-    logger.info(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
+    logger.debug(s"Packing time: ${(System.nanoTime() - startPackingTime)/1000000} ms")
     val startInsertTime = System.nanoTime()
-    logger.info(s"Insert in avl version ${Algos.encode(version)}")
+    logger.debug(s"Insert in avl version ${Algos.encode(version)}")
     avlStorage.insert(
       version,
       toInsert.map {
@@ -70,7 +70,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
         StorageKey @@ AvlTree.elementKey(kSer.toBytes(key))
       )
     )
-    logger.info(s"Insertion time: ${(System.nanoTime() - startInsertTime)/1000000L} ms")
+    logger.debug(s"Insertion time: ${(System.nanoTime() - startInsertTime)/1000000L} ms")
     val newRootNodesStorage = if (saveRootNodesFlag || saveRootNodes) rootNodesStorage.insert(
       version,
       newRoot,
@@ -201,9 +201,17 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
 //      val newRootNode =
 //        NodeSerilalizer.fromBytes[K, V](avlStorage.get(StorageKey !@@ AvlTree.nodeKey(avlStorage.get(AvlTree.rootNodeKey).get)).get)
       val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
-      logger.info(s"root node after rollback: ${newRoot}")
+      logger.info(s"root node hash after rollback: ${Algos.encode(newRoot.hash)}")
       AvlTree[K, V](newRoot, avlStorage, newStorage)
     }
+
+  def restore(additionalBlocks: List[Block])
+             (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
+  Try {
+    val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
+    logger.info(s"root node hash after restore: ${Algos.encode(newRoot.hash)}")
+    AvlTree[K, V](newRoot, avlStorage, newStorage)
+  }
 
   private def getRightPath(node: Node[K, V]): List[Node[K, V]] = node match {
     case shadowNode: ShadowNode[K, V] =>
@@ -392,7 +400,10 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
     }
   }.selfInspection
 
-  override def close(): Unit = avlStorage.close()
+  override def close(): Unit = {
+    avlStorage.close()
+    rootNodesStorage.close()
+  }
 
   override def toString: String = rootNode.toString
 }

@@ -14,7 +14,7 @@ import org.iq80.leveldb.{ DB, ReadOptions }
 import scorex.utils.Random
 import scala.util.Try
 
-trait RootNodesStorage[K, V] {
+trait RootNodesStorage[K, V] extends AutoCloseable {
 
   def safePointHeight: Height
 
@@ -29,7 +29,7 @@ object RootNodesStorage {
   def apply[K: Serializer: Monoid: Hashable: Order,
             V: Serializer: Monoid: Hashable](storage: DB,
                                              rollbackDepth: Int,
-                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] {
+                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] with AutoCloseable {
 
     private def atHeightKey(height: Height): Array[Byte] = Ints.toByteArray(height)
 
@@ -43,12 +43,12 @@ object RootNodesStorage {
         val batch       = storage.createWriteBatch()
         val readOptions = new ReadOptions()
         readOptions.snapshot(storage.getSnapshot)
-        val fileToAdd = new File(rootsPath.getAbsolutePath ++ s"$height")
+        val fileToAdd = new File(rootsPath.getAbsolutePath ++ s"/$height")
         val bos       = new BufferedOutputStream(new FileOutputStream(fileToAdd))
         try {
           val newSafePointHeight     = Math.max(0, height - rollbackDepth)
           val newSafePointSerialized = Ints.toByteArray(newSafePointHeight)
-          val fileToDelete           = new File(rootsPath.getAbsolutePath ++ s"${newSafePointHeight - rollbackDepth}")
+          val fileToDelete           = new File(rootsPath.getAbsolutePath ++ s"/${newSafePointHeight - rollbackDepth}")
           if (fileToDelete.exists()) fileToDelete.delete()
           batch.put(safePointKey, newSafePointSerialized)
           bos.write(NodeSerilalizer.toBytes(rootNode))
@@ -67,7 +67,7 @@ object RootNodesStorage {
       val currentSafePoint = safePointHeight
       try {
         readOptions.snapshot(storage.getSnapshot)
-        val rootNodeFile                 = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"$currentSafePoint"))
+        val rootNodeFile                 = Files.readAllBytes(Paths.get(rootsPath.getAbsolutePath ++ s"/$currentSafePoint"))
         val restoredRootNode: Node[K, V] = NodeSerilalizer.fromBytes(rootNodeFile)
         val avlTree                      = new AvlTree[K, V](restoredRootNode, EmptyVersionalStorage(), emptyRootStorage)
         val newRootNode = insertionInfo
@@ -90,6 +90,8 @@ object RootNodesStorage {
         readOptions.snapshot().close()
       }
     }
+
+    override def close(): Unit = storage.close()
   }
 
   def emptyRootStorage[K: Serializer: Monoid, V: Serializer: Monoid]: RootNodesStorage[K, V] =
@@ -102,6 +104,8 @@ object RootNodesStorage {
         insertionInfo: List[(Height, (List[(K, V)], List[K]))]
       ): (RootNodesStorage[K, V], Node[K, V]) =
         this -> EmptyNode[K, V]()
+
+      override def close(): Unit = ()
     }
 
   def blocks2InsInfo[K, V](blocks: List[Block])
