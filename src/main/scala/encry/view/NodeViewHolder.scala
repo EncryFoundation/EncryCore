@@ -477,13 +477,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.info(s"Qty of additional blocks: ${additionalBlocks.length}")
         rollbackId.map(_ => state.restore(additionalBlocks).get)
           .getOrElse(getRecreatedState(influxRef = influxRefActor))
-//        val toApply = newChain.headers.map { h =>
-//          history.getBlockByHeader(h) match {
-//            case Some(fb) => fb
-//            case None => throw new Exception(s"Failed to get full block for header $h")
-//          }
-//        }
-//        toApply.foldLeft(startState) { (s, m) => s.applyValidModifier(m) }
     }
 
   override def close(): Unit = {
