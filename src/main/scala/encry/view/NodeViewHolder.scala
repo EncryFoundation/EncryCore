@@ -56,6 +56,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
 
   dataHolder ! UpdatedHistory(nodeView.history)
   dataHolder ! ChangedState(nodeView.state)
+  dataHolder ! DataHolderForApi.BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
 
   influxRef.foreach(ref => context.system.scheduler.schedule(5.second, 5.second) {
     logger.info(s"send info. about ${nodeView.history.getBestHeaderHeight} | ${nodeView.history.getBestBlockHeight} | " +
