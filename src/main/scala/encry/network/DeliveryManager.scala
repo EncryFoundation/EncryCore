@@ -186,7 +186,10 @@ class DeliveryManager(influxRef: Option[ActorRef],
           s"${previousModifier.map(Algos.encode)}")
       requestDownload(modifierTypeId, Seq(modifiersId), history, isBlockChainSynced, isMining)
 
-    case PeersForSyncInfo(peers) => sendSync(history.syncInfo, peers)
+    case PeersForSyncInfo(peers) =>
+      logger.info(s"History: ${history.getBestHeaderHeight}")
+      logger.info(s"Sync info: ${history.syncInfo}")
+      sendSync(history.syncInfo, peers)
 
     case FullBlockChainIsSynced => context.become(basicMessageHandler(history, isBlockChainSynced = true, isMining, checkModScheduler))
 
