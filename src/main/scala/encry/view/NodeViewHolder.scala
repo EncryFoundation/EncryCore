@@ -461,8 +461,6 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
           s" History is empty on startup, rollback state to genesis.")
         getRecreatedState(influxRef = influxRefActor)
       case (_, Some(historyBestBlock), state: UtxoState, safePointHeight) =>
-        logger.info(s"History best header height during restore: ${history.getBestHeaderHeight}")
-        logger.info(s"History best block height during restore: ${history.getBestBlockHeight}")
         val headerAtSafePointHeight = history.getBestHeaderAtHeight(safePointHeight)
         val (rollbackId, newChain) = history.getChainToHeader(headerAtSafePointHeight, historyBestBlock.header)
         logger.info(s"State and history are inconsistent." +
