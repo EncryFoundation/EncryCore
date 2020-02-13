@@ -174,7 +174,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (typeId != Transaction.modifierTypeId) influxRef
           .foreach(ref => (0 to filteredModifiers.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
         //todo check this logic
-        logger.info(s"Type of mod: ${typeId}. canProcessTransactions: ${canProcessTransactions}")
+        logger.debug(s"Type of mod: ${typeId}. canProcessTransactions: ${canProcessTransactions}")
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
 
