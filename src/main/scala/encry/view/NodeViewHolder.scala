@@ -427,6 +427,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
       val state: UtxoState = restoreConsistentState(
         UtxoState.create(stateDir, rootsDir, encrySettings, influxRef), history, influxRef
       )
+      history.updateIdsForSyncInfo()
       Some(NodeView(history, state, wallet))
     } catch {
       case ex: Throwable =>
