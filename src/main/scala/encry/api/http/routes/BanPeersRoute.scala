@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.GetBannedPeersHelper
+import encry.api.http.DataHolderForApi.{GetBannedPeersHelper, GetBlockChainSync}
 import encry.api.http.ScriptHelper
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.settings.RESTApiSettings
@@ -24,7 +24,14 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
   def peersAllF: Future[Seq[(InetAddress, (BanReason, BanTime, BanType))]] =
     (dataHolder ? GetBannedPeersHelper).mapTo[Seq[(InetAddress, (BanReason, BanTime, BanType))]]
 
-  def peerScript(peers: Seq[(InetAddress, (BanReason, BanTime, BanType))] ): Text.TypedTag[String] = {
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
+
+  def info: Future[(Seq[(InetAddress, (BanReason, BanTime, BanType))], Boolean)] = for {
+    peers <- peersAllF
+    sync <- syncIsDoneF
+  } yield (peers, sync)
+
+  def peerScript(peers: Seq[(InetAddress, (BanReason, BanTime, BanType))], sync: Boolean): Text.TypedTag[String] = {
 
     html(
       scalatags.Text.all.head(
@@ -112,11 +119,20 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
                     i(cls := "ni ni-tv-2 text-primary"), "Info"
                   )
                 ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./webWallet",
-                    i(cls := "ni ni-planet text-blue"), "Wallet"
+                if (sync) {
+                  li(cls := "nav-item",
+                    a(tpe := "button", cls := "nav-link", disabled := "disabled",
+                      i(cls := "ni ni-planet text-blue"), "Wallet (n.a during sync)"
+                    )
                   )
-                ),
+                }
+                else {
+                  li(cls := "nav-item",
+                    a(cls := "nav-link", href := "./webWallet",
+                      i(cls := "ni ni-planet text-blue"), "Wallet"
+                    )
+                  )
+                },
                 div(cls := "dropdown",
                   a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
                     i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"
@@ -294,9 +310,9 @@ case class BanPeersRoute(settings: RESTApiSettings, dataHolder: ActorRef)(
 
   override def route: Route = (path("bannedPeers") & get) {
     WebRoute.authRoute(
-      onComplete(peersAllF) {
-        case Success(info) =>
-          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+      onComplete(info) {
+        case Success((peers, isSynced)) =>
+          complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(peers, isSynced).render))
         case Failure(_) =>
           complete(s"Couldn't load page with banned peers cause inner system is overloaded. Try it later!")
       },

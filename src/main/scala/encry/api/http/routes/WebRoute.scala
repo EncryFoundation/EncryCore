@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity, StatusCodes}
 import akka.http.scaladsl.server.{Route, ValidationRejection}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetMinerStatus, GetNodePassHashAndSalt}
+import encry.api.http.DataHolderForApi.{GetAllInfoHelper, GetBlockChainSync, GetMinerStatus, GetNodePassHashAndSalt}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
@@ -47,6 +47,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def getPass: Future[String => Boolean] =
     (dataHolder ? GetNodePassHashAndSalt).mapTo[String => Boolean]
+
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
 
   def signUp: Text.TypedTag[String] = html(
     scalatags.Text.all.head(
@@ -178,8 +180,8 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
     path("web") {
         WebRoute.authRoute(
           onComplete(currentInfoF) {
-            case Success(info) =>
-              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(info._1, info._2).render))
+            case Success((nodeInfo, minerStatus, isSynced)) =>
+              complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, webResponse(nodeInfo, minerStatus, isSynced).render))
             case Failure(exception) => complete(exception)
           }, settings)
     }
@@ -189,12 +191,13 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
 
   def infoHelper: Future[Json] = (dataHolder ? GetAllInfoHelper).mapTo[Json]
 
-  def currentInfoF: Future[(Json, MinerStatus)] = for {
+  def currentInfoF: Future[(Json, MinerStatus, Boolean)] = for {
     info <- infoHelper
     status <- statusF
-  } yield (info, status)
+    sync   <- syncIsDoneF
+  } yield (info, status, sync)
 
-  def webResponse(json: Json, minerStatus: MinerStatus): Text.TypedTag[String] = {
+  def webResponse(json: Json, minerStatus: MinerStatus, sync: Boolean): Text.TypedTag[String] = {
     val nodeInfo = parser.decode[InfoApi](json.toString())
 
     html(
@@ -282,11 +285,20 @@ case class WebRoute(override val settings: RESTApiSettings, nodeSettings: NodeSe
                     i(cls := "ni ni-tv-2 text-primary"), "Info"
                   )
                 ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./webWallet",
-                    i(cls := "ni ni-planet text-blue"), "Wallet"
+                if (sync) {
+                  li(cls := "nav-item",
+                    a(tpe := "button", cls := "nav-link", disabled := "disabled",
+                      i(cls := "ni ni-planet text-blue"), "Wallet (n.a during sync)"
+                    )
                   )
-                ),
+                }
+                else {
+                  li(cls := "nav-item",
+                    a(cls := "nav-link", href := "./webWallet",
+                      i(cls := "ni ni-planet text-blue"), "Wallet"
+                    )
+                  )
+                },
                 div(cls := "dropdown",
                   a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
                     i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"

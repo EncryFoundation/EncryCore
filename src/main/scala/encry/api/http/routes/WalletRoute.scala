@@ -826,8 +826,8 @@ case class WalletRoute(settings: RESTApiSettings,
   override def route: Route = path("webWallet") {
       WebRoute.authRoute(
         onComplete(info) {
-          case Success(info) =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(info._1).render))
+          case Success((balance, _)) =>
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, walletScript(balance).render))
         }, settings
       )
   }

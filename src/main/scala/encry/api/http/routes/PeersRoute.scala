@@ -6,7 +6,7 @@ import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Route
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.GetAllPeers
+import encry.api.http.DataHolderForApi.{GetAllPeers, GetBlockChainSync}
 import encry.settings.{NodeSettings, RESTApiSettings}
 import io.circe.generic.auto._
 import scalatags.Text
@@ -21,7 +21,14 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
 
   def peersAllF: Future[Seq[InetSocketAddress]] = (dataHolder ? GetAllPeers).mapTo[Seq[InetSocketAddress]]
 
-  def peerScript(peers: Seq[InetSocketAddress] ): Text.TypedTag[String] = {
+  def syncIsDoneF: Future[Boolean] = (dataHolder ? GetBlockChainSync).mapTo[Boolean]
+
+  def info: Future[(Seq[InetSocketAddress], Boolean)] = for {
+    peers <- peersAllF
+    sync <- syncIsDoneF
+  } yield (peers, sync)
+
+  def peerScript(peers: Seq[InetSocketAddress], sync: Boolean): Text.TypedTag[String] = {
 
     html(
       scalatags.Text.all.head(
@@ -82,11 +89,20 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
                     i(cls := "ni ni-tv-2 text-primary"), "Info"
                   )
                 ),
-                li(cls := "nav-item",
-                  a(cls := "nav-link", href := "./webWallet",
-                    i(cls := "ni ni-planet text-blue"), "Wallet"
+                if (sync) {
+                  li(cls := "nav-item",
+                    a(tpe := "button", cls := "nav-link", disabled := "disabled",
+                      i(cls := "ni ni-planet text-blue"), "Wallet (n.a during sync)"
+                    )
                   )
-                ),
+                }
+                else {
+                  li(cls := "nav-item",
+                    a(cls := "nav-link", href := "./webWallet",
+                      i(cls := "ni ni-planet text-blue"), "Wallet"
+                    )
+                  )
+                },
                 div(cls := "dropdown",
                   a(cls := "nav-link", href := "#", role := "button", data("toggle") := "dropdown", aria.haspopup := "true", aria.expanded := "false",
                     i(cls := "ni ni-bullet-list-67 text-orange"), "Peers"
@@ -203,9 +219,9 @@ case class PeersRoute(settings: RESTApiSettings, nodeSettings: NodeSettings, dat
 
   override def route: Route = (path("allPeers") & get) {
     WebRoute.authRoute(
-        onComplete(peersAllF) {
-          case Success(info) =>
-            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(info).render))
+        onComplete(info) {
+          case Success((peers, isSynced)) =>
+            complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, peerScript(peers, isSynced).render))
           case Failure(_) => complete("Couldn't load page with peers cause of inner system is overloaded. Try it later!")
         },
       settings
