@@ -1,6 +1,5 @@
 package encry.view.wallet
 
-import cats.instances.list._
 import cats.instances.long._
 import cats.instances.map._
 import cats.instances.set._
@@ -13,7 +12,7 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{
   VersionalLevelDbKey,
   VersionalLevelDbValue
 }
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB, VersionalLevelDBCompanion }
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB }
 import encry.utils.BalanceCalculator
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
@@ -21,7 +20,6 @@ import org.encryfoundation.common.modifiers.state.box.{ AssetBox, DataBox, Encry
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import supertagged.@@
 
 class WalletDBImpl private (
   levelDb: VersionalLevelDB,
@@ -83,7 +81,7 @@ class WalletDBImpl private (
         BalanceCalculator.balanceSheet1(spentBxs, intrinsicTokenId).map {
           case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
             Algos.encode(hash) -> idToAmount.map {
-              case (id: TokenId, amount: Amount) => Algos.encode(id) -> amount
+              case (id: TokenId, amount: Amount) => Algos.encode(id) -> (-1 * amount)
             }
         }
       val currentBalances: Map[String, Map[String, Amount]] =
