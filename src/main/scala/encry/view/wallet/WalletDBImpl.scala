@@ -69,32 +69,47 @@ class WalletDBImpl private (
     intrinsicTokenId: ADKey
   ): Unit = {
     val boxesToInsert = newBxs.filterNot(spentBxs.contains)
-    val newBalances: Map[ContractHash, Map[TokenId, Amount]] = {
-      val toAdd = BalanceCalculator.balanceSheet1(newBxs, intrinsicTokenId).map {
-        case (hash, idToAmount) =>
-          Algos.encode(hash) -> idToAmount.map {
-            case (id, amount) => Algos.encode(id) -> amount
-          }
-      }
-      val toRemove = BalanceCalculator.balanceSheet1(spentBxs, intrinsicTokenId).map {
-        case (hash, idToAmount) =>
-          Algos.encode(hash) -> idToAmount.map {
-            case (id, amount) => Algos.encode(id) -> amount
-          }
-      }
-      val current = getBalances.map {
-        case (hash, idToAmount) =>
-          Algos.encode(hash) -> idToAmount.map {
-            case (id, amount) => Algos.encode(id) -> amount
-          }
-      }
-      (toAdd |+| toRemove |+| current).map {
-        case (str, stringToAmount) =>
-          Algos.decode(str).get -> stringToAmount.map {
-            case (str, amount) => Algos.decode(str).get -> amount
-          }
-      }
+
+    val balancesToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
+      val toAddBalances: Map[String, Map[String, Amount]] =
+        BalanceCalculator.balanceSheet1(newBxs, intrinsicTokenId).map {
+          case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
+            Algos.encode(hash) -> idToAmount.map {
+              case (id: TokenId, amount: Amount) => Algos.encode(id) -> amount
+            }
+        }
+      val toRemoveBalances: Map[String, Map[String, Amount]] =
+        BalanceCalculator.balanceSheet1(spentBxs, intrinsicTokenId).map {
+          case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
+            Algos.encode(hash) -> idToAmount.map {
+              case (id: TokenId, amount: Amount) => Algos.encode(id) -> amount
+            }
+        }
+      val currentBalances: Map[String, Map[String, Amount]] =
+        getBalances.map {
+          case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
+            Algos.encode(hash) -> idToAmount.map {
+              case (id: TokenId, amount: Amount) => Algos.encode(id) -> amount
+            }
+        }
+      (toAddBalances |+| toRemoveBalances |+| currentBalances).flatMap {
+        case (hash: String, idToAmount: Map[String, Amount]) =>
+          val decodedHash: Array[Byte]     = Algos.decode(hash).get
+          val newTokenIds: Set[String]     = idToAmount.keys.toSet
+          val currentTokenIds: Set[String] = getTokenIds(decodedHash).map(Algos.encode).toSet
+          val tokenIdsToUpdate: (VersionalLevelDbKey, VersionalLevelDbValue) = hashToTokens(decodedHash) ->
+            VersionalLevelDbValue @@ (newTokenIds ++ currentTokenIds).flatMap { id =>
+              Algos.decode(id).get
+            }.toArray
+          val tokenIdUpdatedAmount: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = idToAmount.map {
+            case (id: String, amount: Amount) =>
+              tokenKeyByContractHash(decodedHash, Algos.decode(id).get) ->
+                VersionalLevelDbValue @@ Longs.toByteArray(amount)
+          }.toList
+          tokenIdsToUpdate :: tokenIdUpdatedAmount
+      }.toList
     }
+
     val accs: List[ContractHash] = getAllWallets
 
     val a: (List[AssetBox], List[DataBox], List[TokenIssuingBox]) =
@@ -173,20 +188,6 @@ class WalletDBImpl private (
           .toArray
     }.toList
 
-    val balancesToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = newBalances.flatMap {
-      case (hash, idToAmount) =>
-        val keys                 = idToAmount.keys.map(Algos.encode).toSet
-        val curK: Set[String]    = getTokenIds(hash).map(Algos.encode).toSet
-        val newKeys: Set[String] = (keys ++ curK)
-        val upd: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = idToAmount.map {
-          case (id, amount) =>
-            tokenKeyByContractHash(hash, id) -> VersionalLevelDbValue @@ Longs.toByteArray(amount)
-        }.toList
-        val newKeysupd = hashToTokens(hash) -> VersionalLevelDbValue @@ newKeys
-          .flatMap(j => Algos.decode(j).get)
-          .toArray
-        newKeysupd :: upd
-    }.toList
     val toIns = LevelDbDiff(
       LevelDBVersion @@ modifierId.untag(ModifierId),
       balancesToInsert ::: newTokenKeys ::: newDataKeys ::: newAssetKeys ::: boxesToInsert.map { box =>
