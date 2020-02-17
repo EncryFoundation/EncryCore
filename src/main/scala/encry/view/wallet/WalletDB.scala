@@ -28,8 +28,8 @@ trait WalletDB {
 
   def updateWallet(
     modifierId: ModifierId,
-    newBxs: Seq[EncryBaseBox],
-    spentBxs: Seq[EncryBaseBox],
+    newBxs: List[EncryBaseBox],
+    spentBxs: List[EncryBaseBox],
     intrinsicTokenId: ADKey
   ): Unit
 
