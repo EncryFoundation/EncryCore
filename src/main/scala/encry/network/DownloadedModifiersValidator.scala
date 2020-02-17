@@ -1,13 +1,13 @@
 package encry.network
 
 import TransactionProto.TransactionProtoMessage
-import akka.actor.{ Actor, ActorRef, ActorSystem, PoisonPill, Props }
-import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.HeaderUtils
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
+import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -16,9 +16,10 @@ import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.NewTransaction
-import org.encryfoundation.common.modifiers.mempool.transaction.{ Transaction, TransactionProtoSerializer }
-import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
-import scala.util.{ Failure, Success, Try }
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
+import scala.util.{Failure, Success, Try}
 
 class DownloadedModifiersValidator(modifierIdSize: Int,
                                    nodeViewHolder: ActorRef,
@@ -79,7 +80,7 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
               Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
                 case Success(tx) if tx.semanticValidity.isSuccess => memoryPoolRef ! NewTransaction(tx)
                 case Success(tx) =>
-                  logger.info(s"Payload with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
+                  logger.info(s"Transaction with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
                   context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
                   nodeViewSync ! InvalidModifier(id)
                 case Failure(ex) =>

@@ -203,10 +203,14 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       settings.constants.DesiredBlockInterval, settings.constants.InitialDifficulty)
   }
 
-  def syncInfo: SyncInfo = lastSyncInfo
+  def syncInfo: SyncInfo = {
+    if (lastSyncInfo.lastHeaderIds.isEmpty) updateIdsForSyncInfo()
+    lastSyncInfo
+  }
 
   def updateIdsForSyncInfo(): Unit =
     lastSyncInfo = SyncInfo(getBestHeader.map { header: Header =>
+      logger.info(s"Best header for sync info is: ${header}")
       ((header.height - settings.network.maxInvObjects + 1) to header.height).flatMap { height: Int =>
         headerIdsAtHeight(height).headOption
       }.toList

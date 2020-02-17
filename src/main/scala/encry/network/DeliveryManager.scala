@@ -174,6 +174,7 @@ class DeliveryManager(influxRef: Option[ActorRef],
         if (typeId != Transaction.modifierTypeId) influxRef
           .foreach(ref => (0 to filteredModifiers.size).foreach(_ => ref ! SerializedModifierFromNetwork(typeId)))
         //todo check this logic
+        logger.debug(s"Type of mod: ${typeId}. canProcessTransactions: ${canProcessTransactions}")
         if ((typeId == Transaction.modifierTypeId && canProcessTransactions) || (typeId != Transaction.modifierTypeId))
           downloadedModifiersValidator ! ModifiersForValidating(remote, typeId, filteredModifiers)
 
@@ -376,11 +377,11 @@ class DeliveryManager(influxRef: Option[ActorRef],
     case Some(data) =>
       data.groupBy(_._1).mapValues(_.map(_._2)).foreach {
         case (mTid, mods) if mods.size <= settings.network.maxInvObjects =>
-          logger.info(s"Send to peer $peer inv msg with mods: ${mods.map(Algos.encode).mkString(",")}")
+          logger.debug(s"Send to peer $peer inv msg with mods: ${mods.map(Algos.encode).mkString(",")}")
           peer.handlerRef ! InvNetworkMessage(mTid -> mods)
         case (mTid, mods) =>
           val modifiers: Seq[ModifierId] = mods.take(settings.network.maxInvObjects)
-          logger.info(s"Send to peer $peer dropped inv msg with mods: ${modifiers.map(Algos.encode).mkString(",")}")
+          logger.debug(s"Send to peer $peer dropped inv msg with mods: ${modifiers.map(Algos.encode).mkString(",")}")
           peer.handlerRef ! InvNetworkMessage(mTid -> modifiers)
       }
     case None => logger.info(s"dataForInvMessage is empty for: $peer. Peer's status is: $status.")
