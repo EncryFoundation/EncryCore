@@ -39,24 +39,14 @@ class WalletDBImpl private (
       .get(VersionalLevelDbKey @@ id.untag(ADKey))
       .flatMap(StateModifierSerializer.parseBytes(_, id.head).toOption)
 
-  def getBalances: Map[ContractHash, Map[TokenId, Amount]] = {
-    val accounts: List[ContractHash] = getAllWallets
-    val tokensToAccounts: Map[ContractHash, Map[TokenId, Amount]] =
-      accounts.foldLeft(Map.empty[ContractHash, Map[TokenId, Amount]]) {
-      case (balance, contractHash) =>
-        val balancesByHash: Map[ContractHash, Map[TokenId, Amount]] =
-          Map(contractHash -> getBalancesByContractHash(contractHash))
-        if (balancesByHash.nonEmpty) balance ++ balancesByHash
-        else balance
-    }
-    tokensToAccounts
-  }
+  def getBalances: Map[ContractHash, Map[TokenId, Amount]] =
+    getAllWallets.map(hash => hash -> getBalancesByContractHash(hash)).toMap
 
   def getTokenIds(hash: ContractHash): List[TokenId] =
     levelDb
       .get(hashToTokens(hash))
-      .map(
-        _.grouped(32).toList).getOrElse(List.empty[TokenId])
+      .map(_.grouped(32).toList)
+      .getOrElse(List.empty[TokenId])
 
   private def getBoxesIdsByKey(key: VersionalLevelDbKey): List[ADKey] =
     levelDb
