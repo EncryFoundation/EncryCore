@@ -45,11 +45,12 @@ class WalletDBImpl private (
   def getBalances: Map[ContractHash, Map[TokenId, Amount]] = ???
   def getTokenIds(hash: ContractHash): List[TokenId]       = ???
 
-  def getBoxesIdsByKey(key: VersionalLevelDbKey): List[ADKey] =
+  private def getBoxesIdsByKey(key: VersionalLevelDbKey): List[ADKey] =
     levelDb
       .get(key)
       .map(_.grouped(32).toList.map(ADKey @@ _))
       .getOrElse(List.empty[ADKey])
+
   @tailrec
   private def loop[BXT](acc: List[BXT], ids: List[ADKey], f: List[BXT] => Boolean): List[BXT] =
     ids.headOption match {
@@ -64,7 +65,11 @@ class WalletDBImpl private (
     contractHash: ContractHash,
     f: List[AssetBox] => Boolean
   ): List[AssetBox] =
-    loop[AssetBox](List.empty[AssetBox], getBoxesIdsByKey(assetBoxesByContractHashKey(contractHash)), f)
+    loop[AssetBox](
+      List.empty[AssetBox],
+      getBoxesIdsByKey(assetBoxesByContractHashKey(contractHash)),
+      f
+    )
 
   override def getTokenIssuingBoxes(
     contractHash: ContractHash,
@@ -79,7 +84,11 @@ class WalletDBImpl private (
   override def getDataBoxes(
     contractHash: ContractHash,
     f: List[DataBox] => Boolean
-  ): List[DataBox] = loop[DataBox](List.empty[DataBox], getBoxesIdsByKey(dataBoxesByContractHashKey(contractHash)), f)
+  ): List[DataBox] = loop[DataBox](
+    List.empty[DataBox],
+    getBoxesIdsByKey(dataBoxesByContractHashKey(contractHash)),
+    f
+  )
 
   override def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount] = ???
 
@@ -150,21 +159,21 @@ class WalletDBImpl private (
           val nextHashEncoded: String = Algos.encode(nextHash)
           (hashToAssetIds.updated(
              nextHashEncoded,
-             assetKeysByHash(nextHash)
+            getBoxesIdsByKey(assetBoxesByContractHashKey(nextHash))
                .filterNot(l => spentBxs.exists(_.id sameElements l))
                .map(Algos.encode)
                .toSet
            ),
            hashToDataIds.updated(
              nextHashEncoded,
-             dataKeysByHash(nextHash)
+             getBoxesIdsByKey(dataBoxesByContractHashKey(nextHash))
                .filterNot(l => spentBxs.exists(_.id sameElements l))
                .map(Algos.encode)
                .toSet
            ),
            hashToTokenIds.updated(
              nextHashEncoded,
-             tokenKeysByHash(nextHash)
+             getBoxesIdsByKey(tokenIssuingBoxesByContractHashKey(nextHash))
                .filterNot(l => spentBxs.exists(_.id sameElements l))
                .map(Algos.encode)
                .toSet
