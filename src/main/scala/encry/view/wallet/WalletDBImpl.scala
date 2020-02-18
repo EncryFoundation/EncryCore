@@ -1,24 +1,20 @@
 package encry.view.wallet
 
-import cats.instances.long._
-import cats.instances.map._
-import cats.instances.set._
-import cats.syntax.semigroup._
+import cats.Functor
+import cats.implicits._
 import com.google.common.primitives.Longs
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{
-  LevelDBVersion,
-  VersionalLevelDbKey,
-  VersionalLevelDbValue
-}
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbDiff, VersionalLevelDB}
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 import encry.utils.BalanceCalculator
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.EncryBox.BxTypeId
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{ AssetBox, DataBox, EncryBaseBox, TokenIssuingBox }
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, DataBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 
 class WalletDBImpl private (
@@ -28,38 +24,96 @@ class WalletDBImpl private (
     with StrictLogging
     with AutoCloseable {
 
-  override def getAllWallets: List[ContractHash] = ???
+  override def getAllWallets: List[ContractHash] =
+    levelDb
+      .get(CONTRACT_HASH_ACCOUNTS)
+      .map(_.grouped(32).toList)
+      .getOrElse(List.empty[Array[Byte]])
+
+  override def getBoxById(id: ADKey): Option[EncryBaseBox] =
+    levelDb
+      .get(VersionalLevelDbKey @@ id.untag(ADKey))
+      .flatMap(wrappedBx => StateModifierSerializer.parseBytes(wrappedBx, id.head).toOption)
 
   def getBalances: Map[ContractHash, Map[TokenId, Amount]] = ???
-
-  override def getBoxById(id: ADKey): Option[EncryBaseBox] = ???
-
   def getTokenIds(hash: ContractHash): List[TokenId] = ???
-
   def assetKeysByHash(hash: ContractHash): List[ADKey] = ???
   def tokenKeysByHash(hash: ContractHash): List[ADKey] = ???
   def dataKeysByHash(hash: ContractHash): List[ADKey]  = ???
 
   override def getAssetBoxesByPredicate(
     contractHash: ContractHash,
-    f: List[AssetBox] => Boolean
-  ): List[AssetBox] = ???
+    f: List[AssetBox] => Boolean): List[AssetBox] = {
+    val listId: List[Array[Byte]] = levelDb
+      .get(assetBoxesByContractHashKey(contractHash))
+      .map(bytes => bytes.grouped(32).toList).getOrElse(List.empty[Array[BxTypeId]])
+        @scala.annotation.tailrec
+        def loop(acc: List[AssetBox], ids: List[Array[Byte]]): List[AssetBox] = {
+          ids.headOption match {
+            case None => acc
+            case Some(value) =>
+              val tmpAcc = getBoxById(ADKey @@ value) match {
+                case Some(value: AssetBox) => acc :+ value
+                case None => acc
+              }
+              if (f(tmpAcc)) tmpAcc
+              else loop(tmpAcc, ids.drop(1))
+          }
+        }
+    loop(List.empty[AssetBox], listId)
+  }
 
   override def getTokenIssuingBoxes(
     contractHash: ContractHash,
     f: List[TokenIssuingBox] => Boolean
-  ): List[TokenIssuingBox] = ???
+  ): List[TokenIssuingBox] = {
+    val listId: List[Array[Byte]] = levelDb
+      .get(assetBoxesByContractHashKey(contractHash))
+      .map(bytes => bytes.grouped(32).toList).getOrElse(List.empty[Array[BxTypeId]])
+    @scala.annotation.tailrec
+    def loop(acc: List[TokenIssuingBox], ids: List[Array[Byte]]): List[TokenIssuingBox] = {
+      ids.headOption match {
+        case None => acc
+        case Some(value) =>
+          val tmpAcc = getBoxById(ADKey @@ value) match {
+            case Some(value: TokenIssuingBox) => acc :+ value
+            case None => acc
+          }
+          if (f(tmpAcc)) tmpAcc
+          else loop(tmpAcc, ids.drop(1))
+      }
+    }
+    loop(List.empty[TokenIssuingBox], listId)
+  }
 
   override def getDataBoxes(
     contractHash: ContractHash,
     f: List[DataBox] => Boolean
-  ): List[DataBox] = ???
+  ): List[DataBox] = {
+    val listId: List[Array[Byte]] = levelDb
+      .get(assetBoxesByContractHashKey(contractHash))
+      .map(bytes => bytes.grouped(32).toList).getOrElse(List.empty[Array[BxTypeId]])
+    @scala.annotation.tailrec
+    def loop(acc: List[DataBox], ids: List[Array[Byte]]): List[DataBox] = {
+      ids.headOption match {
+        case None => acc
+        case Some(value) =>
+          val tmpAcc = getBoxById(ADKey @@ value) match {
+            case Some(value: DataBox) => acc :+ value
+            case None => acc
+          }
+          if (f(tmpAcc)) tmpAcc
+          else loop(tmpAcc, ids.drop(1))
+      }
+    }
+    loop(List.empty[DataBox], listId)
+  }
 
   override def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount] = ???
 
   override def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount = ???
 
-  override def contains(id: ADKey): Boolean = ???
+  override def contains(id: ADKey): Boolean = getBoxById(id).isDefined
 
   override def updateWallet(
     modifierId: ModifierId,
@@ -202,9 +256,9 @@ class WalletDBImpl private (
     )
   }
 
-  override def rollback(modId: ModifierId): Unit = ???
+  override def rollback(modId: ModifierId): Unit = levelDb.rollbackTo(LevelDBVersion @@ modId.untag(ModifierId))
 
-  override def close(): Unit = ???
+  override def close(): Unit = levelDb.close()
 
   private val ASSET_BOXES_BYTES: Array[Byte] = "ASSET_BOXES_BY_USER_KEY".getBytes()
 
