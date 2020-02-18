@@ -17,9 +17,10 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.EncryBox.BxTypeId
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{ AssetBox, DataBox, EncryBaseBox, TokenIssuingBox }
-import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.{ Algos, TaggedTypes }
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
+import supertagged.@@
 
 import scala.annotation.tailrec
 
@@ -44,15 +45,11 @@ class WalletDBImpl private (
   def getBalances: Map[ContractHash, Map[TokenId, Amount]] = ???
   def getTokenIds(hash: ContractHash): List[TokenId]       = ???
 
-  def assetKeysByHash(contractHash: ContractHash): List[ADKey] =
+  def getBoxesIdsByKey(key: VersionalLevelDbKey): List[ADKey] =
     levelDb
-      .get(assetBoxesByContractHashKey(contractHash))
+      .get(key)
       .map(_.grouped(32).toList.map(ADKey @@ _))
       .getOrElse(List.empty[ADKey])
-
-  def tokenKeysByHash(hash: ContractHash): List[ADKey] = ???
-  def dataKeysByHash(hash: ContractHash): List[ADKey]  = ???
-
   @tailrec
   private def loop[BXT](acc: List[BXT], ids: List[ADKey], f: List[BXT] => Boolean): List[BXT] =
     ids.headOption match {
@@ -66,53 +63,23 @@ class WalletDBImpl private (
   override def getAssetBoxesByPredicate(
     contractHash: ContractHash,
     f: List[AssetBox] => Boolean
-  ): List[AssetBox] = loop[AssetBox](List.empty[AssetBox], assetKeysByHash(contractHash), f)
+  ): List[AssetBox] =
+    loop[AssetBox](List.empty[AssetBox], getBoxesIdsByKey(assetBoxesByContractHashKey(contractHash)), f)
 
   override def getTokenIssuingBoxes(
     contractHash: ContractHash,
     f: List[TokenIssuingBox] => Boolean
-  ): List[TokenIssuingBox] = {
-    val listOfIds: List[Array[Byte]] = levelDb
-      .get(assetBoxesByContractHashKey(contractHash))
-      .map(bytes => bytes.grouped(32).toList)
-      .getOrElse(List.empty[Array[BxTypeId]])
-    @scala.annotation.tailrec
-    def loop(acc: List[TokenIssuingBox], ids: List[Array[Byte]]): List[TokenIssuingBox] =
-      ids.headOption match {
-        case None => acc
-        case Some(value) =>
-          val tmpAcc = getBoxById(ADKey @@ value) match {
-            case Some(value: TokenIssuingBox) => acc :+ value
-            case None                         => acc
-          }
-          if (f(tmpAcc)) tmpAcc
-          else loop(tmpAcc, ids.drop(1))
-      }
-    loop(List.empty[TokenIssuingBox], listId)
-  }
+  ): List[TokenIssuingBox] =
+    loop[TokenIssuingBox](
+      List.empty[TokenIssuingBox],
+      getBoxesIdsByKey(tokenIssuingBoxesByContractHashKey(contractHash)),
+      f
+    )
 
   override def getDataBoxes(
     contractHash: ContractHash,
     f: List[DataBox] => Boolean
-  ): List[DataBox] = {
-    val listId: List[Array[Byte]] = levelDb
-      .get(assetBoxesByContractHashKey(contractHash))
-      .map(bytes => bytes.grouped(32).toList)
-      .getOrElse(List.empty[Array[BxTypeId]])
-    @scala.annotation.tailrec
-    def loop(acc: List[DataBox], ids: List[Array[Byte]]): List[DataBox] =
-      ids.headOption match {
-        case None => acc
-        case Some(value) =>
-          val tmpAcc = getBoxById(ADKey @@ value) match {
-            case Some(value: DataBox) => acc :+ value
-            case None                 => acc
-          }
-          if (f(tmpAcc)) tmpAcc
-          else loop(tmpAcc, ids.drop(1))
-      }
-    loop(List.empty[DataBox], listId)
-  }
+  ): List[DataBox] = loop[DataBox](List.empty[DataBox], getBoxesIdsByKey(dataBoxesByContractHashKey(contractHash)), f)
 
   override def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount] = ???
 
