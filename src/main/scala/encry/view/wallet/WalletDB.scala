@@ -10,8 +10,6 @@ import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 
 trait WalletDB {
 
-  def getBoxesIdsByKey(key: VersionalLevelDbKey): List[ADKey]
-
   def getAllWallets: List[ContractHash]
 
   def getBoxById(id: ADKey): Option[EncryBaseBox]

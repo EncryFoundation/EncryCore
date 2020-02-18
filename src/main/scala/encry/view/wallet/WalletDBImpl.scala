@@ -1,26 +1,23 @@
 package encry.view.wallet
 
-import cats.Functor
 import cats.implicits._
 import com.google.common.primitives.Longs
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB }
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{
   LevelDBVersion,
   VersionalLevelDbKey,
   VersionalLevelDbValue
 }
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB }
 import encry.utils.BalanceCalculator
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.EncryBox.BxTypeId
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{ AssetBox, DataBox, EncryBaseBox, TokenIssuingBox }
-import org.encryfoundation.common.utils.{ Algos, TaggedTypes }
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import supertagged.@@
 
 import scala.annotation.tailrec
 
@@ -43,7 +40,8 @@ class WalletDBImpl private (
       .flatMap(StateModifierSerializer.parseBytes(_, id.head).toOption)
 
   def getBalances: Map[ContractHash, Map[TokenId, Amount]] = ???
-  def getTokenIds(hash: ContractHash): List[TokenId]       = ???
+
+  def getTokenIds(hash: ContractHash): List[TokenId] = ???
 
   private def getBoxesIdsByKey(key: VersionalLevelDbKey): List[ADKey] =
     levelDb
@@ -90,9 +88,14 @@ class WalletDBImpl private (
     f
   )
 
-  override def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount] = ???
+  override def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount] =
+    levelDb
+      .get(hashToTokens(contractHash))
+      .map(_.grouped(32).map(id => id -> getTokenBalanceByContractHash(contractHash, id)).toMap)
+      .getOrElse(Map.empty)
 
-  override def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount = ???
+  override def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount =
+    levelDb.get(tokenKeyByContractHash(contractHash, tokenId)).map(Longs.fromByteArray).getOrElse(0L)
 
   override def contains(id: ADKey): Boolean = getBoxById(id).isDefined
 
@@ -159,7 +162,7 @@ class WalletDBImpl private (
           val nextHashEncoded: String = Algos.encode(nextHash)
           (hashToAssetIds.updated(
              nextHashEncoded,
-            getBoxesIdsByKey(assetBoxesByContractHashKey(nextHash))
+             getBoxesIdsByKey(assetBoxesByContractHashKey(nextHash))
                .filterNot(l => spentBxs.exists(_.id sameElements l))
                .map(Algos.encode)
                .toSet
