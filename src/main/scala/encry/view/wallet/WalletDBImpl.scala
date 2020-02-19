@@ -4,23 +4,19 @@ import cats.implicits._
 import com.google.common.primitives.Longs
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
-import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{
-  LevelDBVersion,
-  VersionalLevelDbKey,
-  VersionalLevelDbValue
-}
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB, VersionalLevelDBCompanion }
+import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbDiff, VersionalLevelDB}
 import encry.utils.BalanceCalculator
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{ AssetBox, DataBox, EncryBaseBox, TokenIssuingBox }
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, Box, DataBox, EncryBaseBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
-import supertagged.@@
 
 import scala.annotation.tailrec
+import scala.reflect.ClassTag
 
 class WalletDBImpl private (
   levelDb: VersionalLevelDB,
@@ -40,6 +36,12 @@ class WalletDBImpl private (
       .get(VersionalLevelDbKey @@ id.untag(ADKey))
       .flatMap(StateModifierSerializer.parseBytes(_, id.head).toOption)
 
+  def getTypedBoxById[BXT: ClassTag](id: ADKey): Option[BXT] =
+    levelDb
+      .get(VersionalLevelDbKey @@ id.untag(ADKey))
+      .flatMap(StateModifierSerializer.parseBytes(_, id.head).toOption)
+      .collect { case box: BXT => box }
+
   def getBalances: Map[ContractHash, Map[TokenId, Amount]] =
     getAllWallets.map(hash => hash -> getBalancesByContractHash(hash)).toMap
 
@@ -56,10 +58,10 @@ class WalletDBImpl private (
       .getOrElse(List.empty[ADKey])
 
   @tailrec
-  private def loop[BXT](acc: List[BXT], ids: List[ADKey], f: List[BXT] => Boolean): List[BXT] =
+  private def loop[BXT: ClassTag](acc: List[BXT], ids: List[ADKey], f: List[BXT] => Boolean): List[BXT] =
     ids.headOption match {
       case Some(boxId: ADKey) =>
-        val newAcc: List[BXT] = getBoxById(boxId).fold(acc)(_ :: acc)
+        val newAcc: List[BXT] = getTypedBoxById[BXT](boxId).fold(acc)(_ :: acc)
         if (f(newAcc)) newAcc else loop(newAcc, ids.drop(1), f)
       case None => List.empty[BXT]
     }
@@ -199,7 +201,7 @@ class WalletDBImpl private (
       ): List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
         (typeToDb |+| hashType).map {
           case (hash: String, value: Set[String]) =>
-            key(hash) -> VersionalLevelDbValue @@ value
+            key(Algos.decode(hash).get) -> VersionalLevelDbValue @@ value
               .flatMap(k => Algos.decode(k).get)
               .toArray
         }.toList
