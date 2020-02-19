@@ -9,7 +9,7 @@ import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{
   VersionalLevelDbKey,
   VersionalLevelDbValue
 }
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB }
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, VersionalLevelDB, VersionalLevelDBCompanion }
 import encry.utils.BalanceCalculator
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
@@ -18,6 +18,7 @@ import org.encryfoundation.common.modifiers.state.box.{ AssetBox, DataBox, Encry
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
+import supertagged.@@
 
 import scala.annotation.tailrec
 
@@ -112,21 +113,17 @@ class WalletDBImpl private (
   ): Unit = {
     val boxesToInsert: List[EncryBaseBox] = newBxs.filterNot(spentBxs.contains)
 
+    def balanceSheetFunction(list: List[EncryBaseBox], x: Long = -1) =
+      BalanceCalculator.balanceSheet1(list, intrinsicTokenId).map {
+        case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
+          Algos.encode(hash) -> idToAmount.map {
+            case (id: TokenId, amount: Amount) => Algos.encode(id) -> (x * amount)
+          }
+      }
+
     val balancesToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
-      val toAddBalances: Map[String, Map[String, Amount]] =
-        BalanceCalculator.balanceSheet1(newBxs, intrinsicTokenId).map {
-          case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
-            Algos.encode(hash) -> idToAmount.map {
-              case (id: TokenId, amount: Amount) => Algos.encode(id) -> amount
-            }
-        }
-      val toRemoveBalances: Map[String, Map[String, Amount]] =
-        BalanceCalculator.balanceSheet1(spentBxs, intrinsicTokenId).map {
-          case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
-            Algos.encode(hash) -> idToAmount.map {
-              case (id: TokenId, amount: Amount) => Algos.encode(id) -> (-1 * amount)
-            }
-        }
+      val toAddBalances: Map[String, Map[String, Amount]]    = balanceSheetFunction(newBxs, 1L)
+      val toRemoveBalances: Map[String, Map[String, Amount]] = balanceSheetFunction(spentBxs)
       val currentBalances: Map[String, Map[String, Amount]] =
         getBalances.map {
           case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
@@ -154,10 +151,16 @@ class WalletDBImpl private (
     }
 
     val boxesIdsToContractHashToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
+      def updatedFunction(hashToBxIds: Map[String, Set[String]], nextHash: String, key: VersionalLevelDbKey) =
+        hashToBxIds.updated(nextHash,
+                  getBoxesIdsByKey(key)
+                    .filterNot(l => spentBxs.exists(_.id sameElements l))
+                    .map(Algos.encode)
+                    .toSet)
       val (
         assetsFromDb: Map[String, Set[String]],
         dataFromDB: Map[String, Set[String]],
-        tokensFRomDB: Map[String, Set[String]]
+        tokensFromDB: Map[String, Set[String]]
       ) = getAllWallets.foldLeft(
         Map.empty[String, Set[String]],
         Map.empty[String, Set[String]],
@@ -165,27 +168,9 @@ class WalletDBImpl private (
       ) {
         case ((hashToAssetIds, hashToDataIds, hashToTokenIds), nextHash) =>
           val nextHashEncoded: String = Algos.encode(nextHash)
-          (hashToAssetIds.updated(
-             nextHashEncoded,
-             getBoxesIdsByKey(assetBoxesByContractHashKey(nextHash))
-               .filterNot(l => spentBxs.exists(_.id sameElements l))
-               .map(Algos.encode)
-               .toSet
-           ),
-           hashToDataIds.updated(
-             nextHashEncoded,
-             getBoxesIdsByKey(dataBoxesByContractHashKey(nextHash))
-               .filterNot(l => spentBxs.exists(_.id sameElements l))
-               .map(Algos.encode)
-               .toSet
-           ),
-           hashToTokenIds.updated(
-             nextHashEncoded,
-             getBoxesIdsByKey(tokenIssuingBoxesByContractHashKey(nextHash))
-               .filterNot(l => spentBxs.exists(_.id sameElements l))
-               .map(Algos.encode)
-               .toSet
-           ))
+          (updatedFunction(hashToAssetIds, nextHashEncoded, assetBoxesByContractHashKey(nextHash)),
+           updatedFunction(hashToDataIds, nextHashEncoded, dataBoxesByContractHashKey(nextHash)),
+           updatedFunction(hashToTokenIds, nextHashEncoded, tokenIssuingBoxesByContractHashKey(nextHash)))
       }
       val (
         hashToAssetBoxes: Map[String, Set[String]],
@@ -196,38 +181,35 @@ class WalletDBImpl private (
         Map.empty[String, Set[String]],
         Map.empty[String, Set[String]]
       ) {
-        case ((assets, tokens, data), nextBox: AssetBox) =>
+        case ((assets, data, token), nextBox: AssetBox) =>
           val hash = Algos.encode(nextBox.proposition.contractHash)
-          (assets |+| Map(hash -> Set(Algos.encode(nextBox.id))), tokens, data)
-        case ((assets, tokens, data), nextBox: DataBox) =>
+          (assets |+| Map(hash -> Set(Algos.encode(nextBox.id))), token, data)
+        case ((assets, data, token), nextBox: DataBox) =>
           val hash = Algos.encode(nextBox.proposition.contractHash)
-          (assets, tokens, data |+| Map(hash -> Set(Algos.encode(nextBox.id))))
-        case ((assets, tokens, data), nextBox: TokenIssuingBox) =>
+          (assets, data |+| Map(hash -> Set(Algos.encode(nextBox.id))), token)
+        case ((assets, data, token), nextBox: TokenIssuingBox) =>
           val hash = Algos.encode(nextBox.proposition.contractHash)
-          (assets, tokens |+| Map(hash -> Set(Algos.encode(nextBox.id))), data)
+          (assets, data, token |+| Map(hash -> Set(Algos.encode(nextBox.id))))
       }
 
+      def hashToBxsIdsToDB(
+        typeToDb: Map[String, Set[String]],
+        hashType: Map[String, Set[String]],
+        key: ContractHash => VersionalLevelDbKey
+      ): List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
+        (typeToDb |+| hashType).map {
+          case (hash: String, value: Set[String]) =>
+            key(hash) -> VersionalLevelDbValue @@ value
+              .flatMap(k => Algos.decode(k).get)
+              .toArray
+        }.toList
+
       val newAssetsToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
-        (assetsFromDb |+| hashToAssetBoxes).map {
-          case (hash: String, value: Set[String]) =>
-            assetBoxesByContractHashKey(Algos.decode(hash).get) -> VersionalLevelDbValue @@ value
-              .flatMap(k => Algos.decode(k).get)
-              .toArray
-        }.toList
+        hashToBxsIdsToDB(assetsFromDb, hashToAssetBoxes, assetBoxesByContractHashKey)
       val newDataToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
-        (dataFromDB |+| hashToDataBoxes).map {
-          case (hash: String, value: Set[String]) =>
-            dataBoxesByContractHashKey(Algos.decode(hash).get) -> VersionalLevelDbValue @@ value
-              .flatMap(k => Algos.decode(k).get)
-              .toArray
-        }.toList
+        hashToBxsIdsToDB(dataFromDB, hashToDataBoxes, tokenIssuingBoxesByContractHashKey)
       val newTokenToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
-        (tokensFRomDB |+| hashToTokenBoxes).map {
-          case (hash: String, value: Set[String]) =>
-            tokenIssuingBoxesByContractHashKey(Algos.decode(hash).get) -> VersionalLevelDbValue @@ value
-              .flatMap(k => Algos.decode(k).get)
-              .toArray
-        }.toList
+        hashToBxsIdsToDB(tokensFromDB, hashToTokenBoxes, dataBoxesByContractHashKey)
       newAssetsToDB ::: newDataToDB ::: newTokenToDB
     }
 
