@@ -223,7 +223,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         branchingPointOpt.map { branchPoint =>
           if (!state.version.sameElements(branchPoint)) {
             val branchPointHeight = history.getHeaderById(ModifierId !@@ branchPoint).get.height
-            val additionalBlocks = (state.safePointHeight to branchPointHeight).foldLeft(List.empty[Block]){
+            val additionalBlocks = (state.safePointHeight + 1 to branchPointHeight).foldLeft(List.empty[Block]){
               case (blocks, height) =>
                 val headerAtHeight = history.getBestHeaderAtHeight(height).get
                 val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
@@ -466,7 +466,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
         logger.info(s"State and history are inconsistent." +
           s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
           s"apply ${newChain.length} modifiers")
-        val additionalBlocks = (state.safePointHeight to historyBestBlock.header.height).foldLeft(List.empty[Block]){
+        val additionalBlocks = (state.safePointHeight + 1 to historyBestBlock.header.height).foldLeft(List.empty[Block]){
           case (blocks, height) =>
             val headerAtHeight = history.getBestHeaderAtHeight(height).get
             val blockAtHeight = history.getBlockByHeader(headerAtHeight).get

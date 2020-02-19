@@ -197,7 +197,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       logger.info(s"Before rollback root node: ${rootNode.hash}")
       avlStorage.rollbackTo(to)
       logger.info(s"Storage success rolled back")
-      logger.info(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
+      logger.info(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).getOrElse(Array.emptyByteArray))}")
 //      val newRootNode =
 //        NodeSerilalizer.fromBytes[K, V](avlStorage.get(StorageKey !@@ AvlTree.nodeKey(avlStorage.get(AvlTree.rootNodeKey).get)).get)
       val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
@@ -429,7 +429,10 @@ object AvlTree {
 
   def apply[K: Monoid: Order: Hashable : Serializer,
             V: Monoid : Serializer](avlStorage: VersionalStorage, rootNodesStorage: RootNodesStorage[K, V]): AvlTree[K, V] =
-    new AvlTree[K, V](EmptyNode(), avlStorage, rootNodesStorage)
+    {
+      rootNodesStorage.insert(StorageVersion @@ Array.fill(32)(0: Byte), EmptyNode(), Height @@ 0)
+      new AvlTree[K, V](EmptyNode(), avlStorage, rootNodesStorage)
+    }
 
   def elementKey(key: Array[Byte]): Array[Byte] = (0: Byte) +: key
 
