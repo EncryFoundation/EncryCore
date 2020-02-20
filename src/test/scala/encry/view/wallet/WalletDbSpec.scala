@@ -17,7 +17,14 @@ import org.encryfoundation.common.modifiers.history.{ Block, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{ AssetBox, EncryBaseBox, EncryProposition, MonetaryBox }
+import org.encryfoundation.common.modifiers.state.box.{
+  AssetBox,
+  DataBox,
+  EncryBaseBox,
+  EncryProposition,
+  MonetaryBox,
+  TokenIssuingBox
+}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
@@ -160,10 +167,12 @@ class WalletDbSpec
         moreBoxes.exists(_.bytes sameElements box.bytes)
       } shouldBe true
 
-      walletDb.getAssetBoxesByPredicate(
-        moreBoxes.head.proposition.contractHash,
-        list => list.map(_.amount).sum > moreBoxes.map(_.amount).sum
-      ).isEmpty shouldBe true
+      walletDb
+        .getAssetBoxesByPredicate(
+          moreBoxes.head.proposition.contractHash,
+          list => list.map(_.amount).sum > moreBoxes.map(_.amount).sum
+        )
+        .isEmpty shouldBe true
 
       walletDb.updateWallet(
         ModifierId @@ Random.randomBytes(),
@@ -187,6 +196,77 @@ class WalletDbSpec
       boxesNew1.nonEmpty && boxesNew1.forall { box =>
         moreBoxes.drop(2).exists(_.bytes sameElements box.bytes)
       } shouldBe true
+    }
+  }
+
+  "WalletDb.getTokenIssuingBoxes" should {
+    "return a correct result if the result satisfies the predicate" in {
+      val (walletDb: WalletDBImpl, _) = initTestState
+      val dataBoxesToInsert: IndexedSeq[DataBox] = {
+        val key: PrivateKey25519 = genPrivKeys(1).head
+        IndexedSeq(
+          DataBox(EncryProposition.addressLocked(key.publicImage.address.address), 99, Random.randomBytes()),
+          DataBox(EncryProposition.addressLocked(key.publicImage.address.address), 991, Random.randomBytes()),
+          DataBox(EncryProposition.addressLocked(key.publicImage.address.address), 992, Random.randomBytes())
+        )
+      }
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        dataBoxesToInsert.toList,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
+
+      walletDb
+        .getDataBoxesByPredicate(
+          dataBoxesToInsert.head.proposition.contractHash,
+          boxes => boxes.size == dataBoxesToInsert.size
+        )
+        .nonEmpty shouldBe true
+
+      walletDb
+        .getDataBoxesByPredicate(
+          dataBoxesToInsert.head.proposition.contractHash,
+          boxes => boxes.size > dataBoxesToInsert.size
+        )
+        .nonEmpty shouldBe false
+    }
+  }
+
+  "WalletDb.getDataBoxes" should {
+    "return a correct result if the result satisfies the predicate" in {
+      val (walletDb: WalletDBImpl, _) = initTestState
+      val tid1                        = Random.randomBytes()
+      val tid2                        = Random.randomBytes()
+      val tokenBoxesToInsert: IndexedSeq[TokenIssuingBox] = {
+        val key: PrivateKey25519 = genPrivKeys(1).head
+        IndexedSeq(
+          TokenIssuingBox(EncryProposition.addressLocked(key.publicImage.address.address), 1234L, 999, tid1),
+          TokenIssuingBox(EncryProposition.addressLocked(key.publicImage.address.address), 4321L, 9991, tid1),
+          TokenIssuingBox(EncryProposition.addressLocked(key.publicImage.address.address), 9887L, 9992, tid2),
+          TokenIssuingBox(EncryProposition.addressLocked(key.publicImage.address.address), 768594L, 9993, tid2)
+        )
+      }
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        tokenBoxesToInsert.toList,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
+
+      walletDb
+        .getTokenIssuingBoxesByPredicate(
+          tokenBoxesToInsert.head.proposition.contractHash,
+          boxes => boxes.size == tokenBoxesToInsert.size
+        )
+        .nonEmpty shouldBe true
+
+      walletDb
+        .getDataBoxesByPredicate(
+          tokenBoxesToInsert.head.proposition.contractHash,
+          boxes => boxes.size > tokenBoxesToInsert.size
+        )
+        .nonEmpty shouldBe false
     }
   }
 

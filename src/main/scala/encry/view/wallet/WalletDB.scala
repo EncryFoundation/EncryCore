@@ -16,10 +16,12 @@ trait WalletDB {
 
   def getAssetBoxesByPredicate(contractHash: ContractHash, f: List[AssetBox] => Boolean): List[AssetBox]
 
-  def getTokenIssuingBoxes(contractHash: ContractHash, f: List[TokenIssuingBox] => Boolean): List[TokenIssuingBox]
+  def getTokenIssuingBoxesByPredicate(
+    contractHash: ContractHash,
+    f: List[TokenIssuingBox] => Boolean
+  ): List[TokenIssuingBox]
 
-  def getDataBoxes(contractHash: ContractHash, f: List[DataBox] => Boolean): List[DataBox]
-
+  def getDataBoxesByPredicate(contractHash: ContractHash, f: List[DataBox] => Boolean): List[DataBox]
 
   def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount]
 

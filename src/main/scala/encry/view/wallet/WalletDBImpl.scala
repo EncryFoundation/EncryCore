@@ -71,24 +71,22 @@ class WalletDBImpl(
   override def getAssetBoxesByPredicate(
     contractHash: ContractHash,
     f: List[AssetBox] => Boolean
-  ): List[AssetBox] =
-    loop[AssetBox](
-      List.empty[AssetBox],
-      getBoxesIdsByKey(assetBoxesByContractHashKey(contractHash)),
-      f
-    )
+  ): List[AssetBox] = loop[AssetBox](
+    List.empty[AssetBox],
+    getBoxesIdsByKey(assetBoxesByContractHashKey(contractHash)),
+    f
+  )
 
-  override def getTokenIssuingBoxes(
+  override def getTokenIssuingBoxesByPredicate(
     contractHash: ContractHash,
     f: List[TokenIssuingBox] => Boolean
-  ): List[TokenIssuingBox] =
-    loop[TokenIssuingBox](
-      List.empty[TokenIssuingBox],
-      getBoxesIdsByKey(tokenIssuingBoxesByContractHashKey(contractHash)),
-      f
-    )
+  ): List[TokenIssuingBox] = loop[TokenIssuingBox](
+    List.empty[TokenIssuingBox],
+    getBoxesIdsByKey(tokenIssuingBoxesByContractHashKey(contractHash)),
+    f
+  )
 
-  override def getDataBoxes(
+  override def getDataBoxesByPredicate(
     contractHash: ContractHash,
     f: List[DataBox] => Boolean
   ): List[DataBox] = loop[DataBox](
@@ -157,12 +155,18 @@ class WalletDBImpl(
     }
 
     val boxesIdsToContractHashToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
-      def updatedFunction(hashToBxIds: Map[String, Set[String]], nextHash: String, key: VersionalLevelDbKey) =
-        hashToBxIds.updated(nextHash,
-                            getBoxesIdsByKey(key)
-                              .filterNot(l => spentBxs.exists(_.id sameElements l))
-                              .map(Algos.encode)
-                              .toSet)
+      def updatedFunction(
+        hashToBxIds: Map[String, Set[String]],
+        nextHash: String,
+        key: VersionalLevelDbKey
+      ): Map[String, Set[String]] =
+        hashToBxIds.updated(
+          nextHash,
+          getBoxesIdsByKey(key)
+            .filterNot(l => spentBxs.exists(_.id sameElements l))
+            .map(Algos.encode)
+            .toSet
+        )
       val (
         assetsFromDb: Map[String, Set[String]],
         dataFromDB: Map[String, Set[String]],
@@ -212,9 +216,9 @@ class WalletDBImpl(
       val newAssetsToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
         hashToBxsIdsToDB(assetsFromDb, hashToAssetBoxes, assetBoxesByContractHashKey)
       val newDataToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
-        hashToBxsIdsToDB(dataFromDB, hashToDataBoxes, tokenIssuingBoxesByContractHashKey)
+        hashToBxsIdsToDB(dataFromDB, hashToDataBoxes, dataBoxesByContractHashKey)
       val newTokenToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
-        hashToBxsIdsToDB(tokensFromDB, hashToTokenBoxes, dataBoxesByContractHashKey)
+        hashToBxsIdsToDB(tokensFromDB, hashToTokenBoxes, tokenIssuingBoxesByContractHashKey)
       newAssetsToDB ::: newDataToDB ::: newTokenToDB
     }
 
