@@ -2,35 +2,19 @@ package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{ EncryAppSettings, LevelDBSettings, Settings }
-import encry.storage.levelDb.versionalLevelDB.{
-  LevelDbDiff,
-  LevelDbFactory,
-  VersionalLevelDB,
-  VersionalLevelDBCompanion
-}
-import encry.utils.TestHelper.Props
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VersionalLevelDB, VersionalLevelDBCompanion }
 import encry.utils.{ EncryGenerator, FileHelper }
 import org.encryfoundation.common.crypto.PrivateKey25519
-import org.encryfoundation.common.modifiers.history.{ Block, Payload }
+import org.encryfoundation.common.modifiers.history.Payload
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
-import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{
-  AssetBox,
-  DataBox,
-  EncryBaseBox,
-  EncryProposition,
-  MonetaryBox,
-  TokenIssuingBox
-}
+import org.encryfoundation.common.modifiers.state.box._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
-import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.iq80.leveldb.{ DB, Options }
-import org.scalatest.{ Matchers, PropSpec, WordSpecLike }
 import org.scalatest.mockito.MockitoSugar
+import org.scalatest.{ Matchers, WordSpecLike }
 import scorex.utils.Random
 
 class WalletDbSpec
@@ -199,7 +183,7 @@ class WalletDbSpec
     }
   }
 
-  "WalletDb.getTokenIssuingBoxes" should {
+  "WalletDb.getDataBoxes" should {
     "return a correct result if the result satisfies the predicate" in {
       val (walletDb: WalletDBImpl, _) = initTestState
       val dataBoxesToInsert: IndexedSeq[DataBox] = {
@@ -233,7 +217,7 @@ class WalletDbSpec
     }
   }
 
-  "WalletDb.getDataBoxes" should {
+  "WalletDb.getTokenIssuingBoxes" should {
     "return a correct result if the result satisfies the predicate" in {
       val (walletDb: WalletDBImpl, _) = initTestState
       val tid1                        = Random.randomBytes()
@@ -271,10 +255,6 @@ class WalletDbSpec
   }
 
   "Needs to take what was inserted" should {
-    "getBoxById" in {
-      val (api, newTxs, _) = state
-      (api.getBoxById(newTxs.head.id).get.id sameElements newTxs.head.id) shouldBe true
-    }
     "amount in storage should be correct" in {
       val (api, newTxs, spentTxs) = state
       val amountInStorage = api.getAllWallets
@@ -310,15 +290,6 @@ class WalletDbSpec
         settingsR.constants.IntrinsicTokenId
       )
     }
-    "getAllWallets" in {
-      val (api, _, _) = state
-      api.getAllWallets.nonEmpty shouldBe true
-    }
-    "getTypedBoxById" in {
-      val (api, newTxs, _) = state
-      api.getTypedBoxById[AssetBox](newTxs.head.id).isDefined shouldBe true
-    }
-
   }
 
 }

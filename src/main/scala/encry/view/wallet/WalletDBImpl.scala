@@ -37,16 +37,16 @@ class WalletDBImpl(
 
   override def getBoxById(id: ADKey): Option[EncryBaseBox] = getTypedBoxById[EncryBaseBox](id)
 
-  def getTypedBoxById[BXT: ClassTag](id: ADKey): Option[BXT] =
+  private def getTypedBoxById[BXT: ClassTag](id: ADKey): Option[BXT] =
     levelDb
       .get(VersionalLevelDbKey @@ id.untag(ADKey))
       .flatMap(StateModifierSerializer.parseBytes(_, id.head).toOption)
       .collect { case box: BXT => box }
 
-  def getBalances: Map[ContractHash, Map[TokenId, Amount]] =
+  override def getBalances: Map[ContractHash, Map[TokenId, Amount]] =
     getAllWallets.map(hash => hash -> getBalancesByContractHash(hash)).toMap
 
-  def getTokenIds(hash: ContractHash): List[TokenId] =
+  private def getTokenIds(hash: ContractHash): List[TokenId] =
     levelDb
       .get(hashToTokens(hash))
       .map(_.grouped(32).toList)
@@ -101,7 +101,7 @@ class WalletDBImpl(
       .map(_.grouped(32).toList.map(id => id -> getTokenBalanceByContractHash(contractHash, id)).toMap)
       .getOrElse(Map.empty)
 
-  override def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount =
+  private def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount =
     levelDb.get(tokenKeyByContractHash(contractHash, tokenId)).map(Longs.fromByteArray).getOrElse(0L)
 
   override def contains(id: ADKey): Boolean = getBoxById(id).isDefined
@@ -252,7 +252,7 @@ class WalletDBImpl(
     .hash("CONTRACT_HASH_ACCOUNTS")
     .untag(Digest32)
 
-  def hashToTokens(userHash: ContractHash): VersionalLevelDbKey =
+  private def hashToTokens(userHash: ContractHash): VersionalLevelDbKey =
     VersionalLevelDbKey @@ Algos.hash(userHash ++ CONTRACT_HASH_TOKEN_IDS)
 
   private def assetBoxesByContractHashKey(userHash: ContractHash): VersionalLevelDbKey =

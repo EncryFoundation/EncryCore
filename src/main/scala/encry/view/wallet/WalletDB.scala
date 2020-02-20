@@ -25,7 +25,7 @@ trait WalletDB {
 
   def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount]
 
-  def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount
+  def getBalances: Map[ContractHash, Map[TokenId, Amount]]
 
   def contains(id: ADKey): Boolean
 
