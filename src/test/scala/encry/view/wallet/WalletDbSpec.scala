@@ -37,18 +37,19 @@ class WalletDbSpec
 
   val settingsR: EncryAppSettings = EncryAppSettings.read()
 
-  def init: WalletDBImpl = new WalletDBImpl(vldbInit, settingsR)
+    def init: WalletDBImpl = new WalletDBImpl(vldbInit, settingsR)
 
-  val api: WalletDBImpl                = init
-  val validTxs: Seq[Transaction]       = genValidPaymentTxs(3)
-  val useBox: AssetBox                 = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
-  val spentTx: Transaction             = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), randomAddress)
-  val blockPayload: Payload            = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
-  val blockPayloadWithSpentTx: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
-  val newTxs: List[EncryBaseBox]       = blockPayload.txs.flatMap(_.newBoxes).toList
-  val spentTxs: List[EncryBaseBox]     = blockPayloadWithSpentTx.txs.flatMap(_.newBoxes).toList
-  val res: Unit =
-    api.updateWallet(ModifierId @@ Random.randomBytes(), newTxs, spentTxs, settingsR.constants.IntrinsicTokenId)
+    val api: WalletDBImpl = init
+    val validTxs: Seq[Transaction] = genValidPaymentTxs(3)
+    val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
+    val spentTx: Transaction = genValidPaymentTxToAddrWithSpentBoxes(IndexedSeq(useBox), randomAddress)
+    val blockPayload: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), validTxs)
+    val blockPayloadWithSpentTx: Payload = Payload(ModifierId @@ Array.fill(32)(19: Byte), Seq(spentTx))
+    val newTxs: List[EncryBaseBox] = blockPayload.txs.flatMap(_.newBoxes).toList
+    val spentTxs: List[EncryBaseBox] = blockPayloadWithSpentTx.txs.flatMap(_.newBoxes).toList
+    val res: Unit =
+      api.updateWallet(ModifierId @@ Random.randomBytes(), newTxs, spentTxs, settingsR.constants.IntrinsicTokenId)
+
 
   "Needs to take what was inserted" should {
     "ids are the same" in {
@@ -88,6 +89,9 @@ class WalletDbSpec
       Algos.encode(api.getTokenIds(api.getAllWallets.head).head) shouldEqual Algos.encode(
         settingsR.constants.IntrinsicTokenId
       )
+    }
+    "" in {
+      api.getAssetBoxesByPredicate(api.getAllWallets.head, x => x.map(_.amount).sum > 0).nonEmpty shouldBe true
     }
   }
 
