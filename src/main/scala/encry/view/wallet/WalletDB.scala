@@ -20,6 +20,7 @@ trait WalletDB {
 
   def getDataBoxes(contractHash: ContractHash, f: List[DataBox] => Boolean): List[DataBox]
 
+
   def getBalancesByContractHash(contractHash: ContractHash): Map[TokenId, Amount]
 
   def getTokenBalanceByContractHash(contractHash: ContractHash, tokenId: TokenId): Amount

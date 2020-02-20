@@ -2,6 +2,7 @@ package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
+import encry.modifiers.mempool.TransactionFactory
 import encry.settings.{ EncryAppSettings, LevelDBSettings, Settings }
 import encry.storage.levelDb.versionalLevelDB.{
   LevelDbDiff,
@@ -9,12 +10,14 @@ import encry.storage.levelDb.versionalLevelDB.{
   VersionalLevelDB,
   VersionalLevelDBCompanion
 }
+import encry.utils.TestHelper.Props
 import encry.utils.{ EncryGenerator, FileHelper }
+import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{ Block, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{ AssetBox, EncryBaseBox, MonetaryBox }
+import org.encryfoundation.common.modifiers.state.box.{ AssetBox, EncryBaseBox, EncryProposition, MonetaryBox }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADKey, ModifierId }
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
@@ -110,7 +113,9 @@ class WalletDbSpec
     "return all inserted wallets" in {
       val (walletDb: WalletDBImpl, inserted: Seq[EncryBaseBox]) = initTestState
       val wallets                                               = walletDb.getAllWallets.map(Algos.encode)
-      val neededWallets                                         = inserted.map(l => Algos.encode(l.proposition.contractHash)).toSet
+      val neededWallets = inserted
+        .map(l => Algos.encode(l.proposition.contractHash))
+        .toSet
       (wallets.size == neededWallets.size && wallets.forall(neededWallets.contains)) shouldBe true
 
       val boxesToInsert: List[EncryBaseBox] = genValidPaymentTxs(5).flatMap(_.newBoxes).toList
@@ -126,6 +131,62 @@ class WalletDbSpec
         l => Algos.encode(l.proposition.contractHash)
       )
       (walletsNew.size == neededWalletsNew.size && walletsNew.forall(neededWalletsNew.contains)) shouldBe true
+    }
+  }
+
+  "WalletDb.getAssetBoxesByPredicate" should {
+    "return a correct result if the result satisfies the predicate" in {
+      val (walletDb: WalletDBImpl, _) = initTestState
+      val moreBoxes: IndexedSeq[AssetBox] = {
+        val key: PrivateKey25519 = genPrivKeys(1).head
+        IndexedSeq(
+          AssetBox(EncryProposition.addressLocked(key.publicImage.address.address), 11, 999, None),
+          AssetBox(EncryProposition.addressLocked(key.publicImage.address.address), 111, 9999, None),
+          AssetBox(EncryProposition.addressLocked(key.publicImage.address.address), 112, 9991, None),
+          AssetBox(EncryProposition.addressLocked(key.publicImage.address.address), 113, 999654, None),
+        )
+      }
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        moreBoxes.toList,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
+      val boxes = walletDb.getAssetBoxesByPredicate(
+        moreBoxes.head.proposition.contractHash,
+        list => list.map(_.amount).sum == moreBoxes.map(_.amount).sum
+      )
+      boxes.nonEmpty && boxes.forall { box =>
+        moreBoxes.exists(_.bytes sameElements box.bytes)
+      } shouldBe true
+
+      walletDb.getAssetBoxesByPredicate(
+        moreBoxes.head.proposition.contractHash,
+        list => list.map(_.amount).sum > moreBoxes.map(_.amount).sum
+      ).isEmpty shouldBe true
+
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        List.empty,
+        moreBoxes.take(2).toList,
+        settings.constants.IntrinsicTokenId
+      )
+
+      val boxesNew = walletDb.getAssetBoxesByPredicate(
+        moreBoxes.head.proposition.contractHash,
+        list => list.map(_.amount).sum == moreBoxes.map(_.amount).sum
+      )
+      boxesNew.nonEmpty && boxesNew.forall { box =>
+        moreBoxes.exists(_.bytes sameElements box.bytes)
+      } shouldBe false
+
+      val boxesNew1 = walletDb.getAssetBoxesByPredicate(
+        moreBoxes.head.proposition.contractHash,
+        list => list.map(_.amount).sum == moreBoxes.drop(2).map(_.amount).sum
+      )
+      boxesNew1.nonEmpty && boxesNew1.forall { box =>
+        moreBoxes.drop(2).exists(_.bytes sameElements box.bytes)
+      } shouldBe true
     }
   }
 
