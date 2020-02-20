@@ -2,19 +2,19 @@ package encry.view.wallet
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.settings.{ EncryAppSettings, LevelDBSettings, Settings }
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbDiff, LevelDbFactory, VersionalLevelDBCompanion }
-import encry.utils.{ EncryGenerator, FileHelper }
-import org.encryfoundation.common.modifiers.history.{ Block, Payload }
+import encry.settings.{EncryAppSettings, LevelDBSettings, Settings}
+import encry.storage.levelDb.versionalLevelDB.{LevelDbDiff, LevelDbFactory, VersionalLevelDBCompanion}
+import encry.utils.{EncryGenerator, FileHelper}
+import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
-import org.encryfoundation.common.modifiers.state.box.{ AssetBox, EncryBaseBox, MonetaryBox }
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, MonetaryBox}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{ADKey, ModifierId}
 import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.iq80.leveldb.Options
-import org.scalatest.{ Matchers, PropSpec, WordSpecLike }
+import org.scalatest.{Matchers, PropSpec, WordSpecLike}
 import org.scalatest.mockito.MockitoSugar
 import scorex.utils.Random
 
@@ -37,8 +37,8 @@ class WalletDbSpec
 
   val settingsR: EncryAppSettings = EncryAppSettings.read()
 
+  val state = {
     def init: WalletDBImpl = new WalletDBImpl(vldbInit, settingsR)
-
     val api: WalletDBImpl = init
     val validTxs: Seq[Transaction] = genValidPaymentTxs(3)
     val useBox: AssetBox = validTxs.head.newBoxes.head.asInstanceOf[AssetBox]
@@ -49,15 +49,16 @@ class WalletDbSpec
     val spentTxs: List[EncryBaseBox] = blockPayloadWithSpentTx.txs.flatMap(_.newBoxes).toList
     val res: Unit =
       api.updateWallet(ModifierId @@ Random.randomBytes(), newTxs, spentTxs, settingsR.constants.IntrinsicTokenId)
-
+    (api, newTxs, spentTxs)
+  }
 
   "Needs to take what was inserted" should {
-    "ids are the same" in {
-
+    "getBoxById" in {
+    val (api, newTxs, _) = state
       (api.getBoxById(newTxs.head.id).get.id sameElements newTxs.head.id) shouldBe true
-      api.getAllWallets.nonEmpty shouldBe true
     }
     "amount in storage should be correct" in {
+      val (api, newTxs, spentTxs) = state
       val amountInStorage = api.getAllWallets
         .map(ch => api.getTokenBalanceByContractHash(ch, settingsR.constants.IntrinsicTokenId))
         .foldLeft(0L) {
@@ -86,13 +87,20 @@ class WalletDbSpec
 
     }
     "should contain intrinsic tokenId" in {
+      val (api, _, _) = state
       Algos.encode(api.getTokenIds(api.getAllWallets.head).head) shouldEqual Algos.encode(
         settingsR.constants.IntrinsicTokenId
       )
     }
-    "" in {
-      api.getAssetBoxesByPredicate(api.getAllWallets.head, x => x.map(_.amount).sum > 0).nonEmpty shouldBe true
+    "getAllWallets" in {
+      val (api, _, _) = state
+      api.getAllWallets.nonEmpty shouldBe true
     }
+    "getTypedBoxById" in {
+      val (api, newTxs, _) = state
+      api.getTypedBoxById[AssetBox](newTxs.head.id).isDefined shouldBe true
+    }
+
   }
 
 }
