@@ -1,7 +1,6 @@
 package encry.view.wallet
 
 import java.io.File
-
 import cats.data.NonEmptyChain._
 import cats.data.{NonEmptyChain, Validated}
 import cats.instances.string._
@@ -27,12 +26,9 @@ import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.encryfoundation.prismlang.compiler.CompiledContract.ContractHash
 import org.iq80.leveldb.{DB, Options}
 import scorex.crypto.signatures.PublicKey
-
 import scala.util.{Failure, Success, Try}
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
