@@ -61,8 +61,7 @@ class WalletDbSpec
     val levelDB: DB                       = LevelDbFactory.factory.open(FileHelper.getRandomTempDir, new Options)
     val vlDB: VersionalLevelDB            = VersionalLevelDBCompanion(levelDB, dummyLevelDBSettings)
     def dbInstance: WalletDB              = WalletDB.apply(vlDB, settingsR)
-    val validTxs: Seq[Transaction]        = genValidPaymentTxs(3)
-    val boxesToInsert: List[EncryBaseBox] = validTxs.flatMap(_.newBoxes).toList
+    val boxesToInsert: List[EncryBaseBox] = genValidPaymentTxs(3).flatMap(_.newBoxes).toList
     dbInstance.updateWallet(
       ModifierId @@ Random.randomBytes(),
       boxesToInsert,
@@ -72,7 +71,7 @@ class WalletDbSpec
     (dbInstance, boxesToInsert)
   }
 
-  "WalletDbStorage.getBoxById" should {
+  "WalletDb.getBoxById" should {
     "return non empty value for existed box in db" in {
       val (walletDb: WalletDBImpl, inserted: Seq[EncryBaseBox]) = initTestState
       val comparisonResult: Boolean = inserted.forall { box =>
@@ -82,10 +81,51 @@ class WalletDbSpec
         }
       }
       comparisonResult shouldBe true
+
+      val boxesToInsert: List[EncryBaseBox] = genValidPaymentTxs(5).flatMap(_.newBoxes).toList
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        boxesToInsert,
+        inserted.toList,
+        settings.constants.IntrinsicTokenId
+      )
+      val comparisonResultNegative: Boolean = inserted.forall { box =>
+        walletDb.getBoxById(box.id).isEmpty
+      }
+      val comparisonResultPositive: Boolean = boxesToInsert.forall { box =>
+        val boxFromDB: Option[EncryBaseBox] = walletDb.getBoxById(box.id)
+        boxFromDB.isDefined && boxFromDB.forall { takenBox =>
+          box.bytes.sameElements(takenBox.bytes)
+        }
+      }
+      (comparisonResultNegative && comparisonResultPositive) shouldBe true
     }
     "return empty value for non existed box in db" in {
-      val (walletDb: WalletDBImpl, _: Seq[EncryBaseBox]) = initTestState
+      val (walletDb: WalletDBImpl, _) = initTestState
       walletDb.getBoxById(ADKey @@ Random.randomBytes()).isEmpty shouldBe true
+    }
+  }
+
+  "WalletDb.getAllWallets" should {
+    "return all inserted wallets" in {
+      val (walletDb: WalletDBImpl, inserted: Seq[EncryBaseBox]) = initTestState
+      val wallets                                               = walletDb.getAllWallets.map(Algos.encode)
+      val neededWallets                                         = inserted.map(l => Algos.encode(l.proposition.contractHash)).toSet
+      (wallets.size == neededWallets.size && wallets.forall(neededWallets.contains)) shouldBe true
+
+      val boxesToInsert: List[EncryBaseBox] = genValidPaymentTxs(5).flatMap(_.newBoxes).toList
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        boxesToInsert,
+        inserted.toList,
+        settings.constants.IntrinsicTokenId
+      )
+
+      val walletsNew = walletDb.getAllWallets.map(Algos.encode)
+      val neededWalletsNew = inserted.map(l => Algos.encode(l.proposition.contractHash)) ++ boxesToInsert.map(
+        l => Algos.encode(l.proposition.contractHash)
+      )
+      (walletsNew.size == neededWalletsNew.size && walletsNew.forall(neededWalletsNew.contains)) shouldBe true
     }
   }
 
