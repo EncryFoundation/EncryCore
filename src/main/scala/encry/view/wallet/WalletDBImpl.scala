@@ -194,7 +194,7 @@ class WalletDBImpl(
       ) {
         case ((assets, data, token), nextBox: AssetBox) =>
           val hash = Algos.encode(nextBox.proposition.contractHash)
-          (assets |+| Map(hash -> Set(Algos.encode(nextBox.id))), token, data)
+          (assets |+| Map(hash -> Set(Algos.encode(nextBox.id))), data, token)
         case ((assets, data, token), nextBox: DataBox) =>
           val hash = Algos.encode(nextBox.proposition.contractHash)
           (assets, data |+| Map(hash -> Set(Algos.encode(nextBox.id))), token)
@@ -210,9 +210,8 @@ class WalletDBImpl(
       ): List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
         (typeToDb |+| hashType).map {
           case (hash: String, value: Set[String]) =>
-            key(Algos.decode(hash).get) -> VersionalLevelDbValue @@ value
+            key(Algos.decode(hash).get) -> VersionalLevelDbValue @@ value.toArray
               .flatMap(k => Algos.decode(k).get)
-              .toArray
         }.toList
 
       val newAssetsToDB: List[(VersionalLevelDbKey, VersionalLevelDbValue)] =
