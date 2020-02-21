@@ -124,15 +124,22 @@ class WalletDBImpl(
 
     val infoAboutWalletToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
       val toAddBalances: Map[String, Map[String, Amount]]    = balanceSheetFunction(newBxs, 1L)
+      println(s"toAdd = $toAddBalances")
       val toRemoveBalances: Map[String, Map[String, Amount]] = balanceSheetFunction(spentBxs)
+      println(s"toRemove = $toRemoveBalances")
       val currentBalances: Map[String, Map[String, Amount]] =
         getBalances.map {
           case (hash: ContractHash, idToAmount: Map[TokenId, Amount]) =>
+            println(s"idsToAmount = ${idToAmount.map{
+              case (a,b) => Algos.encode(a) -> b}
+            }")
             Algos.encode(hash) -> idToAmount.map {
               case (id: TokenId, amount: Amount) => Algos.encode(id) -> amount
             }
         }
+      println(s"currentBalance = $currentBalances")
       val updatedWallets                 = toAddBalances |+| toRemoveBalances |+| currentBalances
+      println(s"updateWallets = $updatedWallets")
       val newContractHashes: Array[Byte] = updatedWallets.keys.toList.flatMap(id => Algos.decode(id).get).toArray
       val contractHashToInsert
         : (VersionalLevelDbKey, VersionalLevelDbValue) = CONTRACT_HASH_ACCOUNTS -> VersionalLevelDbValue @@ newContractHashes
@@ -140,10 +147,16 @@ class WalletDBImpl(
       updatedWallets.flatMap {
         case (hash: String, idToAmount: Map[String, Amount]) =>
           val decodedHash: Array[Byte] = Algos.decode(hash).get
+          val a: List[String] = getTokenIds(decodedHash).map(l => Algos.encode(l))
+          val b: List[String] = idToAmount.keys.toList
+          val c: List[String] = a ::: b
+          val d: Set[String] = c.toSet
+          val e: List[String] = d.toList
+          val f: List[Array[Byte]] = e.map(j => Algos.decode(j).get)
+          val g: Array[Array[Byte]] = f.toArray
+          val h: Array[Byte] = g.flatten
           val tokenIdsToUpdate: (VersionalLevelDbKey, VersionalLevelDbValue) =
-            hashToTokens(decodedHash) -> VersionalLevelDbValue @@ (idToAmount.keys.toList
-              .flatMap(elem => Algos.decode(elem).get)
-              .toArray ++ getTokenIds(decodedHash).flatten)
+            hashToTokens(decodedHash) -> VersionalLevelDbValue @@ h
           val tokenIdUpdatedAmount: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = idToAmount.map {
             case (id: String, amount: Amount) =>
               tokenKeyByContractHash(decodedHash, Algos.decode(id).get) ->
@@ -153,6 +166,8 @@ class WalletDBImpl(
           contractHashToInsert :: tokenIdsToUpdate :: tokenIdUpdatedAmount
       }.toList
     }
+
+    println(s"infoAboutWalletToInsert -> ${infoAboutWalletToInsert.map(l => Algos.encode(l._1) -> Algos.encode(l._2)).mkString(",")}")
 
     val boxesIdsToContractHashToInsert: List[(VersionalLevelDbKey, VersionalLevelDbValue)] = {
       def updatedFunction(

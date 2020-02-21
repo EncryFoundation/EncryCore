@@ -125,6 +125,12 @@ class WalletDbSpec
     }
   }
 
+  "WalletDb.getBalances" should {
+    "return a correct result" in {
+
+    }
+  }
+
   "WalletDb.getAssetBoxesByPredicate" should {
     "return a correct result if the result satisfies the predicate" in {
       val (walletDb: WalletDBImpl, _) = initTestState
@@ -217,6 +223,82 @@ class WalletDbSpec
     }
   }
 
+  "WalletDb.getBalances" should {
+    "return correct balances" in {
+      val (walletDb: WalletDBImpl, _) = initTestState
+      val tkId1 = Random.randomBytes()
+      val tkId2 = Random.randomBytes()
+      val key = genPrivKeys(1)
+      val key2 = genPrivKeys(1)
+      val boxesToInsertForPerson1: IndexedSeq[EncryBox[EncryProposition]] = {
+        IndexedSeq(
+          TokenIssuingBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 1234L, 340, tkId1),
+          TokenIssuingBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 4321L, 570, tkId1),
+          DataBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 99, Random.randomBytes()),
+          AssetBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 11, 2000, None),
+          AssetBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 111, 3000, None)
+        )
+      }
+      val boxesToInsertForPerson2: IndexedSeq[EncryBox[EncryProposition]] = {
+        IndexedSeq(
+          TokenIssuingBox(EncryProposition.addressLocked(key2.head.publicImage.address.address), 1234L, 999, tkId2),
+          TokenIssuingBox(EncryProposition.addressLocked(key2.head.publicImage.address.address), 4321L, 9991, tkId2),
+          DataBox(EncryProposition.addressLocked(key2.head.publicImage.address.address), 99, Random.randomBytes()),
+          AssetBox(EncryProposition.addressLocked(key2.head.publicImage.address.address), 11, 999, None),
+          AssetBox(EncryProposition.addressLocked(key2.head.publicImage.address.address), 111, 9999, None)
+        )
+      }
+      val ch1 = boxesToInsertForPerson1.head.proposition.contractHash
+      val ch2 = boxesToInsertForPerson2.head.proposition.contractHash
+      println("qwe")
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        boxesToInsertForPerson1.toList ,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
+      println("<<<<qwe")
+      println(walletDb.getBalancesByContractHash(ch1).map(x => Algos.encode(x._1)))
+      println("qwe>>>>>")
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        boxesToInsertForPerson2.toList ,
+        List.empty,
+        settings.constants.IntrinsicTokenId
+      )
+      boxesToInsertForPerson1.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
+      walletDb.getBalancesByContractHash(ch1).filter{case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+
+      boxesToInsertForPerson2.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
+        walletDb.getBalancesByContractHash(ch2).filter{case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+
+      boxesToInsertForPerson1.drop(3).map(x => x.asInstanceOf[AssetBox]).map(x => x.amount).sum shouldEqual
+        walletDb.getBalancesByContractHash(ch1).filter{case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+
+      boxesToInsertForPerson2.drop(3).map(x => x.asInstanceOf[AssetBox]).map(x => x.amount).sum shouldEqual
+        walletDb.getBalancesByContractHash(ch2).filter{case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+
+      val boxesToRemoveForPerson1 = IndexedSeq(
+        TokenIssuingBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 1234L, 900, tkId1),
+        AssetBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 111, 4000, None)
+      )
+
+      val boxesToRemoveForPerson2 = IndexedSeq(
+        TokenIssuingBox(EncryProposition.addressLocked(key.last.publicImage.address.address), 1234L, 900, tkId2),
+        AssetBox(EncryProposition.addressLocked(key.last.publicImage.address.address), 111, 4000, None)
+      )
+
+      walletDb.updateWallet(
+        ModifierId @@ Random.randomBytes(),
+        List.empty,
+        boxesToRemoveForPerson1.toList ++ boxesToRemoveForPerson2.toList,
+        settings.constants.IntrinsicTokenId
+      )
+
+      println("123   " + walletDb.getBalancesByContractHash(ch1).map(x => Algos.encode(x._1)))
+    }
+  }
+
   "WalletDb.getTokenIssuingBoxes" should {
     "return a correct result if the result satisfies the predicate" in {
       val (walletDb: WalletDBImpl, _) = initTestState
@@ -254,42 +336,36 @@ class WalletDbSpec
     }
   }
 
-  "Needs to take what was inserted" should {
-    "amount in storage should be correct" in {
-      val (api, newTxs, spentTxs) = state
-      val amountInStorage = api.getAllWallets
-        .map(ch => api.getTokenBalanceByContractHash(ch, settingsR.constants.IntrinsicTokenId))
-        .foldLeft(0L) {
-          case (acc, amount) => acc + amount
-        }
-      val amountToInsert: Long = {
-        val newTx: Long = newTxs.map {
-          case a: MonetaryBox => a.amount
-        }.foldLeft(0L) {
-          case (acc, amount) => acc + amount
-        }
-        val spent: Long = spentTxs.map {
-          case a: MonetaryBox => a.amount
-        }.foldLeft(0L) {
-          case (acc, amount) => acc + amount
-        }
-        newTx - spent
-      }
-      val getBalance: Amount = api.getAllWallets.map(x => api.getBalancesByContractHash(x)).foldLeft(0L) {
-        case (acc, amount) => acc + amount.values.sum
-      }
-
-      amountInStorage shouldEqual amountToInsert
-      amountInStorage shouldEqual getBalance
-      amountToInsert shouldEqual getBalance
-
-    }
-    "should contain intrinsic tokenId" in {
-      val (api, _, _) = state
-      Algos.encode(api.getTokenIds(api.getAllWallets.head).head) shouldEqual Algos.encode(
-        settingsR.constants.IntrinsicTokenId
-      )
-    }
-  }
+//  "Needs to take what was inserted" should {
+//    "amount in storage should be correct" in {
+//      val (api, newTxs, spentTxs) = state
+//      val amountInStorage = api.getAllWallets
+//        .map(ch => api.getTokenBalanceByContractHash(ch, settingsR.constants.IntrinsicTokenId))
+//        .foldLeft(0L) {
+//          case (acc, amount) => acc + amount
+//        }
+//      val amountToInsert: Long = {
+//        val newTx: Long = newTxs.map {
+//          case a: MonetaryBox => a.amount
+//        }.foldLeft(0L) {
+//          case (acc, amount) => acc + amount
+//        }
+//        val spent: Long = spentTxs.map {
+//          case a: MonetaryBox => a.amount
+//        }.foldLeft(0L) {
+//          case (acc, amount) => acc + amount
+//        }
+//        newTx - spent
+//      }
+//      val getBalance: Amount = api.getAllWallets.map(x => api.getBalancesByContractHash(x)).foldLeft(0L) {
+//        case (acc, amount) => acc + amount.values.sum
+//      }
+//
+//      amountInStorage shouldEqual amountToInsert
+//      amountInStorage shouldEqual getBalance
+//      amountToInsert shouldEqual getBalance
+//
+//    }
+//  }
 
 }
