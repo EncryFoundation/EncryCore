@@ -230,7 +230,7 @@ class WalletDbSpec
       boxesToInsertForPerson1.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
         walletDb
           .getBalancesByContractHash(ch1)
-          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settings.constants.IntrinsicTokenId) }
           .values
           .toList
           .sum
@@ -238,7 +238,7 @@ class WalletDbSpec
       boxesToInsertForPerson2.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
         walletDb
           .getBalancesByContractHash(ch2)
-          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settings.constants.IntrinsicTokenId) }
           .values
           .toList
           .sum
@@ -246,7 +246,7 @@ class WalletDbSpec
       boxesToInsertForPerson1.drop(3).map(x => x.asInstanceOf[AssetBox]).map(x => x.amount).sum shouldEqual
         walletDb
           .getBalancesByContractHash(ch1)
-          .filter { case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .filter { case (id, _) => Algos.encode(id) == Algos.encode(settings.constants.IntrinsicTokenId) }
           .values
           .toList
           .sum
@@ -254,7 +254,7 @@ class WalletDbSpec
       boxesToInsertForPerson2.drop(3).map(x => x.asInstanceOf[AssetBox]).map(x => x.amount).sum shouldEqual
         walletDb
           .getBalancesByContractHash(ch2)
-          .filter { case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .filter { case (id, _) => Algos.encode(id) == Algos.encode(settings.constants.IntrinsicTokenId) }
           .values
           .toList
           .sum
@@ -280,7 +280,7 @@ class WalletDbSpec
         boxesToRemoveForPerson1.take(1).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
         walletDb
           .getBalancesByContractHash(ch1)
-          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settings.constants.IntrinsicTokenId) }
           .values
           .toList
           .sum
@@ -289,7 +289,7 @@ class WalletDbSpec
         boxesToRemoveForPerson2.take(1).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
         walletDb
           .getBalancesByContractHash(ch2)
-          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settings.constants.IntrinsicTokenId) }
           .values
           .toList
           .sum
