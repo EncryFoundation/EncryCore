@@ -26,7 +26,7 @@ object GetBalance extends Command {
           {
             val balance: String =
               view.vault.getBalances.foldLeft("")((str, tokenInfo) =>
-                if (tokenInfo._1._2 != Algos.encode(settings.constants.IntrinsicTokenId))
+                if (Algos.encode(tokenInfo._1._2) != Algos.encode(settings.constants.IntrinsicTokenId))
                   str.concat(s"TokenID(${tokenInfo._1._2}) for key ${tokenInfo._1._1} : ${tokenInfo._2}\n")
                 else str.concat(s"TokenID(${tokenInfo._1._2}) for key ${tokenInfo._1._1} : ${BigDecimal(tokenInfo._2) / 100000000}\n")
             )

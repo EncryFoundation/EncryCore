@@ -14,7 +14,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, WalletVersionalLevelDB, WalletVersionalLevelDBCompanion}
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.utils.Mnemonic
+import encry.utils.{ByteStr, Mnemonic}
 import encry.view.state.UtxoStateReader
 import encry.view.state.avlTree.{InternalNode, LeafNode, Node, ShadowNode}
 import io.iohk.iodb.{LSMStore, Store}
@@ -23,10 +23,12 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{EncryBaseBox, EncryProposition, MonetaryBox}
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.{DB, Options}
+import scorex.crypto.signatures.PublicKey
 import scala.util.{Failure, Success, Try}
 
 case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: Seq[AccountManager], private val accountStore: Store)
@@ -87,21 +89,19 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
 
   def rollback(to: VersionTag): Try[Unit] = Try(walletStorage.rollback(ModifierId @@ to.untag(VersionTag)))
 
-  def getBalances: Seq[((String, String), Long)] = {
-    val pubKeys = publicKeys
-    val contractHashToKey = contractHashesToKeys(pubKeys)
-    val positiveBalance = walletStorage.getBalances.map { case ((hash, tokenId), amount) =>
-      (contractHashToKey(hash), tokenId) -> amount
+  def getBalances: List[((PublicKey, TokenId), Amount)] = {
+    val pubKeys: Set[PublicKey25519] = publicKeys
+    val contractHashToKey: Map[ByteStr, PublicKey] = pubKeysToContractHashes(pubKeys)
+    val positiveBalance: Map[(PublicKey, TokenId), Amount] = walletStorage.getBalances.map {
+      case ((hash, tokenId), amount) => (contractHashToKey(ByteStr(hash)), tokenId) -> amount
     }
-    (pubKeys.map(k => Algos.encode(k.pubKeyBytes)) -- positiveBalance.keys.map(_._1))
-      .map(_ -> Algos.encode(settings.constants.IntrinsicTokenId) -> 0L).toSeq ++ positiveBalance
-  }.sortBy(_._1._1 != Algos.encode(accountManagers.head.publicAccounts.head.pubKeyBytes))
+    (pubKeys.map(k => ByteStr(k.pubKeyBytes)) -- positiveBalance.keys.map(l => ByteStr(l._1)))
+      .map(l => (PublicKey @@ l.arr) -> settings.constants.IntrinsicTokenId -> 0L).toSeq ++ positiveBalance
+    }.sortBy(l => !(l._1._1 sameElements accountManagers.head.publicAccounts.head.pubKeyBytes)).toList
 
-  def contractHashesToKeys(pubKeys: Set[PublicKey25519]): Map[String, String] = pubKeys
-    .map(key => Algos.encode(key.pubKeyBytes) -> key.address.address)
-    .map { case (key, addr) =>
-      Algos.encode(EncryProposition.addressLocked(addr).contractHash) -> key
-    }.toMap
+  def pubKeysToContractHashes(pubKeys: Set[PublicKey25519]): Map[ByteStr, PublicKey] = pubKeys
+    .map(key => ByteStr(EncryProposition.addressLocked(key.address.address).contractHash) -> key.pubKeyBytes)
+    .toMap
 
   private def validateMnemonicKey(mnemonic: String): Either[NonEmptyChain[String], String] = {
     val words: Array[String] = mnemonic.split(" ")
@@ -154,7 +154,7 @@ object EncryWallet extends StrictLogging {
       }
     case leafNode: LeafNode[StorageKey, StorageValue] =>
       StateModifierSerializer.parseBytes(leafNode.value, leafNode.key.head) match {
-        case Success(bx) => collectBx(bx, accounts)
+        case Success(bx)        => collectBx(bx, accounts)
         case Failure(exception) => throw exception //???????
       }
     case shadowNode: ShadowNode[StorageKey, StorageValue] => List.empty
@@ -172,7 +172,8 @@ object EncryWallet extends StrictLogging {
     val db: DB = LevelDbFactory.factory.open(walletDir, new Options)
     val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34) // 34 = 1 prefix byte + 1 account number byte + 32 key bytes
     val walletStorage: WalletVersionalLevelDB = WalletVersionalLevelDBCompanion(db, settings.levelDB)
-    val password: String = settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
+    val password: String =
+      settings.wallet.map(_.password).getOrElse(throw new RuntimeException("Password not specified"))
     val restoredAccounts: Seq[AccountManager] = AccountManager.restoreAccounts(accountManagerStore, password)
     //init keys
     EncryWallet(walletStorage, restoredAccounts, accountManagerStore)

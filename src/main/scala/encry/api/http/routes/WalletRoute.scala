@@ -8,10 +8,11 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.{GetViewGetBalance, GetViewPrintPubKeys}
 import encry.settings.{EncryAppSettings, RESTApiSettings}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
+import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ADKey
 import scalatags.Text
 import scalatags.Text.all.{div, span, _}
+import scorex.crypto.signatures.PublicKey
 import scala.concurrent.Future
 import scala.language.implicitConversions
 import scala.util.Success
@@ -24,19 +25,18 @@ case class WalletRoute(settings: RESTApiSettings,
 
   val EttTokenId: String = Algos.encode(encrySettings.constants.IntrinsicTokenId)
 
- def walletF: Future[Map[String, List[(String, Amount)]]] =
+ def walletF: Future[Map[(PublicKey, TokenId), Amount]] =
    (dataHolder ? GetViewGetBalance)
-     .mapTo[Map[String, List[(String, Amount)]]]
+     .mapTo[Map[(PublicKey, TokenId), Amount]]
 
  def pubKeysF: Future[List[String]] = (dataHolder ? GetViewPrintPubKeys).mapTo[List[String]]
 
- def info: Future[(Map[String, List[(String, Amount)]], List[String])] = for {
+ def info: Future[(Map[(PublicKey, TokenId), Amount], List[String])] = for {
    wallet <- walletF
    pubKeys <- pubKeysF
  } yield (wallet, pubKeys)
 
- def walletScript(balances: Map[String, List[(String, Amount)]]): Text.TypedTag[String] = {
-
+ def walletScript(balances: Map[(PublicKey, TokenId), Amount]): Text.TypedTag[String] = {
    html(
      scalatags.Text.all.head(
        meta(charset := "utf-8"),
@@ -426,10 +426,9 @@ case class WalletRoute(settings: RESTApiSettings,
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
                                           for {
-                                            coinI <- balances.toList
-                                            coinIds <- coinI._2
+                                            walletMap <- balances.toList
                                           } yield {
-                                            option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2/100000000})" else coinIds._1)
+                                            option(value := walletMap._1._2.toString, if (Algos.encode(walletMap._1._2) == EttTokenId) s"ETT (${walletMap._2/100000000})" else Algos.encode(walletMap._1._2))
                                           }
                                         )
                                       ),
@@ -686,9 +685,9 @@ case class WalletRoute(settings: RESTApiSettings,
                                       div(cls := "form-group",
                                         select(cls := "form-control", id :="coin", name:="coin",
                                           if (balances.nonEmpty) {
-                                            balances.values.flatten.toList.map( coinIds =>
-                                              option(value := coinIds._1, if (coinIds._1 == EttTokenId) s"ETT (${coinIds._2/100000000})" else coinIds._1)
-                                            )
+                                            balances.toList.map { coinIds =>
+                                              option(value := Algos.encode(coinIds._1._2), if (Algos.encode(coinIds._1._2) == EttTokenId) s"ETT (${coinIds._2 / 100000000})" else Algos.encode(coinIds._1._2))
+                                            }
                                           } else {
                                             option(value := "", "")
                                           }
@@ -721,17 +720,16 @@ case class WalletRoute(settings: RESTApiSettings,
                       tbody(
                         if (balances.nonEmpty) {
                           (for {
-                            mapKeyValue <- balances
-                            tokenAmount <- mapKeyValue._2
+                            mapKeyValue <- balances.toList
                           } yield {
-                            val tknStr = tokenAmount._1 match {
-                              case tokenId if tokenId == EttTokenId => "ETT"
-                              case tokenId => tokenId
+                            val tknStr = mapKeyValue._1._2 match {
+                              case tokenId if Algos.encode(tokenId) == EttTokenId => "ETT"
+                              case tokenId => Algos.encode(tokenId)
                             }
                             tr(
-                              th(mapKeyValue._1),
+                              th(Algos.encode(mapKeyValue._1._1)),
                               th(tknStr),
-                              if (tokenAmount._1 == EttTokenId ) th(tokenAmount._2/100000000) else th(tokenAmount._2)
+                              if (Algos.encode(mapKeyValue._1._2) == EttTokenId ) th(mapKeyValue._2/100000000) else th(mapKeyValue._2)
                             )
                           }).toList
                         } else {
@@ -764,7 +762,7 @@ case class WalletRoute(settings: RESTApiSettings,
                       ),
                       tbody(
                         if(balances.keys.nonEmpty) {
-                          for (p <- balances.keys.toList) yield {
+                          for (p <- balances.toList.map(x => Algos.encode(x._1._1))) yield {
                             tr(th(attr("scope") := "row", p))
                           }
                         } else {

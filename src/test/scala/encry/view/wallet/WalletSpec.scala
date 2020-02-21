@@ -164,12 +164,12 @@ class WalletSpec extends PropSpec with Matchers with InstanceFactory with EncryG
 
     wallet.scanPersistent(block)
 
-    val addr1 = Algos.encode(keyManagerOne.mandatoryAccount.publicKeyBytes)
-    val addr2 = Algos.encode(keyManagerTwo.mandatoryAccount.publicKeyBytes)
-    val addr3 = Algos.encode(extraAcc.publicKeyBytes)
+    val addr1: String = Algos.encode(keyManagerOne.mandatoryAccount.publicKeyBytes)
+    val addr2: String = Algos.encode(keyManagerTwo.mandatoryAccount.publicKeyBytes)
+    val addr3: String = Algos.encode(extraAcc.publicKeyBytes)
 
-    wallet.getBalances.filter(_._1._1 == addr1).map(_._2).sum shouldEqual txsQty * Props.boxValue
-    wallet.getBalances.filter(_._1._1 == addr2).map(_._2).sum shouldEqual (txsQty - 1) * Props.boxValue
-    wallet.getBalances.filter(_._1._1 == addr3).map(_._2).sum shouldEqual (txsQty - 2) * Props.boxValue
+    wallet.getBalances.filter(x => Algos.encode(x._1._1) == addr1).map(_._2).sum shouldEqual txsQty * Props.boxValue
+    wallet.getBalances.filter(x => Algos.encode(x._1._1) == addr2).map(_._2).sum shouldEqual (txsQty - 1) * Props.boxValue
+    wallet.getBalances.filter(x => Algos.encode(x._1._1) == addr3).map(_._2).sum shouldEqual (txsQty - 2) * Props.boxValue
   }
 }
