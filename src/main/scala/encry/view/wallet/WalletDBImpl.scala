@@ -50,7 +50,7 @@ class WalletDBImpl(
       .map(_.grouped(32).toList.map(id => id -> getTokenBalanceByContractHash(contractHash, id)).toMap)
       .getOrElse(Map.empty)
 
-  private def getAllWallets: List[ContractHash] =
+  def getAllWallets: List[ContractHash] =
     levelDb
       .get(CONTRACT_HASH_ACCOUNTS)
       .map(_.grouped(32).toList)
