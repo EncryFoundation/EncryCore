@@ -126,9 +126,7 @@ class WalletDbSpec
   }
 
   "WalletDb.getBalances" should {
-    "return a correct result" in {
-
-    }
+    "return a correct result" in {}
   }
 
   "WalletDb.getAssetBoxesByPredicate" should {
@@ -226,10 +224,10 @@ class WalletDbSpec
   "WalletDb.getBalances" should {
     "return correct balances" in {
       val (walletDb: WalletDBImpl, _) = initTestState
-      val tkId1 = Random.randomBytes()
-      val tkId2 = Random.randomBytes()
-      val key = genPrivKeys(1)
-      val key2 = genPrivKeys(1)
+      val tkId1                       = Random.randomBytes()
+      val tkId2                       = Random.randomBytes()
+      val key                         = genPrivKeys(1)
+      val key2                        = genPrivKeys(1)
       val boxesToInsertForPerson1: IndexedSeq[EncryBox[EncryProposition]] = {
         IndexedSeq(
           TokenIssuingBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 1234L, 340, tkId1),
@@ -258,16 +256,36 @@ class WalletDbSpec
       )
 
       boxesToInsertForPerson1.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
-      walletDb.getBalancesByContractHash(ch1).filter{case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+        walletDb
+          .getBalancesByContractHash(ch1)
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .values
+          .toList
+          .sum
 
       boxesToInsertForPerson2.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
-        walletDb.getBalancesByContractHash(ch2).filter{case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+        walletDb
+          .getBalancesByContractHash(ch2)
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .values
+          .toList
+          .sum
 
       boxesToInsertForPerson1.drop(3).map(x => x.asInstanceOf[AssetBox]).map(x => x.amount).sum shouldEqual
-        walletDb.getBalancesByContractHash(ch1).filter{case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+        walletDb
+          .getBalancesByContractHash(ch1)
+          .filter { case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .values
+          .toList
+          .sum
 
       boxesToInsertForPerson2.drop(3).map(x => x.asInstanceOf[AssetBox]).map(x => x.amount).sum shouldEqual
-        walletDb.getBalancesByContractHash(ch2).filter{case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+        walletDb
+          .getBalancesByContractHash(ch2)
+          .filter { case (id, _) => Algos.encode(id) == Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .values
+          .toList
+          .sum
 
       val boxesToRemoveForPerson1 = IndexedSeq(
         TokenIssuingBox(EncryProposition.addressLocked(key.head.publicImage.address.address), 1234L, 900, tkId1),
@@ -288,11 +306,21 @@ class WalletDbSpec
 
       boxesToInsertForPerson1.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum -
         boxesToRemoveForPerson1.take(1).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
-        walletDb.getBalancesByContractHash(ch1).filter{case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+        walletDb
+          .getBalancesByContractHash(ch1)
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .values
+          .toList
+          .sum
 
       boxesToInsertForPerson2.take(2).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum -
         boxesToRemoveForPerson2.take(1).map(x => x.asInstanceOf[TokenIssuingBox]).map(x => x.amount).sum shouldEqual
-        walletDb.getBalancesByContractHash(ch2).filter{case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId)}.values.toList.sum
+        walletDb
+          .getBalancesByContractHash(ch2)
+          .filter { case (id, _) => Algos.encode(id) != Algos.encode(settingsR.constants.IntrinsicTokenId) }
+          .values
+          .toList
+          .sum
     }
   }
 
