@@ -12,8 +12,6 @@ trait WalletDB {
 
   def getBoxById(id: ADKey): Option[EncryBaseBox]
 
-  def getAllWallets: List[ContractHash]
-
   def getAssetBoxesByPredicate(contractHash: ContractHash, f: List[AssetBox] => Boolean): List[AssetBox]
 
   def getTokenIssuingBoxesByPredicate(
