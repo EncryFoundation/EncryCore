@@ -280,7 +280,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                     s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
                 }
               }
-              if (encrySettings.node.mining) context.system.actorSelection("/user/miner") ! EnableMining
+              if (encrySettings.node.mining && progressInfo.chainSwitchingNeeded) context.system.actorSelection("/user/miner") ! StartMining
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
