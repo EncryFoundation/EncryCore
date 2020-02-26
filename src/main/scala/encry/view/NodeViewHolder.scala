@@ -229,6 +229,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
                 blocks :+ blockAtHeight
             }
+            context.system.actorSelection("/user/miner") ! DisableMining
             state.rollbackTo(branchPoint, additionalBlocks) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
           } else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
@@ -279,6 +280,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                     s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
                 }
               }
+              if (encrySettings.node.mining) context.system.actorSelection("/user/miner") ! EnableMining
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
