@@ -416,8 +416,8 @@ object AvlTree extends StrictLogging {
     AvlTree(rootNode, avlStorage, rootNodesStorage)
   }
 
-  def rollbackTo[K, V](to: StorageVersion, additionalBlocks: List[Block], avlStorage: VersionalStorage, rootNodesStorage: RootNodesStorage[K, V])
-                      (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
+  def rollbackTo[K: Hashable: Order, V](to: StorageVersion, additionalBlocks: List[Block], avlStorage: VersionalStorage, rootNodesStorage: RootNodesStorage[K, V])
+                                       (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
     Try {
       logger.info(s"Rollback avl to version: ${Algos.encode(to)}")
       logger.info(s"Versions in storage: ${avlStorage.versions.map(Algos.encode).mkString(",")}")
