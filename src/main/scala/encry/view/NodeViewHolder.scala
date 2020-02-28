@@ -1,6 +1,7 @@
 package encry.view
 
 import java.io.File
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.pattern._
@@ -10,6 +11,7 @@ import encry.EncryApp
 import encry.EncryApp.{system, timeProvider}
 import encry.api.http.DataHolderForApi
 import encry.consensus.HistoryConsensus.ProgressInfo
+import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
@@ -35,6 +37,7 @@ import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -229,6 +232,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                 val blockAtHeight = history.getBlockByHeader(headerAtHeight).get
                 blocks :+ blockAtHeight
             }
+            context.system.actorSelection("/user/miner") ! DisableMining
             state.rollbackTo(branchPoint, additionalBlocks) -> trimChainSuffix(suffixApplied, ModifierId !@@ branchPoint)
           } else Success(state) -> IndexedSeq()
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
@@ -279,6 +283,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
                     s"Processing time is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
                 }
               }
+              if (encrySettings.node.mining && progressInfo.chainSwitchingNeeded) context.system.actorSelection("/user/miner") ! StartMining
               context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
               if (newHis.getBestHeaderId.exists(bestHeaderId =>
                   newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))

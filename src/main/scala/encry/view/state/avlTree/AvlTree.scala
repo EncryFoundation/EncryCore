@@ -198,8 +198,6 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
       avlStorage.rollbackTo(to)
       logger.info(s"Storage success rolled back")
       logger.info(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).getOrElse(Array.emptyByteArray))}")
-//      val newRootNode =
-//        NodeSerilalizer.fromBytes[K, V](avlStorage.get(StorageKey !@@ AvlTree.nodeKey(avlStorage.get(AvlTree.rootNodeKey).get)).get)
       val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
       logger.info(s"root node hash after rollback: ${Algos.encode(newRoot.hash)}")
       AvlTree[K, V](newRoot, avlStorage, newStorage)
@@ -408,7 +406,7 @@ final case class AvlTree[K : Hashable : Order, V](rootNode: Node[K, V],
   override def toString: String = rootNode.toString
 }
 
-object AvlTree {
+object AvlTree extends StrictLogging {
 
   def restore[K: Monoid: Serializer: Hashable: Order, V: Monoid: Serializer](
     avlStorage: VersionalStorage,
@@ -417,6 +415,20 @@ object AvlTree {
     val rootNode = NodeSerilalizer.fromBytes[K, V](avlStorage.get(AvlTree.rootNodeKey).get)
     AvlTree(rootNode, avlStorage, rootNodesStorage)
   }
+
+  def rollbackTo[K: Hashable: Order, V](to: StorageVersion, additionalBlocks: List[Block], avlStorage: VersionalStorage, rootNodesStorage: RootNodesStorage[K, V])
+                                       (implicit kMonoid: Monoid[K], kSer: Serializer[K], vMonoid: Monoid[V], vSer: Serializer[V]): Try[AvlTree[K, V]] =
+    Try {
+      logger.info(s"Rollback avl to version: ${Algos.encode(to)}")
+      logger.info(s"Versions in storage: ${avlStorage.versions.map(Algos.encode).mkString(",")}")
+      logger.info(s"Before rollback node key: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).get)}")
+      avlStorage.rollbackTo(to)
+      logger.info(s"Storage success rolled back")
+      logger.info(s"rootNodeKey: ${Algos.encode(avlStorage.get(AvlTree.rootNodeKey).getOrElse(Array.emptyByteArray))}")
+      val (newStorage, newRoot) = rootNodesStorage.rollbackToSafePoint(RootNodesStorage.blocks2InsInfo[K, V](additionalBlocks))
+      logger.info(s"root node hash after rollback: ${Algos.encode(newRoot.hash)}")
+      AvlTree[K, V](newRoot, avlStorage, newStorage)
+    }
 
   val rootNodeKey: StorageKey = StorageKey !@@ ((3: Byte) +: Algos.hash("root_node"))
 

@@ -74,7 +74,7 @@ object SnapshotAssemblerBench {
       }
       val dir: File = FileHelper.getRandomTempDir
       val levelDb: DB = LevelDbFactory.factory.open(dir, new Options)
-      val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+      val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10, dir)
 
       val firstAvl: AvlTree[StorageKey, StorageValue] = AvlTree[StorageKey, StorageValue](firstStorage, rootNodesStorage)
       val avlNew = (from to to).foldLeft(firstAvl) { case (avl, i) =>

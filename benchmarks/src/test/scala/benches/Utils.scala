@@ -204,7 +204,7 @@ object Utils extends Settings with StrictLogging {
 
     val dirForRoots: File = FileHelper.getRandomTempDir
     val levelDb: DB = LevelDbFactory.factory.open(dirForRoots, new Options)
-    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10)
+    val rootNodesStorage = RootNodesStorage[StorageKey, StorageValue](levelDb, 10, dirForRoots)
 
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
