@@ -5,7 +5,11 @@ import akka.routing.BalancingPool
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.DownloadedModifiersValidator.ModifiersForValidating
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
+import encry.nvg.ModifiersValidator.ModifierForValidation
+import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
+import encry.view.history.HistoryReader
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 class IntermediaryNVH(settings: EncryAppSettings) extends Actor with StrictLogging {
 
@@ -20,10 +24,20 @@ class IntermediaryNVH(settings: EncryAppSettings) extends Actor with StrictLoggi
       name = "Modifiers-validator-router"
     )
 
+  var historyReader: HistoryReader = HistoryReader.empty
+
   override def receive: Receive = {
-    case msg @ ModifiersForValidating(_, _, _) => modifiersValidatorRouter ! msg
-    case msg @ DataFromPeer(_, _)              => networkMessagesProcessor ! msg
-    case _                                     =>
+    case ModifiersForValidating(remote, typeId, modifiers) =>
+      logger.info(s"Got ${modifiers.size} modifiers of type $typeId for validation.")
+      modifiers.foreach {
+        case (id: ModifierId, bytes: Array[Byte]) =>
+          modifiersValidatorRouter ! ModifierForValidation(historyReader, id, typeId, bytes, remote)
+      }
+    case msg @ DataFromPeer(_, _) => networkMessagesProcessor ! msg
+    case UpdateHistoryReader(newReader: HistoryReader) =>
+      historyReader = newReader
+      networkMessagesProcessor ! newReader
+    case _ =>
   }
 }
 
