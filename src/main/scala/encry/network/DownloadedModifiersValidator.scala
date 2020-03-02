@@ -37,41 +37,6 @@ class DownloadedModifiersValidator(modifierIdSize: Int,
   }
 
   def workingCycle(history: History): Receive = {
-    case ModifiersForValidating(remote, typeId, filteredModifiers) if typeId != Transaction.modifierTypeId =>
-      filteredModifiers.foreach {
-        case (id, bytes) =>
-          ModifiersToNetworkUtils.fromProto(typeId, bytes) match {
-            case Success(modifier) =>
-              val syntacticValidation: Boolean = ModifiersToNetworkUtils.isSyntacticallyValid(modifier, modifierIdSize)
-              val preSemanticValidation: Either[HeaderUtils.PreSemanticValidationException, Unit] =
-                ModifiersToNetworkUtils.isPreSemanticValidation(modifier, history, settings)
-              if (syntacticValidation && preSemanticValidation.isRight) {
-                logger.debug(
-                  s"Modifier: ${modifier.encodedId} after testApplicable is correct. " +
-                    s"Sending validated modifier to NodeViewHolder"
-                )
-                influxRef.foreach(_ ! ValidatedModifierFromNetwork(typeId))
-                nodeViewHolder ! ModifierFromRemote(modifier)
-              } else {
-                logger.info(
-                  s"Modifier with id: ${modifier.encodedId} of type: $typeId invalid cause of:" +
-                    s"isSyntacticallyValid = false or $preSemanticValidation"
-                )
-                if (!syntacticValidation) peersKeeper ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
-                else
-                  preSemanticValidation match {
-                    case Left(value) => peersKeeper ! BanPeer(remote, PreSemanticInvalidModifier(value.error))
-                    case Right(_)    =>
-                  }
-                nodeViewSync ! InvalidModifier(id)
-              }
-            case Failure(ex) =>
-              peersKeeper ! BanPeer(remote, CorruptedSerializedBytes)
-              logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-              nodeViewSync ! InvalidModifier(id)
-          }
-      }
-
     case ModifiersForValidating(remote, typeId, filteredModifiers) =>
       typeId match {
         case Transaction.modifierTypeId =>
