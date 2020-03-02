@@ -268,9 +268,6 @@ object NodeViewSynchronizer {
                                             status: encry.consensus.HistoryConsensus.HistoryComparisonResult,
                                             extension: Option[Seq[(ModifierTypeId, ModifierId)]])
 
-    final case class RequestFromLocal(source: ConnectedPeer,
-                                      modifierTypeId: ModifierTypeId,
-                                      modifierIds: Seq[ModifierId])
     sealed trait CLIPeer
 
     final case class PeerFromCli(address: InetSocketAddress) extends CLIPeer

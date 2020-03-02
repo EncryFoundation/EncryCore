@@ -1,11 +1,12 @@
 package encry.network
 
 import java.net.InetAddress
+
 import encry.network.BlackList.BanType.{PermanentBan, TemporaryBan}
 import encry.network.BlackList._
-import encry.settings.EncryAppSettings
+import encry.settings.BlackListSettings
 
-final case class BlackList(settings: EncryAppSettings,
+final case class BlackList(settings: BlackListSettings,
                            private val blackList: Map[InetAddress, (BanReason, BanTime, BanType)]) {
 
   def contains(peer: InetAddress): Boolean = blackList.contains(peer)
@@ -16,7 +17,7 @@ final case class BlackList(settings: EncryAppSettings,
     })))
 
   def cleanupBlackList: BlackList = BlackList(settings, blackList.filterNot { case (_, (_, banTime, banType)) =>
-    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= settings.blackList.banTime.toMillis)
+    banType != PermanentBan && (System.currentTimeMillis() - banTime.time >= settings.banTime.toMillis)
   })
 
   def remove(peer: InetAddress): BlackList = BlackList(settings, blackList - peer)
@@ -59,6 +60,6 @@ object BlackList {
 
   final case class BanTime(time: Long) extends AnyVal
 
-  def apply(settings: EncryAppSettings): BlackList =
+  def apply(settings: BlackListSettings): BlackList =
     BlackList(settings, Map.empty[InetAddress, (BanReason, BanTime, BanType)])
 }
