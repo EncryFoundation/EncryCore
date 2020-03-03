@@ -102,7 +102,10 @@ class NetworkRouter(settings: NetworkSettings,
 
 object NetworkRouter {
 
-  case class ModifierFromNetwork(modTypeId: ModifierTypeId, modId: ModifierId, modBytes: Array[Byte])
+  case class ModifierFromNetwork(source: InetSocketAddress,
+                                 modTypeId: ModifierTypeId,
+                                 modId: ModifierId,
+                                 modBytes: Array[Byte])
 
   def props(settings: NetworkSettings): Props = Props(new NetworkRouter(settings))
 }
