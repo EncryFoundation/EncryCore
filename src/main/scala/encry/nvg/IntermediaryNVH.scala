@@ -3,15 +3,17 @@ package encry.nvg
 import akka.actor.{ Actor, ActorRef }
 import akka.routing.BalancingPool
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.DownloadedModifiersValidator.ModifiersForValidating
+import encry.network.BlackList.BanReason.CorruptedSerializedBytes
+import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
+import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.ModifierForValidation
 import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
-class IntermediaryNVH(settings: EncryAppSettings) extends Actor with StrictLogging {
+class IntermediaryNVH(settings: EncryAppSettings, intermediaryNetwork: ActorRef) extends Actor with StrictLogging {
 
   val networkMessagesProcessor: ActorRef =
     context.actorOf(NetworkMessagesProcessor.props, name = "Network-messages-processor")
@@ -37,7 +39,8 @@ class IntermediaryNVH(settings: EncryAppSettings) extends Actor with StrictLoggi
     case UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! newReader
-    case _ =>
+    case msg @ BanPeer(_, _)      => networkMessagesProcessor ! msg
+    case msg @ InvalidModifier(_) => networkMessagesProcessor ! msg
   }
 }
 

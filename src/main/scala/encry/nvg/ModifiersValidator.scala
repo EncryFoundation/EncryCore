@@ -45,14 +45,13 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
             logger.info(s"Modifier ${modifier.encodedId} is syntactically invalid.")
             context.parent ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
             context.parent ! InvalidModifier(modifierId)
-          } else {
+          } else
             preSemanticValidation.leftMap {
               case IllegalHeight(error) =>
                 logger.info(s"Modifier ${modifier.encodedId} is invalid cause: $error.")
                 context.parent ! BanPeer(remote, PreSemanticInvalidModifier(error))
                 context.parent ! InvalidModifier(modifierId)
             }
-          }
       }
   }
 
@@ -64,14 +63,12 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
     modifier match {
       case header: Header =>
         val bestHeaderHeight: Int = historyReader.getBestHeaderHeight
-        Either.cond(
-          bestHeaderHeight - settings.constants.MaxRollbackDepth <= header.height,
-          (),
+        if (bestHeaderHeight - settings.constants.MaxRollbackDepth <= header.height) ().asRight
+        else
           IllegalHeight(
             s"Height of received header is ${header.height}. Current best header height is $bestHeaderHeight. " +
               s"Max possible received header's height is ${bestHeaderHeight - settings.constants.MaxRollbackDepth}."
-          )
-        )
+          ).asLeft
       case _: Payload => ().asRight[PreSemanticValidationException]
     }
 
