@@ -1,13 +1,12 @@
 package encry.nvg
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{ Actor, ActorRef }
 import akka.routing.BalancingPool
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
-import encry.local.miner.Miner.{DisableMining, StartMining}
-import encry.network.BlackList.BanReason.CorruptedSerializedBytes
+import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.ModifierForValidation
@@ -15,7 +14,12 @@ import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.DownloadRequest
-import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks}
+import encry.view.fast.sync.SnapshotHolder.{
+  FastSyncDone,
+  HeaderChainIsSynced,
+  RequiredManifestHeightAndId,
+  TreeChunks
+}
 import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -63,7 +67,7 @@ class IntermediaryNVH(
     case msg @ DisableMining                     => //+ to miner
     case msg @ StartMining                       => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)          => //+ to data holder
-    case msg @ RolledBackTransactions(_)          => //+ to memory pool
+    case msg @ RolledBackTransactions(_)         => //+ to memory pool
   }
 }
 

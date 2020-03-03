@@ -2,8 +2,8 @@ package encry.nvg
 
 import java.io.File
 
-import cats.syntax.option._
 import akka.actor.{ Actor, ActorRef, Props }
+import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
@@ -12,15 +12,14 @@ import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NodeViewHolder.NodeView
+import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
+import encry.nvg.NodeViewHolder.{ DownloadRequest, NodeView, UpdateInformation }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
-import encry.view.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
-import encry.view.NodeViewHolder.{ DownloadRequest, UpdateInformation }
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
@@ -38,6 +37,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
 
 import scala.collection.{ mutable, IndexedSeq, Seq }
+import scala.concurrent.duration._
 import scala.util.{ Failure, Success, Try }
 
 class NodeViewHolder(
@@ -48,9 +48,26 @@ class NodeViewHolder(
     with StrictLogging
     with AutoCloseable {
 
+  import context.dispatcher
+
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
   var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
+
+  context.parent ! BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
+
+  context.system.scheduler.schedule(1.seconds, 10.seconds) {
+    logger.info(
+      s"History best header id is: ${nodeView.history.getBestHeaderId.map(Algos.encode)}.\n " +
+        s"History best header height is: ${nodeView.history.getBestHeaderHeight}.\n " +
+        s"History best block id is: ${nodeView.history.getBestBlockId.map(Algos.encode)}.\n " +
+        s"History best block height is: ${nodeView.history.getBestBlockHeight}.\n " +
+        s"History best block header is: ${nodeView.history.getHeaderOfBestBlock.map(_.encodedId)}.\n " +
+        s"State height is: ${nodeView.state.height}.\n " +
+        s"Cache size is: ${ModifiersCache.size}.\n " +
+        s"Cache elements are: ${ModifiersCache.cache.keys.toList.map(key => Algos.encode(key.toArray)).mkString(",")}."
+    )
+  }
 
   override def receive: Receive = {
     case ValidatedModifier(modifier: PersistentModifier) =>
@@ -486,6 +503,25 @@ object NodeViewHolder {
   final case class UpdateHistoryReader(history: HistoryReader) extends AnyVal
 
   final case class NodeView(history: History, state: UtxoState, wallet: EncryWallet)
+
+  object ReceivableMessages {
+    final case class CreateAccountManagerFromSeed(seed: String)         extends AnyVal
+    final case class LocallyGeneratedModifier(pmod: PersistentModifier) extends AnyVal
+  }
+
+  final case class DownloadRequest(
+    modifierTypeId: ModifierTypeId,
+    modifierId: ModifierId,
+    previousModifier: Option[ModifierId] = None
+  ) extends NodeViewHolderEvent
+
+  final case class UpdateInformation(
+    history: History,
+    state: UtxoState,
+    failedMod: Option[PersistentModifier],
+    alternativeProgressInfo: Option[ProgressInfo],
+    suffix: IndexedSeq[PersistentModifier]
+  )
 
   def props(
     settings: EncryAppSettings,
