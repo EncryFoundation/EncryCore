@@ -6,10 +6,12 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
+import encry.network.DownloadedModifiersValidator.InvalidModifier
+import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NetworkRouter.ModifierFromNetwork
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{
+  OtherNodeSyncingStatus,
   RollbackFailed,
   RollbackSucceed,
   SemanticallyFailedModification,
@@ -30,7 +32,6 @@ import encry.view.fast.sync.SnapshotHolder.{
 import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 class IntermediaryNVH(
   settings: EncryAppSettings,
@@ -65,6 +66,8 @@ class IntermediaryNVH(
     case msg @ InvalidModifier(_)                   => networkMessagesProcessor ! msg
     case msg @ FastSyncDone                         => networkMessagesProcessor ! msg
     case msg @ DownloadRequest(_, _, _)             => networkMessagesProcessor ! msg
+    case msg @ OtherNodeSyncingStatus(_, _, _)      => networkMessagesProcessor ! msg
+    case msg @ RequestFromLocal(_, _, _)            => networkMessagesProcessor ! msg
     case msg @ RequiredManifestHeightAndId(_, _)    => //+ to fast sync
     case msg @ TreeChunks(_, _)                     => //+ to fast sync
     case msg @ HeaderChainIsSynced                  => networkMessagesProcessor ! msg
@@ -73,7 +76,7 @@ class IntermediaryNVH(
     case msg @ StartMining                          => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)             => //+ to data holder
     case msg @ RolledBackTransactions(_)            => //+ to memory pool
-    case msg: StatsSenderMessage                    => //+ to stats sender
+    case msg: StatsSenderMessage                    => influxRef.foreach(_ ! msg)
     case msg @ RollbackSucceed(_)                   =>
     case msg @ RollbackFailed(_)                    =>
     case msg @ SemanticallySuccessfulModifier(_)    =>

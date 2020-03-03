@@ -113,17 +113,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case _ => //Do nothing
     }
     case DataFromPeer(message, remote) => message match {
-      case SyncInfoNetworkMessage(syncInfo) => Option(history) match {
-        case Some(historyReader) =>
-          val ext: Seq[ModifierId] = historyReader.continuationIds(syncInfo, settings.network.syncPacketLength)
-          val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          logger.info(s"Comparison with $remote having starting points ${idsToString(syncInfo.startingPoints)}. " +
-            s"Comparison result is $comparison. Sending extension of length ${ext.length}.")
-          if (!(ext.nonEmpty || comparison != Younger)) logger.warn("Extension is empty while comparison is younger")
-          deliveryManager ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
-          peersKeeper ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
-        case _ =>
-      }
+
       case RequestModifiersNetworkMessage((typeId, requestedIds)) if chainSynced || settings.node.offlineGeneration =>
         val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
           .flatMap(id => modifiersRequestCache
@@ -170,9 +160,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       case InvNetworkMessage(invData) if invData._1 == Transaction.modifierTypeId =>
         logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}, but " +
           s"chainSynced is $chainSynced and canProcessTransactions is $canProcessTransactions.")
-      case InvNetworkMessage(invData) if invData._1 == Payload.modifierTypeId && !history.isFullChainSynced =>
-        logger.info(s"Got inv message with payloads: ${invData._2.map(Algos.encode).mkString(",")}. " +
-          s"But full chain is not synced. Ignore them.")
+
       case InvNetworkMessage(invData) =>
         logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
           s" $invData._1. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
@@ -264,7 +252,7 @@ object NodeViewSynchronizer {
 
     case object SendLocalSyncInfo
 
-    final case class OtherNodeSyncingStatus(remote: ConnectedPeer,
+    final case class OtherNodeSyncingStatus(remote: InetSocketAddress,
                                             status: encry.consensus.HistoryConsensus.HistoryComparisonResult,
                                             extension: Option[Seq[(ModifierTypeId, ModifierId)]])
 

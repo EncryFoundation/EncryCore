@@ -138,7 +138,7 @@ object NetworkController {
 
   object ReceivableMessages {
 
-    case class DataFromPeer(message: NetworkMessage, source: ConnectedPeer)
+    case class DataFromPeer(message: NetworkMessage, source: InetSocketAddress)
 
     case class RegisterMessagesHandler(types: Seq[(Byte, String)], handler: ActorRef)
   }

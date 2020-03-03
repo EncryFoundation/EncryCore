@@ -73,7 +73,7 @@ class NodeViewHolder(
   override def receive: Receive = {
     case ValidatedModifier(modifier: PersistentModifier) =>
       val startTime: Long                         = System.currentTimeMillis()
-      val wrappedKey: mutable.WrappedArray.ofByte = toKey(modifier.id)
+      val wrappedKey: mutable.WrappedArray.ofByte = NodeViewHolder.toKey(modifier.id)
       val isInHistory: Boolean                    = nodeView.history.isModifierDefined(modifier.id)
       val isInCache: Boolean                      = ModifiersCache.contains(wrappedKey)
       if (isInHistory || isInCache)
@@ -374,8 +374,6 @@ class NodeViewHolder(
       }
     } else logger.info(s"Trying to apply modifier ${modifier.encodedId} that's already in history.")
 
-  def toKey(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
-
   def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
     val rolledBackTxs: IndexedSeq[Transaction] = toRemove
       .flatMap(extractTransactions)
@@ -489,6 +487,8 @@ class NodeViewHolder(
 }
 
 object NodeViewHolder {
+
+  def toKey(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
   final case class UpdateHistoryReader(history: HistoryReader) extends AnyVal
 
