@@ -2,11 +2,11 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
+import encry.network.MessageBuilder.{GetPeerInfo, GetPeers}
 import encry.network.PeerConnectionHandler.{Incoming, Outgoing}
-import encry.network.PeersKeeper.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
+import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 
 import scala.util.Try
@@ -81,7 +81,10 @@ class PK(networkSettings: NetworkSettings,
         logger.info(s"Peer: $peer removed from availablePeers cause of it has been banned. " +
           s"Current is: ${peersForConnection.mkString(",")}.")
       }
-
+    case GetPeers => sender() ! connectedPeers.getAll.map(_._2.connectedPeer)
+    case GetPeerInfo(peerIp) => connectedPeers.getAll.find(_._1 == peerIp).map {
+      case (_, info) => sender() ! info.connectedPeer
+    }
   }
 
   def isSelf(address: InetSocketAddress): Boolean = Try(address == networkSettings.bindAddress ||

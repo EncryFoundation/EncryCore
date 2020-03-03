@@ -12,7 +12,8 @@ import encry.network.Messages.MessageToNetwork
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
-import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection, OutgoingConnectionFailed, PeerForConnection}
+import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, NewConnection, OutgoingConnectionFailed}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 
@@ -53,7 +54,7 @@ class NetworkRouter(settings: NetworkSettings,
     case MessageFromNetwork(message, Some(remote)) =>
       peersKeeper ! BanPeer(remote, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
-    case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg), "peersKeeper")
+    case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg, peersKeeper), "peersKeeper")
   }
 
   def peersLogic: Receive = {
@@ -66,18 +67,11 @@ class NetworkRouter(settings: NetworkSettings,
         Some(settings.connectionTimeout),
         pullMode = true
       )
-
     case Connected(remote, localAddress) =>
-      logger.info(s"Network router got 'Connected' message from: $remote. " +
+      logger.info(s"Network controller got 'Connected' message from: $remote. " +
         s"Trying to set stable connection with remote... " +
         s"Local TCP endpoint is: $localAddress.")
       peersKeeper ! NewConnection(remote, sender())
-
-    case HandshakedDone(remote) =>
-      logger.info(s"Network controller got approvement from peer handler about successful handshake. " +
-        s"Sending to peerKeeper connected peer.")
-      peersKeeper ! HandshakedDone(remote)
-
     case ConnectionVerified(remote, remoteConnection, connectionType) =>
       logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
       val peerConnectionHandler: ActorRef = context.actorOf(
@@ -86,10 +80,7 @@ class NetworkRouter(settings: NetworkSettings,
       )
       peerConnectionHandler ! StartInteraction
 
-    case ConnectionStopped(peer) =>
-      logger.info(s"Network controller got signal about breaking connection with: $peer. " +
-        s"Sending to peerKeeper actual information.")
-      peersKeeper ! ConnectionStopped(peer)
+    case msg: ConnectionStatusMessages => peersKeeper ! msg
 
     case CommandFailed(connect: Connect) =>
       logger.info(s"Failed to connect to: ${connect.remoteAddress}.")
