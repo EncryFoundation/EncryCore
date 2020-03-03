@@ -108,7 +108,7 @@ class PeersKeeper(settings: EncryAppSettings,
     case RequestPeerForConnection =>
       logger.info(s"Got request for a new connection but current number of connection is max: ${connectedPeers.size}.")
 
-    case VerifyConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isSelf(remote) =>
+    case NewConnection(remote, remoteConnection) if connectedPeers.size < settings.network.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
         s"Remote InetSocketAddress is: $remote. Remote InetAddress is ${remote.getAddress}. " +
         s"Current known peers: ${knownPeers.mkString(",")}")
@@ -134,7 +134,7 @@ class PeersKeeper(settings: EncryAppSettings,
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
         s" Didn't banned: $notBannedPeer, Didn't connected: $notConnectedYet.")
 
-    case VerifyConnection(remote, remoteConnection) =>
+    case NewConnection(remote, remoteConnection) =>
       logger.info(s"Peers keeper got request for verifying the connection but current number of max connection is " +
         s"bigger than possible or isSelf: ${isSelf(remote)}.")
 
@@ -310,8 +310,8 @@ object PeersKeeper {
 
   sealed trait PeerCommandHelper
 
-  final case class VerifyConnection(peer: InetSocketAddress,
-                                    remoteConnection: ActorRef)
+  final case class NewConnection(peer: InetSocketAddress,
+                                 remoteConnection: ActorRef)
 
   final case class ConnectionVerified(peer: InetSocketAddress,
                                       remoteConnection: ActorRef,
@@ -353,7 +353,7 @@ object PeersKeeper {
         case AccumulatedPeersStatistic(_)    => 1
         case BanPeer(_, _)                   => 1
         case SendLocalSyncInfo               => 1
-        case VerifyConnection(_, _)          => 2
+        case NewConnection(_, _)          => 2
         case HandshakedDone(_)               => 2
         case ConnectionStopped(_)            => 2
         case OutgoingConnectionFailed(_)     => 2

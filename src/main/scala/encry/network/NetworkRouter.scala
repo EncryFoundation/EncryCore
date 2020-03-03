@@ -12,11 +12,12 @@ import encry.network.Messages.MessageToNetwork
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
-import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, ConnectionVerified, HandshakedDone, OutgoingConnectionFailed, PeerForConnection, VerifyConnection}
-import encry.settings.NetworkSettings
+import encry.network.PeersKeeper.{BanPeer, ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection, OutgoingConnectionFailed, PeerForConnection}
+import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 
-class NetworkRouter(settings: NetworkSettings) extends Actor with StrictLogging {
+class NetworkRouter(settings: NetworkSettings,
+                    blackListSettings: BlackListSettings) extends Actor with StrictLogging {
 
   import context.system
 
@@ -24,7 +25,7 @@ class NetworkRouter(settings: NetworkSettings) extends Actor with StrictLogging 
 
   IO(Tcp) ! Bind(self, settings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
-  val peersKeeper = context.system.actorOf(PK.props(), "peersKeeper")
+  val peersKeeper = context.system.actorOf(PK.props(settings, blackListSettings), "peersKeeper")
   val deliveryManager = context.system.actorOf(DM.props(), "deliveryManager")
   val externalSocketAddress: Option[InetSocketAddress] = settings.declaredAddress
 
@@ -70,7 +71,12 @@ class NetworkRouter(settings: NetworkSettings) extends Actor with StrictLogging 
       logger.info(s"Network router got 'Connected' message from: $remote. " +
         s"Trying to set stable connection with remote... " +
         s"Local TCP endpoint is: $localAddress.")
-      peersKeeper ! VerifyConnection(remote, sender())
+      peersKeeper ! NewConnection(remote, sender())
+
+    case HandshakedDone(remote) =>
+      logger.info(s"Network controller got approvement from peer handler about successful handshake. " +
+        s"Sending to peerKeeper connected peer.")
+      peersKeeper ! HandshakedDone(remote)
 
     case ConnectionVerified(remote, remoteConnection, connectionType) =>
       logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
@@ -79,11 +85,6 @@ class NetworkRouter(settings: NetworkSettings) extends Actor with StrictLogging 
           .withDispatcher("network-dispatcher")
       )
       peerConnectionHandler ! StartInteraction
-
-    case HandshakedDone(remote) =>
-      logger.info(s"Network controller got approvement from peer handler about successful handshake. " +
-        s"Sending to peerKeeper connected peer.")
-      peersKeeper ! HandshakedDone(remote)
 
     case ConnectionStopped(peer) =>
       logger.info(s"Network controller got signal about breaking connection with: $peer. " +

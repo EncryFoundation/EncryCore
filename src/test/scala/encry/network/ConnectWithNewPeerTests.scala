@@ -219,7 +219,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       peersKeeper.underlyingActor.outgoingConnections.contains(testNetSettings.network.knownPeers.head) shouldBe true
       peersKeeper.underlyingActor.peersForConnection.contains(testNetSettings.network.knownPeers.head) shouldBe true
 
-      networkController.send(peersKeeper, VerifyConnection(testNetSettings.network.knownPeers.head, peersSenderProbe.ref))
+      networkController.send(peersKeeper, NewConnection(testNetSettings.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
         ConnectionVerified(testNetSettings.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
 
@@ -239,7 +239,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       peersKeeper.underlyingActor.outgoingConnections.contains(testNetSettings.network.knownPeers.head) shouldBe true
       peersKeeper.underlyingActor.peersForConnection.contains(testNetSettings.network.knownPeers.head) shouldBe true
 
-      networkController.send(peersKeeper, VerifyConnection(testNetSettings.network.knownPeers.head, peersSenderProbe.ref))
+      networkController.send(peersKeeper, NewConnection(testNetSettings.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
         ConnectionVerified(testNetSettings.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
 
@@ -260,7 +260,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       peersKeeper.underlyingActor.outgoingConnections.contains(testNetSettings.network.knownPeers.head) shouldBe true
       peersKeeper.underlyingActor.peersForConnection.contains(testNetSettings.network.knownPeers.head) shouldBe true
 
-      networkController.send(peersKeeper, VerifyConnection(testNetSettings.network.knownPeers.head, peersSenderProbe.ref))
+      networkController.send(peersKeeper, NewConnection(testNetSettings.network.knownPeers.head, peersSenderProbe.ref))
       networkController.expectMsg(
         ConnectionVerified(testNetSettings.network.knownPeers.head, peersSenderProbe.ref, Outgoing))
 
@@ -275,7 +275,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       val remoteAddress: InetSocketAddress = testNetSettings.network.knownPeers.head
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(testNetSettings, TestProbe().ref, TestProbe().ref))
 
-      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, NewConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectMsg(ConnectionVerified(remoteAddress, remoteConnectionTestProbe.ref, Incoming))
       peersKeeper.stop()
     }
@@ -290,7 +290,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
           "test-peer", Some(remoteAddress), System.currentTimeMillis()))
 
       peersKeeper ! BanPeer(connectedPeer, SyntacticallyInvalidPersistentModifier)
-      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, NewConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
     }
@@ -305,7 +305,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
           "test-peer", Some(remoteAddress), System.currentTimeMillis()))
 
       peersKeeper ! HandshakedDone(connectedPeer)
-      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, NewConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
     }
@@ -315,7 +315,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       val remoteAddress: InetSocketAddress = new InetSocketAddress("172.16.11.99", 9001)
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(knowPeersSettings, TestProbe().ref, TestProbe().ref))
 
-      networkController.send(peersKeeper, VerifyConnection(remoteAddress, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, NewConnection(remoteAddress, remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
     }
@@ -324,7 +324,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
       val remoteConnectionTestProbe: TestProbe = TestProbe()
       val peersKeeper: TestActorRef[PeersKeeper] = TestActorRef[PeersKeeper](PeersKeeper.props(testNetSettings, TestProbe().ref, TestProbe().ref))
 
-      networkController.send(peersKeeper, VerifyConnection(
+      networkController.send(peersKeeper, NewConnection(
         new InetSocketAddress("0.0.0.0", 9001), remoteConnectionTestProbe.ref))
       networkController.expectNoMsg()
       peersKeeper.stop()
@@ -336,7 +336,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
 
       peersKeeper ! RequestPeerForConnection
       peersKeeper.underlyingActor.outgoingConnections.contains(knowPeersSettings.network.knownPeers.head) shouldBe true
-      networkController.send(peersKeeper, VerifyConnection(knowPeersSettings.network.knownPeers.head, remoteConnectionTestProbe.ref))
+      networkController.send(peersKeeper, NewConnection(knowPeersSettings.network.knownPeers.head, remoteConnectionTestProbe.ref))
       networkController.expectMsg(
         ConnectionVerified(knowPeersSettings.network.knownPeers.head, remoteConnectionTestProbe.ref, Outgoing))
     }

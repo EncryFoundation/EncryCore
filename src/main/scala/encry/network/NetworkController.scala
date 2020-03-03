@@ -93,7 +93,7 @@ class NetworkController(networkSettings: NetworkSettings,
       logger.info(s"Network controller got 'Connected' message from: $remote. " +
         s"Trying to set stable connection with remote... " +
         s"Local TCP endpoint is: $localAddress.")
-      peersKeeper ! VerifyConnection(remote, sender())
+      peersKeeper ! NewConnection(remote, sender())
 
     case ConnectionVerified(remote, remoteConnection, connectionType) =>
       logger.info(s"Network controller got approvement for stable connection with: $remote. Starting interaction process...")
