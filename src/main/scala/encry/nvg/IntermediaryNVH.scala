@@ -10,6 +10,7 @@ import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.ModifierForValidation
 import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
+import encry.view.fast.sync.SnapshotHolder.FastSyncDone
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
@@ -41,6 +42,7 @@ class IntermediaryNVH(settings: EncryAppSettings, intermediaryNetwork: ActorRef)
       networkMessagesProcessor ! newReader
     case msg @ BanPeer(_, _)      => networkMessagesProcessor ! msg
     case msg @ InvalidModifier(_) => networkMessagesProcessor ! msg
+    case msg @ FastSyncDone       => networkMessagesProcessor ! msg
   }
 }
 

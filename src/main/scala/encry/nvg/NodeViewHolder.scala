@@ -1,15 +1,13 @@
 package encry.nvg
 
 import java.io.File
-
 import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
-import encry.EncryApp
-import encry.EncryApp.system
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NodeViewHolder.NodeView
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
@@ -17,11 +15,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
-import encry.view.NodeViewHolder.ReceivableMessages.{
-  CreateAccountManagerFromSeed,
-  LocallyGeneratedModifier,
-  ModifierFromRemote
-}
+import encry.view.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
 import encry.view.NodeViewHolder.{ DownloadRequest, UpdateInformation }
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
@@ -37,13 +31,12 @@ import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId }
-
 import scala.collection.{ mutable, IndexedSeq, Seq }
 import scala.util.{ Failure, Success, Try }
 
 class NodeViewHolder(
   settings: EncryAppSettings,
-  timeProvider: NetworkTimeProvider,
+  ntp: NetworkTimeProvider,
   influxRef: Option[ActorRef]
 ) extends Actor
     with StrictLogging
@@ -54,41 +47,48 @@ class NodeViewHolder(
   var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
 
   override def receive: Receive = {
-    case ModifierFromRemote(modifier: PersistentModifier) =>
-      val isInHistory: Boolean = nodeView.history.isModifierDefined(modifier.id)
-      val isInCache: Boolean   = ModifiersCache.contains(key(modifier.id))
+    case ValidatedModifier(modifier: PersistentModifier) =>
+      val startTime: Long                         = System.currentTimeMillis()
+      val wrappedKey: mutable.WrappedArray.ofByte = key(modifier.id)
+      val isInHistory: Boolean                    = nodeView.history.isModifierDefined(modifier.id)
+      val isInCache: Boolean                      = ModifiersCache.contains(wrappedKey)
       if (isInHistory || isInCache)
         logger.info(
-          s"Modifier ${modifier.encodedId} can't be placed into the cache cause:" +
-            s" contains in cache: $isInCache, contains in history: $isInHistory"
+          s"Modifier ${modifier.encodedId} can't be placed into the cache cause: " +
+            s"contains in cache: $isInCache, contains in history: $isInHistory."
         )
-      else ModifiersCache.put(key(modifier.id), modifier, nodeView.history)
+      else ModifiersCache.put(wrappedKey, modifier, nodeView.history)
       computeApplications()
+      logger.debug(
+        s"Time of processing validated modifier with id: ${modifier.encodedId} " +
+          s"is: ${(System.currentTimeMillis() - startTime) / 1000}s."
+      )
 
     case LocallyGeneratedModifier(modifier: PersistentModifier) =>
       val startTime: Long = System.currentTimeMillis()
-      logger.info(s"Got locally generated modifier ${modifier.encodedId} of type ${modifier.modifierTypeId}")
+      logger.info(s"Got locally generated modifier ${modifier.encodedId}.")
       modifier match {
         case block: Block =>
           pmodModify(block.header, isLocallyGenerated = true)
           pmodModify(block.payload, isLocallyGenerated = true)
       }
       logger.debug(
-        s"Processing time of modifier ${modifier.encodedId} is ${(System.currentTimeMillis() - startTime) / 1000}s."
+        s"Time of process locally generated modifier with id: ${modifier.encodedId} " +
+          s"is ${(System.currentTimeMillis() - startTime) / 1000}s."
       )
 
     case FastSyncFinished(state, wallet) =>
-      logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
+      val startTime: Long = System.currentTimeMillis()
+      logger.info(s"Node view holder got a signal about finishing fast sync process.")
       nodeView.state.tree.avlStorage.close()
       nodeView.wallet.close()
       FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
       FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
       FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
-      logger.info(s"Updated best block in fast sync mod. Updated state height.")
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
         override val settings: EncryAppSettings        = settings
         override var isFullChainSynced: Boolean        = settings.node.offlineGeneration
-        override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
+        override val timeProvider: NetworkTimeProvider = ntp
         override val historyStorage: HistoryStorage    = nodeView.history.historyStorage
       }
       newHistory.fastSyncInProgress.fastSyncVal = false
@@ -101,24 +101,29 @@ class NodeViewHolder(
         updatedState = Some(state),
         updatedVault = Some(wallet)
       )
-      system.actorSelection("/user/nodeViewSynchronizer") ! FastSyncDone
-      logger.info(s"Fast sync finished successfully!")
+      context.parent ! FastSyncDone
+      logger.debug(
+        s"Time of processing fast sync done message is: ${(System.currentTimeMillis() - startTime) / 1000}s."
+      )
 
     case CreateAccountManagerFromSeed(seed) =>
-      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
+      val newAccount: Either[String, EncryWallet] =
+        nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
       updateNodeView(updatedVault = newAccount.toOption)
       sender() ! newAccount
 
-    case RemoveRedundantManifestIds => potentialManifestIds = List.empty
+    case RemoveRedundantManifestIds =>
+      potentialManifestIds = List.empty
 
   }
 
   //todo refactor loop
   def computeApplications(): Unit = {
-    val mods = ModifiersCache.popCandidate(nodeView.history)
-    if (mods.nonEmpty) {
+    val modifiers: List[PersistentModifier] = ModifiersCache.popCandidate(nodeView.history)
+    if (modifiers.nonEmpty) {
+      logger.info(s"Got new modifiers in compute application ${modifiers.map(_.encodedId)}.")
       logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
-      mods.foreach(mod => pmodModify(mod))
+      modifiers.foreach(mod => pmodModify(mod))
       computeApplications()
     } else Unit
   }
@@ -395,7 +400,7 @@ class NodeViewHolder(
     rootsDir.mkdir()
     assert(stateDir.listFiles().isEmpty, s"Genesis directory $stateDir should always be empty.")
     val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
-    val history: History = History.readOrGenerate(settings, timeProvider)
+    val history: History = History.readOrGenerate(settings, ntp)
     val wallet: EncryWallet =
       EncryWallet.readOrGenerate(EncryWallet.getWalletDir(settings), EncryWallet.getKeysDir(settings), settings)
     NodeView(history, state, wallet)
@@ -408,7 +413,7 @@ class NodeViewHolder(
         stateDir.mkdirs()
         val rootsDir: File = UtxoState.getRootsDir(settings)
         rootsDir.mkdir()
-        val history: History = History.readOrGenerate(settings, timeProvider)
+        val history: History = History.readOrGenerate(settings, ntp)
         val wallet: EncryWallet =
           EncryWallet.readOrGenerate(EncryWallet.getWalletDir(settings), EncryWallet.getKeysDir(settings), settings)
         val state: UtxoState = restoreConsistentState(

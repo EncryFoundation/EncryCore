@@ -15,9 +15,8 @@ import encry.network.BlackList.BanReason.{
 import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
-import encry.nvg.ModifiersValidator.ModifierForValidation
+import encry.nvg.ModifiersValidator.{ ModifierForValidation, ValidatedModifier }
 import encry.settings.EncryAppSettings
-import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer }
@@ -40,7 +39,7 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
             isSyntacticallyValid(modifier, settings.constants.ModifierIdSize)
           if (preSemanticValidation.isRight && syntacticValidation) {
             logger.debug(s"Modifier ${modifier.encodedId} is valid.")
-            nodeViewHolderRef ! ModifierFromRemote(modifier)
+            nodeViewHolderRef ! ValidatedModifier(modifier)
           } else if (!syntacticValidation) {
             logger.info(s"Modifier ${modifier.encodedId} is syntactically invalid.")
             context.parent ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
@@ -99,6 +98,8 @@ object ModifiersValidator {
     modifierBytes: Array[Byte],
     remote: ConnectedPeer
   )
+
+  final case class ValidatedModifier(modifier: PersistentModifier) extends AnyVal
 
   def props(nodeViewHolderRef: ActorRef, settings: EncryAppSettings): Props =
     Props(new ModifiersValidator(nodeViewHolderRef, settings))
