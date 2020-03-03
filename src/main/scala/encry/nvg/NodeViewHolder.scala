@@ -1,10 +1,13 @@
 package encry.nvg
 
 import java.io.File
-import akka.actor.{ Actor, ActorRef, Props }
+
+import cats.syntax.option._
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.local.miner.Miner.{ DisableMining, StartMining }
+import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersValidator.ValidatedModifier
@@ -15,24 +18,25 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
-import encry.view.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
-import encry.view.NodeViewHolder.{ DownloadRequest, UpdateInformation }
+import encry.view.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, LocallyGeneratedModifier}
+import encry.view.NodeViewHolder.{DownloadRequest, UpdateInformation}
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
+import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader}
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId }
-import scala.collection.{ mutable, IndexedSeq, Seq }
-import scala.util.{ Failure, Success, Try }
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+
+import scala.collection.{IndexedSeq, Seq, mutable}
+import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(
   settings: EncryAppSettings,
@@ -69,8 +73,8 @@ class NodeViewHolder(
       logger.info(s"Got locally generated modifier ${modifier.encodedId}.")
       modifier match {
         case block: Block =>
-          pmodModify(block.header, isLocallyGenerated = true)
-          pmodModify(block.payload, isLocallyGenerated = true)
+          applyModfier(block.header, isLocallyGenerated = true)
+          applyModfier(block.payload, isLocallyGenerated = true)
       }
       logger.debug(
         s"Time of process locally generated modifier with id: ${modifier.encodedId} " +
@@ -97,9 +101,9 @@ class NodeViewHolder(
       )
       newHistory.isHeadersChainSyncedVar = true
       updateNodeView(
-        updatedHistory = Some(newHistory),
-        updatedState = Some(state),
-        updatedVault = Some(wallet)
+        updatedHistory = newHistory.some,
+        updatedState = state.some,
+        updatedVault = wallet.some
       )
       context.parent ! FastSyncDone
       logger.debug(
@@ -122,8 +126,7 @@ class NodeViewHolder(
     val modifiers: List[PersistentModifier] = ModifiersCache.popCandidate(nodeView.history)
     if (modifiers.nonEmpty) {
       logger.info(s"Got new modifiers in compute application ${modifiers.map(_.encodedId)}.")
-      logger.info(s"mods: ${mods.map(mod => Algos.encode(mod.id))}")
-      modifiers.foreach(mod => pmodModify(mod))
+      modifiers.foreach(applyModfier(_))
       computeApplications()
     } else Unit
   }
@@ -146,35 +149,35 @@ class NodeViewHolder(
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = None): Unit =
     pi.toDownload.foreach {
-      case (tid, id) =>
-        if (tid != Transaction.modifierTypeId)
-          logger.info(
-            s"NVH trigger sending DownloadRequest to NVSH with type: $tid " +
-              s"for modifier: ${Algos.encode(id)}. PrevMod is: ${previousModifier.map(Algos.encode)}."
-          )
+      case (tid: ModifierTypeId, id: ModifierId) =>
+        logger.info(
+          s"Node view holder created download request for modifier ${Algos.encode(id)} of type $tid." +
+            s" Previous modifier is ${previousModifier.map(Algos.encode)}."
+        )
         if ((nodeView.history.isFullChainSynced && tid == Payload.modifierTypeId) || tid != Payload.modifierTypeId)
-          system.actorSelection("/user/nodeViewSynchronizer") ! DownloadRequest(tid, id, previousModifier)
-        else
-          logger.info(
-            s"Ignore sending request for payload (${Algos.encode(id)}) from nvh because of nodeView.history.isFullChainSynced = false"
-          )
+          context.parent ! DownloadRequest(tid, id, previousModifier)
+        else logger.info(s"Ignore sending request for payload ${Algos.encode(id)} because full chain is not synced.")
     }
 
-  def trimChainSuffix(suffix: IndexedSeq[PersistentModifier],
-                      rollbackPoint: ModifierId): IndexedSeq[PersistentModifier] = {
+  def trimChainSuffix(
+    suffix: IndexedSeq[PersistentModifier],
+    rollbackPoint: ModifierId
+  ): IndexedSeq[PersistentModifier] = {
     val idx: Int = suffix.indexWhere(_.id.sameElements(rollbackPoint))
-    if (idx == -1) IndexedSeq() else suffix.drop(idx)
+    if (idx == -1) IndexedSeq.empty else suffix.drop(idx)
   }
 
   @scala.annotation.tailrec
-  private def updateState(history: History,
-                          state: UtxoState,
-                          progressInfo: ProgressInfo,
-                          suffixApplied: IndexedSeq[PersistentModifier],
-                          isLocallyGenerated: Boolean = false): (History, UtxoState, Seq[PersistentModifier]) = {
-    logger.info(s"\nStarting updating state in updateState function!")
+  private def updateState(
+    history: History,
+    state: UtxoState,
+    progressInfo: ProgressInfo,
+    suffixApplied: IndexedSeq[PersistentModifier],
+    isLocallyGenerated: Boolean = false
+  ): (History, UtxoState, Seq[PersistentModifier]) = {
+    logger.info(s"Starting updating state in updateState function!")
     if (!isLocallyGenerated) progressInfo.toApply.foreach {
-      case header: Header => requestDownloads(progressInfo, Some(header.id))
+      case header: Header => requestDownloads(progressInfo, header.id.some)
       case _              => requestDownloads(progressInfo, None)
     }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
@@ -189,10 +192,10 @@ class NodeViewHolder(
                 val blockAtHeight  = history.getBlockByHeader(headerAtHeight).get
                 blocks :+ blockAtHeight
             }
-            context.system.actorSelection("/user/miner") ! DisableMining
+            context.parent ! DisableMining
             state.rollbackTo(branchPoint, additionalBlocks) -> trimChainSuffix(suffixApplied,
                                                                                ModifierId !@@ branchPoint)
-          } else Success(state) -> IndexedSeq()
+          } else Success(state) -> IndexedSeq.empty
         }.getOrElse(Failure(new Exception("Trying to rollback when branchPoint is empty.")))
       } else Success(state) -> suffixApplied
     stateToApplyTry match {
@@ -201,7 +204,8 @@ class NodeViewHolder(
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, None, None, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) {
           case (u, modToApply) =>
-            val saveRootNodesFlag = (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2
+            val saveRootNodesFlag: Boolean =
+              (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2
             if (u.failedMod.isEmpty) u.state.applyModifier(modToApply, saveRootNodesFlag) match {
               case Right(stateAfterApply) =>
                 influxRef.foreach(
@@ -239,7 +243,7 @@ class NodeViewHolder(
                         currentChunkHeight = settings.snapshotSettings.chunkDepth,
                         stateAfterApply.tree.avlStorage
                       )
-                    system.actorSelection("/user/nodeViewSynchronizer") ! TreeChunks(chunks, potentialManifestId)
+                    context.parent ! TreeChunks(chunks, potentialManifestId)
                     potentialManifestIds = ManifestId @@ potentialManifestId :: potentialManifestIds
                     logger.info(
                       s"State tree successfully processed for snapshot. " +
@@ -248,7 +252,7 @@ class NodeViewHolder(
                   }
                 }
                 if (settings.node.mining && progressInfo.chainSwitchingNeeded)
-                  context.system.actorSelection("/user/miner") ! StartMining
+                  context.parent ! StartMining
                 context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
                 if (newHis.getBestHeaderId.exists(
                       bestHeaderId =>
@@ -270,7 +274,7 @@ class NodeViewHolder(
                 val (newHis: History, newProgressInfo: ProgressInfo) =
                   history.reportModifierIsInvalid(modToApply)
                 context.system.eventStream.publish(SemanticallyFailedModification(modToApply, e))
-                UpdateInformation(newHis, u.state, Some(modToApply), Some(newProgressInfo), u.suffix)
+                UpdateInformation(newHis, u.state, modToApply.some, newProgressInfo.some, u.suffix)
             } else u
         }
         uf.failedMod match {
@@ -285,98 +289,81 @@ class NodeViewHolder(
     }
   }
 
-  def pmodModify(pmod: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
-    if (!nodeView.history.isModifierDefined(pmod.id)) {
+  def applyModfier(modifier: PersistentModifier, isLocallyGenerated: Boolean = false): Unit =
+    if (!nodeView.history.isModifierDefined(modifier.id)) {
       logger.debug(
-        s"\nStarting to apply modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history."
+        s"Start modifier ${modifier.encodedId} application of type ${modifier.modifierTypeId} to the history."
       )
-      val startAppHistory = System.currentTimeMillis()
-      if (settings.influxDB.isDefined)
-        context.system
-          .actorSelection("user/statsSender") !
-          StartApplyingModifier(pmod.id, pmod.modifierTypeId, System.currentTimeMillis())
-      nodeView.history.append(pmod) match {
+      val startApplicationToTheHistory: Long = System.currentTimeMillis()
+      influxRef.foreach(_ ! StartApplyingModifier(modifier.id, modifier.modifierTypeId, System.currentTimeMillis()))
+      nodeView.history.append(modifier) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
           logger.info(
-            s"Successfully applied modifier ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to history."
+            s"Successfully applied modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} to the history. " +
+              s"Time of applying is: ${(System.currentTimeMillis() - startApplicationToTheHistory) / 1000}s."
           )
-          logger.debug(
-            s"Time of applying to history SUCCESS is: ${System.currentTimeMillis() - startAppHistory}. modId is: ${pmod.encodedId}"
-          )
-          if (pmod.modifierTypeId == Header.modifierTypeId) historyBeforeStUpdate.updateIdsForSyncInfo()
-          influxRef.foreach { ref =>
-            ref ! EndOfApplyingModifier(pmod.id)
-            val isHeader: Boolean = pmod match {
+          if (modifier.modifierTypeId == Header.modifierTypeId) historyBeforeStUpdate.updateIdsForSyncInfo()
+          influxRef.foreach { ref: ActorRef =>
+            ref ! EndOfApplyingModifier(modifier.id)
+            ref ! ModifierAppendedToHistory(modifier match {
               case _: Header  => true
               case _: Payload => false
-            }
-            ref ! ModifierAppendedToHistory(isHeader, success = true)
+            }, success = true)
           }
-          if (historyBeforeStUpdate.fastSyncInProgress.fastSyncVal && pmod.modifierTypeId == Payload.modifierTypeId &&
+          if (historyBeforeStUpdate.fastSyncInProgress.fastSyncVal &&
+              modifier.modifierTypeId == Payload.modifierTypeId &&
               historyBeforeStUpdate.getBestBlockHeight >= historyBeforeStUpdate.lastAvailableManifestHeight) {
-            logger.info(s"nodeView.history.getBestBlockHeight ${historyBeforeStUpdate.getBestBlockHeight}")
             logger.info(
-              s"nodeView.history.heightOfLastAvailablePayloadForRequest ${historyBeforeStUpdate.lastAvailableManifestHeight}"
+              s"getBestBlockHeight ${historyBeforeStUpdate.getBestBlockHeight}. " +
+                s"heightOfLastAvailablePayloadForRequest ${historyBeforeStUpdate.lastAvailableManifestHeight}"
             )
             historyBeforeStUpdate.getBestHeaderAtHeight(historyBeforeStUpdate.lastAvailableManifestHeight).foreach {
-              h =>
-                system.actorSelection("/user/nodeViewSynchronizer") ! RequiredManifestHeightAndId(
+              h: Header =>
+                context.parent ! RequiredManifestHeightAndId(
                   historyBeforeStUpdate.lastAvailableManifestHeight,
                   Algos.hash(h.stateRoot ++ h.id)
                 )
             }
           }
           logger.info(
-            s"Going to apply modifications ${pmod.encodedId} of type ${pmod.modifierTypeId} on nodeViewHolder to the state: $progressInfo"
+            s"Going to apply modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} to the state. " +
+              s"Progress info is: $progressInfo."
           )
           if (progressInfo.toApply.nonEmpty) {
-            logger.info(
-              s"\n progress info non empty. To apply: ${progressInfo.toApply.map(mod => Algos.encode(mod.id))}"
-            )
             val startPoint: Long = System.currentTimeMillis()
+            logger.info(s"Progress info is non empty. To apply is: ${progressInfo.toApply.map(_.encodedId)}.")
             val (newHistory: History, newState: UtxoState, blocksApplied: Seq[PersistentModifier]) =
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq(), isLocallyGenerated)
-            if (newHistory.isHeadersChainSynced)
-              system.actorSelection("/user/nodeViewSynchronizer") ! HeaderChainIsSynced
-            if (settings.influxDB.isDefined)
-              context.actorSelection("/user/statsSender") ! StateUpdating(System.currentTimeMillis() - startPoint)
+            if (newHistory.isHeadersChainSynced) context.parent ! HeaderChainIsSynced
+            influxRef.foreach(_ ! StateUpdating(System.currentTimeMillis() - startPoint))
             sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
             if (progressInfo.chainSwitchingNeeded)
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
-            logger.debug(s"\nPersistent modifier ${pmod.encodedId} applied successfully")
-            if (settings.influxDB.isDefined)
-              newHistory.getBestHeader.foreach(
-                header => context.actorSelection("/user/statsSender") ! BestHeaderInChain(header)
-              )
+            logger.debug(s"Persistent modifier ${modifier.encodedId} was applied successfully.")
+            for {
+              ref    <- influxRef
+              header <- newHistory.getBestHeader
+            } yield ref ! BestHeaderInChain(header)
             if (newHistory.isFullChainSynced) {
-              logger.debug(s"\nblockchain is synced on nvh on height ${newHistory.getBestHeaderHeight}!")
+              logger.debug(s"BlockChain is synced on nvh at the height ${newHistory.getBestHeaderHeight}.")
               ModifiersCache.setChainSynced()
-              system.actorSelection("/user/nodeViewSynchronizer") ! FullBlockChainIsSynced
-              system.actorSelection("/user/miner") ! FullBlockChainIsSynced
+              context.parent ! FullBlockChainIsSynced
             }
-            updateNodeView(Some(newHistory), Some(newState), Some(nodeView.wallet))
+            updateNodeView(newHistory.some, newState.some, nodeView.wallet.some)
           } else {
-            influxRef.foreach { ref =>
-              logger.info(
-                s"send info 3. about ${historyBeforeStUpdate.getBestHeaderHeight} | ${historyBeforeStUpdate.getBestBlockHeight}"
-              )
-              ref ! HeightStatistics(historyBeforeStUpdate.getBestHeaderHeight, nodeView.state.height)
-            }
-            if (!isLocallyGenerated) requestDownloads(progressInfo, Some(pmod.id))
-            context.system.eventStream.publish(SemanticallySuccessfulModifier(pmod))
-            logger.info(s"\nProgress info is empty")
-            updateNodeView(updatedHistory = Some(historyBeforeStUpdate))
+            logger.info(s"Progress info is empty.")
+            influxRef.foreach(_ ! HeightStatistics(historyBeforeStUpdate.getBestHeaderHeight, nodeView.state.height))
+            if (!isLocallyGenerated) requestDownloads(progressInfo, modifier.id.some)
+            context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
+            updateNodeView(updatedHistory = historyBeforeStUpdate.some)
           }
         case Left(e) =>
-          logger.debug(
-            s"\nCan`t apply persistent modifier (id: ${pmod.encodedId}, contents: $pmod)" +
-              s" to history caused $e"
-          )
+          logger.debug(s"Can't apply modifier ${modifier.encodedId}, contents: $modifier to history cause $e.")
           context.system.eventStream
-            .publish(SyntacticallyFailedModification(pmod, List(HistoryApplyError(e.getMessage))))
+            .publish(SyntacticallyFailedModification(modifier, List(HistoryApplyError(e.getMessage))))
       }
-    } else logger.info(s"\nTrying to apply modifier ${pmod.encodedId} that's already in history.")
+    } else logger.info(s"Trying to apply modifier ${modifier.encodedId} that's already in history.")
 
   def key(id: ModifierId): mutable.WrappedArray.ofByte = new mutable.WrappedArray.ofByte(id)
 
@@ -424,12 +411,12 @@ class NodeViewHolder(
         history.updateIdsForSyncInfo()
         logger.info(s"History best block height: ${history.getBestBlockHeight}")
         logger.info(s"History best header height: ${history.getBestHeaderHeight}")
-        Some(NodeView(history, state, wallet))
+        NodeView(history, state, wallet).some
       } catch {
         case ex: Throwable =>
           logger.info(s"${ex.getMessage} during state restore. Recover from Modifiers holder!")
           new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
-          Some(genesisState)
+          genesisState.some
       } else {
       None
     }

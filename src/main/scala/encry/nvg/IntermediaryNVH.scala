@@ -3,14 +3,22 @@ package encry.nvg
 import akka.actor.{ Actor, ActorRef }
 import akka.routing.BalancingPool
 import com.typesafe.scalalogging.StrictLogging
+import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.BlackList.BanReason.CorruptedSerializedBytes
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.ModifierForValidation
 import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
-import encry.view.fast.sync.SnapshotHolder.FastSyncDone
+import encry.view.NodeViewHolder.DownloadRequest
+import encry.view.fast.sync.SnapshotHolder.{
+  FastSyncDone,
+  HeaderChainIsSynced,
+  RequiredManifestHeightAndId,
+  TreeChunks
+}
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
@@ -40,9 +48,16 @@ class IntermediaryNVH(settings: EncryAppSettings, intermediaryNetwork: ActorRef)
     case UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! newReader
-    case msg @ BanPeer(_, _)      => networkMessagesProcessor ! msg
-    case msg @ InvalidModifier(_) => networkMessagesProcessor ! msg
-    case msg @ FastSyncDone       => networkMessagesProcessor ! msg
+    case msg @ BanPeer(_, _)                     => networkMessagesProcessor ! msg
+    case msg @ InvalidModifier(_)                => networkMessagesProcessor ! msg
+    case msg @ FastSyncDone                      => networkMessagesProcessor ! msg
+    case msg @ DownloadRequest(_, _, _)          => networkMessagesProcessor ! msg
+    case msg @ RequiredManifestHeightAndId(_, _) => //+ to fast sync
+    case msg @ TreeChunks(_, _)                  => //+ to fast sync
+    case msg @ HeaderChainIsSynced               => networkMessagesProcessor ! msg
+    case msg @ FullBlockChainIsSynced            => networkMessagesProcessor ! msg //+ to miner
+    case msg @ DisableMining                     => //+ to miner
+    case msg @ StartMining                       => //+ to miner
   }
 }
 
