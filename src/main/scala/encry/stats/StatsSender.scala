@@ -147,16 +147,17 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
 }
 
 object StatsSender {
-  final case class BestHeaderInChain(bestHeader: Header) extends AnyVal
-  final case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int)
-  final case class TransactionsInBlock(txsNum: Int) extends AnyVal
-  final case class ModifierAppendedToHistory(isHeader: Boolean, success: Boolean)
-  final case class ModifierAppendedToState(success: Boolean) extends AnyVal
+  sealed trait StatsSenderMessage
+  final case class TransactionsInBlock(txsNum: Int) extends StatsSenderMessage
+  final case class BestHeaderInChain(bestHeader: Header) extends StatsSenderMessage
+  final case class HeightStatistics(bestHeaderHeight: Int, bestBlockHeight: Int) extends StatsSenderMessage
+  final case class ModifierAppendedToHistory(isHeader: Boolean, success: Boolean) extends StatsSenderMessage
+  final case class ModifierAppendedToState(success: Boolean) extends StatsSenderMessage
   final case class InfoAboutTransactionsFromMiner(qty: Int) extends AnyVal
-  final case class EndOfApplyingModifier(modifierId: ModifierId) extends AnyVal
-  final case class StateUpdating(time: Long) extends AnyVal
+  final case class EndOfApplyingModifier(modifierId: ModifierId) extends StatsSenderMessage
+  final case class StateUpdating(time: Long) extends StatsSenderMessage
   final case class SleepTime(time: Long) extends AnyVal
-  final case class StartApplyingModifier(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long)
+  final case class StartApplyingModifier(modifierId: ModifierId, modifierTypeId: ModifierTypeId, startTime: Long) extends StatsSenderMessage
   final case class MiningEnd(blockHeader: Header, workerIdx: Int, workersQty: Int)
   final case class MiningTime(time: Long) extends AnyVal
   final case class SendDownloadRequest(modifierTypeId: ModifierTypeId, modifiers: Seq[ModifierId])
