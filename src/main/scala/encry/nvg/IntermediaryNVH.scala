@@ -12,6 +12,7 @@ import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.ModifierForValidation
 import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.fast.sync.SnapshotHolder.{
   FastSyncDone,
@@ -22,12 +23,18 @@ import encry.view.fast.sync.SnapshotHolder.{
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
-class IntermediaryNVH(settings: EncryAppSettings, intermediaryNetwork: ActorRef) extends Actor with StrictLogging {
+class IntermediaryNVH(
+  settings: EncryAppSettings,
+  intermediaryNetwork: ActorRef,
+  timeProvider: NetworkTimeProvider,
+  influxRef: Option[ActorRef]
+) extends Actor
+    with StrictLogging {
 
   val networkMessagesProcessor: ActorRef =
     context.actorOf(NetworkMessagesProcessor.props, name = "Network-messages-processor")
   val nodeViewHolder: ActorRef =
-    context.actorOf(NodeViewHolder.props, name = "Node-view-holder")
+    context.actorOf(NodeViewHolder.props(settings, timeProvider, influxRef), name = "Node-view-holder")
   val modifiersValidatorRouter: ActorRef =
     context.actorOf(
       BalancingPool(5)
