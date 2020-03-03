@@ -82,4 +82,6 @@ class IntermediaryNVH(
   }
 }
 
-object IntermediaryNVH {}
+object IntermediaryNVH {
+
+}
