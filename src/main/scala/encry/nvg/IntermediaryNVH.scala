@@ -8,6 +8,7 @@ import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
+import encry.network.NetworkRouter.ModifierFromNetwork
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{
   RollbackFailed,
   RollbackSucceed,
@@ -28,6 +29,7 @@ import encry.view.fast.sync.SnapshotHolder.{
 }
 import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 class IntermediaryNVH(
@@ -52,12 +54,9 @@ class IntermediaryNVH(
   var historyReader: HistoryReader = HistoryReader.empty
 
   override def receive: Receive = {
-    case ModifiersForValidating(remote, typeId, modifiers) =>
-      logger.info(s"Got ${modifiers.size} modifiers of type $typeId for validation.")
-      modifiers.foreach {
-        case (id: ModifierId, bytes: Array[Byte]) =>
-          modifiersValidatorRouter ! ModifierForValidation(historyReader, id, typeId, bytes, remote)
-      }
+    case ModifierFromNetwork(remote, typeId, modifierId, modifierBytes) =>
+      logger.info(s"Got modifier ${Algos.encode(modifierId)} of type $typeId from $remote for validation.")
+      modifiersValidatorRouter ! ModifierForValidation(historyReader, modifierId, typeId, modifierBytes, remote)
     case msg @ DataFromPeer(_, _) => networkMessagesProcessor ! msg
     case UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
@@ -82,6 +81,4 @@ class IntermediaryNVH(
   }
 }
 
-object IntermediaryNVH {
-
-}
+object IntermediaryNVH {}

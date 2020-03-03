@@ -1,12 +1,13 @@
 package encry.view
 
-import akka.actor.{ Actor, ActorRef, ActorSystem, PoisonPill, Props }
-import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.settings.EncryAppSettings
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.NodeViewHolder._
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction

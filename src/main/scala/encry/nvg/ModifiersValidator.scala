@@ -1,5 +1,7 @@
 package encry.nvg
 
+import java.net.InetSocketAddress
+
 import HeaderProto.HeaderProtoMessage
 import PayloadProto.PayloadProtoMessage
 import akka.actor.{ Actor, ActorRef, Props }
@@ -13,7 +15,6 @@ import encry.network.BlackList.BanReason.{
   SyntacticallyInvalidPersistentModifier
 }
 import encry.network.DownloadedModifiersValidator.InvalidModifier
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.{ ModifierForValidation, ValidatedModifier }
 import encry.settings.EncryAppSettings
@@ -96,7 +97,7 @@ object ModifiersValidator {
     modifierId: ModifierId,
     modifierTypeId: ModifierTypeId,
     modifierBytes: Array[Byte],
-    remote: ConnectedPeer
+    remote: InetSocketAddress
   )
 
   final case class ValidatedModifier(modifier: PersistentModifier) extends AnyVal

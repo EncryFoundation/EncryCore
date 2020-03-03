@@ -339,7 +339,7 @@ object PeersKeeper {
 
   final case class UpdatedPeersCollection(peers: Map[InetSocketAddress, (ConnectedPeer, HistoryComparisonResult, PeersPriorityStatus)])
 
-  final case class BanPeer(peer: ConnectedPeer, reason: BanReason)
+  final case class BanPeer(peer: InetSocketAddress, reason: BanReason)
 
   final case class BanPeerFromAPI(peer: InetSocketAddress, reason: BanReason) extends PeerCommandHelper
 
