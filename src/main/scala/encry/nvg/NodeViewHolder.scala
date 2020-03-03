@@ -6,46 +6,27 @@ import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp.system
-import encry.api.http.DataHolderForApi
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{
-  ChangedHistory,
-  ChangedState,
-  RollbackFailed,
-  RollbackSucceed,
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification
-}
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.NodeViewHolder.NodeView
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.{
-  BestHeaderInChain,
-  EndOfApplyingModifier,
-  HeightStatistics,
-  ModifierAppendedToHistory,
-  ModifierAppendedToState,
-  StartApplyingModifier,
-  StateUpdating,
-  TransactionsInBlock
-}
+import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.ModifiersCache
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
-import encry.view.NodeViewHolder.ReceivableMessages.ModifierFromRemote
+import encry.view.NodeViewHolder.ReceivableMessages.{
+  CreateAccountManagerFromSeed,
+  LocallyGeneratedModifier,
+  ModifierFromRemote
+}
 import encry.view.NodeViewHolder.{ DownloadRequest, UpdateInformation }
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
-import encry.view.fast.sync.SnapshotHolder.{
-  HeaderChainIsSynced,
-  RequiredManifestHeightAndId,
-  SnapshotChunk,
-  TreeChunks
-}
-import encry.view.history.{ History, HistoryReader }
-import encry.view.mempool.MemoryPool.RolledBackTransactions
+import encry.view.fast.sync.SnapshotHolder._
+import encry.view.history.storage.HistoryStorage
+import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
@@ -58,7 +39,6 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId }
 
 import scala.collection.{ mutable, IndexedSeq, Seq }
-import scala.concurrent.ExecutionContextExecutor
 import scala.util.{ Failure, Success, Try }
 
 class NodeViewHolder(
@@ -69,14 +49,68 @@ class NodeViewHolder(
     with StrictLogging
     with AutoCloseable {
 
-  import context.dispatcher
-
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
   var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
 
   override def receive: Receive = {
-    case ModifierFromRemote(modifier) =>
+    case ModifierFromRemote(modifier: PersistentModifier) =>
+      val isInHistory: Boolean = nodeView.history.isModifierDefined(modifier.id)
+      val isInCache: Boolean   = ModifiersCache.contains(key(modifier.id))
+      if (isInHistory || isInCache)
+        logger.info(
+          s"Modifier ${modifier.encodedId} can't be placed into the cache cause:" +
+            s" contains in cache: $isInCache, contains in history: $isInHistory"
+        )
+      else ModifiersCache.put(key(modifier.id), modifier, nodeView.history)
+      computeApplications()
+
+    case LocallyGeneratedModifier(modifier: PersistentModifier) =>
+      val startTime: Long = System.currentTimeMillis()
+      logger.info(s"Got locally generated modifier ${modifier.encodedId} of type ${modifier.modifierTypeId}")
+      modifier match {
+        case block: Block =>
+          pmodModify(block.header, isLocallyGenerated = true)
+          pmodModify(block.payload, isLocallyGenerated = true)
+      }
+      logger.debug(
+        s"Processing time of modifier ${modifier.encodedId} is ${(System.currentTimeMillis() - startTime) / 1000}s."
+      )
+
+    case FastSyncFinished(state, wallet) =>
+      logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
+      nodeView.state.tree.avlStorage.close()
+      nodeView.wallet.close()
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/tmpDirState"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
+      FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
+      logger.info(s"Updated best block in fast sync mod. Updated state height.")
+      val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
+        override val settings: EncryAppSettings        = settings
+        override var isFullChainSynced: Boolean        = settings.node.offlineGeneration
+        override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
+        override val historyStorage: HistoryStorage    = nodeView.history.historyStorage
+      }
+      newHistory.fastSyncInProgress.fastSyncVal = false
+      newHistory.blockDownloadProcessor.updateMinimalBlockHeightVar(
+        nodeView.history.blockDownloadProcessor.minimalBlockHeight
+      )
+      newHistory.isHeadersChainSyncedVar = true
+      updateNodeView(
+        updatedHistory = Some(newHistory),
+        updatedState = Some(state),
+        updatedVault = Some(wallet)
+      )
+      system.actorSelection("/user/nodeViewSynchronizer") ! FastSyncDone
+      logger.info(s"Fast sync finished successfully!")
+
+    case CreateAccountManagerFromSeed(seed) =>
+      val newAccount = nodeView.wallet.addAccount(seed, settings.wallet.map(_.password).get, nodeView.state)
+      updateNodeView(updatedVault = newAccount.toOption)
+      sender() ! newAccount
+
+    case RemoveRedundantManifestIds => potentialManifestIds = List.empty
+
   }
 
   //todo refactor loop

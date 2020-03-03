@@ -84,57 +84,7 @@ class NodeViewHolder(memoryPoolRef: ActorRef,
   var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
 
   override def receive: Receive = {
-    case CreateAccountManagerFromSeed(seed) =>
-      val newAccount = nodeView.wallet.addAccount(seed, encrySettings.wallet.map(_.password).get, nodeView.state)
-      updateNodeView(updatedVault = newAccount.toOption)
-      sender() ! newAccount
-    case FastSyncFinished(state, wallet) =>
-      logger.info(s"Node view holder got message FastSyncDoneAt. Started state replacing.")
-      nodeView.state.tree.avlStorage.close()
-      nodeView.wallet.close()
-      FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/tmpDirState"))
-      FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/keysTmp"))
-      FileUtils.deleteDirectory(new File(s"${encrySettings.directory}/walletTmp"))
-      logger.info(s"Updated best block in fast sync mod. Updated state height.")
-      val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
-        override val settings: EncryAppSettings = encrySettings
-        override var isFullChainSynced: Boolean = settings.node.offlineGeneration
-        override val timeProvider: NetworkTimeProvider = EncryApp.timeProvider
-        override val historyStorage: HistoryStorage = nodeView.history.historyStorage
-      }
-      newHistory.fastSyncInProgress.fastSyncVal = false
-      newHistory.blockDownloadProcessor.updateMinimalBlockHeightVar(nodeView.history.blockDownloadProcessor.minimalBlockHeight)
-      newHistory.isHeadersChainSyncedVar = true
-      updateNodeView(
-        updatedHistory = Some(newHistory),
-        updatedState = Some(state),
-        updatedVault = Some(wallet)
-      )
-      system.actorSelection("/user/nodeViewSynchronizer") ! FastSyncDone
-      logger.info(s"Fast sync finished successfully!")
-    case RemoveRedundantManifestIds => potentialManifestIds = List.empty
-    case ModifierFromRemote(mod) =>
-      val isInHistory: Boolean = nodeView.history.isModifierDefined(mod.id)
-      val isInCache: Boolean = ModifiersCache.contains(key(mod.id))
-      if (isInHistory || isInCache)
-        logger.info(s"Received modifier of type: ${mod.modifierTypeId}  ${Algos.encode(mod.id)} " +
-          s"can't be placed into cache cause of: inCache: ${!isInCache}.")
-      else ModifiersCache.put(key(mod.id), mod, nodeView.history)
-      computeApplications()
 
-    case lm: LocallyGeneratedModifier =>
-      logger.debug(s"Start processing LocallyGeneratedModifier message on NVH.")
-      val startTime = System.currentTimeMillis()
-      logger.info(s"Got locally generated modifier ${lm.pmod.encodedId} of type ${lm.pmod.modifierTypeId}")
-      lm.pmod match {
-        case block: Block =>
-          pmodModify(block.header, isLocallyGenerated = true)
-          pmodModify(block.payload, isLocallyGenerated = true)
-        case anyMod =>
-          pmodModify(anyMod, isLocallyGenerated = true)
-      }
-      logger.debug(s"Time processing of msg LocallyGeneratedModifier with mod of type ${lm.pmod.modifierTypeId}:" +
-        s" with id: ${Algos.encode(lm.pmod.id)} -> ${System.currentTimeMillis() - startTime}")
 
     case GetDataFromCurrentView(f) =>
       f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet)) match {
