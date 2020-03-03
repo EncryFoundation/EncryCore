@@ -35,7 +35,6 @@ import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
-
 import scala.collection.{ mutable, IndexedSeq, Seq }
 import scala.concurrent.duration._
 import scala.util.{ Failure, Success, Try }
