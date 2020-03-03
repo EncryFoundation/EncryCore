@@ -15,5 +15,7 @@ object Messages {
     final case class ResponseFromLocal(source: InetSocketAddress,
                                        modifierTypeId: ModifierTypeId,
                                        modifiers: Map[ModifierId, Array[Byte]]) extends MessageToNetwork
+    final case class BroadcastModifier(modifierTypeId: ModifierTypeId,
+                                       modifierId: ModifierId) extends MessageToNetwork
   }
 }

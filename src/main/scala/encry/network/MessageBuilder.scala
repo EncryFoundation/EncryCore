@@ -7,9 +7,9 @@ import akka.pattern._
 import akka.util.Timeout
 import encry.network.MessageBuilder.{GetPeerInfo, GetPeers}
 import encry.network.Messages.MessageToNetwork
-import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal, SendSyncInfo}
+import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import org.encryfoundation.common.network.BasicMessagesRepo.{ModifiersNetworkMessage, RequestModifiersNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, RequestModifiersNetworkMessage}
 
 import scala.concurrent.duration._
 import scala.util.Try
@@ -36,6 +36,10 @@ case class MessageBuilder(msg: MessageToNetwork, peersKeeper: ActorRef) extends 
         (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].map { peer =>
           peer.handlerRef ! ModifiersNetworkMessage(modTypeId -> modsIds)
         }
+      }
+    case BroadcastModifier(modTypeId, modInfo) =>
+      (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
+        peers.foreach(_.handlerRef ! InvNetworkMessage(modTypeId -> List(modInfo)))
       }
   }
 }

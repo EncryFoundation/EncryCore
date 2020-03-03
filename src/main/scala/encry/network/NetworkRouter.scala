@@ -16,6 +16,7 @@ import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, N
 import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 class NetworkRouter(settings: NetworkSettings,
                     blackListSettings: BlackListSettings) extends Actor with StrictLogging {
@@ -100,6 +101,8 @@ class NetworkRouter(settings: NetworkSettings,
 }
 
 object NetworkRouter {
+
+  case class ModifierFromNetwork(modTypeId: ModifierTypeId, modId: ModifierId, modBytes: Array[Byte])
 
   def props(settings: NetworkSettings): Props = Props(new NetworkRouter(settings))
 }
