@@ -161,12 +161,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         logger.debug(s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}, but " +
           s"chainSynced is $chainSynced and canProcessTransactions is $canProcessTransactions.")
 
-      case InvNetworkMessage(invData) =>
-        logger.debug(s"Got inv message on NodeViewSynchronizer from ${remote.socketAddress} with modifiers of type:" +
-          s" $invData._1. Size of inv is: ${invData._2.size}. Sending CompareViews to NVH. " +
-          s"\nModifiers in inv message are: ${invData._2.map(Algos.encode).mkString(",")}")
-        nodeViewHolderRef ! CompareViews(remote, invData._1, invData._2)
-
       case _ => logger.debug(s"NodeViewSyncronyzer got invalid type of DataFromPeer message!")
     }
     case msg@RequestPeersForFirstSyncInfo =>

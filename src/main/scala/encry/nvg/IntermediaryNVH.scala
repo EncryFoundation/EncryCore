@@ -80,7 +80,9 @@ class IntermediaryNVH(
     case msg @ RollbackSucceed(_)                   =>
     case msg @ RollbackFailed(_)                    =>
     case msg @ SemanticallySuccessfulModifier(_)    =>
+      networkMessagesProcessor ! msg
     case msg @ SemanticallyFailedModification(_, _) =>
+      networkMessagesProcessor ! msg
   }
 }
 
