@@ -10,6 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling}
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, NewConnection, OutgoingConnectionFailed}
@@ -24,6 +25,7 @@ class NetworkRouter(settings: NetworkSettings,
   import context.system
 
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
+  var handlerForMods: ActorRef = ActorRef.noSender
 
   IO(Tcp) ! Bind(self, settings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
@@ -37,6 +39,7 @@ class NetworkRouter(settings: NetworkSettings,
       val ids = types.map(_._1)
       messagesHandlers += (ids -> handler)
     case CommandFailed(cmd: Tcp.Command) => logger.info(s"Failed to execute: $cmd.")
+    case RegisterForModsHandling => handlerForMods = sender()
     case msg => logger.warn(s"NetworkController: got something strange $msg.")
   }
 
@@ -55,6 +58,7 @@ class NetworkRouter(settings: NetworkSettings,
     case MessageFromNetwork(message, Some(remote)) =>
       peersKeeper ! BanPeer(remote.socketAddress, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
+    case msg: ModifierFromNetwork => handlerForMods ! msg
     case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg, peersKeeper), "peersKeeper")
   }
 
@@ -94,7 +98,7 @@ class NetworkRouter(settings: NetworkSettings,
                           mH: Map[Seq[Byte], ActorRef]): Unit =
     mH.find(_._1.contains(messageId)).map(_._2) match {
       case Some(handler) =>
-        handler ! DataFromPeer(message, remote)
+        handler ! DataFromPeer(message, remote.socketAddress)
         logger.debug(s"Send message DataFromPeer with ${message.messageName} to $handler.")
       case None => logger.info("No handlers found for message: " + message.messageName)
     }
@@ -106,6 +110,8 @@ object NetworkRouter {
                                  modTypeId: ModifierTypeId,
                                  modId: ModifierId,
                                  modBytes: Array[Byte])
+
+  case object RegisterForModsHandling
 
   def props(settings: NetworkSettings): Props = Props(new NetworkRouter(settings))
 }

@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.network.DM.{AwaitingRequest, RequestSent}
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkRouter.ModifierFromNetwork
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
 import encry.settings.NetworkSettings
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
@@ -40,6 +40,7 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
         context.parent ! ModifierFromNetwork(source, modTypeId, modId, modBytes)
       } else logger.info(s"Peer $source sent spam mod of type $modTypeId and id ${Algos.encode(modId)}")
     case SemanticallySuccessfulModifier(mod) => receivedModifier -= toKey(mod.id)
+    case SemanticallyFailedModification(mod, _) => receivedModifier -= toKey(mod.id)
   }
 
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
