@@ -310,18 +310,21 @@ object PeersKeeper {
 
   sealed trait PeerCommandHelper
 
-  final case class NewConnection(peer: InetSocketAddress,
-                                 remoteConnection: ActorRef)
+  sealed trait ConnectionStatusMessages
+  object ConnectionStatusMessages {
+    final case class NewConnection(peer: InetSocketAddress,
+                                   remoteConnection: ActorRef) extends ConnectionStatusMessages
 
-  final case class ConnectionVerified(peer: InetSocketAddress,
-                                      remoteConnection: ActorRef,
-                                      ct: ConnectionType)
+    final case class ConnectionVerified(peer: InetSocketAddress,
+                                        remoteConnection: ActorRef,
+                                        ct: ConnectionType) extends ConnectionStatusMessages
 
-  final case class OutgoingConnectionFailed(peer: InetSocketAddress)
+    final case class OutgoingConnectionFailed(peer: InetSocketAddress) extends ConnectionStatusMessages
 
-  final case class HandshakedDone(peer: ConnectedPeer)
+    final case class HandshakedDone(peer: ConnectedPeer) extends ConnectionStatusMessages
 
-  final case class ConnectionStopped(peer: InetSocketAddress)
+    final case class ConnectionStopped(peer: InetSocketAddress) extends ConnectionStatusMessages
+  }
 
   case object RequestPeerForConnection
 
