@@ -5,7 +5,9 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.MessageBuilder.{GetPeerInfo, GetPeers}
+import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{Incoming, Outgoing}
+import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 
@@ -30,7 +32,7 @@ class PK(networkSettings: NetworkSettings,
   var peersForConnection: Map[InetSocketAddress, Int] = networkSettings.knownPeers
     .collect { case peer: InetSocketAddress if !isSelf(peer) => peer -> 0 }.toMap
 
-  override def receive: Receive = {
+  override def receive: Receive = banPeersLogic orElse {
     case NewConnection(remote, remoteConnection) if connectedPeers.size < networkSettings.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
         s"Remote InetSocketAddress is: $remote. Remote InetAddress is ${remote.getAddress}. " +
@@ -60,7 +62,6 @@ class PK(networkSettings: NetworkSettings,
     case NewConnection(remote, _) =>
       logger.info(s"Peers keeper got request for verifying the connection but current number of max connection is " +
         s"bigger than possible or isSelf: ${isSelf(remote)}.")
-
     case HandshakedDone(connectedPeer) =>
       logger.info(s"Peers keeper got approvement about finishing a handshake." +
         s" Initializing new peer: ${connectedPeer.socketAddress}")
@@ -85,6 +86,17 @@ class PK(networkSettings: NetworkSettings,
     case GetPeerInfo(peerIp) => connectedPeers.getAll.find(_._1 == peerIp).map {
       case (_, info) => sender() ! info.connectedPeer
     }
+  }
+
+  def banPeersLogic: Receive = {
+    case BanPeer(peer, reason) =>
+      logger.info(s"Banning peer: ${peer} for $reason.")
+      blackList = blackList.banPeer(reason, peer.getAddress)
+      connectedPeers.getAll.find(_._1 == peer).map(_._2.connectedPeer.handlerRef ! CloseConnection)
+
+    case BanPeerFromAPI(peer, reason) =>
+      logger.info(s"Got msg from API... Removing peer: $peer, reason: $reason")
+      blackList = blackList.banPeer(reason, peer.getAddress)
   }
 
   def isSelf(address: InetSocketAddress): Boolean = Try(address == networkSettings.bindAddress ||

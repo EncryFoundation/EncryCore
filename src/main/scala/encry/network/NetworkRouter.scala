@@ -53,7 +53,7 @@ class NetworkRouter(settings: NetworkSettings,
       logger.debug(s"Got ${message.messageName} on the NetworkController.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
-      peersKeeper ! BanPeer(remote, InvalidNetworkMessage(message.messageName))
+      peersKeeper ! BanPeer(remote.socketAddress, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
     case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg, peersKeeper), "peersKeeper")
   }
