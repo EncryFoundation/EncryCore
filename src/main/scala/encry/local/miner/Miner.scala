@@ -139,6 +139,8 @@ class Miner(dataHolder: ActorRef,
 
   def receiveSemanticallySuccessfulModifier: Receive = {
     case SemanticallySuccessfulModifier(mod: Block) if needNewCandidate(mod) =>
+      transactionsPool = transactionsPool ++ mod.payload.txs.dropRight(1)
+        .diff(candidateOpt.map(_.transactions.dropRight(1)).getOrElse(IndexedSeq.empty))
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
@@ -188,7 +190,7 @@ class Miner(dataHolder: ActorRef,
 
     val difficulty: Difficulty = bestHeaderOpt.map(parent => view.history.requiredDifficultyAfter(parent) match {
       case Right(value) => value
-      case Left(value)  => EncryApp.forceStopApplication(999, value.toString)
+      case Left(value) => EncryApp.forceStopApplication(999, value.toString)
     })
       .getOrElse(TestNetConstants.InitialDifficulty)
 
