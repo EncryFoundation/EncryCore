@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.testkit.{ TestActorRef, TestProbe }
 import encry.modifiers.InstanceFactory
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
+//import encry.network.DownloadedModifiersValidator.{ InvalidModifier, ModifiersForValidating }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ ChangedHistory, UpdatedHistory }
 import encry.network.PeerConnectionHandler.{ ConnectedPeer, Outgoing }
 import encry.network.PeersKeeper.BanPeer
