@@ -5,8 +5,6 @@ import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import cats.syntax.either._
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, SemanticallySuccessfulModifier, SuccessfulTransaction}
-import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.nvg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -128,7 +126,7 @@ class MemoryPool(settings: EncryAppSettings,
 //    case RequestModifiersForTransactions(remote, ids) =>
 //      val modifiersIds: Seq[Transaction] = ids
 //        .map(Algos.encode)
-//        .collect { case id if memoryPool.contains(id) => memoryPool.get(id) }
+//        .collect { case if memorascyPool.contains(id) => memoryPool.get(id) }
 //        .flatten
 //      sender() ! RequestedModifiersForRemote(remote, modifiersIds)
 //      logger.debug(s"MemoryPool got request modifiers message. Number of requested ids is ${ids.size}." +

@@ -27,7 +27,7 @@ class IntermediaryMempool(settings: EncryAppSettings,
     context.actorOf(TransactionsValidator.props(settings, memoryPool, networkTimeProvider),
                     name = "Transaction-validator")
   val mempoolProcessor: ActorRef =
-    context.actorOf(MemoryPoolProcessor.props(settings), name = "mempool-processor")
+    context.actorOf(MemoryPoolProcessor.props(settings, networkTimeProvider), name = "mempool-processor")
 
   override def receive(): Receive = {
     case msg @ InvalidModifier(_)                    => // to nvsh

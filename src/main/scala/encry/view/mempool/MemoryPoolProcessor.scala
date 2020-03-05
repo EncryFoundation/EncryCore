@@ -1,23 +1,26 @@
 package encry.view.mempool
 
 import java.net.InetSocketAddress
-import akka.actor.{ Actor, Props }
+
+import akka.actor.{Actor, Props}
 import com.google.common.base.Charsets
-import com.google.common.hash.{ BloomFilter, Funnels }
+import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.settings.EncryAppSettings
+import encry.utils.NetworkTimeProvider
 import encry.view.mempool.IntermediaryMempool.IsChainSynced
 import encry.view.mempool.MemoryPool.TransactionProcessing
-import encry.view.mempool.MemoryPoolProcessor.{ CleanupBloomFilter, RequestedModifiersForRemote }
+import encry.view.mempool.MemoryPoolProcessor.{CleanupBloomFilter, RequestedModifiersForRemote}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.network.BasicMessagesRepo.{ InvNetworkMessage, RequestModifiersNetworkMessage }
+import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestModifiersNetworkMessage}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.IndexedSeq
 
-class MemoryPoolProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
+class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
   import context.dispatcher
 
@@ -26,6 +29,8 @@ class MemoryPoolProcessor(settings: EncryAppSettings) extends Actor with StrictL
   var canProcessTransactions: Boolean = false
 
   var chainSynced: Boolean = false
+
+  var memoryPool: MemoryPoolStorage = MemoryPoolStorage.empty(settings, ntp)
 
   override def preStart(): Unit =
     context.system.scheduler.schedule(settings.mempool.bloomFilterCleanupInterval,
@@ -96,7 +101,7 @@ class MemoryPoolProcessor(settings: EncryAppSettings) extends Actor with StrictL
 
 object MemoryPoolProcessor {
 
-  def props(settings: EncryAppSettings) = Props(new MemoryPoolProcessor(settings))
+  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider) = Props(new MemoryPoolProcessor(settings, ntp))
 
   case object CleanupBloomFilter
 
