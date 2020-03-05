@@ -20,14 +20,13 @@ import scala.collection.{IndexedSeq, mutable}
 import scala.util.Random
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
-import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{ModifiersForValidating}
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.PeersKeeper.ConnectionStatusMessages.ConnectionStopped
 import encry.network.PeersKeeper._
 import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
 import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.BadNode
-import encry.nvg.NodeViewHolder.DownloadRequest
 import encry.view.mempool.MemoryPool.{StartTransactionsValidation, StopTransactionsValidation}
 import org.encryfoundation.common.modifiers.history.{Block, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction

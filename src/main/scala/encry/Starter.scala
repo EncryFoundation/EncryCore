@@ -20,6 +20,7 @@ import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
 import encry.network.{NetworkRouter, NodeViewSynchronizer}
+import encry.nvg.IntermediaryNVH
 import encry.settings._
 import encry.stats.StatsSender
 import encry.utils.{Mnemonic, NetworkTimeProvider}
@@ -415,12 +416,12 @@ class Starter(settings: EncryAppSettings,
           .props(newSettings, timeProvider, miner, influxRef)
           .withDispatcher("mempool-dispatcher")
       )
-      val nodeViewHolder: ActorRef = context.system.actorOf(
-        NodeViewHolder
-          .props(memoryPool, influxRef, dataHolderForApi, newSettings)
-          .withDispatcher("nvh-dispatcher"),
-        "nodeViewHolder"
-      )
+//      val nodeViewHolder: ActorRef = context.system.actorOf(
+//        NodeViewHolder
+//          .props(memoryPool, influxRef, dataHolderForApi, newSettings)
+//          .withDispatcher("nvh-dispatcher"),
+//        "nodeViewHolder"
+//      )
 
       if (nodePass.nonEmpty) dataHolderForApi ! PassForStorage(nodePass)
 
@@ -431,12 +432,18 @@ class Starter(settings: EncryAppSettings,
 //        "nodeViewSynchronizer"
 //      )
 
-      context.system.actorOf(
+      val networkRouter = context.system.actorOf(
         NetworkRouter
           .props(networkSettings, settings.blackList)
           .withDispatcher("nvsh-dispatcher"),
         "nodeViewSynchronizer"
       )
+
+      val nvhRouter = context.system.actorOf(
+        IntermediaryNVH.props(settings, networkRouter, timeProvider, influxRef)
+      )
+
+
 
       if (newSettings.node.mining) miner ! StartMining
       if (newSettings.node.useCli) {
