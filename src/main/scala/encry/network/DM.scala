@@ -13,7 +13,7 @@ import encry.settings.NetworkSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
-
+import cats.syntax.option._
 import scala.collection.mutable
 
 case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging {
@@ -35,7 +35,7 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
         AwaitingRequest(peer, modTypeId, modId, 1)
       )
     case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts <= networkSettings.maxDeliveryChecks =>
-      if (expectedModifiers.contains(toKey(modId))) context.parent ! RequestFromLocal(peer, modTypeId, List(modId))
+      if (expectedModifiers.contains(toKey(modId))) context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))
     case AwaitingRequest(peer, _, modId, _) =>
       logger.info(s"Stop requesting modifier ${Algos.encode(modId)} from peer $peer")
     case ModifierFromNetwork(source, modTypeId, modId, modBytes) =>

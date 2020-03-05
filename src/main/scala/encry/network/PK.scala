@@ -5,7 +5,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.{BanReason, BanTime, BanType}
-import encry.network.MessageBuilder.{GetPeerInfo, GetPeers}
+import encry.network.MessageBuilder.{GetPeerByPredicate, GetPeerInfo, GetPeers}
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{Incoming, Outgoing}
 import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI, PeerForConnection, RequestPeerForConnection}
@@ -107,6 +107,11 @@ class PK(networkSettings: NetworkSettings,
         logger.info(s"Peer: $peer removed from availablePeers cause of it has been banned. " +
           s"Current is: ${peersForConnection.mkString(",")}.")
       }
+    case predicate: GetPeerByPredicate => connectedPeers.getAll.find {
+      case (_, info) => predicate.predicate(info)
+    }.map {
+      case (_, info) => sender() ! info.connectedPeer.handlerRef
+    }
     case GetPeers => sender() ! connectedPeers.getAll.map(_._2.connectedPeer)
     case GetPeerInfo(peerIp) => connectedPeers.getAll.find(_._1 == peerIp).map {
       case (_, info) => sender() ! info.connectedPeer
