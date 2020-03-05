@@ -2,6 +2,7 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
@@ -13,13 +14,13 @@ import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.NodeViewHolder.CurrentView
-import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView}
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
@@ -34,6 +35,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
+
 import scala.collection._
 import scala.concurrent.duration._
 

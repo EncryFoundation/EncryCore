@@ -8,12 +8,13 @@ import encry.network.DM.{AwaitingRequest, RequestSent}
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkController.ReceivableMessages.RegisterMessagesHandler
 import encry.network.NetworkRouter.ModifierFromNetwork
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
 import encry.settings.NetworkSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import cats.syntax.option._
+import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
+
 import scala.collection.mutable
 
 case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging {

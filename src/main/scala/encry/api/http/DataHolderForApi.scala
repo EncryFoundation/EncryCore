@@ -1,6 +1,7 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.pattern._
 import akka.util.Timeout
@@ -20,9 +21,10 @@ import encry.network.ConnectedPeersCollection
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeerFromAPI
+import encry.nvg.NodeViewHolder.NodeViewChange
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.NodeViewHolder.ReceivableMessages.{ GetDataFromCurrentView}
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.wallet.EncryWallet
@@ -31,6 +33,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)

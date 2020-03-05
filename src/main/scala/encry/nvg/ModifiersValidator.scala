@@ -14,9 +14,9 @@ import encry.network.BlackList.BanReason.{
   PreSemanticInvalidModifier,
   SyntacticallyInvalidPersistentModifier
 }
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SyntacticallyFailedModification
 import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.{ InvalidModifierBytes, ModifierForValidation, ValidatedModifier }
+import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
 import encry.settings.EncryAppSettings
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier

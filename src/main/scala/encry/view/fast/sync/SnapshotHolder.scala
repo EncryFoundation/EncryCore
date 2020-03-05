@@ -2,29 +2,28 @@ package encry.view.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
-import cats.syntax.either._
+import akka.actor.{ Actor, ActorRef, Cancellable, Props }
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason.{InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
-import encry.network.{Broadcast, PeerConnectionHandler}
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
+import encry.network.PeersKeeper.SendToNetwork
+import encry.network.{ Broadcast, PeerConnectionHandler }
+import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ChunkId, ManifestId}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
+import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ ChunkId, ManifestId }
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.History
 import encry.view.state.UtxoState
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
+import encry.view.state.avlTree.{ Node, NodeSerilalizer }
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import supertagged.TaggedType
+
 import scala.util.Try
 
 class SnapshotHolder(settings: EncryAppSettings,
@@ -278,21 +277,21 @@ class SnapshotHolder(settings: EncryAppSettings,
             if requestsProcessor.canBeProcessed(snapshotProcessor, requiredManifestId) =>
           snapshotProcessor.actualManifest.foreach { m =>
             logger.info(s"Sent to remote actual manifest with id ${Algos.encode(requiredManifestId)}")
-            //remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
+          //remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
           }
         case RequestManifestMessage(manifest) =>
           logger.debug(s"Got request for manifest with ${Algos.encode(manifest)}")
         case RequestChunkMessage(chunkId)
-          //if requestsProcessor.canProcessRequest(remote)
-        =>
+            //if requestsProcessor.canProcessRequest(remote)
+            =>
           logger.debug(s"Got RequestChunkMessage. Current handledRequests ${requestsProcessor.handledRequests}.")
           val chunkFromDB: Option[SnapshotChunkMessage] = snapshotProcessor.getChunkById(chunkId)
           chunkFromDB.foreach { chunk =>
             logger.debug(s"Sent to $remote chunk $chunk.")
             val networkMessage: NetworkMessage = ResponseChunkMessage(chunk)
-            //remote.handlerRef ! networkMessage
+          //remote.handlerRef ! networkMessage
           }
-          //requestsProcessor = requestsProcessor.processRequest(remote)
+        //requestsProcessor = requestsProcessor.processRequest(remote)
         case RequestChunkMessage(_) =>
         case _                      =>
       }

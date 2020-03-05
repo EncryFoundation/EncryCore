@@ -8,8 +8,8 @@ import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.nvg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.ReceivableMessages.CompareViews
@@ -79,7 +79,7 @@ class MemoryPool(settings: EncryAppSettings,
     case CompareViews(peer, _, transactions) =>
       val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions.toIndexedSeq)
       if (notYetRequestedTransactions.nonEmpty) {
-        sender ! RequestFromLocal(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
+        //sender ! RequestFromLocal(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
         logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
           s" Not yet requested ids size is ${notYetRequestedTransactions.size}.")
       } else logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +

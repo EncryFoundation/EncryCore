@@ -8,8 +8,8 @@ import encry.network.DeliveryManager.CheckPayloadsToDownload
 import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
 import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ OtherNodeSyncingStatus, SemanticallySuccessfulModifier }
-import encry.nvg.NodeViewHolder.{  UpdateHistoryReader }
+import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
+import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, UpdateHistoryReader }
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader

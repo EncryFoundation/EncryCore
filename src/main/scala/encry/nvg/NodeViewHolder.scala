@@ -14,7 +14,16 @@ import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
-import encry.nvg.NodeViewHolder.{ NodeView, UpdateHistoryReader, UpdateInformation }
+import encry.nvg.NodeViewHolder.{
+  NodeView,
+  RollbackFailed,
+  RollbackSucceed,
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification,
+  UpdateHistoryReader,
+  UpdateInformation
+}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -31,7 +40,7 @@ import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
@@ -501,6 +510,24 @@ object NodeViewHolder {
     final case class CreateAccountManagerFromSeed(seed: String)         extends AnyVal
     final case class LocallyGeneratedModifier(pmod: PersistentModifier) extends AnyVal
   }
+
+  trait NodeViewHolderEvent
+
+  trait NodeViewChange extends NodeViewHolderEvent
+
+  case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
+
+  case class RollbackSucceed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
+
+  case class SyntacticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
+      extends ModificationOutcome
+
+  case class SemanticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
+      extends ModificationOutcome
+
+  case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome
+
+  case class SemanticallySuccessfulModifier(modifier: PersistentNodeViewModifier) extends ModificationOutcome
 
   final case class DownloadRequest(
     modifierTypeId: ModifierTypeId,

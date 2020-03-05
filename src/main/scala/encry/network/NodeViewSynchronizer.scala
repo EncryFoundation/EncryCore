@@ -2,13 +2,14 @@ package encry.network
 
 import HeaderProto.HeaderProtoMessage
 import java.net.InetSocketAddress
+
 import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus._
-import encry.local.miner.Miner.{DisableMining, ClIMiner, StartMining}
+import encry.local.miner.Miner.{ClIMiner, DisableMining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -29,11 +30,14 @@ import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, Tr
 import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
+import encry.nvg.NodeViewHolder.{NodeViewChange, NodeViewHolderEvent, SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fast.sync.SnapshotHolder
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks, UpdateSnapshot}
+
 import scala.util.Try
 
 //class NodeViewSynchronizer(influxRef: Option[ActorRef],
@@ -228,31 +232,13 @@ object NodeViewSynchronizer {
 
     final case class RemovePeerFromBlackList(address: InetSocketAddress) extends CLIPeer
 
-    trait NodeViewHolderEvent
-
-    trait NodeViewChange extends NodeViewHolderEvent
-
     case class ChangedHistory(reader: History) extends NodeViewChange
 
     final case class UpdatedHistory(history: History) extends AnyVal
 
     case class ChangedState(reader: UtxoState) extends NodeViewChange
 
-    case class RollbackFailed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
-
-    case class RollbackSucceed(branchPointOpt: Option[VersionTag]) extends NodeViewHolderEvent
-
     trait ModificationOutcome extends NodeViewHolderEvent
-
-    case class SyntacticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
-      extends ModificationOutcome
-
-    case class SemanticallyFailedModification(modifier: PersistentNodeViewModifier, errors: List[ModifierApplyError])
-      extends ModificationOutcome
-
-    case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome
-
-    case class SemanticallySuccessfulModifier(modifier: PersistentNodeViewModifier) extends ModificationOutcome
 
   }
 

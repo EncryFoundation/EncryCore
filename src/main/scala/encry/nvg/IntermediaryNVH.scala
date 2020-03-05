@@ -12,7 +12,14 @@ import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandlin
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.{ InvalidModifierBytes, ModifierForValidation }
-import encry.nvg.NodeViewHolder.UpdateHistoryReader
+import encry.nvg.NodeViewHolder.{
+  RollbackFailed,
+  RollbackSucceed,
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification,
+  UpdateHistoryReader
+}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
