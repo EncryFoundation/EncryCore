@@ -3,11 +3,9 @@ package encry.view.mempool
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import cats.syntax.either._
-import com.google.common.base.Charsets
-import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.nvg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.settings.EncryAppSettings
@@ -17,28 +15,22 @@ import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransac
 import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.collection.IndexedSeq
 
 class MemoryPool(settings: EncryAppSettings,
                  networkTimeProvider: NetworkTimeProvider,
-                 minerReference: ActorRef,
+                 intermediaryMempool: ActorRef,
                  influxReference: Option[ActorRef]) extends Actor with StrictLogging {
 
   import context.dispatcher
 
   var memoryPool: MemoryPoolStorage = MemoryPoolStorage.empty(settings, networkTimeProvider)
 
-  var bloomFilterForTransactionsIds: BloomFilter[String] = initBloomFilter
+  var canProcessTransactions: Boolean = false
 
   override def preStart(): Unit = {
     logger.debug(s"Starting MemoryPool. Initializing all schedulers")
-    context.system.eventStream.subscribe(self, classOf[NewTransaction])
-    context.system.scheduler.schedule(
-      settings.mempool.bloomFilterCleanupInterval,
-      settings.mempool.bloomFilterCleanupInterval, self, CleanupBloomFilter)
     context.system.scheduler.schedule(
       settings.mempool.cleanupInterval,
       settings.mempool.cleanupInterval, self, RemoveExpiredFromPool)
@@ -67,7 +59,8 @@ class MemoryPool(settings: EncryAppSettings,
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
-        Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StopTransactionsValidation)
+        canProcessTransactions = false
+        context.parent ! TransactionProcessing(canProcessTransactions)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + 1
@@ -76,14 +69,14 @@ class MemoryPool(settings: EncryAppSettings,
         context.become(continueProcessing(currentTransactionsNumber))
       }
 
-    case CompareViews(peer, _, transactions) =>
-      val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions.toIndexedSeq)
-      if (notYetRequestedTransactions.nonEmpty) {
-        //sender ! RequestFromLocal(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
-        logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
-          s" Not yet requested ids size is ${notYetRequestedTransactions.size}.")
-      } else logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
-        s" There are no not yet requested ids.")
+//    case CompareViews(peer, _, transactions) =>
+//      val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions.toIndexedSeq)
+//      if (notYetRequestedTransactions.nonEmpty) {
+//        sender ! RequestFromLocal(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
+//        logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
+//          s" Not yet requested ids size is ${notYetRequestedTransactions.size}.")
+//      } else logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
+//        s" There are no not yet requested ids.")
 
     case RolledBackTransactions(transactions) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransactions: Seq[Transaction]) =
@@ -95,7 +88,8 @@ class MemoryPool(settings: EncryAppSettings,
         logger.debug(s"MemoryPool has its limit of processed transactions. " +
           s"Transit to 'disableTransactionsProcessor' state." +
           s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
-        Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StopTransactionsValidation)
+        canProcessTransactions = false
+        context.parent ! TransactionProcessing(canProcessTransactions)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
@@ -111,20 +105,19 @@ class MemoryPool(settings: EncryAppSettings,
         s"Transit to a transactionsProcessor state.")
       if (state == NotProcessingNewTransactions)
         Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StartTransactionsValidation)
+      canProcessTransactions = true
+      context.parent ! TransactionProcessing(canProcessTransactions)
       context.become(continueProcessing(currentNumberOfProcessedTransactions = 0))
 
     case SemanticallySuccessfulModifier(_) =>
       logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with non block modifier" +
         s"while $state. Do nothing in this case.")
 
-    case CleanupBloomFilter =>
-      bloomFilterForTransactionsIds = initBloomFilter
-
     case SendTransactionsToMiner =>
       val (newMemoryPool: MemoryPoolStorage, transactionsForMiner: Seq[Transaction]) =
         memoryPool.getTransactionsForMiner
       memoryPool = newMemoryPool
-      minerReference ! TransactionsForMiner(transactionsForMiner)
+      intermediaryMempool ! TransactionsForMiner(transactionsForMiner)
       logger.debug(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
         s" New pool size is ${memoryPool.size}. Ids ${transactionsForMiner.map(_.encodedId)}")
 
@@ -132,28 +125,16 @@ class MemoryPool(settings: EncryAppSettings,
       memoryPool = memoryPool.filter(memoryPool.isExpired)
       logger.debug(s"MemoryPool got RemoveExpiredFromPool message. After cleaning pool size is: ${memoryPool.size}.")
 
-    case RequestModifiersForTransactions(remote, ids) =>
-      val modifiersIds: Seq[Transaction] = ids
-        .map(Algos.encode)
-        .collect { case id if memoryPool.contains(id) => memoryPool.get(id) }
-        .flatten
-      sender() ! RequestedModifiersForRemote(remote, modifiersIds)
-      logger.debug(s"MemoryPool got request modifiers message. Number of requested ids is ${ids.size}." +
-        s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote.")
+//    case RequestModifiersForTransactions(remote, ids) =>
+//      val modifiersIds: Seq[Transaction] = ids
+//        .map(Algos.encode)
+//        .collect { case id if memoryPool.contains(id) => memoryPool.get(id) }
+//        .flatten
+//      sender() ! RequestedModifiersForRemote(remote, modifiersIds)
+//      logger.debug(s"MemoryPool got request modifiers message. Number of requested ids is ${ids.size}." +
+//        s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote.")
 
     case message => logger.debug(s"MemoryPool got unhandled message $message.")
-  }
-
-  def initBloomFilter: BloomFilter[String] = BloomFilter.create(
-    Funnels.stringFunnel(Charsets.UTF_8),
-    settings.mempool.bloomFilterCapacity,
-    settings.mempool.bloomFilterFailureProbability
-  )
-
-  def notRequestedYet(ids: IndexedSeq[ModifierId]): IndexedSeq[ModifierId] = ids.collect {
-    case id: ModifierId if !bloomFilterForTransactionsIds.mightContain(Algos.encode(id)) =>
-      bloomFilterForTransactionsIds.put(Algos.encode(id))
-      id
   }
 }
 
@@ -165,15 +146,11 @@ object MemoryPool {
 
   final case class TransactionsForMiner(txs: Seq[Transaction]) extends AnyVal
 
-  final case class RequestModifiersForTransactions(peer: ConnectedPeer, txsIds: Seq[ModifierId])
-
-  final case class RequestedModifiersForRemote(peer: ConnectedPeer, txs: Seq[Transaction])
-
   case object SendTransactionsToMiner
 
-  case object RemoveExpiredFromPool
+  case class TransactionProcessing(info: Boolean)
 
-  case object CleanupBloomFilter
+  case object RemoveExpiredFromPool
 
   case object StopTransactionsValidation
 
@@ -191,17 +168,16 @@ object MemoryPool {
 
   def props(settings: EncryAppSettings,
             ntp: NetworkTimeProvider,
-            minerRef: ActorRef,
+            intermediaryMempool: ActorRef,
             influx: Option[ActorRef]): Props =
-    Props(new MemoryPool(settings, ntp, minerRef, influx))
+    Props(new MemoryPool(settings, ntp, intermediaryMempool, influx))
 
   class MemoryPoolPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
-        case RemoveExpiredFromPool | CleanupBloomFilter | SendTransactionsToMiner => 0
+        case RemoveExpiredFromPool | SendTransactionsToMiner => 0
         case NewTransaction(_) => 1
-        case CompareViews(_, _, _) | RequestModifiersForTransactions(_, _) => 2
-        case otherwise => 3
+        case otherwise => 2
       })
 
 }
