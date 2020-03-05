@@ -34,8 +34,8 @@ class NetworkRouter(settings: NetworkSettings,
 
   IO(Tcp) ! Bind(self, settings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
-  val peersKeeper = context.system.actorOf(PK.props(settings, blackListSettings), "peersKeeper")
-  val deliveryManager = context.system.actorOf(DM.props(settings), "deliveryManager")
+  val peersKeeper = context.actorOf(PK.props(settings, blackListSettings), "peersKeeper")
+  val deliveryManager = context.actorOf(DM.props(settings), "deliveryManager")
   val externalSocketAddress: Option[InetSocketAddress] = settings.declaredAddress
 
   override def receive: Receive = bindingLogic orElse businessLogic orElse peersLogic orElse {
@@ -67,7 +67,7 @@ class NetworkRouter(settings: NetworkSettings,
     case msg: ModifierFromNetwork => handlerForMods ! msg
     case msg: OtherNodeSyncingStatus => peersKeeper ! msg
     case msg: MessageToNetwork =>
-      context.system.actorOf(MessageBuilder.props(msg, peersKeeper, deliveryManager), s"messageBuilder${Random.nextInt()}")
+      context.actorOf(MessageBuilder.props(msg, peersKeeper, deliveryManager), s"messageBuilder${Random.nextInt()}")
   }
 
   def peersLogic: Receive = {

@@ -4,13 +4,18 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
+import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.MessageBuilder.{GetPeerByPredicate, GetPeerInfo, GetPeers}
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{Incoming, Outgoing}
 import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI, PeerForConnection, RequestPeerForConnection}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
+import org.encryfoundation.common.network.BasicMessagesRepo.{GetPeersNetworkMessage, PeersNetworkMessage}
 
 import scala.util.{Random, Try}
 
@@ -33,7 +38,14 @@ class PK(networkSettings: NetworkSettings,
   var peersForConnection: Map[InetSocketAddress, Int] = networkSettings.knownPeers
     .collect { case peer: InetSocketAddress if !isSelf(peer) => peer -> 0 }.toMap
 
-  override def receive: Receive = banPeersLogic orElse {
+  override def preStart(): Unit = {
+    context.parent ! RegisterMessagesHandler(Seq(
+          PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
+          GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
+    ), self)
+  }
+
+  override def receive: Receive = banPeersLogic orElse networkMessagesProcessingLogic orElse {
     case RequestPeerForConnection if connectedPeers.size < networkSettings.maxConnections =>
       def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType): (InetAddress, BanReason) = address -> r
       logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
@@ -58,6 +70,8 @@ class PK(networkSettings: NetworkSettings,
           logger.info(s"Adding new peer: $peer to awaitingHandshakeConnections." +
             s" Current is: ${awaitingHandshakeConnections.mkString(",")}")
         }
+    case OtherNodeSyncingStatus(remote, comparison, _) =>
+      connectedPeers = connectedPeers.updateHistoryComparisonResult(Map(remote -> comparison))
     case NewConnection(remote, remoteConnection) if connectedPeers.size < networkSettings.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
         s"Remote InetSocketAddress is: $remote. Remote InetAddress is ${remote.getAddress}. " +
@@ -118,6 +132,40 @@ class PK(networkSettings: NetworkSettings,
     }
   }
 
+  def networkMessagesProcessingLogic: Receive = {
+    case DataFromPeer(message, remote) => message match {
+      case PeersNetworkMessage(peers) if !connectWithOnlyKnownPeers =>
+        logger.info(s"Got peers message from $remote with peers ${peers.mkString(",")}")
+        peers
+          .filterNot { p =>
+            blackList.contains(p.getAddress) || connectedPeers.contains(p) || isSelf(p) || peersForConnection.contains(p)
+          }.foreach { p =>
+            logger.info(s"Found new peer: $p. Adding it to the available peers collection.")
+            peersForConnection = peersForConnection.updated(p, 0)
+          }
+        logger.info(s"New available peers collection after processing peers from $remote is: ${peersForConnection.keys.mkString(",")}.")
+
+      case PeersNetworkMessage(_) =>
+        logger.info(s"Got PeersNetworkMessage from $remote, but connectWithOnlyKnownPeers: $connectWithOnlyKnownPeers, " +
+          s"so ignore this message and ban this peer.")
+        self ! BanPeer(remote, SentPeersMessageWithoutRequest)
+
+      case GetPeersNetworkMessage =>
+        def findPeersForRemote(add: InetSocketAddress, info: PeerInfo): Boolean =
+          Try {
+            if (remote.getAddress.isSiteLocalAddress) true
+            else add.getAddress.isSiteLocalAddress && add != remote
+          }.getOrElse(false)
+
+        val peers: Seq[InetSocketAddress] = connectedPeers.collect(findPeersForRemote, getPeersForRemote)
+        logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
+        logger.info(s"Remote is side local: ${remote} : ${Try(remote.getAddress.isSiteLocalAddress)}")
+        connectedPeers.getAll.find(_._1 == remote).foreach {
+          case (_, info) => info.connectedPeer.handlerRef ! PeersNetworkMessage(peers)
+        }
+    }
+  }
+
   def banPeersLogic: Receive = {
     case BanPeer(peer, reason) =>
       logger.info(s"Banning peer: ${peer} for $reason.")
@@ -128,6 +176,8 @@ class PK(networkSettings: NetworkSettings,
       logger.info(s"Got msg from API... Removing peer: $peer, reason: $reason")
       blackList = blackList.banPeer(reason, peer.getAddress)
   }
+
+  def getPeersForRemote(add: InetSocketAddress, info: PeerInfo): InetSocketAddress = add
 
   def isSelf(address: InetSocketAddress): Boolean = Try(address == networkSettings.bindAddress ||
     networkSettings.declaredAddress.contains(address) ||
