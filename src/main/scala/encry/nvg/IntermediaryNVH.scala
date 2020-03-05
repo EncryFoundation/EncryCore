@@ -9,7 +9,7 @@ import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
-import encry.network.NetworkRouter.ModifierFromNetwork
+import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{
   OtherNodeSyncingStatus,
   RollbackFailed,
@@ -57,7 +57,7 @@ class IntermediaryNVH(
     self
   )
 
-  //todo add registration for ModifierFromNetwork msg
+  intermediaryNetwork ! RegisterForModsHandling
 
   val networkMessagesProcessor: ActorRef =
     context.actorOf(NetworkMessagesProcessor.props(settings), name = "Network-messages-processor")
