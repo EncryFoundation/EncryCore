@@ -1,4 +1,4 @@
-package encry.view
+package encry.nvg
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.view.history.History
@@ -7,11 +7,11 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.annotation.tailrec
-import scala.collection.immutable.SortedMap
 import scala.collection.concurrent.TrieMap
+import scala.collection.immutable.SortedMap
 import scala.collection.mutable
-import encry.EncryApp.settings
 
 object ModifiersCache extends StrictLogging {
 
