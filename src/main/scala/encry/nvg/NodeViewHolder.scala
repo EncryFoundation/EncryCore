@@ -2,19 +2,19 @@ package encry.nvg
 
 import java.io.File
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, LocallyGeneratedModifier}
-import encry.nvg.NodeViewHolder.{ NodeView, UpdateHistoryReader, UpdateInformation}
+import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
+import encry.nvg.NodeViewHolder.{ NodeView, UpdateHistoryReader, UpdateInformation }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -24,7 +24,7 @@ import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
 import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader}
+import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
@@ -32,14 +32,14 @@ import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
 
-import scala.collection.{IndexedSeq, Seq, mutable}
+import scala.collection.{ mutable, IndexedSeq, Seq }
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 class NodeViewHolder(
   settings: EncryAppSettings,
@@ -148,7 +148,6 @@ class NodeViewHolder(
     } else ()
   }
 
-  //todo replace outgoing message with history reader
   def updateNodeView(
     updatedHistory: Option[History] = none,
     updatedState: Option[UtxoState] = none,
@@ -348,7 +347,7 @@ class NodeViewHolder(
               updateState(historyBeforeStUpdate, nodeView.state, progressInfo, IndexedSeq(), isLocallyGenerated)
             if (newHistory.isHeadersChainSynced) context.parent ! HeaderChainIsSynced
             context.parent ! StateUpdating(System.currentTimeMillis() - startPoint)
-            sendUpdatedInfoToMemoryPool(progressInfo.toRemove)
+            sendUpdatedInfoToMemoryPool(progressInfo.toRemove, progressInfo.toApply)
             if (progressInfo.chainSwitchingNeeded)
               nodeView.wallet.rollback(VersionTag !@@ progressInfo.branchPoint.get).get
             blocksApplied.foreach(nodeView.wallet.scanPersistent)
@@ -373,12 +372,16 @@ class NodeViewHolder(
       }
     } else logger.info(s"Trying to apply modifier ${modifier.encodedId} that's already in history.")
 
-  def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier]): Unit = {
-    val rolledBackTxs: IndexedSeq[Transaction] = toRemove
+  def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier], toApply: Seq[PersistentModifier]): Unit = {
+    val toRemoveTxs: IndexedSeq[Transaction] = toRemove
       .flatMap(extractTransactions)
       .toIndexedSeq
-    //todo compare with toApply
-    if (rolledBackTxs.nonEmpty) context.parent ! RolledBackTransactions(rolledBackTxs)
+    val toApplyTxs: Vector[String] = toApply
+      .flatMap(extractTransactions)
+      .toVector
+      .map(_.encodedId)
+    val resultedTxs: IndexedSeq[Transaction] = toRemoveTxs.filterNot(tx => toApplyTxs.contains(tx.encodedId))
+    if (resultedTxs.nonEmpty) context.parent ! RolledBackTransactions(resultedTxs)
   }
 
   def extractTransactions(mod: PersistentModifier): Seq[Transaction] = mod match {
