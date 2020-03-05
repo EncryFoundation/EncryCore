@@ -10,7 +10,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus._
 import encry.local.miner.Miner.{DisableMining, ClIMiner, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer

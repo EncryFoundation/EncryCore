@@ -1,25 +1,18 @@
 package encry.nvg
 
-import akka.actor.{ Actor, ActorRef }
+import akka.actor.{ Actor, ActorRef, Props }
 import akka.routing.BalancingPool
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{
-  OtherNodeSyncingStatus,
-  RollbackFailed,
-  RollbackSucceed,
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification
-}
-import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
-import encry.nvg.ModifiersValidator.{ InvalidNetworkBytes, ModifierForValidation }
-import encry.nvg.NodeViewHolder.{ DownloadRequest, UpdateHistoryReader }
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeersKeeper.BanPeer
+import encry.nvg.ModifiersValidator.{ InvalidModifierBytes, ModifierForValidation }
+import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
@@ -33,7 +26,6 @@ import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import org.encryfoundation.common.network.BasicMessagesRepo.{
   InvNetworkMessage,
-  ModifiersNetworkMessage,
   RequestModifiersNetworkMessage,
   SyncInfoNetworkMessage
 }
@@ -76,17 +68,17 @@ class IntermediaryNVH(
       logger.info(s"Got modifier ${Algos.encode(modifierId)} of type $typeId from $remote for validation.")
       modifiersValidatorRouter ! ModifierForValidation(historyReader, modifierId, typeId, modifierBytes, remote)
     case msg @ DataFromPeer(_, _) => networkMessagesProcessor ! msg
-    case UpdateHistoryReader(newReader: HistoryReader) =>
+    case msg @ UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
-      networkMessagesProcessor ! newReader
+      networkMessagesProcessor ! msg
     case msg @ BanPeer(_, _)                         => intermediaryNetwork ! msg
-    case msg @ InvalidNetworkBytes(_)                => intermediaryNetwork ! msg
-    case msg @ DownloadRequest(_, _)                 => intermediaryNetwork ! msg
+    case msg @ InvalidModifierBytes(_)               => intermediaryNetwork ! msg
     case msg @ OtherNodeSyncingStatus(_, _, _)       => intermediaryNetwork ! msg
     case msg @ RequestFromLocal(_, _, _)             => intermediaryNetwork ! msg
     case msg @ ResponseFromLocal(_, _, _)            => intermediaryNetwork ! msg
     case msg @ BroadcastModifier(_, _)               => intermediaryNetwork ! msg
     case msg @ SyntacticallyFailedModification(_, _) => intermediaryNetwork ! msg
+    case msg @ SendSyncInfo(_)                       => intermediaryNetwork ! msg
     case msg @ RequiredManifestHeightAndId(_, _)     => //+ to fast sync
     case msg @ TreeChunks(_, _)                      => //+ to fast sync
     case msg @ FastSyncDone                          =>
@@ -106,4 +98,11 @@ class IntermediaryNVH(
   }
 }
 
-object IntermediaryNVH {}
+object IntermediaryNVH {
+  def props(
+    settings: EncryAppSettings,
+    intermediaryNetwork: ActorRef,
+    timeProvider: NetworkTimeProvider,
+    influxRef: Option[ActorRef]
+  ): Props = Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef))
+}

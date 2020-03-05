@@ -5,11 +5,11 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Younger }
 import cats.syntax.option._
 import encry.network.DeliveryManager.CheckPayloadsToDownload
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
 import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ OtherNodeSyncingStatus, SemanticallySuccessfulModifier }
-import encry.nvg.NodeViewHolder.DownloadRequest
+import encry.nvg.NodeViewHolder.{  UpdateHistoryReader }
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader
@@ -25,6 +25,8 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
+import scala.concurrent.duration._
+
 class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   import context.dispatcher
@@ -32,6 +34,11 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
   var historyReader: HistoryReader = HistoryReader.empty
 
   var modifiersRequestCache: Map[String, Array[Byte]] = Map.empty
+
+  context.system.scheduler.schedule(5.seconds, settings.network.syncInterval) {
+    logger.debug("Scheduler once for SendLocalSyncInfo triggered")
+    context.parent ! SendSyncInfo(historyReader.syncInfo)
+  }
 
   override def receive(): Receive =
     workingCycle(
@@ -41,6 +48,8 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
     )
 
   def workingCycle(modifiersRequester: Option[Cancellable]): Receive = {
+    case UpdateHistoryReader(newReader: HistoryReader) =>
+      historyReader = newReader
     case SemanticallySuccessfulModifier(mod) =>
       //todo possible way to call CheckPayloadsToDownload
       mod match {
@@ -86,7 +95,7 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
           if (ids.nonEmpty &&
               (invData._1 == Header.modifierTypeId ||
               (historyReader.isHeadersChainSyncedVar && invData._1 == Payload.modifierTypeId)))
-            sender() ! RequestFromLocal(remote, invData._1, ids.toList)
+            sender() ! RequestFromLocal(remote.some, invData._1, ids.toList)
           logger.info(s"Time of processing inv message is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
 
         case RequestModifiersNetworkMessage((typeId, requestedIds)) if typeId == Payload.modifierTypeId =>
@@ -114,7 +123,7 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
     case CheckPayloadsToDownload =>
       val newIds: Seq[ModifierId] = historyReader.payloadsIdsToDownload(settings.network.networkChunkSize)
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
-      if (newIds.nonEmpty) context.parent ! DownloadRequest(Payload.modifierTypeId, newIds.toList)
+      if (newIds.nonEmpty) context.parent ! RequestFromLocal(none, Payload.modifierTypeId, newIds.toList)
       val nextCheckModsScheduler: Cancellable =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
       context.become(workingCycle(nextCheckModsScheduler.some))
