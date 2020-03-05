@@ -378,6 +378,7 @@ class NodeViewHolder(
     val rolledBackTxs: IndexedSeq[Transaction] = toRemove
       .flatMap(extractTransactions)
       .toIndexedSeq
+    //todo compare with toApply
     if (rolledBackTxs.nonEmpty) context.parent ! RolledBackTransactions(rolledBackTxs)
   }
 

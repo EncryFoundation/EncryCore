@@ -32,7 +32,6 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
-import encry.view.NodeViewHolder.DownloadRequest
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 import encry.view.fast.sync.SnapshotHolder
 import encry.view.fast.sync.SnapshotHolder.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks, UpdateSnapshot}
@@ -126,31 +125,7 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
         if (unrequestedModifiers.nonEmpty) typeId match {
           case Transaction.modifierTypeId =>
             memoryPoolRef ! RequestModifiersForTransactions(remote, unrequestedModifiers)
-          case Payload.modifierTypeId =>
-            getModsForRemote(unrequestedModifiers).foreach(_.foreach {
-              case (id, bytes) =>
-                remote.handlerRef ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
-            })
-          case tId => getModsForRemote(unrequestedModifiers).foreach { modifiers =>
-            modifiers.foreach(k =>
-              logger.debug(s"Response to ${remote.socketAddress} header ${
-                Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(k._2)))
-              }")
-            )
-            remote.handlerRef ! ModifiersNetworkMessage(tId -> modifiers)
-          }
         }
-
-        def getModsForRemote(ids: Seq[ModifierId]): Option[Map[ModifierId, Array[Byte]]] = Option(history)
-          .map { historyStorage =>
-            val modifiers: Map[ModifierId, Array[Byte]] = unrequestedModifiers
-              .view
-              .map(id => id -> historyStorage.modifierBytesById(id))
-              .collect { case (id, mod) if mod.isDefined => id -> mod.get}
-              .toMap
-            logger.debug(s"Send response to $remote with ${modifiers.size} modifiers of type $typeId")
-            modifiers
-          }
 
       case RequestModifiersNetworkMessage(requestedIds) =>
         logger.info(s"Request from $remote for ${requestedIds._2.size} modifiers discarded cause to chain isn't synced")
@@ -167,8 +142,6 @@ class NodeViewSynchronizer(influxRef: Option[ActorRef],
       logger.info(s"NodeViewSyncronizer got request from delivery manager to peers keeper for" +
         s" peers for first sync info message. Resending $msg to peers keeper.")
       peersKeeper ! msg
-    case msg@RequestFromLocal(_, _, _) => deliveryManager ! msg
-    case msg@DownloadRequest(_, _, _) => deliveryManager ! msg
     case msg@UpdatedPeersCollection(_) => deliveryManager ! msg
     case msg@PeersForSyncInfo(_) =>
       logger.info(s"NodeViewSync got peers for sync info. Sending them to DM.")
@@ -294,7 +267,6 @@ object NodeViewSynchronizer {
   class NodeViewSynchronizerPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
-        case RequestFromLocal(_, _, _) => 0
 
         case DataFromPeer(msg, _) => msg match {
           case SyncInfoNetworkMessage(_) => 1

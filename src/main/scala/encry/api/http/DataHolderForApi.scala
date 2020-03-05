@@ -22,7 +22,7 @@ import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeerFromAPI
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, GetDataFromCurrentView}
+import encry.view.NodeViewHolder.ReceivableMessages.{ GetDataFromCurrentView}
 import encry.view.history.History
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.wallet.EncryWallet
@@ -238,7 +238,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       sender() ! history.toList.flatMap(_.headerIdsAtHeight(i).map(Algos.encode))
 
     case CreateAccountManagerFromSeedHelper(seed) =>
-      (nvhRef ? CreateAccountManagerFromSeed(seed)).mapTo[Either[String, EncryWallet]].pipeTo(sender())
+      //(nvhRef ? CreateAccountManagerFromSeed(seed)).mapTo[Either[String, EncryWallet]].pipeTo(sender())
 
     case GetAllInfoHelper =>
 

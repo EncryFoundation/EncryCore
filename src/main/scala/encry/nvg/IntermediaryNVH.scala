@@ -8,7 +8,7 @@ import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.network.NetworkController.ReceivableMessages.DataFromPeer
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NetworkRouter.ModifierFromNetwork
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{
   OtherNodeSyncingStatus,
@@ -31,6 +31,12 @@ import encry.view.fast.sync.SnapshotHolder.{
 }
 import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
+import org.encryfoundation.common.network.BasicMessagesRepo.{
+  InvNetworkMessage,
+  ModifiersNetworkMessage,
+  RequestModifiersNetworkMessage,
+  SyncInfoNetworkMessage
+}
 import org.encryfoundation.common.utils.Algos
 
 class IntermediaryNVH(
@@ -41,8 +47,19 @@ class IntermediaryNVH(
 ) extends Actor
     with StrictLogging {
 
+  intermediaryNetwork ! RegisterMessagesHandler(
+    Seq(
+      InvNetworkMessage.NetworkMessageTypeID              -> "InvNetworkMessage",
+      RequestModifiersNetworkMessage.NetworkMessageTypeID -> "RequestModifiersNetworkMessage",
+      SyncInfoNetworkMessage.NetworkMessageTypeID         -> "SyncInfoNetworkMessage"
+    ),
+    self
+  )
+
+  //todo add registration for ModifierFromNetwork msg
+
   val networkMessagesProcessor: ActorRef =
-    context.actorOf(NetworkMessagesProcessor.props, name = "Network-messages-processor")
+    context.actorOf(NetworkMessagesProcessor.props(settings), name = "Network-messages-processor")
   val nodeViewHolder: ActorRef =
     context.actorOf(NodeViewHolder.props(settings, timeProvider, influxRef), name = "Node-view-holder")
   val modifiersValidatorRouter: ActorRef =
@@ -68,6 +85,7 @@ class IntermediaryNVH(
     case msg @ DownloadRequest(_, _, _)             => networkMessagesProcessor ! msg
     case msg @ OtherNodeSyncingStatus(_, _, _)      => networkMessagesProcessor ! msg
     case msg @ RequestFromLocal(_, _, _)            => networkMessagesProcessor ! msg
+    case msg @ ModifiersNetworkMessage(_, _)        => networkMessagesProcessor ! msg
     case msg @ RequiredManifestHeightAndId(_, _)    => //+ to fast sync
     case msg @ TreeChunks(_, _)                     => //+ to fast sync
     case msg @ HeaderChainIsSynced                  => networkMessagesProcessor ! msg
@@ -79,10 +97,8 @@ class IntermediaryNVH(
     case msg: StatsSenderMessage                    => influxRef.foreach(_ ! msg)
     case msg @ RollbackSucceed(_)                   =>
     case msg @ RollbackFailed(_)                    =>
-    case msg @ SemanticallySuccessfulModifier(_)    =>
-      networkMessagesProcessor ! msg
-    case msg @ SemanticallyFailedModification(_, _) =>
-      networkMessagesProcessor ! msg
+    case msg @ SemanticallySuccessfulModifier(_)    => networkMessagesProcessor ! msg
+    case msg @ SemanticallyFailedModification(_, _) => networkMessagesProcessor ! msg
   }
 }
 

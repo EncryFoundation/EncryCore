@@ -19,7 +19,7 @@ import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.NodeViewHolder.CurrentView
-import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
+import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView}
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
@@ -111,7 +111,7 @@ class Miner(dataHolder: ActorRef,
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      context.actorSelection("/user/nodeViewHolder") ! LocallyGeneratedModifier(block)
+      //context.actorSelection("/user/nodeViewHolder") ! LocallyGeneratedModifier(block)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)

@@ -18,6 +18,8 @@ trait HistoryReader {
 
   def isModifierDefined(id: ModifierId): Boolean
 
+  def modifierBytesById(id: ModifierId): Option[Array[Byte]]
+
 }
 
 object HistoryReader {
@@ -27,6 +29,7 @@ object HistoryReader {
     def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] = Seq.empty
     var isFullChainSynced: Boolean = true
     def compare(si: SyncInfo): HistoryComparisonResult = Older
+    def modifierBytesById(id: ModifierId): Option[Array[Byte]] = None
   }
 
   def apply(): HistoryReader = new HistoryReader {
@@ -35,5 +38,6 @@ object HistoryReader {
     def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] = Seq.empty
     def compare(si: SyncInfo): HistoryComparisonResult = Older
     var isFullChainSynced: Boolean = true
+    def modifierBytesById(id: ModifierId): Option[Array[Byte]] = None
   }
 }
