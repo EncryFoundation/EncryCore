@@ -11,18 +11,21 @@ import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling}
+import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, NewConnection, OutgoingConnectionFailed}
-import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection}
+import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection, RequestPeerForConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import scala.concurrent.duration._
 
 class NetworkRouter(settings: NetworkSettings,
                     blackListSettings: BlackListSettings) extends Actor with StrictLogging {
 
   import context.system
+  import context.dispatcher
 
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var handlerForMods: ActorRef = ActorRef.noSender
@@ -30,10 +33,10 @@ class NetworkRouter(settings: NetworkSettings,
   IO(Tcp) ! Bind(self, settings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
   val peersKeeper = context.system.actorOf(PK.props(settings, blackListSettings), "peersKeeper")
-  val deliveryManager = context.system.actorOf(DM.props(), "deliveryManager")
+  val deliveryManager = context.system.actorOf(DM.props(settings), "deliveryManager")
   val externalSocketAddress: Option[InetSocketAddress] = settings.declaredAddress
 
-  override def receive: Receive = bindingLogic orElse businessLogic orElse {
+  override def receive: Receive = bindingLogic orElse businessLogic orElse peersLogic orElse {
     case RegisterMessagesHandler(types, handler) =>
       logger.info(s"Registering handlers for ${types.mkString(",")}.")
       val ids = types.map(_._1)
@@ -46,6 +49,7 @@ class NetworkRouter(settings: NetworkSettings,
   def bindingLogic: Receive = {
     case Bound(address) =>
       logger.info(s"Successfully bound to the port ${address.getPort}.")
+      context.system.scheduler.schedule(2.seconds, 5.second)(peersKeeper ! RequestPeerForConnection)
     case CommandFailed(add: Bind) =>
       logger.info(s"Node can't be bind to the address: ${add.localAddress}.")
       context.stop(self)
@@ -59,7 +63,8 @@ class NetworkRouter(settings: NetworkSettings,
       peersKeeper ! BanPeer(remote.socketAddress, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
     case msg: ModifierFromNetwork => handlerForMods ! msg
-    case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg, peersKeeper), "peersKeeper")
+    case msg: OtherNodeSyncingStatus => peersKeeper ! msg
+    case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg, peersKeeper, deliveryManager), "peersKeeper")
   }
 
   def peersLogic: Receive = {
@@ -113,5 +118,6 @@ object NetworkRouter {
 
   case object RegisterForModsHandling
 
-  def props(settings: NetworkSettings): Props = Props(new NetworkRouter(settings))
+  def props(settings: NetworkSettings,
+            blackListSettings: BlackListSettings): Props = Props(new NetworkRouter(settings, blackListSettings))
 }

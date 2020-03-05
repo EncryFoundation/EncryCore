@@ -6,9 +6,11 @@ import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.DM.{AwaitingRequest, RequestSent}
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.NetworkController.ReceivableMessages.RegisterMessagesHandler
 import encry.network.NetworkRouter.ModifierFromNetwork
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
 import encry.settings.NetworkSettings
+import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
@@ -22,6 +24,9 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
 
   var expectedModifiers: Set[ModifierIdAsKey] = Set.empty
   var receivedModifier: Set[ModifierIdAsKey] = Set.empty
+
+  override def preStart(): Unit =
+    context.parent ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID -> "ModifiersNetworkMessage"), self)
 
   override def receive: Receive = {
     case RequestSent(peer, modTypeId, modId) =>
@@ -50,7 +55,7 @@ object DM {
 
   case class AwaitingRequest(peer: InetSocketAddress, modTypeId: ModifierTypeId, modId: ModifierId, attempts: Int)
   case class RequestSent(peer: InetSocketAddress, modTypeId: ModifierTypeId, modId: ModifierId)
+  case class IsRequested(modifierId: ModifierId)
 
-
-  def props(): Props = ???
+  def props(networkSettings: NetworkSettings): Props = Props(new DM(networkSettings))
 }

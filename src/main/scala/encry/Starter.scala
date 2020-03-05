@@ -1,10 +1,11 @@
 package encry
 
 import java.net.InetSocketAddress
-import akka.actor.{ Actor, ActorRef }
+
+import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{NonEmptyChain, Validated}
 import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.apply._
@@ -15,19 +16,20 @@ import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{ prompt, StartListening }
+import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
-import encry.network.NodeViewSynchronizer
+import encry.network.{NetworkRouter, NodeViewSynchronizer}
 import encry.settings._
 import encry.stats.StatsSender
-import encry.utils.{ Mnemonic, NetworkTimeProvider }
+import encry.utils.{Mnemonic, NetworkTimeProvider}
 import encry.view.NodeViewHolder
 import encry.view.mempool.MemoryPool
 import encry.view.wallet.AccountManager
+
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
@@ -422,9 +424,16 @@ class Starter(settings: EncryAppSettings,
 
       if (nodePass.nonEmpty) dataHolderForApi ! PassForStorage(nodePass)
 
+//      context.system.actorOf(
+//        NodeViewSynchronizer
+//          .props(influxRef, nodeViewHolder, newSettings, memoryPool, dataHolderForApi)
+//          .withDispatcher("nvsh-dispatcher"),
+//        "nodeViewSynchronizer"
+//      )
+
       context.system.actorOf(
-        NodeViewSynchronizer
-          .props(influxRef, nodeViewHolder, newSettings, memoryPool, dataHolderForApi)
+        NetworkRouter
+          .props(networkSettings, settings.blackList)
           .withDispatcher("nvsh-dispatcher"),
         "nodeViewSynchronizer"
       )

@@ -4,14 +4,15 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.MessageBuilder.{GetPeerInfo, GetPeers}
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{Incoming, Outgoing}
-import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI}
+import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI, PeerForConnection, RequestPeerForConnection}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 
-import scala.util.Try
+import scala.util.{Random, Try}
 
 class PK(networkSettings: NetworkSettings,
          blacklistSettings: BlackListSettings) extends Actor with StrictLogging {
@@ -33,6 +34,30 @@ class PK(networkSettings: NetworkSettings,
     .collect { case peer: InetSocketAddress if !isSelf(peer) => peer -> 0 }.toMap
 
   override def receive: Receive = banPeersLogic orElse {
+    case RequestPeerForConnection if connectedPeers.size < networkSettings.maxConnections =>
+      def mapReason(address: InetAddress, r: BanReason, t: BanTime, bt: BanType): (InetAddress, BanReason) = address -> r
+      logger.info(s"Got request for new connection. Current number of connections is: ${connectedPeers.size}, " +
+        s"so peer keeper allows to add one more connection. Current available peers are: " +
+        s"${peersForConnection.mkString(",")}. Current black list is: ${
+          blackList.collect((_, _, _, _) => true, mapReason).mkString(",")
+        }. Current known peers: ${knownPeers.mkString(",")}.")
+      logger.info(s"awaitingHandshakeConnections ${awaitingHandshakeConnections.mkString(",")}")
+      logger.info(s"connectedPeers.getAll ${connectedPeers.getAll.mkString(",")}")
+      val peers = peersForConnection
+        .filterNot(p => awaitingHandshakeConnections.contains(p._1) || connectedPeers.contains(p._1))
+      logger.info(s"peers size: ${peers.size}")
+      Random.shuffle(peers.toSeq)
+        .headOption
+        .foreach { case (peer, _) =>
+          outgoingConnections += peer
+          logger.info(s"Selected peer: $peer. Sending 'PeerForConnection' message to network controller. " +
+            s"Adding new outgoing connection to outgoingConnections collection. Current collection is: " +
+            s"${outgoingConnections.mkString(",")}.")
+          sender() ! PeerForConnection(peer)
+          awaitingHandshakeConnections += peer
+          logger.info(s"Adding new peer: $peer to awaitingHandshakeConnections." +
+            s" Current is: ${awaitingHandshakeConnections.mkString(",")}")
+        }
     case NewConnection(remote, remoteConnection) if connectedPeers.size < networkSettings.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
         s"Remote InetSocketAddress is: $remote. Remote InetAddress is ${remote.getAddress}. " +

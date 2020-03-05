@@ -20,45 +20,45 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 import scala.util.{Failure, Success, Try}
 
-class DownloadedModifiersValidator(modifierIdSize: Int,
-                                   nodeViewHolder: ActorRef,
-                                   peersKeeper: ActorRef,
-                                   nodeViewSync: ActorRef,
-                                   memoryPoolRef: ActorRef,
-                                   influxRef: Option[ActorRef],
-                                   settings: EncryAppSettings)
-    extends Actor
-    with StrictLogging {
-
-  override def receive: Receive = {
-    case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
-    case msg                           => logger.info(s"Got $msg on DownloadedModifiersValidator")
-  }
-
-  def workingCycle(history: History): Receive = {
-    case ModifiersForValidating(remote, typeId, filteredModifiers) =>
-      typeId match {
-        case Transaction.modifierTypeId =>
-          filteredModifiers.foreach {
-            case (id, bytes) =>
-              Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
-                case Success(tx) if tx.semanticValidity.isSuccess => memoryPoolRef ! NewTransaction(tx)
-                case Success(tx) =>
-                  logger.info(s"Transaction with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
-                  context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
-                  nodeViewSync ! InvalidModifier(id)
-                case Failure(ex) =>
-                  context.parent ! BanPeer(remote, CorruptedSerializedBytes)
-                  nodeViewSync ! InvalidModifier(id)
-                  logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
-              }
-          }
-      }
-    case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
-    case msg                           => logger.info(s"Got $msg on DownloadedModifiersValidator")
-  }
-
-}
+//class DownloadedModifiersValidator(modifierIdSize: Int,
+//                                   nodeViewHolder: ActorRef,
+//                                   peersKeeper: ActorRef,
+//                                   nodeViewSync: ActorRef,
+//                                   memoryPoolRef: ActorRef,
+//                                   influxRef: Option[ActorRef],
+//                                   settings: EncryAppSettings)
+//    extends Actor
+//    with StrictLogging {
+//
+//  override def receive: Receive = {
+//    case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
+//    case msg                           => logger.info(s"Got $msg on DownloadedModifiersValidator")
+//  }
+//
+//  def workingCycle(history: History): Receive = {
+//    case ModifiersForValidating(remote, typeId, filteredModifiers) =>
+//      typeId match {
+//        case Transaction.modifierTypeId =>
+//          filteredModifiers.foreach {
+//            case (id, bytes) =>
+//              Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
+//                case Success(tx) if tx.semanticValidity.isSuccess => memoryPoolRef ! NewTransaction(tx)
+//                case Success(tx) =>
+//                  logger.info(s"Transaction with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
+//                  context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
+//                  nodeViewSync ! InvalidModifier(id)
+//                case Failure(ex) =>
+//                  context.parent ! BanPeer(remote, CorruptedSerializedBytes)
+//                  nodeViewSync ! InvalidModifier(id)
+//                  logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
+//              }
+//          }
+//      }
+//    case UpdatedHistory(historyReader) => context.become(workingCycle(historyReader))
+//    case msg                           => logger.info(s"Got $msg on DownloadedModifiersValidator")
+//  }
+//
+//}
 
 object DownloadedModifiersValidator {
 
@@ -68,22 +68,22 @@ object DownloadedModifiersValidator {
 
   final case class InvalidModifier(ids: ModifierId) extends AnyVal
 
-  def props(modifierIdSize: Int,
-            nodeViewHolder: ActorRef,
-            peersKeeper: ActorRef,
-            nodeViewSync: ActorRef,
-            memoryPoolRef: ActorRef,
-            influxRef: Option[ActorRef],
-            settings: EncryAppSettings): Props =
-    Props(
-      new DownloadedModifiersValidator(modifierIdSize,
-                                       nodeViewHolder,
-                                       peersKeeper,
-                                       nodeViewSync,
-                                       memoryPoolRef,
-                                       influxRef,
-                                       settings)
-    )
+//  def props(modifierIdSize: Int,
+//            nodeViewHolder: ActorRef,
+//            peersKeeper: ActorRef,
+//            nodeViewSync: ActorRef,
+//            memoryPoolRef: ActorRef,
+//            influxRef: Option[ActorRef],
+//            settings: EncryAppSettings): Props =
+//    Props(
+//      new DownloadedModifiersValidator(modifierIdSize,
+//                                       nodeViewHolder,
+//                                       peersKeeper,
+//                                       nodeViewSync,
+//                                       memoryPoolRef,
+//                                       influxRef,
+//                                       settings)
+//    )
 
   class DownloadedModifiersValidatorPriorityQueue(settings: ActorSystem.Settings, config: Config)
       extends UnboundedStablePriorityMailbox(PriorityGenerator {
