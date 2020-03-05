@@ -80,19 +80,19 @@ class IntermediaryNVH(
     case UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! newReader
-    case msg @ BanPeer(_, _)                     => networkMessagesProcessor ! msg
-    case msg @ InvalidModifier(_)                => networkMessagesProcessor ! msg
-    case msg @ FastSyncDone                      => networkMessagesProcessor ! msg
-    case msg @ DownloadRequest(_, _, _)          => networkMessagesProcessor ! msg
-    case msg @ OtherNodeSyncingStatus(_, _, _)   => networkMessagesProcessor ! msg
-    case msg @ RequestFromLocal(_, _, _)         => networkMessagesProcessor ! msg
-    case msg @ ModifiersNetworkMessage(_, _)     => networkMessagesProcessor ! msg
-    case msg @ SendToNetwork(_, _)               => networkMessagesProcessor ! msg
-    case msg @ IdsForRequest(_)                  => networkMessagesProcessor ! msg
+    case msg @ BanPeer(_, _)                     => intermediaryNetwork ! msg
+    case msg @ InvalidModifier(_)                => intermediaryNetwork ! msg
+    case msg @ FastSyncDone                      => intermediaryNetwork ! msg
+    case msg @ DownloadRequest(_, _, _)          => intermediaryNetwork ! msg
+    case msg @ OtherNodeSyncingStatus(_, _, _)   => intermediaryNetwork ! msg
+    case msg @ RequestFromLocal(_, _, _)         => intermediaryNetwork ! msg
+    case msg @ ModifiersNetworkMessage(_, _)     => intermediaryNetwork ! msg
+    case msg @ SendToNetwork(_, _)               => intermediaryNetwork ! msg
+    case msg @ IdsForRequest(_)                  => intermediaryNetwork ! msg
     case msg @ RequiredManifestHeightAndId(_, _) => //+ to fast sync
     case msg @ TreeChunks(_, _)                  => //+ to fast sync
-    case msg @ HeaderChainIsSynced               => networkMessagesProcessor ! msg
-    case msg @ FullBlockChainIsSynced            => networkMessagesProcessor ! msg //+ to miner
+    case msg @ HeaderChainIsSynced               => intermediaryNetwork ! msg
+    case msg @ FullBlockChainIsSynced            => intermediaryNetwork ! msg //+ to miner
     case msg @ DisableMining                     => //+ to miner
     case msg @ StartMining                       => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)          => //+ to data holder
@@ -101,9 +101,9 @@ class IntermediaryNVH(
     case msg @ RollbackSucceed(_)                =>
     case msg @ RollbackFailed(_)                 =>
     case msg @ SemanticallySuccessfulModifier(_) =>
+      intermediaryNetwork ! msg
       networkMessagesProcessor ! msg
-      networkMessagesProcessor ! msg
-    case msg @ SemanticallyFailedModification(_, _) => networkMessagesProcessor ! msg
+    case msg @ SemanticallyFailedModification(_, _) => intermediaryNetwork ! msg
   }
 }
 
