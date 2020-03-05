@@ -440,10 +440,8 @@ class Starter(settings: EncryAppSettings,
       )
 
       val nvhRouter = context.system.actorOf(
-        IntermediaryNVH.props(settings, networkRouter, timeProvider, influxRef)
+        IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef)
       )
-
-
 
       if (newSettings.node.mining) miner ! StartMining
       if (newSettings.node.useCli) {
