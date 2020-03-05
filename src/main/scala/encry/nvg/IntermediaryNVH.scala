@@ -7,7 +7,7 @@ import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.DownloadedModifiersValidator.InvalidModifier
-import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{
@@ -82,17 +82,16 @@ class IntermediaryNVH(
       networkMessagesProcessor ! newReader
     case msg @ BanPeer(_, _)                     => intermediaryNetwork ! msg
     case msg @ InvalidModifier(_)                => intermediaryNetwork ! msg
-    case msg @ FastSyncDone                      => intermediaryNetwork ! msg
-    case msg @ DownloadRequest(_, _, _)          => intermediaryNetwork ! msg
+    case msg @ DownloadRequest(_, _)             => intermediaryNetwork ! msg
     case msg @ OtherNodeSyncingStatus(_, _, _)   => intermediaryNetwork ! msg
     case msg @ RequestFromLocal(_, _, _)         => intermediaryNetwork ! msg
-    case msg @ ModifiersNetworkMessage(_, _)     => intermediaryNetwork ! msg
-    case msg @ SendToNetwork(_, _)               => intermediaryNetwork ! msg
-    case msg @ IdsForRequest(_)                  => intermediaryNetwork ! msg
+    case msg @ ResponseFromLocal(_, _, _)        => intermediaryNetwork ! msg
+    case msg @ BroadcastModifier(_, _)           => intermediaryNetwork ! msg
     case msg @ RequiredManifestHeightAndId(_, _) => //+ to fast sync
     case msg @ TreeChunks(_, _)                  => //+ to fast sync
-    case msg @ HeaderChainIsSynced               => intermediaryNetwork ! msg
-    case msg @ FullBlockChainIsSynced            => intermediaryNetwork ! msg //+ to miner
+    case msg @ FastSyncDone                      =>
+    case msg @ HeaderChainIsSynced               =>
+    case msg @ FullBlockChainIsSynced            => //+ to miner
     case msg @ DisableMining                     => //+ to miner
     case msg @ StartMining                       => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)          => //+ to data holder

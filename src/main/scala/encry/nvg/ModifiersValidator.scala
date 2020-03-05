@@ -44,7 +44,7 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
           } else if (!syntacticValidation) {
             logger.info(s"Modifier ${modifier.encodedId} is syntactically invalid.")
             context.parent ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
-            context.parent ! InvalidModifier(modifierId)
+            context.parent ! SyntacticallyInvalidPersistentModifier(modifierId)
           } else
             preSemanticValidation.leftMap {
               case IllegalHeight(error) =>

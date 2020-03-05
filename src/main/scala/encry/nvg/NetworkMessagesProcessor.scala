@@ -1,23 +1,26 @@
 package encry.nvg
 
-import akka.actor.{Actor, Cancellable, Props}
+import akka.actor.{ Actor, Cancellable, Props }
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.HistoryConsensus.{HistoryComparisonResult, Younger}
-import encry.network.Broadcast
+import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Younger }
 import cats.syntax.option._
 import encry.network.DeliveryManager.CheckPayloadsToDownload
-import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
 import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{OtherNodeSyncingStatus, SemanticallySuccessfulModifier}
-import encry.network.PeersKeeper.SendToNetwork
-import encry.nvg.NetworkMessagesProcessor.IdsForRequest
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ OtherNodeSyncingStatus, SemanticallySuccessfulModifier }
+import encry.nvg.NodeViewHolder.DownloadRequest
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.network.BasicMessagesRepo.{
+  InvNetworkMessage,
+  ModifiersNetworkMessage,
+  RequestModifiersNetworkMessage,
+  SyncInfoNetworkMessage
+}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -44,7 +47,7 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
         case block: Block if historyReader.isFullChainSynced =>
           List(block.header, block.payload).foreach { mod: PersistentModifier =>
             logger.info(s"Going to broadcast inv for modifier of type ${mod.modifierTypeId} with id: ${mod.encodedId}.")
-            context.parent ! SendToNetwork(InvNetworkMessage(mod.modifierTypeId -> Seq(mod.id)), Broadcast)
+            context.parent ! BroadcastModifier(mod.modifierTypeId, mod.id)
           }
           modifiersRequestCache = Map(
             block.encodedId         -> toProto(block.header),
@@ -100,18 +103,18 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
 
           typeId match {
             case h if h == Header.modifierTypeId =>
-              context.parent ! ModifiersNetworkMessage(typeId -> getModsForRemote(unrequestedModifiers, historyReader))
+              context.parent ! ResponseFromLocal(remote, typeId, getModsForRemote(unrequestedModifiers, historyReader))
             case _ =>
               getModsForRemote(unrequestedModifiers, historyReader).foreach {
                 case (id: ModifierId, bytes: Array[Byte]) =>
-                  context.parent ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
+                  context.parent ! ResponseFromLocal(remote, typeId, Map(id -> bytes))
               }
           }
       }
     case CheckPayloadsToDownload =>
       val newIds: Seq[ModifierId] = historyReader.payloadsIdsToDownload(settings.network.networkChunkSize)
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
-      if (newIds.nonEmpty) context.parent ! IdsForRequest(newIds.toList)
+      if (newIds.nonEmpty) context.parent ! DownloadRequest(Payload.modifierTypeId, newIds.toList)
       val nextCheckModsScheduler: Cancellable =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
       context.become(workingCycle(nextCheckModsScheduler.some))
@@ -125,6 +128,5 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
 }
 
 object NetworkMessagesProcessor {
-  final case class IdsForRequest(ids: List[ModifierId]) extends AnyVal
   def props(settings: EncryAppSettings): Props = Props(new NetworkMessagesProcessor(settings))
 }
