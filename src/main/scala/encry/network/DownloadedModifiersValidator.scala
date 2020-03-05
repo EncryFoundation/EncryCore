@@ -7,7 +7,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.history.HeaderUtils
 import encry.network.BlackList.BanReason._
-import encry.network.DownloadedModifiersValidator.{InvalidModifier, ModifiersForValidating}
+import encry.network.DownloadedModifiersValidator.{ ModifiersForValidating}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer

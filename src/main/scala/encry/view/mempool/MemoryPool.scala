@@ -7,7 +7,8 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{RequestFromLocal, SemanticallySuccessfulModifier, SuccessfulTransaction}
+import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider

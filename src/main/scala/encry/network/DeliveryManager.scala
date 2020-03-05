@@ -540,7 +540,6 @@ object DeliveryManager {
 
         case ConnectionStopped(_) => 1
 
-        case InvalidModifier(_) => 2
 
 //        case DataFromPeer(msg: ModifiersNetworkMessage, _) =>
 //          msg match {
