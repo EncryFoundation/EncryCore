@@ -3,10 +3,11 @@ package encry.view.fast.sync
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
+import encry.nvg.SnapshotProcessorActor.{ SnapshotManifest, SnapshotManifestSerializer }
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.SnapshotHolder.{ SnapshotManifest, SnapshotManifestSerializer }
 import org.encryfoundation.common.utils.Algos
+
 import scala.util.Try
 
 trait SnapshotProcessorStorageAPI extends StrictLogging {

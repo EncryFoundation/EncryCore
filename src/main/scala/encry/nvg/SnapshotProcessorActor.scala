@@ -1,20 +1,28 @@
-package encry.view.fast.sync
+package encry.nvg
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import akka.actor.{ Actor, ActorRef, Cancellable, Props }
+import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.BlackList.BanReason.{
+  InvalidChunkMessage,
+  InvalidResponseManifestMessage,
+  InvalidStateAfterFastSync
+}
+import encry.network.Broadcast
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
-import encry.network.PeersKeeper.SendToNetwork
-import encry.network.{ Broadcast, PeerConnectionHandler }
+import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
+import encry.nvg.SnapshotProcessorActor.SnapshotManifest.{ ChunkId, ManifestId }
+import encry.nvg.SnapshotProcessorActor._
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ ChunkId, ManifestId }
-import encry.view.fast.sync.SnapshotHolder._
+import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
+import encry.view.fast.sync.{ RequestsPerPeriodProcessor, SnapshotDownloadController, SnapshotProcessor }
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.{ Node, NodeSerilalizer }
@@ -26,11 +34,12 @@ import supertagged.TaggedType
 
 import scala.util.Try
 
-class SnapshotHolder(settings: EncryAppSettings,
-                     networkController: ActorRef,
-                     nodeViewHolder: ActorRef,
-                     nodeViewSynchronizer: ActorRef)
-    extends Actor
+class SnapshotProcessorActor(
+  settings: EncryAppSettings,
+  networkController: ActorRef,
+  nodeViewHolder: ActorRef,
+  nodeViewSynchronizer: ActorRef
+) extends Actor
     with StrictLogging {
 
   import context.dispatcher
@@ -93,43 +102,43 @@ class SnapshotHolder(settings: EncryAppSettings,
           logger.info(
             s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks."
           )
-//        case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
-//          (for {
-//            controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
-//            (controller, chunk) = controllerAndChunk
-//            validChunk          <- snapshotProcessor.validateChunkId(chunk)
-//            processor           = snapshotProcessor.updateCache(validChunk)
-//            newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
-//                             case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
-//                             case t                          => t.asLeft[SnapshotProcessor]
-//                           }
-//          } yield (newProcessor, controller)) match {
-//            case Left(err: UnexpectedChunkMessage) =>
-//              logger.info(s"Error has occurred ${err.error} with peer $remote")
-//            case Left(error) =>
-//              logger.info(s"Error has occurred: $error")
-//              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
-//              restartFastSync(history)
-//            case Right((processor, controller))
-//                if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty && processor.chunksCache.nonEmpty =>
-//              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
-//              restartFastSync(history)
-//            case Right((processor, controller)) if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty =>
-//              processor.assembleUTXOState() match {
-//                case Right(state) =>
-//                  logger.info(s"Tree is valid on Snapshot holder!")
-//                  processor.wallet.foreach { wallet: EncryWallet =>
-//                    (nodeViewHolder ! FastSyncFinished(state, wallet)).asRight[FastSyncException]
-//                  }
-//                case _ =>
-//                  nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
-//                  restartFastSync(history).asLeft[Unit]
-//              }
-//            case Right((processor, controller)) =>
-//              snapshotDownloadController = controller
-//              snapshotProcessor = processor
-//              if (snapshotDownloadController.awaitedChunks.isEmpty) self ! RequestNextChunks
-//          }
+        case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
+          (for {
+            controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
+            (controller, chunk) = controllerAndChunk
+            validChunk          <- snapshotProcessor.validateChunkId(chunk)
+            processor           = snapshotProcessor.updateCache(validChunk)
+            newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
+                             case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
+                             case t                          => t.asLeft[SnapshotProcessor]
+                           }
+          } yield (newProcessor, controller)) match {
+            case Left(err: UnexpectedChunkMessage) =>
+              logger.info(s"Error has occurred ${err.error} with peer $remote")
+            case Left(error) =>
+              logger.info(s"Error has occurred: $error")
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
+              restartFastSync(history)
+            case Right((processor, controller))
+                if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty && processor.chunksCache.nonEmpty =>
+              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
+              restartFastSync(history)
+            case Right((processor, controller)) if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty =>
+              processor.assembleUTXOState() match {
+                case Right(state) =>
+                  logger.info(s"Tree is valid on Snapshot holder!")
+                  processor.wallet.foreach { wallet: EncryWallet =>
+                    (nodeViewHolder ! FastSyncFinished(state, wallet)).asRight[FastSyncException]
+                  }
+                case _ =>
+                  nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
+                  restartFastSync(history).asLeft[Unit]
+              }
+            case Right((processor, controller)) =>
+              snapshotDownloadController = controller
+              snapshotProcessor = processor
+              if (snapshotDownloadController.awaitedChunks.isEmpty) self ! RequestNextChunks
+          }
 
         case ResponseChunkMessage(_) =>
           logger.info(s"Received chunk from unexpected peer ${remote}")
@@ -149,9 +158,9 @@ class SnapshotHolder(settings: EncryAppSettings,
         case Right(controllerAndIds) =>
           snapshotDownloadController = controllerAndIds._1
           controllerAndIds._2.foreach { msg =>
-            snapshotDownloadController.cp.foreach { peer: PeerConnectionHandler.ConnectedPeer =>
-              peer.handlerRef ! msg
-            }
+//            snapshotDownloadController.cp.foreach { peer: PeerConnectionHandler.ConnectedPeer =>
+//              peer.handlerRef ! msg
+//            }
           }
           context.become(fastSyncMod(history, timer).orElse(commonMessages))
       }
@@ -173,7 +182,7 @@ class SnapshotHolder(settings: EncryAppSettings,
       snapshotDownloadController.awaitedChunks.map { id =>
         RequestChunkMessage(id.data)
       }.foreach { msg =>
-        snapshotDownloadController.cp.foreach(peer => peer.handlerRef ! msg)
+        //snapshotDownloadController.cp.foreach(peer => peer.handlerRef ! msg)
       }
       context.become(fastSyncMod(history, timer).orElse(commonMessages))
 
@@ -210,39 +219,39 @@ class SnapshotHolder(settings: EncryAppSettings,
       context.become(awaitManifestMod(newScheduler.some, history).orElse(commonMessages))
 
     case DataFromPeer(message, remote) =>
-//      message match {
-//        case ResponseManifestMessage(manifest) =>
-//          val isValidManifest: Boolean =
-//            snapshotDownloadController.checkManifestValidity(manifest.manifestId.toByteArray, history)
-//          val canBeProcessed: Boolean = snapshotDownloadController.canNewManifestBeProcessed
-//          if (isValidManifest && canBeProcessed) {
-//            (for {
-//              controller <- snapshotDownloadController.processManifest(manifest, remote, history)
-//              processor <- snapshotProcessor.initializeApplicableChunksCache(
-//                            history,
-//                            snapshotDownloadController.requiredManifestHeight
-//                          )
-//            } yield (controller, processor)) match {
-//              case Left(error) =>
-//                nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
-//              case Right((controller, processor)) =>
-//                logger.debug(s"Request manifest message successfully processed.")
-//                responseManifestTimeout.foreach(_.cancel())
-//                snapshotDownloadController = controller
-//                snapshotProcessor = processor
-//                self ! RequestNextChunks
-//                logger.debug("Manifest processed successfully.")
-//                context.become(fastSyncMod(history, none))
-//            }
-//          } else if (!isValidManifest) {
-//            logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
-//            nodeViewSynchronizer ! BanPeer(
-//              remote,
-//              InvalidResponseManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
-//            )
-//          } else logger.info(s"Doesn't need to process new manifest.")
-//        case _ =>
-//      }
+      message match {
+        case ResponseManifestMessage(manifest) =>
+          val isValidManifest: Boolean =
+            snapshotDownloadController.checkManifestValidity(manifest.manifestId.toByteArray, history)
+          val canBeProcessed: Boolean = snapshotDownloadController.canNewManifestBeProcessed
+          if (isValidManifest && canBeProcessed) {
+            (for {
+              controller <- snapshotDownloadController.processManifest(manifest, remote, history)
+              processor <- snapshotProcessor.initializeApplicableChunksCache(
+                            history,
+                            snapshotDownloadController.requiredManifestHeight
+                          )
+            } yield (controller, processor)) match {
+              case Left(error) =>
+                nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
+              case Right((controller, processor)) =>
+                logger.debug(s"Request manifest message successfully processed.")
+                responseManifestTimeout.foreach(_.cancel())
+                snapshotDownloadController = controller
+                snapshotProcessor = processor
+                self ! RequestNextChunks
+                logger.debug("Manifest processed successfully.")
+                context.become(fastSyncMod(history, none))
+            }
+          } else if (!isValidManifest) {
+            logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
+            nodeViewSynchronizer ! BanPeer(
+              remote,
+              InvalidResponseManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
+            )
+          } else logger.info(s"Doesn't need to process new manifest.")
+        case _ =>
+      }
 
     case msg @ RequiredManifestHeightAndId(_, _) =>
       self ! msg
@@ -316,7 +325,7 @@ class SnapshotHolder(settings: EncryAppSettings,
     context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
 }
 
-object SnapshotHolder {
+object SnapshotProcessorActor {
 
   case object RemoveRedundantManifestIds
 
@@ -383,7 +392,7 @@ object SnapshotHolder {
             networkController: ActorRef,
             nodeViewHolderRef: ActorRef,
             nodeViewSynchronizer: ActorRef): Props = Props(
-    new SnapshotHolder(settings, networkController, nodeViewHolderRef, nodeViewSynchronizer)
+    new SnapshotProcessorActor(settings, networkController, nodeViewHolderRef, nodeViewSynchronizer)
   )
 
 }

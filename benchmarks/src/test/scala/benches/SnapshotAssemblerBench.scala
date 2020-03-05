@@ -7,12 +7,12 @@ import benches.SnapshotAssemblerBench.SnapshotAssemblerBenchState
 import encry.view.state.avlTree.utils.implicits.Instances._
 import benches.StateBenches.{StateBenchState, benchSettings}
 import benches.Utils.{getRandomTempDir, utxoFromBoxHolder}
+import encry.nvg.SnapshotProcessorActor
 import encry.settings.Settings
 import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.FileHelper
-import encry.view.fast.sync.SnapshotHolder
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import org.encryfoundation.common.utils.TaggedTypes.Height

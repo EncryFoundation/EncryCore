@@ -1,15 +1,42 @@
 package encry.network
 
+import HeaderProto.HeaderProtoMessage
 import java.net.InetSocketAddress
-import akka.actor.{ActorSystem, PoisonPill}
+
+import akka.actor.{Actor, ActorRef, ActorSystem, PoisonPill, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import akka.util.Timeout
 import com.typesafe.config.Config
-import encry.nvg.NodeViewHolder.{NodeViewChange, NodeViewHolderEvent, SemanticallySuccessfulModifier, SuccessfulTransaction}
+import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.HistoryConsensus._
+import encry.local.miner.Miner.{ClIMiner, DisableMining, StartMining}
+import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PeersKeeper._
+import encry.network.PrioritiesCalculator.AccumulatedPeersStatistic
+import encry.settings.EncryAppSettings
+import encry.utils.CoreTaggedTypes.VersionTag
+import encry.utils.Utils._
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.history.History
 import encry.view.mempool.MemoryPool._
 import encry.view.state.UtxoState
-import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.{NodeViewModifier, PersistentNodeViewModifier}
+import org.encryfoundation.common.modifiers.history._
+import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import org.encryfoundation.common.network.BasicMessagesRepo._
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
+import scala.concurrent.duration._
+import encry.network.ModifiersToNetworkUtils._
+import encry.nvg.NodeViewHolder.{NodeViewChange, NodeViewHolderEvent, SemanticallySuccessfulModifier, SuccessfulTransaction}
+import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
+
+import scala.util.Try
 
 //class NodeViewSynchronizer(influxRef: Option[ActorRef],
 //                           nodeViewHolderRef: ActorRef,

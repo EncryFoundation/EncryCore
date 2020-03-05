@@ -1,42 +1,50 @@
 package encry.view.fast.sync
 
 import java.io.File
+
 import akka.actor.ActorRef
 import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
+import encry.nvg.SnapshotProcessorActor.{
+  SnapshotChunk,
+  SnapshotChunkSerializer,
+  SnapshotManifest,
+  SnapshotManifestSerializer
+}
+import encry.nvg.SnapshotProcessorActor.SnapshotManifest.ManifestId
 import encry.settings.EncryAppSettings
-import encry.storage.{RootNodesStorage, VersionalStorage}
-import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
+import encry.storage.{ RootNodesStorage, VersionalStorage }
+import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.view.fast.sync.FastSyncExceptions._
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
-import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree._
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
-import org.iq80.leveldb.{DB, Options}
+import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
+import org.iq80.leveldb.{ DB, Options }
 import scorex.utils.Random
-import scala.collection.immutable.{HashMap, HashSet}
-import scala.language.postfixOps
-import scala.util.{Failure, Success}
 
-final case class SnapshotProcessor(settings: EncryAppSettings,
-                                   storage: VersionalStorage,
-                                   applicableChunks: HashSet[ByteArrayWrapper],
-                                   chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk],
-                                   wallet: Option[EncryWallet])
-    extends StrictLogging
+import scala.collection.immutable.{ HashMap, HashSet }
+import scala.language.postfixOps
+import scala.util.{ Failure, Success }
+
+final case class SnapshotProcessor(
+  settings: EncryAppSettings,
+  storage: VersionalStorage,
+  applicableChunks: HashSet[ByteArrayWrapper],
+  chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk],
+  wallet: Option[EncryWallet]
+) extends StrictLogging
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
 
@@ -181,7 +189,7 @@ final case class SnapshotProcessor(settings: EncryAppSettings,
       rootNode <- getRootNode
       height   <- getHeight
       //todo: remove RootNodesStorage.emptyRootStorage
-      avlTree  = new AvlTree[StorageKey, StorageValue](rootNode, storage, RootNodesStorage.emptyRootStorage)
+      avlTree = new AvlTree[StorageKey, StorageValue](rootNode, storage, RootNodesStorage.emptyRootStorage)
     } yield UtxoState(avlTree, height, settings.constants, influxRef)
 
   private def getHeight: Either[EmptyHeightKey, Height] =

@@ -1,46 +1,43 @@
 package encry.view.fast.sync
 
 import java.io.File
+import java.net.InetSocketAddress
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.nvg.SnapshotProcessorActor.SnapshotManifest.ChunkId
+import encry.nvg.SnapshotProcessorActor.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
 import encry.view.fast.sync.FastSyncExceptions._
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ChunkId
-import encry.view.fast.sync.SnapshotHolder.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer}
-import encry.view.fast.sync.FastSyncExceptions._
-import encry.view.fast.sync.SnapshotHolder.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.view.history.History
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, RequestChunkMessage }
-import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.network.BasicMessagesRepo.RequestChunkMessage
 import org.encryfoundation.common.utils.Algos
-import org.iq80.leveldb.{DB, Options}
+import org.iq80.leveldb.{ DB, Options }
 
-final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
-                                            awaitedChunks: Set[ByteArrayWrapper],
-                                            settings: EncryAppSettings,
-                                            cp: Option[ConnectedPeer],
-                                            requiredManifestHeight: Int,
-                                            storage: DB,
-                                            batchesSize: Int,
-                                            nextGroupForRequestNumber: Int)
-    extends SnapshotDownloadControllerStorageAPI
+final case class SnapshotDownloadController(
+  requiredManifestId: Array[Byte],
+  awaitedChunks: Set[ByteArrayWrapper],
+  settings: EncryAppSettings,
+  cp: Option[InetSocketAddress],
+  requiredManifestHeight: Int,
+  storage: DB,
+  batchesSize: Int,
+  nextGroupForRequestNumber: Int
+) extends SnapshotDownloadControllerStorageAPI
     with StrictLogging
     with AutoCloseable {
 
   def processManifest(
     manifestProto: SnapshotManifestProtoMessage,
-    remote: ConnectedPeer,
+    remote: InetSocketAddress,
     history: History
   ): Either[SnapshotDownloadControllerException, SnapshotDownloadController] = {
-    logger.info(s"Got new manifest from ${remote.socketAddress}.")
+    logger.info(s"Got new manifest from $remote.")
     Either.fromTry(SnapshotManifestSerializer.fromProto(manifestProto)) match {
       case Left(error) =>
         logger.info(s"Manifest was parsed with error ${error.getCause}.")
@@ -74,9 +71,9 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 
   def processRequestedChunk(
     chunkMessage: SnapshotChunkMessage,
-    remote: ConnectedPeer
+    remote: InetSocketAddress
   ): Either[ChunkValidationError, (SnapshotDownloadController, SnapshotChunk)] = {
-    logger.debug(s"Got new chunk from ${remote.socketAddress}.")
+    logger.debug(s"Got new chunk from $remote.")
     Either.fromTry(SnapshotChunkSerializer.fromProto(chunkMessage)) match {
       case Left(error) =>
         logger.info(s"Chunk was parsed with error ${error.getCause}.")
@@ -123,7 +120,7 @@ final case class SnapshotDownloadController(requiredManifestId: Array[Byte],
 
   def canNewManifestBeProcessed: Boolean = cp.isEmpty
 
-  def canChunkBeProcessed(remote: ConnectedPeer): Boolean = cp.exists(_.socketAddress == remote.socketAddress)
+  def canChunkBeProcessed(remote: InetSocketAddress): Boolean = cp.contains(remote)
 
   def reInitFastSync: SnapshotDownloadController =
     try {

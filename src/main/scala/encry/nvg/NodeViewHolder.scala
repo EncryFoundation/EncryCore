@@ -24,14 +24,22 @@ import encry.nvg.NodeViewHolder.{
   UpdateHistoryReader,
   UpdateInformation
 }
+import encry.nvg.SnapshotProcessorActor.{
+  FastSyncDone,
+  FastSyncFinished,
+  HeaderChainIsSynced,
+  RemoveRedundantManifestIds,
+  RequiredManifestHeightAndId,
+  SnapshotChunk,
+  TreeChunks
+}
+import encry.nvg.SnapshotProcessorActor.SnapshotManifest.ManifestId
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.ManifestId
-import encry.view.fast.sync.SnapshotHolder._
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
 import encry.view.mempool.MemoryPool.RolledBackTransactions

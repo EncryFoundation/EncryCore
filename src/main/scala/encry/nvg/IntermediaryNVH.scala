@@ -20,15 +20,10 @@ import encry.nvg.NodeViewHolder.{
   SyntacticallyFailedModification,
   UpdateHistoryReader
 }
+import encry.nvg.SnapshotProcessorActor.{ FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
-import encry.view.fast.sync.SnapshotHolder.{
-  FastSyncDone,
-  HeaderChainIsSynced,
-  RequiredManifestHeightAndId,
-  TreeChunks
-}
 import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import org.encryfoundation.common.network.BasicMessagesRepo.{
