@@ -14,9 +14,9 @@ import encry.network.BlackList.BanReason.{
   PreSemanticInvalidModifier,
   SyntacticallyInvalidPersistentModifier
 }
-import encry.network.DownloadedModifiersValidator.InvalidModifier
+import encry.network.NodeViewSynchronizer.ReceivableMessages.SyntacticallyFailedModification
 import encry.network.PeersKeeper.BanPeer
-import encry.nvg.ModifiersValidator.{ ModifierForValidation, ValidatedModifier }
+import encry.nvg.ModifiersValidator.{ InvalidNetworkBytes, ModifierForValidation, ValidatedModifier }
 import encry.settings.EncryAppSettings
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -32,7 +32,7 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
         case Left(error) =>
           logger.info(s"Modifier ${Algos.encode(modifierId)} is incorrect cause: ${error.getMessage}.")
           context.parent ! BanPeer(remote, CorruptedSerializedBytes)
-          context.parent ! InvalidModifier(modifierId)
+          context.parent ! InvalidNetworkBytes(modifierId)
         case Right(modifier) =>
           val preSemanticValidation: Either[PreSemanticValidationException, Unit] =
             isPreSemanticValid(modifier, reader, settings)
@@ -44,13 +44,13 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
           } else if (!syntacticValidation) {
             logger.info(s"Modifier ${modifier.encodedId} is syntactically invalid.")
             context.parent ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
-            context.parent ! SyntacticallyInvalidPersistentModifier(modifierId)
+            context.parent ! SyntacticallyFailedModification(modifier, List.empty)
           } else
             preSemanticValidation.leftMap {
               case IllegalHeight(error) =>
                 logger.info(s"Modifier ${modifier.encodedId} is invalid cause: $error.")
                 context.parent ! BanPeer(remote, PreSemanticInvalidModifier(error))
-                context.parent ! InvalidModifier(modifierId)
+                context.parent ! SyntacticallyFailedModification(modifier, List.empty)
             }
       }
   }
@@ -101,6 +101,8 @@ object ModifiersValidator {
   )
 
   final case class ValidatedModifier(modifier: PersistentModifier) extends AnyVal
+
+  final case class InvalidNetworkBytes(id: ModifierId) extends AnyVal
 
   def props(nodeViewHolderRef: ActorRef, settings: EncryAppSettings): Props =
     Props(new ModifiersValidator(nodeViewHolderRef, settings))

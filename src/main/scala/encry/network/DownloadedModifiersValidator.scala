@@ -66,7 +66,6 @@ object DownloadedModifiersValidator {
                                           typeId: ModifierTypeId,
                                           modifiers: Map[ModifierId, Array[Byte]])
 
-  final case class InvalidModifier(ids: ModifierId) extends AnyVal
 
 //  def props(modifierIdSize: Int,
 //            nodeViewHolder: ActorRef,

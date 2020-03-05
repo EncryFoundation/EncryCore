@@ -6,7 +6,6 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.DownloadedModifiersValidator.InvalidModifier
 import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
@@ -15,11 +14,11 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{
   RollbackFailed,
   RollbackSucceed,
   SemanticallyFailedModification,
-  SemanticallySuccessfulModifier
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification
 }
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
-import encry.nvg.ModifiersValidator.ModifierForValidation
-import encry.nvg.NetworkMessagesProcessor.IdsForRequest
+import encry.nvg.ModifiersValidator.{ InvalidNetworkBytes, ModifierForValidation }
 import encry.nvg.NodeViewHolder.{ DownloadRequest, UpdateHistoryReader }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
@@ -80,25 +79,26 @@ class IntermediaryNVH(
     case UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! newReader
-    case msg @ BanPeer(_, _)                     => intermediaryNetwork ! msg
-    case msg @ InvalidModifier(_)                => intermediaryNetwork ! msg
-    case msg @ DownloadRequest(_, _)             => intermediaryNetwork ! msg
-    case msg @ OtherNodeSyncingStatus(_, _, _)   => intermediaryNetwork ! msg
-    case msg @ RequestFromLocal(_, _, _)         => intermediaryNetwork ! msg
-    case msg @ ResponseFromLocal(_, _, _)        => intermediaryNetwork ! msg
-    case msg @ BroadcastModifier(_, _)           => intermediaryNetwork ! msg
-    case msg @ RequiredManifestHeightAndId(_, _) => //+ to fast sync
-    case msg @ TreeChunks(_, _)                  => //+ to fast sync
-    case msg @ FastSyncDone                      =>
-    case msg @ HeaderChainIsSynced               =>
-    case msg @ FullBlockChainIsSynced            => //+ to miner
-    case msg @ DisableMining                     => //+ to miner
-    case msg @ StartMining                       => //+ to miner
-    case msg @ BlockAndHeaderInfo(_, _)          => //+ to data holder
-    case msg @ RolledBackTransactions(_)         => //+ to memory pool
-    case msg: StatsSenderMessage                 => influxRef.foreach(_ ! msg)
-    case msg @ RollbackSucceed(_)                =>
-    case msg @ RollbackFailed(_)                 =>
+    case msg @ BanPeer(_, _)                         => intermediaryNetwork ! msg
+    case msg @ InvalidNetworkBytes(_)                => intermediaryNetwork ! msg
+    case msg @ DownloadRequest(_, _)                 => intermediaryNetwork ! msg
+    case msg @ OtherNodeSyncingStatus(_, _, _)       => intermediaryNetwork ! msg
+    case msg @ RequestFromLocal(_, _, _)             => intermediaryNetwork ! msg
+    case msg @ ResponseFromLocal(_, _, _)            => intermediaryNetwork ! msg
+    case msg @ BroadcastModifier(_, _)               => intermediaryNetwork ! msg
+    case msg @ SyntacticallyFailedModification(_, _) => intermediaryNetwork ! msg
+    case msg @ RequiredManifestHeightAndId(_, _)     => //+ to fast sync
+    case msg @ TreeChunks(_, _)                      => //+ to fast sync
+    case msg @ FastSyncDone                          =>
+    case msg @ HeaderChainIsSynced                   =>
+    case msg @ FullBlockChainIsSynced                => //+ to miner
+    case msg @ DisableMining                         => //+ to miner
+    case msg @ StartMining                           => //+ to miner
+    case msg @ BlockAndHeaderInfo(_, _)              => //+ to data holder
+    case msg @ RolledBackTransactions(_)             => //+ to memory pool
+    case msg: StatsSenderMessage                     => influxRef.foreach(_ ! msg)
+    case msg @ RollbackSucceed(_)                    =>
+    case msg @ RollbackFailed(_)                     =>
     case msg @ SemanticallySuccessfulModifier(_) =>
       intermediaryNetwork ! msg
       networkMessagesProcessor ! msg
