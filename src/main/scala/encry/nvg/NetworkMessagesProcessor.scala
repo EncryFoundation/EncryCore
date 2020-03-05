@@ -3,14 +3,18 @@ package encry.nvg
 import akka.actor.{ Actor, Props }
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Younger }
+import encry.network.Broadcast
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
+import encry.network.NodeViewSynchronizer.ReceivableMessages.{ OtherNodeSyncingStatus, SemanticallySuccessfulModifier }
+import encry.network.PeersKeeper.SendToNetwork
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.ModifiersCache
 import encry.view.history.HistoryReader
-import org.encryfoundation.common.modifiers.history.{ Header, Payload }
+import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.network.BasicMessagesRepo.{
   InvNetworkMessage,
   ModifiersNetworkMessage,
@@ -21,15 +25,25 @@ import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
-import scala.collection.Seq
-
 class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   var historyReader: HistoryReader = HistoryReader.empty
 
-  //todo last modifiers cache?
+  var modifiersRequestCache: Map[String, Array[Byte]] = Map.empty
 
   override def receive: Receive = {
+    case SemanticallySuccessfulModifier(mod) =>
+      mod match {
+        case block: Block if historyReader.isFullChainSynced =>
+          List(block.header, block.payload).foreach { mod: PersistentModifier =>
+            logger.info(s"Going to broadcast inv for modifier of type ${mod.modifierTypeId} with id: ${mod.encodedId}.")
+            context.parent ! SendToNetwork(InvNetworkMessage(mod.modifierTypeId -> Seq(mod.id)), Broadcast)
+          }
+          modifiersRequestCache = Map(
+            block.encodedId         -> toProto(block.header),
+            block.payload.encodedId -> toProto(block.payload)
+          )
+      }
     case DataFromPeer(message, remote) =>
       message match {
         case SyncInfoNetworkMessage(syncInfo: SyncInfo) =>
@@ -66,12 +80,26 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
           logger.info(s"Time of processing inv message is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
 
         case RequestModifiersNetworkMessage((typeId, requestedIds)) if typeId == Payload.modifierTypeId =>
-          getModsForRemote(requestedIds.toList, historyReader).foreach {
-            case (id: ModifierId, bytes: Array[Byte]) =>
-              context.parent ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
+          val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
+            .flatMap(
+              (id: ModifierId) =>
+                modifiersRequestCache
+                  .get(Algos.encode(id))
+                  .map(id -> _)
+            )
+            .toMap
+          if (modifiersFromCache.nonEmpty) context.parent ! ModifiersNetworkMessage(typeId -> modifiersFromCache)
+          val unrequestedModifiers: List[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains).toList
+
+          typeId match {
+            case h if h == Header.modifierTypeId =>
+              context.parent ! ModifiersNetworkMessage(typeId -> getModsForRemote(unrequestedModifiers, historyReader))
+            case _ =>
+              getModsForRemote(unrequestedModifiers, historyReader).foreach {
+                case (id: ModifierId, bytes: Array[Byte]) =>
+                  context.parent ! ModifiersNetworkMessage(typeId -> Map(id -> bytes))
+              }
           }
-        case RequestModifiersNetworkMessage((typeId, requestedIds)) =>
-          context.parent ! ModifiersNetworkMessage(typeId -> getModsForRemote(requestedIds.toList, historyReader))
       }
   }
 

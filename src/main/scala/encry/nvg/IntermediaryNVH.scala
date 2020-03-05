@@ -17,7 +17,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{
   SemanticallyFailedModification,
   SemanticallySuccessfulModifier
 }
-import encry.network.PeersKeeper.BanPeer
+import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.nvg.ModifiersValidator.ModifierForValidation
 import encry.nvg.NodeViewHolder.{ DownloadRequest, UpdateHistoryReader }
 import encry.settings.EncryAppSettings
@@ -79,25 +79,28 @@ class IntermediaryNVH(
     case UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! newReader
-    case msg @ BanPeer(_, _)                        => networkMessagesProcessor ! msg
-    case msg @ InvalidModifier(_)                   => networkMessagesProcessor ! msg
-    case msg @ FastSyncDone                         => networkMessagesProcessor ! msg
-    case msg @ DownloadRequest(_, _, _)             => networkMessagesProcessor ! msg
-    case msg @ OtherNodeSyncingStatus(_, _, _)      => networkMessagesProcessor ! msg
-    case msg @ RequestFromLocal(_, _, _)            => networkMessagesProcessor ! msg
-    case msg @ ModifiersNetworkMessage(_, _)        => networkMessagesProcessor ! msg
-    case msg @ RequiredManifestHeightAndId(_, _)    => //+ to fast sync
-    case msg @ TreeChunks(_, _)                     => //+ to fast sync
-    case msg @ HeaderChainIsSynced                  => networkMessagesProcessor ! msg
-    case msg @ FullBlockChainIsSynced               => networkMessagesProcessor ! msg //+ to miner
-    case msg @ DisableMining                        => //+ to miner
-    case msg @ StartMining                          => //+ to miner
-    case msg @ BlockAndHeaderInfo(_, _)             => //+ to data holder
-    case msg @ RolledBackTransactions(_)            => //+ to memory pool
-    case msg: StatsSenderMessage                    => influxRef.foreach(_ ! msg)
-    case msg @ RollbackSucceed(_)                   =>
-    case msg @ RollbackFailed(_)                    =>
-    case msg @ SemanticallySuccessfulModifier(_)    => networkMessagesProcessor ! msg
+    case msg @ BanPeer(_, _)                     => networkMessagesProcessor ! msg
+    case msg @ InvalidModifier(_)                => networkMessagesProcessor ! msg
+    case msg @ FastSyncDone                      => networkMessagesProcessor ! msg
+    case msg @ DownloadRequest(_, _, _)          => networkMessagesProcessor ! msg
+    case msg @ OtherNodeSyncingStatus(_, _, _)   => networkMessagesProcessor ! msg
+    case msg @ RequestFromLocal(_, _, _)         => networkMessagesProcessor ! msg
+    case msg @ ModifiersNetworkMessage(_, _)     => networkMessagesProcessor ! msg
+    case msg @ SendToNetwork(_, _)               => networkMessagesProcessor ! msg
+    case msg @ RequiredManifestHeightAndId(_, _) => //+ to fast sync
+    case msg @ TreeChunks(_, _)                  => //+ to fast sync
+    case msg @ HeaderChainIsSynced               => networkMessagesProcessor ! msg
+    case msg @ FullBlockChainIsSynced            => networkMessagesProcessor ! msg //+ to miner
+    case msg @ DisableMining                     => //+ to miner
+    case msg @ StartMining                       => //+ to miner
+    case msg @ BlockAndHeaderInfo(_, _)          => //+ to data holder
+    case msg @ RolledBackTransactions(_)         => //+ to memory pool
+    case msg: StatsSenderMessage                 => influxRef.foreach(_ ! msg)
+    case msg @ RollbackSucceed(_)                =>
+    case msg @ RollbackFailed(_)                 =>
+    case msg @ SemanticallySuccessfulModifier(_) =>
+      networkMessagesProcessor ! msg
+      networkMessagesProcessor ! msg
     case msg @ SemanticallyFailedModification(_, _) => networkMessagesProcessor ! msg
   }
 }
