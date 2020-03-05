@@ -436,7 +436,7 @@ class Starter(settings: EncryAppSettings,
         NetworkRouter
           .props(networkSettings, settings.blackList)
           .withDispatcher("nvsh-dispatcher"),
-        "nodeViewSynchronizer"
+        "networkRouter"
       )
 
       val nvhRouter = context.system.actorOf(

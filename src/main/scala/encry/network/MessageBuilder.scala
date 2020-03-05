@@ -41,6 +41,7 @@ case class MessageBuilder(msg: MessageToNetwork,
           }
         }
       }
+      context.stop(self)
     case RequestFromLocal(None, modTypeId, modsIds) =>
       Try {
         (peersKeeper ? (GetPeerWithOlderHistory() || GetPeerWithEqualHistory())).mapTo[ConnectedPeer].foreach { peer =>
@@ -54,20 +55,24 @@ case class MessageBuilder(msg: MessageToNetwork,
           }
         }
       }
+      context.stop(self)
     case SendSyncInfo(syncInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
         peers.foreach(_.handlerRef ! syncInfo)
       }
+      context.stop(self)
     case ResponseFromLocal(peer, modTypeId, modsIds) =>
       Try {
         (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].map { peer =>
           peer.handlerRef ! ModifiersNetworkMessage(modTypeId -> modsIds)
         }
       }
+      context.stop(self)
     case BroadcastModifier(modTypeId, modInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
         peers.foreach(_.handlerRef ! InvNetworkMessage(modTypeId -> List(modInfo)))
       }
+      context.stop(self)
   }
 }
 

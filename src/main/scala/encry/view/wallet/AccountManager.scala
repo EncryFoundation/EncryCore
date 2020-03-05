@@ -65,16 +65,16 @@ case class AccountManager private(store: Store, password: String, mandatoryAccou
 object AccountManager {
 
   def init(mnemonicKey: String, pass: String, settings: EncryAppSettings): Unit = {
-      val keysTmpDir: File = new File(s"${settings.directory}/keysTmp")
-      val keysDir: File = new File(s"${settings.directory}/keys")
-      keysDir.mkdirs()
-      keysTmpDir.mkdirs()
-      val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
-      val accountTmpManagerStore: LSMStore = new LSMStore(keysTmpDir, keepVersions = 0, keySize = 34)
-      val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
-      val tmpAccount = AccountManager.apply(accountTmpManagerStore, pass, mnemonicKey, 0.toByte)
-      account.store.close()
-      tmpAccount.store.close()
+    val keysTmpDir: File = new File(s"${settings.directory}/keysTmp")
+    val keysDir: File = new File(s"${settings.directory}/keys")
+    keysDir.mkdirs()
+    keysTmpDir.mkdirs()
+    val accountManagerStore: LSMStore = new LSMStore(keysDir, keepVersions = 0, keySize = 34)
+    val accountTmpManagerStore: LSMStore = new LSMStore(keysTmpDir, keepVersions = 0, keySize = 34)
+    val account = AccountManager.apply(accountManagerStore, pass, mnemonicKey, 0.toByte)
+    val tmpAccount = AccountManager.apply(accountTmpManagerStore, pass, mnemonicKey, 0.toByte)
+    account.store.close()
+    tmpAccount.store.close()
   }
 
   val AccountPrefix: Byte = 0x05

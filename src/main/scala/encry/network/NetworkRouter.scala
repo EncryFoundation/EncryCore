@@ -19,7 +19,9 @@ import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConn
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+
 import scala.concurrent.duration._
+import scala.util.Random
 
 class NetworkRouter(settings: NetworkSettings,
                     blackListSettings: BlackListSettings) extends Actor with StrictLogging {
@@ -64,7 +66,8 @@ class NetworkRouter(settings: NetworkSettings,
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
     case msg: ModifierFromNetwork => handlerForMods ! msg
     case msg: OtherNodeSyncingStatus => peersKeeper ! msg
-    case msg: MessageToNetwork => context.system.actorOf(MessageBuilder.props(msg, peersKeeper, deliveryManager), "peersKeeper")
+    case msg: MessageToNetwork =>
+      context.system.actorOf(MessageBuilder.props(msg, peersKeeper, deliveryManager), s"messageBuilder${Random.nextInt()}")
   }
 
   def peersLogic: Receive = {
