@@ -8,7 +8,7 @@ object Messages {
 
   sealed trait MessageToNetwork
   object MessageToNetwork {
-    final case class RequestFromLocal(source: InetSocketAddress,
+    final case class RequestFromLocal(source: Option[InetSocketAddress],
                                       modifierTypeId: ModifierTypeId,
                                       modifierIds: List[ModifierId]) extends MessageToNetwork
     final case class SendSyncInfo(syncInfo: SyncInfo) extends MessageToNetwork
