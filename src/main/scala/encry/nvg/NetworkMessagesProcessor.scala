@@ -1,14 +1,17 @@
 package encry.nvg
 
-import akka.actor.{ Actor, Props }
+import akka.actor.{ Actor, Cancellable, Props }
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Younger }
 import encry.network.Broadcast
+import cats.syntax.option._
+import encry.network.DeliveryManager.CheckPayloadsToDownload
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.{ OtherNodeSyncingStatus, SemanticallySuccessfulModifier }
 import encry.network.PeersKeeper.SendToNetwork
+import encry.nvg.NetworkMessagesProcessor.IdsForRequest
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.ModifiersCache
@@ -27,11 +30,20 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
 
+  import context.dispatcher
+
   var historyReader: HistoryReader = HistoryReader.empty
 
   var modifiersRequestCache: Map[String, Array[Byte]] = Map.empty
 
-  override def receive: Receive = {
+  override def receive(): Receive =
+    workingCycle(
+      context.system.scheduler
+        .scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
+        .some
+    )
+
+  def workingCycle(modifiersRequester: Option[Cancellable]): Receive = {
     case SemanticallySuccessfulModifier(mod) =>
       mod match {
         case block: Block if historyReader.isFullChainSynced =>
@@ -101,6 +113,13 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
               }
           }
       }
+    case CheckPayloadsToDownload =>
+      val newIds: Seq[ModifierId] = historyReader.payloadsIdsToDownload(settings.network.networkChunkSize)
+      logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
+      if (newIds.nonEmpty) context.parent ! IdsForRequest(newIds.toList)
+      val nextCheckModsScheduler: Cancellable =
+        context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)
+      context.become(workingCycle(nextCheckModsScheduler.some))
   }
 
   def getModsForRemote(ids: List[ModifierId], reader: HistoryReader): Map[ModifierId, Array[Byte]] =
@@ -111,5 +130,6 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
 }
 
 object NetworkMessagesProcessor {
+  final case class IdsForRequest(ids: List[ModifierId]) extends AnyVal
   def props(settings: EncryAppSettings): Props = Props(new NetworkMessagesProcessor(settings))
 }

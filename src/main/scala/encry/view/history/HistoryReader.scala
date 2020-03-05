@@ -4,6 +4,8 @@ import encry.consensus.HistoryConsensus.{HistoryComparisonResult, Older}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
+import scala.collection.immutable.HashSet
+
 trait HistoryReader {
 
   def getBestHeaderHeight: Int
@@ -20,6 +22,8 @@ trait HistoryReader {
 
   def modifierBytesById(id: ModifierId): Option[Array[Byte]]
 
+  def payloadsIdsToDownload(howMany: Int): Seq[ModifierId]
+
 }
 
 object HistoryReader {
@@ -30,6 +34,7 @@ object HistoryReader {
     var isFullChainSynced: Boolean = true
     def compare(si: SyncInfo): HistoryComparisonResult = Older
     def modifierBytesById(id: ModifierId): Option[Array[Byte]] = None
+    def payloadsIdsToDownload(howMany: Int): Seq[ModifierId] = Seq.empty
   }
 
   def apply(): HistoryReader = new HistoryReader {
@@ -39,5 +44,6 @@ object HistoryReader {
     def compare(si: SyncInfo): HistoryComparisonResult = Older
     var isFullChainSynced: Boolean = true
     def modifierBytesById(id: ModifierId): Option[Array[Byte]] = None
+    def payloadsIdsToDownload(howMany: Int): Seq[ModifierId] = Seq.empty
   }
 }

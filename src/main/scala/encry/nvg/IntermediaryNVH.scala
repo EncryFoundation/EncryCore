@@ -19,6 +19,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.{
 }
 import encry.network.PeersKeeper.{ BanPeer, SendToNetwork }
 import encry.nvg.ModifiersValidator.ModifierForValidation
+import encry.nvg.NetworkMessagesProcessor.IdsForRequest
 import encry.nvg.NodeViewHolder.{ DownloadRequest, UpdateHistoryReader }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
@@ -87,6 +88,7 @@ class IntermediaryNVH(
     case msg @ RequestFromLocal(_, _, _)         => networkMessagesProcessor ! msg
     case msg @ ModifiersNetworkMessage(_, _)     => networkMessagesProcessor ! msg
     case msg @ SendToNetwork(_, _)               => networkMessagesProcessor ! msg
+    case msg @ IdsForRequest(_)                  => networkMessagesProcessor ! msg
     case msg @ RequiredManifestHeightAndId(_, _) => //+ to fast sync
     case msg @ TreeChunks(_, _)                  => //+ to fast sync
     case msg @ HeaderChainIsSynced               => networkMessagesProcessor ! msg
