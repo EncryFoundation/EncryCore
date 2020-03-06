@@ -339,21 +339,6 @@ class NodeViewHolder(
             case _: Header  => true
             case _: Payload => false
           }, success = true)
-          if (historyBeforeStUpdate.fastSyncInProgress.fastSyncVal &&
-              modifier.modifierTypeId == Payload.modifierTypeId &&
-              historyBeforeStUpdate.getBestBlockHeight >= historyBeforeStUpdate.lastAvailableManifestHeight) {
-            logger.info(
-              s"getBestBlockHeight ${historyBeforeStUpdate.getBestBlockHeight}. " +
-                s"heightOfLastAvailablePayloadForRequest ${historyBeforeStUpdate.lastAvailableManifestHeight}"
-            )
-            historyBeforeStUpdate.getBestHeaderAtHeight(historyBeforeStUpdate.lastAvailableManifestHeight).foreach {
-              h: Header =>
-                context.parent ! RequiredManifestHeightAndId(
-                  historyBeforeStUpdate.lastAvailableManifestHeight,
-                  Algos.hash(h.stateRoot ++ h.id)
-                )
-            }
-          }
           logger.info(
             s"Going to apply modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} to the state. " +
               s"Progress info is: $progressInfo."
