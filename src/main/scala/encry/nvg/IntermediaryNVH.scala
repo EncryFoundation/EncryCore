@@ -1,28 +1,48 @@
 package encry.nvg
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import akka.routing.BalancingPool
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
-import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo}
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling}
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
+import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
+import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeersKeeper.BanPeer
-import encry.nvg.ModifiersValidator.{InvalidModifierBytes, ModifierForValidation}
+import encry.nvg.ModifiersValidator.{ InvalidModifierBytes, ModifierForValidation }
 import encry.nvg.fast.sync.SnapshotProcessor
-import encry.nvg.nvhg.NodeViewHolder.{RollbackFailed, RollbackSucceed, SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification, UpdateHistoryReader}
-import encry.nvg.fast.sync.SnapshotProcessor.{FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks}
+import encry.nvg.nvhg.NodeViewHolder.{
+  RollbackFailed,
+  RollbackSucceed,
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification,
+  UpdateHistoryReader
+}
+import encry.nvg.fast.sync.SnapshotProcessor.{
+  FastSyncDone,
+  HeaderChainIsSynced,
+  RequiredManifestHeightAndId,
+  TreeChunks
+}
 import encry.nvg.nvhg.NodeViewHolder
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestChunkMessage, RequestManifestMessage, RequestModifiersNetworkMessage, ResponseChunkMessage, ResponseManifestMessage, SyncInfoNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{
+  InvNetworkMessage,
+  RequestChunkMessage,
+  RequestManifestMessage,
+  RequestModifiersNetworkMessage,
+  ResponseChunkMessage,
+  ResponseManifestMessage,
+  SyncInfoNetworkMessage
+}
 import org.encryfoundation.common.utils.Algos
 
 class IntermediaryNVH(
