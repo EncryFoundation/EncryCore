@@ -45,8 +45,11 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
       context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(self !
         AwaitingRequest(peer, modTypeId, modId, 1)
       )
-    case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts <= networkSettings.maxDeliveryChecks =>
-      if (expectedModifiers.contains(toKey(modId))) context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))
+    case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts <= networkSettings.maxDeliveryChecks && expectedModifiers.contains(toKey(modId))=>
+      context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))
+      context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(self !
+        AwaitingRequest(peer, modTypeId, modId, attempts + 1)
+      )
     case AwaitingRequest(peer, _, modId, _) =>
       logger.info(s"Stop requesting modifier ${Algos.encode(modId)} from peer $peer")
     case ModifierFromNetwork(source, modTypeId, modId, modBytes) =>
