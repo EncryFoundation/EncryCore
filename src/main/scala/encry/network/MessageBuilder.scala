@@ -52,24 +52,27 @@ case class MessageBuilder(peersKeeper: ActorRef,
     case SendSyncInfo(syncInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
         peers.foreach(_.handlerRef ! SyncInfoNetworkMessage(syncInfo))
+        context.parent ! MsgSent(SyncInfoNetworkMessage.NetworkMessageTypeID, peers.head.socketAddress)
       }
-      context.stop(self)
     case ResponseFromLocal(peer, modTypeId, modsIds) =>
       Try {
         (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].map { peer =>
           peer.handlerRef ! ModifiersNetworkMessage(modTypeId -> modsIds)
+          context.parent ! MsgSent(ModifiersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
         }
       }
       context.stop(self)
     case BroadcastModifier(modTypeId, modInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
         peers.foreach(_.handlerRef ! InvNetworkMessage(modTypeId -> List(modInfo)))
+        context.parent ! MsgSent(InvNetworkMessage.NetworkMessageTypeID, peers.head.socketAddress)
       }
       context.stop(self)
     case SendPeers(peers, remote) =>
       Try {
         (peersKeeper ? GetPeerInfo(remote)).mapTo[ConnectedPeer].map { peer =>
           peer.handlerRef ! PeersNetworkMessage(peers)
+          context.parent ! MsgSent(PeersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
         }
       }
 
