@@ -32,7 +32,7 @@ case class MessageBuilder(peersKeeper: ActorRef,
           logger.info(s"Going to req mods from ${peer.socketAddress}")
           (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
             peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> status.notRequested)
-            modsIds.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
+            status.notRequested.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
             logger.info(s"Requested or received: ${status.requested.length}. Not request or not received: ${status.notRequested.length}")
             context.parent ! MsgSent(RequestModifiersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
           }
