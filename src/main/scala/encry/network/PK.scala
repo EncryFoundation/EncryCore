@@ -125,7 +125,7 @@ class PK(networkSettings: NetworkSettings,
     case predicate: GetPeerByPredicate => connectedPeers.getAll.find {
       case (_, info) => predicate.predicate(info)
     }.map {
-      case (_, info) => sender() ! info.connectedPeer.handlerRef
+      case (_, info) => sender() ! info.connectedPeer
     }
     case GetPeers => sender() ! connectedPeers.getAll.map(_._2.connectedPeer)
     case GetPeerInfo(peerIp) => connectedPeers.getAll.find(_._1 == peerIp).map {

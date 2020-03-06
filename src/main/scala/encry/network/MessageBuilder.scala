@@ -29,7 +29,7 @@ case class MessageBuilder(peersKeeper: ActorRef,
     case RequestFromLocal(Some(peer), modTypeId, modsIds) =>
       Try {
         (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].map { peer =>
-          logger.info(s"Going to req mods from ${peer.socketAddress}")
+          logger.info(s"Going to req mods from ${peer.socketAddress} of type ${modTypeId}")
           (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
             peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> status.notRequested)
             status.notRequested.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
@@ -40,15 +40,16 @@ case class MessageBuilder(peersKeeper: ActorRef,
       }
     case RequestFromLocal(None, modTypeId, modsIds) =>
       Try {
-        (peersKeeper ? (MessageBuilder.PeerWithOlderHistory || MessageBuilder.PeerWithEqualHistory)).mapTo[ConnectedPeer].foreach { peer =>
+        (peersKeeper ? (MessageBuilder.PeerWithOlderHistory || MessageBuilder.PeerWithEqualHistory)).mapTo[ConnectedPeer].map { peer =>
+          logger.info(s"Going to req mods from ${peer.socketAddress} of type ${modTypeId}")
           (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
+            logger.info(s"Requested or received: ${status.requested.length}. Not request or not received: ${status.notRequested.length}")
             peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> status.notRequested)
             modsIds.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
             context.parent ! MsgSent(RequestModifiersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
           }
         }
       }
-      context.stop(self)
     case SendSyncInfo(syncInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
         peers.foreach(_.handlerRef ! SyncInfoNetworkMessage(syncInfo))
@@ -90,11 +91,9 @@ object MessageBuilder {
     def predicate: PeerInfo => Boolean
 
     def ||(that: GetPeerByPredicate): GetPeerByPredicate = {
-      println("invoke!")
       GetPeerByPredicate((info: PeerInfo) => predicate(info) || that.predicate(info))
     }
     def &&(that: GetPeerByPredicate): GetPeerByPredicate = {
-      println("invoke!")
       val newPredicate = (info: PeerInfo) => this.predicate.andThen(res => that.predicate(info) && res)(info)
       GetPeerByPredicate(newPredicate)
     }
