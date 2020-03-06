@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.{Equal, Older, Younger}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.DM.{IsRequested, RequestSent, RequestStatus}
-import encry.network.MessageBuilder.{GetPeerInfo, GetPeerWithEqualHistory, GetPeerWithOlderHistory, GetPeers, MsgSent}
+import encry.network.MessageBuilder.{GetPeerInfo, GetPeers, MsgSent}
 import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendPeers, SendSyncInfo}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, PeersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
@@ -40,7 +40,7 @@ case class MessageBuilder(peersKeeper: ActorRef,
       }
     case RequestFromLocal(None, modTypeId, modsIds) =>
       Try {
-        (peersKeeper ? (GetPeerWithOlderHistory() || GetPeerWithEqualHistory())).mapTo[ConnectedPeer].foreach { peer =>
+        (peersKeeper ? (MessageBuilder.PeerWithOlderHistory || MessageBuilder.PeerWithEqualHistory)).mapTo[ConnectedPeer].foreach { peer =>
           (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
             peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> status.notRequested)
             modsIds.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
@@ -86,25 +86,29 @@ object MessageBuilder {
   case class GetPeerInfo(peerIp: InetSocketAddress)
 
   trait GetPeerByPredicate {
+
     def predicate: PeerInfo => Boolean
-    def ||(that: GetPeerByPredicate): GetPeerByPredicate = new GetPeerByPredicate {
-      override def predicate: PeerInfo => Boolean = info => this.predicate(info) || that.predicate(info)
+
+    def ||(that: GetPeerByPredicate): GetPeerByPredicate = {
+      println("invoke!")
+      GetPeerByPredicate((info: PeerInfo) => predicate(info) || that.predicate(info))
     }
-    def &&(that: GetPeerByPredicate): GetPeerByPredicate =new GetPeerByPredicate {
-      override def predicate: PeerInfo => Boolean = info => this.predicate(info) && that.predicate(info)
+    def &&(that: GetPeerByPredicate): GetPeerByPredicate = {
+      println("invoke!")
+      val newPredicate = (info: PeerInfo) => this.predicate.andThen(res => that.predicate(info) && res)(info)
+      GetPeerByPredicate(newPredicate)
     }
-  }
-  final case class GetPeerWithEqualHistory() extends GetPeerByPredicate {
-    override def predicate: PeerInfo => Boolean = (info: PeerInfo) => info.historyComparisonResult == Equal
   }
 
-  final case class GetPeerWithOlderHistory() extends GetPeerByPredicate {
-    override def predicate: PeerInfo => Boolean = (info: PeerInfo) => info.historyComparisonResult == Older
+  object GetPeerByPredicate {
+    def apply(peerPredicate: PeerInfo => Boolean): GetPeerByPredicate = new GetPeerByPredicate {
+      override def predicate: PeerInfo => Boolean = peerPredicate
+    }
   }
 
-  final case class GetPeerWithYoungerHistory() extends GetPeerByPredicate {
-    override def predicate: PeerInfo => Boolean = (info: PeerInfo) => info.historyComparisonResult == Younger
-  }
+  val PeerWithEqualHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Equal)
+  val PeerWithOlderHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Older)
+  val PeerWithYoungerHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Younger)
 
   def props(peersKeeper: ActorRef,
             deliveryManager: ActorRef): Props = Props(new MessageBuilder(peersKeeper, deliveryManager))
