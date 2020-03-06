@@ -67,7 +67,10 @@ class NetworkRouter(settings: NetworkSettings,
     case msg: ModifierFromNetwork => handlerForMods ! msg
     case msg: OtherNodeSyncingStatus => peersKeeper ! msg
     case msg: MessageToNetwork =>
-      context.actorOf(MessageBuilder.props(msg, peersKeeper, deliveryManager), s"messageBuilder${Random.nextInt()}")
+      context.actorOf(
+        MessageBuilder.props(peersKeeper, deliveryManager),
+        s"messageBuilder${Random.nextInt()}"
+      ) ! msg
   }
 
   def peersLogic: Receive = {

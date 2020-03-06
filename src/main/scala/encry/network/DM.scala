@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 
 import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.DM.{AwaitingRequest, RequestSent}
+import encry.network.DM.{AwaitingRequest, IsRequested, RequestSent}
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkController.ReceivableMessages.RegisterMessagesHandler
 import encry.network.NetworkRouter.ModifierFromNetwork
@@ -47,6 +47,9 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
       } else logger.info(s"Peer $source sent spam mod of type $modTypeId and id ${Algos.encode(modId)}")
     case SemanticallySuccessfulModifier(mod) => receivedModifier -= toKey(mod.id)
     case SemanticallyFailedModification(mod, _) => receivedModifier -= toKey(mod.id)
+    case IsRequested(modId) =>
+      logger.info(s"Going to check if ${Algos.encode(modId)} has been requested. Res: ${receivedModifier.contains(toKey(modId))}")
+      sender() ! receivedModifier.contains(toKey(modId))
   }
 
   def toKey(id: ModifierId): ModifierIdAsKey = new mutable.WrappedArray.ofByte(id)
@@ -57,6 +60,5 @@ object DM {
   case class AwaitingRequest(peer: InetSocketAddress, modTypeId: ModifierTypeId, modId: ModifierId, attempts: Int)
   case class RequestSent(peer: InetSocketAddress, modTypeId: ModifierTypeId, modId: ModifierId)
   case class IsRequested(modifierId: ModifierId)
-
   def props(networkSettings: NetworkSettings): Props = Props(new DM(networkSettings))
 }

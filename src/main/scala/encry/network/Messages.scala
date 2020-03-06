@@ -17,5 +17,6 @@ object Messages {
                                        modifiers: Map[ModifierId, Array[Byte]]) extends MessageToNetwork
     final case class BroadcastModifier(modifierTypeId: ModifierTypeId,
                                        modifierId: ModifierId) extends MessageToNetwork
+    final case class SendPeers(peers: List[InetSocketAddress], to: InetSocketAddress) extends MessageToNetwork
   }
 }

@@ -8,6 +8,7 @@ import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.MessageBuilder.{GetPeerByPredicate, GetPeerInfo, GetPeers}
+import encry.network.Messages.MessageToNetwork.SendPeers
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
@@ -157,12 +158,10 @@ class PK(networkSettings: NetworkSettings,
             else add.getAddress.isSiteLocalAddress && add != remote
           }.getOrElse(false)
 
-        val peers: Seq[InetSocketAddress] = connectedPeers.collect(findPeersForRemote, getPeersForRemote)
+        val peers: List[InetSocketAddress] = connectedPeers.collect(findPeersForRemote, getPeersForRemote).toList
         logger.info(s"Got request for local known peers. Sending to: $remote peers: ${peers.mkString(",")}.")
         logger.info(s"Remote is side local: ${remote} : ${Try(remote.getAddress.isSiteLocalAddress)}")
-        connectedPeers.getAll.find(_._1 == remote).foreach {
-          case (_, info) => info.connectedPeer.handlerRef ! PeersNetworkMessage(peers)
-        }
+        context.parent ! SendPeers(peers, remote)
     }
   }
 

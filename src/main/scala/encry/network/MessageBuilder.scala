@@ -11,16 +11,16 @@ import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.DM.{IsRequested, RequestSent}
 import encry.network.MessageBuilder.{GetPeerInfo, GetPeerWithEqualHistory, GetPeerWithOlderHistory, GetPeers}
 import encry.network.Messages.MessageToNetwork
-import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo}
+import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendPeers, SendSyncInfo}
 import encry.network.PeerConnectionHandler.ConnectedPeer
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, RequestModifiersNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, PeersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.utils.Algos
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 
-case class MessageBuilder(msg: MessageToNetwork,
-                          peersKeeper: ActorRef,
+case class MessageBuilder(peersKeeper: ActorRef,
                           deliveryManager: ActorRef) extends Actor with StrictLogging {
 
   import context.dispatcher
@@ -31,13 +31,21 @@ case class MessageBuilder(msg: MessageToNetwork,
     case RequestFromLocal(Some(peer), modTypeId, modsIds) =>
       Try {
         (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].foreach { peer =>
+          logger.info(s"Going to req mods from ${peer.socketAddress}")
           modsIds.foreach { modId =>
-            for {
-              isRequested <- (deliveryManager ? IsRequested(modId)).mapTo[Boolean]
-            } yield if (!isRequested) {
-              peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> modsIds)
-              deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId)
-            } else logger.debug(s"Duplicate request for modifier of type ${modTypeId} and id: ${Algos.encode(modId)}")
+            val res123 = (deliveryManager ? IsRequested(modId))
+            //Await.result(res123, 2 minutes)
+            logger.info(s"res: ${res123.getClass}")
+            res123.mapTo[Boolean].foreach { res =>
+              if (res) logger.info(s"Another res: ${res}")
+            }
+            (deliveryManager ? IsRequested(modId)).mapTo[Boolean].foreach { isRequested =>
+              logger.info(s"isRequested: ${isRequested}")
+              if (!isRequested) {
+                peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> modsIds)
+                deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId)
+              } else logger.debug(s"Duplicate request for modifier of type ${modTypeId} and id: ${Algos.encode(modId)}")
+            }
           }
         }
       }
@@ -48,7 +56,7 @@ case class MessageBuilder(msg: MessageToNetwork,
           modsIds.foreach { modId =>
             for {
               isRequested <- (deliveryManager ? IsRequested(modId)).mapTo[Boolean]
-            } yield if (!isRequested) {
+            } yield if (isRequested) {
               peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> modsIds)
               deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId)
             } else logger.debug(s"Duplicate request for modifier of type ${modTypeId} and id: ${Algos.encode(modId)}")
@@ -58,7 +66,7 @@ case class MessageBuilder(msg: MessageToNetwork,
       context.stop(self)
     case SendSyncInfo(syncInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
-        peers.foreach(_.handlerRef ! syncInfo)
+        peers.foreach(_.handlerRef ! SyncInfoNetworkMessage(syncInfo))
       }
       context.stop(self)
     case ResponseFromLocal(peer, modTypeId, modsIds) =>
@@ -73,6 +81,13 @@ case class MessageBuilder(msg: MessageToNetwork,
         peers.foreach(_.handlerRef ! InvNetworkMessage(modTypeId -> List(modInfo)))
       }
       context.stop(self)
+    case SendPeers(peers, remote) =>
+      Try {
+        (peersKeeper ? GetPeerInfo(remote)).mapTo[ConnectedPeer].map { peer =>
+          peer.handlerRef ! PeersNetworkMessage(peers)
+        }
+      }
+
   }
 }
 
@@ -102,7 +117,6 @@ object MessageBuilder {
     override def predicate: PeerInfo => Boolean = (info: PeerInfo) => info.historyComparisonResult == Younger
   }
 
-  def props(msg: MessageToNetwork,
-            peersKeeper: ActorRef,
-            deliveryManager: ActorRef): Props = Props(new MessageBuilder(msg, peersKeeper, deliveryManager))
+  def props(peersKeeper: ActorRef,
+            deliveryManager: ActorRef): Props = Props(new MessageBuilder(peersKeeper, deliveryManager))
 }
