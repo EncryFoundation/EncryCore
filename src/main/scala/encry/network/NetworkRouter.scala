@@ -10,7 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
 import encry.network.MessageBuilder.MsgSent
-import encry.network.MessageBuilder.{GetPeerInfo,   GetPeers, MsgSent}
+import encry.network.MessageBuilder.{GetPeerInfo, GetPeers, MsgSent}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling, RegisterForTxHandling}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
@@ -21,7 +21,7 @@ import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConn
 import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
+import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, NetworkMessage}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 import scala.concurrent.duration._
@@ -65,6 +65,9 @@ class NetworkRouter(settings: NetworkSettings,
   }
 
   def businessLogic: Receive = {
+    case mfn@MessageFromNetwork(inv@InvNetworkMessage(data), Some(_)) if data._1 == Transaction.modifierTypeId && inv.isValid(settings.syncPacketLength) =>
+      logger.debug(s"Got ${inv.messageName} on the NetworkRouter.")
+      txsHandler ! mfn
     case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.syncPacketLength) =>
       logger.debug(s"Got ${message.messageName} on the NetworkRouter.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)

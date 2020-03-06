@@ -3,16 +3,24 @@ package encry.view.mempool
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import cats.syntax.either._
+import com.google.common.base.Charsets
+import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal}
+import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.nvg.nvhg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.ReceivableMessages.CompareViews
+import encry.view.mempool.IntermediaryMempool.IsChainSynced
 import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
 import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestModifiersNetworkMessage}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.collection.IndexedSeq
 
@@ -25,7 +33,11 @@ class MemoryPool(settings: EncryAppSettings,
 
   var memoryPool: MemoryPoolStorage = MemoryPoolStorage.empty(settings, networkTimeProvider)
 
+  var bloomFilterForTransactionsIds: BloomFilter[String] = initBloomFilter
+
   var canProcessTransactions: Boolean = false
+
+  var chainSynced: Boolean = false
 
   override def preStart(): Unit = {
     logger.debug(s"Starting MemoryPool. Initializing all schedulers")
@@ -47,6 +59,47 @@ class MemoryPool(settings: EncryAppSettings,
   def disableTransactionsProcessor: Receive = auxiliaryReceive(MemoryPoolStateType.NotProcessingNewTransactions)
 
   def transactionsProcessor(currentNumberOfProcessedTransactions: Int): Receive = {
+    case DataFromPeer(message, remote) =>
+      message match {
+        case RequestModifiersNetworkMessage((_, requestedIds)) =>
+          val modifiersIds: Seq[Transaction] = requestedIds
+            .map(Algos.encode)
+            .collect { case id if memoryPool.contains(id) => memoryPool.get(id) }
+            .flatten
+          logger.debug(
+            s"MemoryPool got request modifiers message. Number of requested ids is ${requestedIds.size}." +
+              s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote."
+          )
+          context.parent ! ResponseFromLocal(
+            remote,
+            Transaction.modifierTypeId,
+            modifiersIds.map(tx => tx.id -> tx.bytes).toMap
+          )
+        case InvNetworkMessage((_, txs)) =>
+          val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(txs.toIndexedSeq)
+          if (notYetRequestedTransactions.nonEmpty) {
+            sender ! RequestFromLocal(Some(remote), Transaction.modifierTypeId, notYetRequestedTransactions.toList)
+            logger.debug(
+              s"MemoryPool got inv message with ${txs.size} ids." +
+                s" Not yet requested ids size is ${notYetRequestedTransactions.size}."
+            )
+          } else
+            logger.debug(
+              s"MemoryPool got inv message with ${txs.size} ids." +
+                s" There are no not yet requested ids."
+            )
+
+        case InvNetworkMessage(invData) =>
+          logger.debug(
+            s"Get inv with tx: ${invData._2.map(Algos.encode).mkString(",")}, but " +
+              s"chainSynced is $chainSynced and canProcessTransactions is $canProcessTransactions."
+          )
+
+        case _ => logger.debug(s"MemoryPoolProcessor got invalid type of DataFromPeer message!")
+      }
+
+    case IsChainSynced(info) => chainSynced = info
+
     case NewTransaction(transaction) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransaction: Option[Transaction]) =
         memoryPool.validateTransaction(transaction)
@@ -134,6 +187,18 @@ class MemoryPool(settings: EncryAppSettings,
 
     case message => logger.debug(s"MemoryPool got unhandled message $message.")
   }
+
+  def notRequestedYet(ids: IndexedSeq[ModifierId]): IndexedSeq[ModifierId] = ids.collect {
+    case id: ModifierId if !bloomFilterForTransactionsIds.mightContain(Algos.encode(id)) =>
+      bloomFilterForTransactionsIds.put(Algos.encode(id))
+      id
+  }
+
+  def initBloomFilter: BloomFilter[String] = BloomFilter.create(
+    Funnels.stringFunnel(Charsets.UTF_8),
+    settings.mempool.bloomFilterCapacity,
+    settings.mempool.bloomFilterFailureProbability
+  )
 }
 
 object MemoryPool {

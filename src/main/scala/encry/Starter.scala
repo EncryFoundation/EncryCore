@@ -25,6 +25,9 @@ import encry.settings._
 import encry.stats.StatsSender
 import encry.utils.{ Mnemonic, NetworkTimeProvider }
 import encry.view.mempool.MemoryPool
+import encry.utils.{Mnemonic, NetworkTimeProvider}
+import encry.view.NodeViewHolder
+import encry.view.mempool.{IntermediaryMempool, MemoryPool}
 import encry.view.wallet.AccountManager
 
 import scala.concurrent.Future
@@ -408,13 +411,13 @@ class Starter(settings: EncryAppSettings,
       }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
-      lazy val miner: ActorRef =
+      val miner: ActorRef =
         context.system.actorOf(Miner.props(dataHolderForApi, influxRef, newSettings), "miner")
-      lazy val memoryPool: ActorRef = context.system.actorOf(
-        MemoryPool
-          .props(newSettings, timeProvider, miner, influxRef)
-          .withDispatcher("mempool-dispatcher")
-      )
+//      lazy val memoryPool: ActorRef = context.system.actorOf(
+//        MemoryPool
+//          .props(newSettings, timeProvider, miner, influxRef)
+//          .withDispatcher("mempool-dispatcher")
+//      )
 //      val nodeViewHolder: ActorRef = context.system.actorOf(
 //        NodeViewHolder
 //          .props(memoryPool, influxRef, dataHolderForApi, newSettings)
@@ -440,6 +443,10 @@ class Starter(settings: EncryAppSettings,
 
       val nvhRouter = context.system.actorOf(
         IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef)
+      )
+
+      val memoryPool = context.system.actorOf(
+        IntermediaryMempool.props(newSettings, timeProvider, miner, influxRef, networkRouter)
       )
 
       if (newSettings.node.mining) miner ! StartMining

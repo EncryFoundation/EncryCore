@@ -472,7 +472,7 @@ class NodeViewHolder(
         logger.info(
           s"State and history are inconsistent." +
             s" Going to rollback to ${rollbackId.map(Algos.encode)} and " +
-            s"apply ${newChain.length} modifiers"
+            s"apply ${newChain.length} modifiers. State safe point: ${safePointHeight}. ${newChain.headers.head.height}. ${newChain.headers.last.height}"
         )
         val additionalBlocks =
           (state.safePointHeight + 1 to historyBestBlock.header.height).foldLeft(List.empty[Block]) {

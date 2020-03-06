@@ -446,7 +446,7 @@ object AvlTree extends StrictLogging {
     avlStorage: VersionalStorage,
     rootNodesStorage: RootNodesStorage[K, V]
   ): AvlTree[K, V] = {
-    rootNodesStorage.insert(StorageVersion @@ Array.fill(32)(0: Byte), EmptyNode(), Height @@ 0)
+    rootNodesStorage.insert(StorageVersion @@ Array.fill(32)(0: Byte), EmptyNode(), Height @@ -1)
     new AvlTree[K, V](EmptyNode(), avlStorage, rootNodesStorage)
   }
 

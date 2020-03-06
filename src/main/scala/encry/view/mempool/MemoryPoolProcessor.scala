@@ -6,13 +6,13 @@ import akka.actor.{Actor, Props}
 import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.IntermediaryMempool.IsChainSynced
 import encry.view.mempool.MemoryPool.TransactionProcessing
-import encry.view.mempool.MemoryPoolProcessor.{CleanupBloomFilter}
+import encry.view.mempool.MemoryPoolProcessor.CleanupBloomFilter
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestModifiersNetworkMessage}
 import org.encryfoundation.common.utils.Algos
@@ -49,7 +49,6 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
 
     case DataFromPeer(message, remote) =>
       message match {
-
         case RequestModifiersNetworkMessage((_, requestedIds)) =>
           val modifiersIds: Seq[Transaction] = requestedIds
             .map(Algos.encode)
@@ -59,7 +58,11 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
             s"MemoryPool got request modifiers message. Number of requested ids is ${requestedIds.size}." +
               s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote."
           )
-
+          context.parent ! ResponseFromLocal(
+            remote,
+            Transaction.modifierTypeId,
+            modifiersIds.map(tx => tx.id -> tx.bytes).toMap
+          )
         case InvNetworkMessage((_, txs)) =>
           val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(txs.toIndexedSeq)
           if (notYetRequestedTransactions.nonEmpty) {
