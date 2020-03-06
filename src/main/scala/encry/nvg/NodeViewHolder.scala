@@ -70,6 +70,8 @@ class NodeViewHolder(
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
+  context.parent ! UpdateHistoryReader(HistoryReader(nodeView.history))
+
   var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
 
   context.parent ! BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
