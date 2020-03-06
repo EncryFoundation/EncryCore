@@ -9,6 +9,7 @@ import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
+import encry.network.MessageBuilder.{GetPeerInfo, GetPeerWithEqualHistory, GetPeerWithOlderHistory, GetPeers, MsgSent}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
@@ -43,6 +44,7 @@ class NetworkRouter(settings: NetworkSettings,
       logger.info(s"Registering handlers for ${types.mkString(",")}.")
       val ids = types.map(_._1)
       messagesHandlers += (ids -> handler)
+    case msg: MsgSent => context.stop(sender())
     case CommandFailed(cmd: Tcp.Command) => logger.info(s"Failed to execute: $cmd.")
     case RegisterForModsHandling => handlerForMods = sender()
     case msg => logger.warn(s"NetworkController: got something strange $msg.")

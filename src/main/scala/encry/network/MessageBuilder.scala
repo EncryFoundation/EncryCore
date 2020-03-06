@@ -8,15 +8,13 @@ import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.{Equal, Older, Younger}
 import encry.network.ConnectedPeersCollection.PeerInfo
-import encry.network.DM.{IsRequested, RequestSent}
-import encry.network.MessageBuilder.{GetPeerInfo, GetPeerWithEqualHistory, GetPeerWithOlderHistory, GetPeers}
-import encry.network.Messages.MessageToNetwork
+import encry.network.DM.{IsRequested, RequestSent, RequestStatus}
+import encry.network.MessageBuilder.{GetPeerInfo, GetPeerWithEqualHistory, GetPeerWithOlderHistory, GetPeers, MsgSent}
 import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendPeers, SendSyncInfo}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, PeersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.utils.Algos
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Try
 
@@ -30,36 +28,22 @@ case class MessageBuilder(peersKeeper: ActorRef,
   override def receive: Receive = {
     case RequestFromLocal(Some(peer), modTypeId, modsIds) =>
       Try {
-        (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].foreach { peer =>
+        (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].map { peer =>
           logger.info(s"Going to req mods from ${peer.socketAddress}")
-          modsIds.foreach { modId =>
-            val res123 = (deliveryManager ? IsRequested(modId))
-            //Await.result(res123, 2 minutes)
-            logger.info(s"res: ${res123.getClass}")
-            res123.mapTo[Boolean].foreach { res =>
-              if (res) logger.info(s"Another res: ${res}")
-            }
-            (deliveryManager ? IsRequested(modId)).mapTo[Boolean].foreach { isRequested =>
-              logger.info(s"isRequested: ${isRequested}")
-              if (!isRequested) {
-                peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> modsIds)
-                deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId)
-              } else logger.debug(s"Duplicate request for modifier of type ${modTypeId} and id: ${Algos.encode(modId)}")
-            }
+          (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
+            peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> status.notRequested)
+            modsIds.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
+            context.parent ! MsgSent(RequestModifiersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
           }
         }
       }
-      context.stop(self)
     case RequestFromLocal(None, modTypeId, modsIds) =>
       Try {
         (peersKeeper ? (GetPeerWithOlderHistory() || GetPeerWithEqualHistory())).mapTo[ConnectedPeer].foreach { peer =>
-          modsIds.foreach { modId =>
-            for {
-              isRequested <- (deliveryManager ? IsRequested(modId)).mapTo[Boolean]
-            } yield if (isRequested) {
-              peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> modsIds)
-              deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId)
-            } else logger.debug(s"Duplicate request for modifier of type ${modTypeId} and id: ${Algos.encode(modId)}")
+          (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
+            peer.handlerRef ! RequestModifiersNetworkMessage(modTypeId -> status.notRequested)
+            modsIds.foreach(modId => deliveryManager ! RequestSent(peer.socketAddress, modTypeId, modId))
+            context.parent ! MsgSent(RequestModifiersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
           }
         }
       }
@@ -94,6 +78,7 @@ case class MessageBuilder(peersKeeper: ActorRef,
 object MessageBuilder {
 
   case object GetPeers
+  case class MsgSent(msgType: Byte, receiver: InetSocketAddress)
   case class GetPeerInfo(peerIp: InetSocketAddress)
 
   trait GetPeerByPredicate {
