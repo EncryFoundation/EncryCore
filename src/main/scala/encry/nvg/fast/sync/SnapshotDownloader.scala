@@ -1,26 +1,14 @@
-package encry.nvg
+package encry.nvg.fast.sync
 
-import akka.actor.{ Actor, Cancellable }
-import cats.syntax.either._
-import cats.syntax.option._
+import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason.{ InvalidChunkMessage, InvalidStateAfterFastSync }
 import encry.network.Messages.MessageToNetwork.BroadcastManifestRequest
-import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.network.PeersKeeper.BanPeer
-import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
-import encry.nvg.SnapshotProcessor._
+import encry.nvg.fast.sync.SnapshotProcessor.{BroadcastManifestRequestMessage, RequiredManifestHeightAndId}
+import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
-import encry.view.fast.sync.FastSyncExceptions.{ ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage }
-import encry.view.fast.sync.{ SnapshotDownloadController, SnapshotHolder }
-import encry.view.history.{ History, HistoryReader }
-import encry.view.wallet.EncryWallet
-import org.encryfoundation.common.modifiers.history.{ Header, Payload }
-import org.encryfoundation.common.network.BasicMessagesRepo.{
-  RequestChunkMessage,
-  ResponseChunkMessage,
-  ResponseManifestMessage
-}
+import encry.view.fast.sync.{SnapshotDownloadController, SnapshotHolder}
+import encry.view.history.HistoryReader
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.Algos
 
 class SnapshotDownloader(settings: EncryAppSettings) extends Actor with StrictLogging {

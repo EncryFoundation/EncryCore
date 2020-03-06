@@ -1,4 +1,4 @@
-package encry.nvg
+package encry.nvg.fast.sync
 
 import akka.actor.Actor
 

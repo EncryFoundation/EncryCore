@@ -7,36 +7,33 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.SnapshotProcessor.{
-  SnapshotChunk,
-  SnapshotChunkSerializer,
-  SnapshotManifest,
-  SnapshotManifestSerializer
-}
-import encry.nvg.SnapshotProcessor.SnapshotManifest.ManifestId
+import encry.nvg.fast.sync.SnapshotProcessor.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotChunk
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
 import encry.settings.EncryAppSettings
-import encry.storage.{ RootNodesStorage, VersionalStorage }
-import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
+import encry.storage.{RootNodesStorage, VersionalStorage}
+import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
 import encry.storage.iodb.versionalIODB.IODBWrapper
-import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.view.fast.sync.FastSyncExceptions._
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree._
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.wallet.EncryWallet
-import io.iohk.iodb.{ ByteArrayWrapper, LSMStore }
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
-import org.iq80.leveldb.{ DB, Options }
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.iq80.leveldb.{DB, Options}
 import scorex.utils.Random
 
-import scala.collection.immutable.{ HashMap, HashSet }
+import scala.collection.immutable.{HashMap, HashSet}
 import scala.language.postfixOps
-import scala.util.{ Failure, Success }
+import scala.util.{Failure, Success}
 
 final case class SnapshotHolder(
   settings: EncryAppSettings,

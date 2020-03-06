@@ -1,23 +1,19 @@
-package encry.nvg
+package encry.nvg.fast.sync
 
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import akka.actor.{Actor, ActorRef, Cancellable, Props}
-import cats.syntax.either._
 import cats.syntax.option._
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason.{InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
-import encry.network.Broadcast
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
+import encry.network.DeliveryManager.CheckDelivery
+import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
-import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
-import encry.nvg.SnapshotProcessor.SnapshotManifest.{ChunkId, ManifestId}
-import encry.nvg.SnapshotProcessor._
+import encry.nvg.fast.sync.SnapshotProcessor.{DropProcessedCount, HeaderChainIsSynced, RemoveRedundantManifestIds, TreeChunks}
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.{ChunkId, ManifestId}
+import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
 import encry.view.fast.sync.{RequestsPerPeriodProcessor, SnapshotDownloadController, SnapshotHolder}
 import encry.view.history.{History, HistoryReader}
 import encry.view.state.UtxoState

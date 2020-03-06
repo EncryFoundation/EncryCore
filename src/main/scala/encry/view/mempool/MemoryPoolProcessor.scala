@@ -12,7 +12,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.IntermediaryMempool.IsChainSynced
 import encry.view.mempool.MemoryPool.TransactionProcessing
-import encry.view.mempool.MemoryPoolProcessor.{CleanupBloomFilter, RequestedModifiersForRemote}
+import encry.view.mempool.MemoryPoolProcessor.{CleanupBloomFilter}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestModifiersNetworkMessage}
 import org.encryfoundation.common.utils.Algos
@@ -55,7 +55,6 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
             .map(Algos.encode)
             .collect { case id if memoryPool.contains(id) => memoryPool.get(id) }
             .flatten
-          context.parent ! RequestedModifiersForRemote(remote, modifiersIds)
           logger.debug(
             s"MemoryPool got request modifiers message. Number of requested ids is ${requestedIds.size}." +
               s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote."

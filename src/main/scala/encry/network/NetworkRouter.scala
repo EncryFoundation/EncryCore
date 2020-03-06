@@ -10,6 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
 import encry.network.MessageBuilder.MsgSent
+import encry.network.MessageBuilder.{GetPeerInfo,   GetPeers, MsgSent}
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling, RegisterForTxHandling}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
@@ -17,7 +18,7 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, NewConnection, OutgoingConnectionFailed}
 import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection, RequestPeerForConnection}
-import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
+import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage

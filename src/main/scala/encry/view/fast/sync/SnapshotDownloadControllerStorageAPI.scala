@@ -1,7 +1,7 @@
 package encry.view.fast.sync
 
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.SnapshotProcessor.SnapshotManifest.ChunkId
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ChunkId
 import encry.settings.EncryAppSettings
 import org.encryfoundation.common.utils.Algos
 import org.iq80.leveldb.DB

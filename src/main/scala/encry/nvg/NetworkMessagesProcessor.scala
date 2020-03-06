@@ -1,26 +1,22 @@
 package encry.nvg
 
-import akka.actor.{ Actor, Cancellable, Props }
+import akka.actor.{Actor, Cancellable, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Younger }
+import encry.consensus.HistoryConsensus.{HistoryComparisonResult, Younger}
 import cats.syntax.option._
 import encry.network.DeliveryManager.CheckPayloadsToDownload
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
+import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo}
 import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
-import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, UpdateHistoryReader }
+import encry.nvg.nvhg.NodeViewHolder
+import encry.nvg.nvhg.NodeViewHolder.{SemanticallySuccessfulModifier, UpdateHistoryReader}
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
-import org.encryfoundation.common.network.BasicMessagesRepo.{
-  InvNetworkMessage,
-  ModifiersNetworkMessage,
-  RequestModifiersNetworkMessage,
-  SyncInfoNetworkMessage
-}
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId

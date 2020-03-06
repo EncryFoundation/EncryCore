@@ -21,7 +21,7 @@ import encry.network.ConnectedPeersCollection
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeerFromAPI
-import encry.nvg.NodeViewHolder.NodeViewChange
+import encry.nvg.nvhg.NodeViewHolder.NodeViewChange
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView

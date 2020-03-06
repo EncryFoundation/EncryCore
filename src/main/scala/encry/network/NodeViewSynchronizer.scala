@@ -33,7 +33,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 import scala.concurrent.duration._
 import encry.network.ModifiersToNetworkUtils._
-import encry.nvg.NodeViewHolder.{NodeViewChange, NodeViewHolderEvent, SemanticallySuccessfulModifier, SuccessfulTransaction}
+import encry.nvg.nvhg.NodeViewHolder.{NodeViewChange, NodeViewHolderEvent, SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.view.NodeViewHolder.ReceivableMessages.{CompareViews, GetNodeViewChanges}
 
 import scala.util.Try

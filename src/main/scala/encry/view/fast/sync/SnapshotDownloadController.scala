@@ -8,8 +8,8 @@ import SnapshotManifestProto.SnapshotManifestProtoMessage
 import cats.syntax.either._
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.SnapshotProcessor.SnapshotManifest.ChunkId
-import encry.nvg.SnapshotProcessor.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ChunkId
+import encry.nvg.fast.sync.SnapshotProcessor.{ SnapshotChunk, SnapshotChunkSerializer, SnapshotManifestSerializer }
 import encry.settings.EncryAppSettings
 import encry.storage.levelDb.versionalLevelDB.LevelDbFactory
 import encry.view.fast.sync.FastSyncExceptions._

@@ -14,7 +14,7 @@ import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
+import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time

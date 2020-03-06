@@ -1,4 +1,4 @@
-package encry.nvg
+package encry.nvg.nvhg
 
 import java.io.File
 
@@ -12,11 +12,28 @@ import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
+import encry.nvg.ModifiersCache
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
-import encry.nvg.NodeViewHolder._
-import encry.nvg.SnapshotProcessor.SnapshotManifest.ManifestId
-import encry.nvg.SnapshotProcessor._
+import encry.nvg.fast.sync.SnapshotProcessor.{
+  FastSyncDone,
+  FastSyncFinished,
+  HeaderChainIsSynced,
+  RemoveRedundantManifestIds,
+  SnapshotChunk,
+  TreeChunks
+}
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
+import encry.nvg.nvhg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
+import encry.nvg.nvhg.NodeViewHolder.{
+  NodeView,
+  RollbackFailed,
+  RollbackSucceed,
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification,
+  UpdateHistoryReader,
+  UpdateInformation
+}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
