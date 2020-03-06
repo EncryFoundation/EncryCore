@@ -62,6 +62,7 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
             block.encodedId         -> toProto(block.header),
             block.payload.encodedId -> toProto(block.payload)
           )
+        case _ =>
       }
     case DataFromPeer(message, remote) =>
       message match {
