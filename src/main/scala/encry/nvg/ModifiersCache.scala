@@ -2,7 +2,7 @@ package encry.nvg
 
 import com.typesafe.scalalogging.StrictLogging
 import encry.view.history.History
-import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
+import encry.view.history.ValidationError.{ FatalValidationError, NonFatalValidationError }
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
@@ -17,7 +17,7 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-  val cache: TrieMap[Key, PersistentModifier] = TrieMap.empty
+  val cache: TrieMap[Key, PersistentModifier]                     = TrieMap.empty
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap.empty[Int, List[ModifierId]]
 
   private var isChainSynced = false
@@ -36,18 +36,23 @@ object ModifiersCache extends StrictLogging {
     value match {
       case header: Header =>
         val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(header.height, List())
-        logger.debug(s"possibleHeadersAtCurrentHeight(${header.height}): ${possibleHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
+        logger.debug(
+          s"possibleHeadersAtCurrentHeight(${header.height}): ${possibleHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}"
+        )
         val updatedHeadersAtCurrentHeight: List[ModifierId] = header.id :: possibleHeadersAtCurrentHeight
-        logger.debug(s"updatedHeadersAtCurrentHeight(${header.height}): ${updatedHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}")
+        logger.debug(
+          s"updatedHeadersAtCurrentHeight(${header.height}): ${updatedHeadersAtCurrentHeight.map(Algos.encode).mkString(",")}"
+        )
         headersCollection = headersCollection.updated(header.height, updatedHeadersAtCurrentHeight)
       case _ =>
     }
 
-    if (size > history.settings.node.modifiersCacheSize) cache.find { case (_, modifier) =>
-      history.testApplicable(modifier) match {
-        case Right(_) | Left(_: NonFatalValidationError) => false
-        case _ => true
-      }
+    if (size > history.settings.node.modifiersCacheSize) cache.find {
+      case (_, modifier) =>
+        history.testApplicable(modifier) match {
+          case Right(_) | Left(_: NonFatalValidationError) => false
+          case _                                           => true
+        }
     }.map(mod => remove(mod._1))
   }
 
@@ -64,13 +69,19 @@ object ModifiersCache extends StrictLogging {
 
   def findCandidateKey(history: History): List[Key] = {
 
-    def isApplicable(key: Key): Boolean = cache.get(key).exists(modifier => history.testApplicable(modifier) match {
-      case Left(_: FatalValidationError) => remove(key); false
-      case Right(_)                      => true
-      case Left(_)                       => false
-    })
+    def isApplicable(key: Key): Boolean =
+      cache
+        .get(key)
+        .exists(
+          modifier =>
+            history.testApplicable(modifier) match {
+              case Left(_: FatalValidationError) => remove(key); false
+              case Right(_)                      => true
+              case Left(_)                       => false
+          }
+        )
 
-    def getHeadersKeysAtHeight(height: Int): List[Key] = {
+    def getHeadersKeysAtHeight(height: Int): List[Key] =
       headersCollection.get(height) match {
         case Some(headersIds) =>
           headersIds.map(new mutable.WrappedArray.ofByte(_)).collect {
@@ -79,26 +90,28 @@ object ModifiersCache extends StrictLogging {
         case None =>
           List.empty[Key]
       }
-    }
 
     def findApplicablePayloadAtHeight(height: Int): List[Key] = {
       history.headerIdsAtHeight(height).view.flatMap(history.getHeaderById).collect {
         case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
           new mutable.WrappedArray.ofByte(header.payloadId)
       }
-      }.toList
+    }.toList
 
-    def exhaustiveSearch: List[Key] = List(cache.find { case (k, v) =>
-      v match {
-        case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
-        case _ =>
-          val isApplicableMod: Boolean = isApplicable(k)
-          isApplicableMod
-      }
-    }).collect { case Some(v) => v._1 }
+    def exhaustiveSearch: List[Key] =
+      List(cache.find {
+        case (k, v) =>
+          v match {
+            case _: Header if history.getBestHeaderId.exists(headerId => headerId sameElements v.parentId) => true
+            case _ =>
+              val isApplicableMod: Boolean = isApplicable(k)
+              isApplicableMod
+          }
+      }).collect { case Some(v) => v._1 }
 
     @tailrec
-    def applicableBestPayloadChain(atHeight: Int = history.getBestBlockHeight, prevKeys: List[Key] = List.empty[Key]): List[Key] = {
+    def applicableBestPayloadChain(atHeight: Int = history.getBestBlockHeight,
+                                   prevKeys: List[Key] = List.empty[Key]): List[Key] = {
       val payloads = findApplicablePayloadAtHeight(atHeight)
       if (payloads.nonEmpty) applicableBestPayloadChain(atHeight + 1, prevKeys ++ payloads)
       else prevKeys
@@ -112,9 +125,9 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
             case Some(v: Header)
-              if (history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
-                (v.parentId sameElements Header.GenesisParentId) ||
-                history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
+                if (history.getBestHeaderHeight == history.settings.constants.PreGenesisHeight &&
+                  (v.parentId sameElements Header.GenesisParentId) ||
+                  history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
               logger.debug(s"Find new bestHeader in cache: ${Algos.encode(v.id)}")
               new mutable.WrappedArray.ofByte(v.id)
           }
@@ -124,26 +137,31 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"${history.getBestHeader}")
           logger.debug(s"${history.getBestHeaderHeight}")
           logger.debug(s"${headersCollection.get(history.getBestHeaderHeight + 1).map(_.map(Algos.encode))}")
-          logger.debug(s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
-            s"Trying to find in range [${history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]")
-          (history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth to history.getBestHeaderHeight).flatMap(height =>
-            getHeadersKeysAtHeight(height)
-          ).toList
+          logger.debug(
+            s"No header in cache at height ${history.getBestHeaderHeight + 1}. " +
+              s"Trying to find in range [${history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth}, ${history.getBestHeaderHeight}]"
+          )
+          (history.getBestHeaderHeight - history.settings.constants.MaxRollbackDepth to history.getBestHeaderHeight)
+            .flatMap(height => getHeadersKeysAtHeight(height))
+            .toList
       }
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
-    else history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
-      case Some(id) => history.getHeaderById(id) match {
-        case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
-          List(new mutable.WrappedArray.ofByte(header.payloadId))
-        case _ if history.isFullChainSynced => exhaustiveSearch
-        case _ => List.empty[Key]
+    else
+      history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
+        case Some(id) =>
+          history.getHeaderById(id) match {
+            case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
+              List(new mutable.WrappedArray.ofByte(header.payloadId))
+            case _ if history.isFullChainSynced => exhaustiveSearch
+            case _                              => List.empty[Key]
+          }
+        case None if isChainSynced =>
+          logger.debug(s"No payloads for current history")
+          exhaustiveSearch
+        case None =>
+          logger.debug(s"No payloads for current history")
+          List.empty[Key]
       }
-      case None if isChainSynced =>
-        logger.debug(s"No payloads for current history")
-        exhaustiveSearch
-      case None => logger.debug(s"No payloads for current history")
-        List.empty[Key]
-    }
   }
 }

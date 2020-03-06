@@ -14,26 +14,9 @@ import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
-import encry.nvg.NodeViewHolder.{
-  NodeView,
-  RollbackFailed,
-  RollbackSucceed,
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification,
-  UpdateHistoryReader,
-  UpdateInformation
-}
-import encry.nvg.SnapshotProcessor.{
-  FastSyncDone,
-  FastSyncFinished,
-  HeaderChainIsSynced,
-  RemoveRedundantManifestIds,
-  RequiredManifestHeightAndId,
-  SnapshotChunk,
-  TreeChunks
-}
+import encry.nvg.NodeViewHolder._
 import encry.nvg.SnapshotProcessor.SnapshotManifest.ManifestId
+import encry.nvg.SnapshotProcessor._
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -48,9 +31,9 @@ import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
+import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
 
