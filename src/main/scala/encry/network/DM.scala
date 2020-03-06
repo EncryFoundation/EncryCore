@@ -42,8 +42,8 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
       }
     case RequestSent(peer, modTypeId, modId) =>
       expectedModifiers += toKey(modId)
-      context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(self !
-        AwaitingRequest(peer, modTypeId, modId, 1)
+      context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(
+        self ! AwaitingRequest(peer, modTypeId, modId, 1)
       )
     case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts <= networkSettings.maxDeliveryChecks && expectedModifiers.contains(toKey(modId))=>
       context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))

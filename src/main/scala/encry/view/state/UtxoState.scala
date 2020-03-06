@@ -76,7 +76,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
-        logger.info(s"Current root node hash: ${tree.rootNode.hash}")
+        logger.info(s"Current root node hash: ${Algos.encode(tree.rootNode.hash)}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
         val validstartTime = System.nanoTime()
@@ -120,7 +120,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
             } else {
-              logger.info(s"After applying root node: ${newTree.rootNode.hash}")
+              logger.info(s"After applying root node: ${Algos.encode(newTree.rootNode.hash)}")
               UtxoState(
                 newTree,
                 Height @@ block.header.height,
@@ -139,7 +139,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def rollbackTo(version: VersionTag, additionalBlocks: List[Block]): Try[UtxoState] = Try{
     logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
     val rollbackedAvl = AvlTree.rollbackTo(StorageVersion !@@ version, additionalBlocks, tree.avlStorage, tree.rootNodesStorage).get
-    logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
+    logger.info(s"UTXO -> rollbackTo -> ${tree.avlStorage.get(UtxoState.bestHeightKey).map(Ints.fromByteArray)}.")
     val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants, influxRef)
   }
@@ -147,7 +147,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def restore(additionalBlocks: List[Block]): Try[UtxoState] = Try {
     logger.info(s"Rollback utxo from storage: ${Algos.encode(version)}")
     val rollbackedAvl = tree.restore(additionalBlocks).get
-    logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
+    logger.info(s"UTXO -> restore -> ${tree.avlStorage.get(UtxoState.bestHeightKey).map(Ints.fromByteArray)}.")
     val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants, influxRef)
   }

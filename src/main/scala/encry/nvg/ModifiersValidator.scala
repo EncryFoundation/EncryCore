@@ -55,6 +55,8 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
       }
   }
 
+
+
   private def isPreSemanticValid(
     modifier: PersistentModifier,
     historyReader: HistoryReader,
