@@ -4,8 +4,8 @@ import cats.syntax.order._
 import cats.{Monoid, Order}
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.SnapshotProcessorActor.SnapshotChunk
-import encry.nvg.SnapshotProcessorActor.SnapshotManifest.ChunkId
+import encry.nvg.SnapshotProcessor.SnapshotChunk
+import encry.nvg.SnapshotProcessor.SnapshotManifest.ChunkId
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.view.state.UtxoState

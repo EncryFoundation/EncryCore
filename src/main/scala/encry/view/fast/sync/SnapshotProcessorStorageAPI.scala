@@ -3,7 +3,7 @@ package encry.view.fast.sync
 import SnapshotChunkProto.SnapshotChunkMessage
 import SnapshotManifestProto.SnapshotManifestProtoMessage
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.SnapshotProcessorActor.{ SnapshotManifest, SnapshotManifestSerializer }
+import encry.nvg.SnapshotProcessor.{ SnapshotManifest, SnapshotManifestSerializer }
 import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
 import org.encryfoundation.common.utils.Algos

@@ -7,7 +7,7 @@ import benches.SnapshotAssemblerBench.SnapshotAssemblerBenchState
 import encry.view.state.avlTree.utils.implicits.Instances._
 import benches.StateBenches.{StateBenchState, benchSettings}
 import benches.Utils.{getRandomTempDir, utxoFromBoxHolder}
-import encry.nvg.SnapshotProcessorActor
+import encry.nvg.SnapshotProcessor
 import encry.settings.Settings
 import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}

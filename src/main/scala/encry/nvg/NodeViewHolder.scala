@@ -24,7 +24,7 @@ import encry.nvg.NodeViewHolder.{
   UpdateHistoryReader,
   UpdateInformation
 }
-import encry.nvg.SnapshotProcessorActor.{
+import encry.nvg.SnapshotProcessor.{
   FastSyncDone,
   FastSyncFinished,
   HeaderChainIsSynced,
@@ -33,7 +33,7 @@ import encry.nvg.SnapshotProcessorActor.{
   SnapshotChunk,
   TreeChunks
 }
-import encry.nvg.SnapshotProcessorActor.SnapshotManifest.ManifestId
+import encry.nvg.SnapshotProcessor.SnapshotManifest.ManifestId
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -70,10 +70,9 @@ class NodeViewHolder(
 
   var nodeView: NodeView = restoreState().getOrElse(genesisState)
 
-  context.parent ! UpdateHistoryReader(HistoryReader(nodeView.history))
-
   var potentialManifestIds: List[ManifestId] = List.empty[ManifestId]
 
+  context.parent ! UpdateHistoryReader(HistoryReader(nodeView.history))
   context.parent ! BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
 
   context.system.scheduler.schedule(1.seconds, 10.seconds) {

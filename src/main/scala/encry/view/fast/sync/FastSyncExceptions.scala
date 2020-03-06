@@ -24,7 +24,7 @@ object FastSyncExceptions {
   sealed trait SnapshotDownloadControllerException extends FastSyncException
   final case class InvalidManifestBytes(error: String)             extends SnapshotDownloadControllerException
 
-  final case class ApplicableChunkIsAbsent(error: String, processor: SnapshotProcessor) extends FastSyncException
+  final case class ApplicableChunkIsAbsent(error: String, processor: SnapshotHolder) extends FastSyncException
   final case class BestHeaderAtHeightIsAbsent(error: String) extends FastSyncException
   final case class InitializeHeightAndRootKeysException(error: String) extends FastSyncException
   final case class ChunksIdsToDownloadException(error: String) extends FastSyncException

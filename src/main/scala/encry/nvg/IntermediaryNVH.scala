@@ -2,6 +2,7 @@ package encry.nvg
 
 import akka.actor.{ Actor, ActorRef, Props }
 import akka.routing.BalancingPool
+import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.{ DisableMining, StartMining }
@@ -20,7 +21,7 @@ import encry.nvg.NodeViewHolder.{
   SyntacticallyFailedModification,
   UpdateHistoryReader
 }
-import encry.nvg.SnapshotProcessorActor.{ FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks }
+import encry.nvg.SnapshotProcessor.{ FastSyncDone, HeaderChainIsSynced, RequiredManifestHeightAndId, TreeChunks }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
@@ -28,7 +29,11 @@ import encry.view.history.HistoryReader
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import org.encryfoundation.common.network.BasicMessagesRepo.{
   InvNetworkMessage,
+  RequestChunkMessage,
+  RequestManifestMessage,
   RequestModifiersNetworkMessage,
+  ResponseChunkMessage,
+  ResponseManifestMessage,
   SyncInfoNetworkMessage
 }
 import org.encryfoundation.common.utils.Algos
@@ -62,6 +67,22 @@ class IntermediaryNVH(
         .props(ModifiersValidator.props(nodeViewHolder, settings)),
       name = "Modifiers-validator-router"
     )
+  val snapshotProcessor: Option[ActorRef] =
+    if (settings.constants.SnapshotCreationHeight <= settings.constants.MaxRollbackDepth ||
+        (!settings.snapshotSettings.enableFastSynchronization && !settings.snapshotSettings.enableSnapshotCreation))
+      none[ActorRef]
+    else {
+      intermediaryNetwork ! RegisterMessagesHandler(
+        Seq(
+          RequestManifestMessage.NetworkMessageTypeID  -> "RequestManifest",
+          ResponseManifestMessage.NetworkMessageTypeID -> "ResponseManifestMessage",
+          RequestChunkMessage.NetworkMessageTypeID     -> "RequestChunkMessage",
+          ResponseChunkMessage.NetworkMessageTypeID    -> "ResponseChunkMessage"
+        ),
+        self
+      )
+      context.actorOf(SnapshotProcessor.props(settings, nodeViewHolder)).some
+    }
 
   var historyReader: HistoryReader = HistoryReader.empty
 
@@ -69,7 +90,13 @@ class IntermediaryNVH(
     case ModifierFromNetwork(remote, typeId, modifierId, modifierBytes) =>
       logger.info(s"Got modifier ${Algos.encode(modifierId)} of type $typeId from $remote for validation.")
       modifiersValidatorRouter ! ModifierForValidation(historyReader, modifierId, typeId, modifierBytes, remote)
-    case msg @ DataFromPeer(_, _) => networkMessagesProcessor ! msg
+    case msg @ DataFromPeer(_: SyncInfoNetworkMessage, _)         => networkMessagesProcessor ! msg
+    case msg @ DataFromPeer(_: InvNetworkMessage, _)              => networkMessagesProcessor ! msg
+    case msg @ DataFromPeer(_: RequestModifiersNetworkMessage, _) => networkMessagesProcessor ! msg
+    case msg @ DataFromPeer(_: RequestManifestMessage, _)         => snapshotProcessor.foreach(_ ! msg)
+    case msg @ DataFromPeer(_: ResponseManifestMessage, _)        => snapshotProcessor.foreach(_ ! msg)
+    case msg @ DataFromPeer(_: RequestChunkMessage, _)            => snapshotProcessor.foreach(_ ! msg)
+    case msg @ DataFromPeer(_: ResponseChunkMessage, _)           => snapshotProcessor.foreach(_ ! msg)
     case msg @ UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! msg

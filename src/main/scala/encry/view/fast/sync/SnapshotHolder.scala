@@ -7,13 +7,13 @@ import cats.syntax.either._
 import cats.syntax.option._
 import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.SnapshotProcessorActor.{
+import encry.nvg.SnapshotProcessor.{
   SnapshotChunk,
   SnapshotChunkSerializer,
   SnapshotManifest,
   SnapshotManifestSerializer
 }
-import encry.nvg.SnapshotProcessorActor.SnapshotManifest.ManifestId
+import encry.nvg.SnapshotProcessor.SnapshotManifest.ManifestId
 import encry.settings.EncryAppSettings
 import encry.storage.{ RootNodesStorage, VersionalStorage }
 import encry.storage.VersionalStorage.{ StorageKey, StorageType, StorageValue, StorageVersion }
@@ -38,7 +38,7 @@ import scala.collection.immutable.{ HashMap, HashSet }
 import scala.language.postfixOps
 import scala.util.{ Failure, Success }
 
-final case class SnapshotProcessor(
+final case class SnapshotHolder(
   settings: EncryAppSettings,
   storage: VersionalStorage,
   applicableChunks: HashSet[ByteArrayWrapper],
@@ -48,24 +48,24 @@ final case class SnapshotProcessor(
     with SnapshotProcessorStorageAPI
     with AutoCloseable {
 
-  def updateCache(chunk: SnapshotChunk): SnapshotProcessor =
+  def updateCache(chunk: SnapshotChunk): SnapshotHolder =
     this.copy(chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk))
 
-  def initializeApplicableChunksCache(history: History, height: Int): Either[FastSyncException, SnapshotProcessor] =
+  def initializeApplicableChunksCache(history: History, height: Int): Either[FastSyncException, SnapshotHolder] =
     for {
       stateRoot <- Either.fromOption(
                     history.getBestHeaderAtHeight(height).map(_.stateRoot),
                     BestHeaderAtHeightIsAbsent(s"There is no best header at required height $height")
                   )
-      processor: SnapshotProcessor = this.copy(applicableChunks = HashSet(ByteArrayWrapper(stateRoot)))
+      processor: SnapshotHolder = this.copy(applicableChunks = HashSet(ByteArrayWrapper(stateRoot)))
       resultedProcessor <- processor.initializeHeightAndRootKeys(stateRoot, height) match {
                             case Left(error) =>
-                              InitializeHeightAndRootKeysException(error.getMessage).asLeft[SnapshotProcessor]
+                              InitializeHeightAndRootKeysException(error.getMessage).asLeft[SnapshotHolder]
                             case Right(newProcessor) => newProcessor.asRight[FastSyncException]
                           }
     } yield resultedProcessor
 
-  private def initializeHeightAndRootKeys(rootNodeId: Array[Byte], height: Int): Either[Throwable, SnapshotProcessor] =
+  private def initializeHeightAndRootKeys(rootNodeId: Array[Byte], height: Int): Either[Throwable, SnapshotHolder] =
     Either.catchNonFatal {
       storage.insert(
         StorageVersion @@ Random.randomBytes(),
@@ -75,7 +75,7 @@ final case class SnapshotProcessor(
       this
     }
 
-  def reInitStorage: SnapshotProcessor =
+  def reInitStorage: SnapshotHolder =
     try {
       storage.close()
       wallet.foreach(_.close())
@@ -84,7 +84,7 @@ final case class SnapshotProcessor(
       import org.apache.commons.io.FileUtils
       FileUtils.deleteDirectory(stateDir)
       FileUtils.deleteDirectory(walletDir)
-      SnapshotProcessor.initialize(settings, settings.storage.state)
+      SnapshotHolder.initialize(settings, settings.storage.state)
     } catch {
       case err: Throwable =>
         throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
@@ -98,7 +98,7 @@ final case class SnapshotProcessor(
     case emptyNode: EmptyNode[StorageKey, StorageValue] => List.empty[Node[StorageKey, StorageValue]]
   }
 
-  def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotProcessor] = {
+  def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotHolder] = {
     val kSerializer: Serializer[StorageKey]         = implicitly[Serializer[StorageKey]]
     val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
     val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
@@ -154,7 +154,7 @@ final case class SnapshotProcessor(
         val newApplicableChunk = (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
           toApplicable.map(node => ByteArrayWrapper(node.hash))
         this.copy(applicableChunks = newApplicableChunk).asRight[ChunkApplyError]
-      case Left(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotProcessor]
+      case Left(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotHolder]
     }
   }
 
@@ -165,7 +165,7 @@ final case class SnapshotProcessor(
         s"Node hash:(${Algos.encode(chunk.node.hash)}) doesn't equal to chunk id:(${Algos.encode(chunk.id)})"
       ).asLeft[SnapshotChunk]
 
-  private def getNextApplicableChunk: Either[FastSyncException, (SnapshotChunk, SnapshotProcessor)] =
+  private def getNextApplicableChunk: Either[FastSyncException, (SnapshotChunk, SnapshotHolder)] =
     for {
       idAndChunk <- Either.fromOption(chunksCache.find { case (id, _) => applicableChunks.contains(id) },
                                       ApplicableChunkIsAbsent("There are no applicable chunks in cache", this))
@@ -176,7 +176,7 @@ final case class SnapshotProcessor(
       (chunk, this.copy(chunksCache = newChunksCache))
     }
 
-  def processNextApplicableChunk(snapshotProcessor: SnapshotProcessor): Either[FastSyncException, SnapshotProcessor] =
+  def processNextApplicableChunk(snapshotProcessor: SnapshotHolder): Either[FastSyncException, SnapshotHolder] =
     for {
       chunkAndProcessor  <- snapshotProcessor.getNextApplicableChunk
       (chunk, processor) = chunkAndProcessor
@@ -214,7 +214,7 @@ final case class SnapshotProcessor(
       node       <- getNode(rootNodeId)
     } yield node
 
-  def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotProcessor] = {
+  def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotHolder] = {
     logger.info(
       s"Start updating actual manifest to new one at height " +
         s"${block.header.height} with block id ${block.encodedId}."
@@ -226,7 +226,7 @@ final case class SnapshotProcessor(
     id: ManifestId,
     manifestIds: Seq[Array[Byte]],
     newChunks: List[SnapshotChunk]
-  ): Either[ProcessNewSnapshotError, SnapshotProcessor] = {
+  ): Either[ProcessNewSnapshotError, SnapshotHolder] = {
     //todo add only exists chunks
     val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
     val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
@@ -242,12 +242,12 @@ final case class SnapshotProcessor(
     val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
     logger.info(s"A new snapshot created successfully. Insertion started.")
     Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
-      case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotProcessor]
+      case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotHolder]
       case Right(_)    => this.asRight[ProcessNewSnapshotError]
     }
   }
 
-  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotProcessor] =
+  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotHolder] =
     for {
       bestManifestId <- Either.fromOption(
                          history.getBestHeaderAtHeight(height).map(header => Algos.hash(header.stateRoot ++ header.id)),
@@ -269,7 +269,7 @@ final case class SnapshotProcessor(
         Either.catchNonFatal(
           storage.insert(StorageVersion @@ Random.randomBytes(), List(toApply), toDelete.map(StorageKey @@ _))
         ) match {
-          case Left(error) => ProcessNewBlockError(error.getMessage).asLeft[SnapshotProcessor]
+          case Left(error) => ProcessNewBlockError(error.getMessage).asLeft[SnapshotHolder]
           case Right(_)    => this.asRight[ProcessNewBlockError]
         }
       }
@@ -278,15 +278,15 @@ final case class SnapshotProcessor(
   override def close(): Unit = storage.close()
 }
 
-object SnapshotProcessor extends StrictLogging {
+object SnapshotHolder extends StrictLogging {
 
-  def initialize(settings: EncryAppSettings, storageType: StorageType): SnapshotProcessor =
+  def initialize(settings: EncryAppSettings, storageType: StorageType): SnapshotHolder =
     if (settings.snapshotSettings.enableFastSynchronization)
       create(settings, new File(s"${settings.directory}/state"), storageType)
     else
       create(settings, getDirProcessSnapshots(settings), storageType)
 
-  def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotProcessor = {
+  def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotHolder = {
     val snapshotStorage = getDirProcessSnapshots(settings)
     snapshotStorage.mkdirs()
     val storage: VersionalStorage =
@@ -299,12 +299,12 @@ object SnapshotProcessor extends StrictLogging {
           val levelDBInit: DB = LevelDbFactory.factory.open(snapshotStorage, new Options)
           VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
       }
-    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, none[EncryWallet])
+    new SnapshotHolder(settings, storage, HashSet.empty, HashMap.empty, none[EncryWallet])
   }
 
   def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
-  def create(settings: EncryAppSettings, snapshotsDir: File, storageType: StorageType): SnapshotProcessor = {
+  def create(settings: EncryAppSettings, snapshotsDir: File, storageType: StorageType): SnapshotHolder = {
     snapshotsDir.mkdirs()
     val storage: VersionalStorage =
       storageType match {
@@ -328,6 +328,6 @@ object SnapshotProcessor extends StrictLogging {
           .some
       else none[EncryWallet]
 
-    new SnapshotProcessor(settings, storage, HashSet.empty, HashMap.empty, wallet)
+    new SnapshotHolder(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }
 }
