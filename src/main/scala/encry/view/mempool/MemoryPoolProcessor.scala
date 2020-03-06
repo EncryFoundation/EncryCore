@@ -104,7 +104,4 @@ object MemoryPoolProcessor {
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider) = Props(new MemoryPoolProcessor(settings, ntp))
 
   case object CleanupBloomFilter
-
-  final case class RequestedModifiersForRemote(peer: InetSocketAddress, txs: Seq[Transaction])
-
 }

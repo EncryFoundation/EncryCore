@@ -9,9 +9,9 @@ import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
-import encry.network.MessageBuilder.{GetPeerInfo, GetPeerWithEqualHistory, GetPeerWithOlderHistory, GetPeers, MsgSent}
+import encry.network.MessageBuilder.MsgSent
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling}
+import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling, RegisterForTxHandling}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
 import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
@@ -19,6 +19,7 @@ import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, N
 import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection, RequestPeerForConnection}
 import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.{BlackListSettings, NetworkSettings}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
@@ -33,6 +34,7 @@ class NetworkRouter(settings: NetworkSettings,
 
   var messagesHandlers: Map[Seq[Byte], ActorRef] = Map.empty
   var handlerForMods: ActorRef = ActorRef.noSender
+  var txsHandler: ActorRef = ActorRef.noSender
 
   IO(Tcp) ! Bind(self, settings.bindAddress, options = KeepAlive(true) :: Nil, pullMode = false)
 
@@ -45,9 +47,10 @@ class NetworkRouter(settings: NetworkSettings,
       logger.info(s"Registering handlers for ${types.mkString(",")}.")
       val ids = types.map(_._1)
       messagesHandlers += (ids -> handler)
-    case msg: MsgSent => context.stop(sender())
+    case _: MsgSent => context.stop(sender())
     case CommandFailed(cmd: Tcp.Command) => logger.info(s"Failed to execute: $cmd.")
     case RegisterForModsHandling => handlerForMods = sender()
+    case RegisterForTxHandling => txsHandler = sender()
     case msg => logger.warn(s"NetworkController: got something strange $msg.")
   }
 
@@ -62,13 +65,14 @@ class NetworkRouter(settings: NetworkSettings,
 
   def businessLogic: Receive = {
     case MessageFromNetwork(message, Some(remote)) if message.isValid(settings.syncPacketLength) =>
-      logger.debug(s"Got ${message.messageName} on the NetworkController.")
+      logger.debug(s"Got ${message.messageName} on the NetworkRouter.")
       findHandler(message, message.NetworkMessageTypeID, remote, messagesHandlers)
     case MessageFromNetwork(message, Some(remote)) =>
       peersKeeper ! BanPeer(remote.socketAddress, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
     case msg: SemanticallySuccessfulModifier => deliveryManager ! msg
-    case msg: ModifierFromNetwork => handlerForMods ! msg
+    case msg: ModifierFromNetwork if msg.modTypeId != Transaction.modifierTypeId => handlerForMods ! msg
+    case msg: ModifierFromNetwork => txsHandler ! msg
     case msg: OtherNodeSyncingStatus => peersKeeper ! msg
     case msg: MessageToNetwork =>
       context.actorOf(
@@ -127,6 +131,7 @@ object NetworkRouter {
                                  modBytes: Array[Byte])
 
   case object RegisterForModsHandling
+  case object RegisterForTxHandling
 
   def props(settings: NetworkSettings,
             blackListSettings: BlackListSettings): Props = Props(new NetworkRouter(settings, blackListSettings))
