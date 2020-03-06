@@ -17,6 +17,7 @@ import encry.network.PeerConnectionHandler.ReceivableMessages.StartInteraction
 import encry.network.PeerConnectionHandler.{ConnectedPeer, MessageFromNetwork}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionVerified, NewConnection, OutgoingConnectionFailed}
 import encry.network.PeersKeeper.{BanPeer, ConnectionStatusMessages, PeerForConnection, RequestPeerForConnection}
+import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.NetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
@@ -66,6 +67,7 @@ class NetworkRouter(settings: NetworkSettings,
     case MessageFromNetwork(message, Some(remote)) =>
       peersKeeper ! BanPeer(remote.socketAddress, InvalidNetworkMessage(message.messageName))
       logger.info(s"Invalid message type: ${message.messageName} from remote $remote.")
+    case msg: SemanticallySuccessfulModifier => deliveryManager ! msg
     case msg: ModifierFromNetwork => handlerForMods ! msg
     case msg: OtherNodeSyncingStatus => peersKeeper ! msg
     case msg: MessageToNetwork =>
