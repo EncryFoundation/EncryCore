@@ -511,7 +511,9 @@ object DeliveryManager {
 
   case object CheckPayloadsToDownload
 
-  final case object FullBlockChainIsSynced
+  trait BlockchainStatus
+
+  final case object FullBlockChainIsSynced extends BlockchainStatus
 
   final case class CheckModifiersWithQueueSize(size: Int) extends AnyVal
 

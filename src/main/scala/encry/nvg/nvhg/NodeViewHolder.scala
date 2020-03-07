@@ -2,61 +2,48 @@ package encry.nvg.nvhg
 
 import java.io.File
 
-import akka.actor.{ Actor, ActorRef, Props }
+import akka.actor.{Actor, ActorRef, Props}
+import akka.pattern._
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.local.miner.Miner.{ DisableMining, StartMining }
+import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersCache
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.fast.sync.SnapshotProcessor.{
-  FastSyncDone,
-  FastSyncFinished,
-  HeaderChainIsSynced,
-  RemoveRedundantManifestIds,
-  SnapshotChunk,
-  TreeChunks
-}
+import encry.nvg.fast.sync.SnapshotProcessor.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RemoveRedundantManifestIds, SnapshotChunk, TreeChunks}
 import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
-import encry.nvg.nvhg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
-import encry.nvg.nvhg.NodeViewHolder.{
-  NodeView,
-  RollbackFailed,
-  RollbackSucceed,
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification,
-  UpdateHistoryReader,
-  UpdateInformation
-}
+import encry.nvg.nvhg.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, LocallyGeneratedModifier}
+import encry.nvg.nvhg.NodeViewHolder.{GetDataFromCurrentView, NodeView, RollbackFailed, RollbackSucceed, SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification, UpdateHistoryReader, UpdateInformation}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
+import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
+import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader}
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
+import org.encryfoundation.common.modifiers.{PersistentModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 
-import scala.collection.{ mutable, IndexedSeq, Seq }
+import scala.collection.{IndexedSeq, Seq, mutable}
+import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(
   settings: EncryAppSettings,
@@ -120,6 +107,13 @@ class NodeViewHolder(
         s"Time of processing locally generated modifier with id: ${modifier.encodedId} " +
           s"is ${(System.currentTimeMillis() - startTime) / 1000}s."
       )
+
+    case GetDataFromCurrentView(f, sender) =>
+      logger.info("Receive GetDataFromCurrentView on nvh")
+      f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet)) match {
+        case resultFuture: Future[_] => resultFuture.pipeTo(sender)
+        case result => sender ! result
+      }
 
     case FastSyncFinished(state: UtxoState, wallet: EncryWallet) =>
       val startTime: Long = System.currentTimeMillis()
@@ -290,7 +284,7 @@ class NodeViewHolder(
                 }
                 if (settings.node.mining && progressInfo.chainSwitchingNeeded)
                   context.parent ! StartMining
-                context.parent ! SemanticallySuccessfulModifier(modToApply)
+                context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
                 if (newHis.getBestHeaderId.exists(
                       bestHeaderId =>
                         newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
@@ -359,16 +353,17 @@ class NodeViewHolder(
             logger.debug(s"Persistent modifier ${modifier.encodedId} was applied successfully.")
             newHistory.getBestHeader.foreach(context.parent ! BestHeaderInChain(_))
             if (newHistory.isFullChainSynced) {
-              logger.debug(s"BlockChain is synced on nvh at the height ${newHistory.getBestHeaderHeight}.")
+              logger.info(s"BlockChain is synced on nvh at the height ${newHistory.getBestHeaderHeight}.")
               ModifiersCache.setChainSynced()
               context.parent ! FullBlockChainIsSynced
+              context.system.eventStream.publish(FullBlockChainIsSynced)
             }
             updateNodeView(newHistory.some, newState.some, nodeView.wallet.some)
           } else {
             logger.info(s"Progress info is empty.")
             context.parent ! HeightStatistics(historyBeforeStUpdate.getBestHeaderHeight, nodeView.state.height)
             if (!isLocallyGenerated) requestDownloads(progressInfo, modifier.id.some)
-            context.parent ! SemanticallySuccessfulModifier(modifier)
+            context.system.eventStream.publish(SemanticallySuccessfulModifier(modifier))
             updateNodeView(updatedHistory = historyBeforeStUpdate.some)
           }
         case Left(e: Throwable) =>
@@ -524,6 +519,8 @@ object NodeViewHolder {
   case class SuccessfulTransaction(transaction: Transaction) extends ModificationOutcome
 
   case class SemanticallySuccessfulModifier(modifier: PersistentNodeViewModifier) extends ModificationOutcome
+
+  case class GetDataFromCurrentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A, sender: ActorRef)
 
   final case class DownloadRequest(
     modifierTypeId: ModifierTypeId,

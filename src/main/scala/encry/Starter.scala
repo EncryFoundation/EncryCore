@@ -411,8 +411,6 @@ class Starter(settings: EncryAppSettings,
       }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
-      val miner: ActorRef =
-        context.system.actorOf(Miner.props(dataHolderForApi, influxRef, newSettings), "miner")
 //      lazy val memoryPool: ActorRef = context.system.actorOf(
 //        MemoryPool
 //          .props(newSettings, timeProvider, miner, influxRef)
@@ -446,9 +444,11 @@ class Starter(settings: EncryAppSettings,
       )
 
       val memoryPool = context.system.actorOf(
-        IntermediaryMempool.props(newSettings, timeProvider, miner, influxRef, networkRouter)
+        IntermediaryMempool.props(newSettings, timeProvider, influxRef, networkRouter)
       )
 
+      val miner: ActorRef =
+        context.system.actorOf(Miner.props(dataHolderForApi, memoryPool, nvhRouter, influxRef, newSettings), "miner")
       if (newSettings.node.mining) miner ! StartMining
       if (newSettings.node.useCli) {
         context.system

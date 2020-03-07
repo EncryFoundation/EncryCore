@@ -7,10 +7,11 @@ import encry.network.BlackList.BanReason.{CorruptedSerializedBytes, Syntacticall
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
+import encry.nvg.ModifiersValidator.InvalidModifierBytes
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.MemoryPool.NewTransaction
-import encry.view.mempool.TransactionsValidator.{InvalidModifier, ModifiersForValidating}
+import encry.view.mempool.TransactionsValidator.{InvalidTransaction, ModifiersForValidating}
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
@@ -32,10 +33,10 @@ class TransactionsValidator(settings: EncryAppSettings,
             case Success(tx) =>
               logger.info(s"Transaction with id: ${tx.encodedId} invalid cause of: ${tx.semanticValidity}.")
               context.parent ! BanPeer(remote, SyntacticallyInvalidTransaction)
-              context.parent ! InvalidModifier(id)
+              context.parent ! InvalidTransaction(id)
             case Failure(ex) =>
               context.parent ! BanPeer(remote, CorruptedSerializedBytes)
-              context.parent ! InvalidModifier(id)
+              context.parent ! InvalidModifierBytes(id)
               logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
           }
        }
@@ -48,7 +49,7 @@ object TransactionsValidator {
                                           typeId: ModifierTypeId,
                                           modifiers: Map[ModifierId, Array[Byte]])
 
-  final case class InvalidModifier(ids: ModifierId) extends AnyVal
+  final case class InvalidTransaction(ids: ModifierId) extends AnyVal
 
   def props(settings: EncryAppSettings, memPool: ActorRef, ntp: NetworkTimeProvider): Props =
     Props(new TransactionsValidator(settings, memPool, ntp))

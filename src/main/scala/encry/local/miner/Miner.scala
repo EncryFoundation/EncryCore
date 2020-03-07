@@ -13,14 +13,15 @@ import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme
 import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
-import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
+import encry.network.DeliveryManager
+import encry.network.DeliveryManager.{BlockchainStatus, FullBlockChainIsSynced}
+import encry.nvg.nvhg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.nvg.nvhg.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.NodeViewHolder.CurrentView
-import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
 import encry.view.mempool.MemoryPool.TransactionsForMiner
 import encry.view.state.UtxoState
@@ -40,6 +41,8 @@ import scala.collection._
 import scala.concurrent.duration._
 
 class Miner(dataHolder: ActorRef,
+            mempool: ActorRef,
+            nvh: ActorRef,
             influx: Option[ActorRef],
             settings: EncryAppSettings) extends Actor with StrictLogging {
 
@@ -62,6 +65,7 @@ class Miner(dataHolder: ActorRef,
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[ClIMiner])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
+    context.system.eventStream.subscribe(self, classOf[BlockchainStatus])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
       influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
     )
@@ -79,7 +83,10 @@ class Miner(dataHolder: ActorRef,
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
 
-  override def receive: Receive = if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
+  override def receive: Receive = {
+    logger.info(s"settings.node.mining: ${settings.node.mining}. syncingDone: ${syncingDone}")
+    if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
+  }
 
   def mining: Receive = {
     case StartMining if context.children.nonEmpty & syncingDone =>
@@ -113,7 +120,7 @@ class Miner(dataHolder: ActorRef,
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      //context.actorSelection("/user/nodeViewHolder") ! LocallyGeneratedModifier(block)
+      nvh ! LocallyGeneratedModifier(block)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
@@ -131,9 +138,11 @@ class Miner(dataHolder: ActorRef,
 
   def miningDisabled: Receive = {
     case EnableMining =>
+      logger.info("Enable mining on miner!")
       context.become(miningEnabled)
       self ! StartMining
     case FullBlockChainIsSynced =>
+      logger.info("Set syncingDone to true")
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
     case DisableMining | SemanticallySuccessfulModifier(_) =>
@@ -144,7 +153,7 @@ class Miner(dataHolder: ActorRef,
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
-    case SemanticallySuccessfulModifier(_) =>
+    case SemanticallySuccessfulModifier(_) => logger.info("Got new block. But needNewCandidate - false")
   }
 
   def receiverCandidateBlock: Receive = {
@@ -160,7 +169,9 @@ class Miner(dataHolder: ActorRef,
   }
 
   def chainEvents: Receive = {
-    case FullBlockChainIsSynced => syncingDone = true
+    case FullBlockChainIsSynced =>
+      logger.info("Set syncingDone on miner to true")
+      syncingDone = true
   }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
@@ -216,31 +227,33 @@ class Miner(dataHolder: ActorRef,
     candidate
   }
 
-  def produceCandidate(): Unit =
-    context.actorSelection("/user/nodeViewHolder") ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
-      nodeView =>
-        val producingStartTime: Time = System.currentTimeMillis()
-        startTime = producingStartTime
-        val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)
-        bestHeaderOpt match {
-          case Some(h) => logger.info(s"Best header at height ${h.height}")
-          case None => logger.info(s"No best header opt")
-        }
-        val candidate: CandidateEnvelope =
-          if ((bestHeaderOpt.isDefined &&
-            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
-            logger.info(s"Starting candidate generation at " +
-              s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-            logger.info("Going to calculate last block:")
-            val envelope: CandidateEnvelope =
-              CandidateEnvelope
-                .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-            envelope
-          } else CandidateEnvelope.empty
-        candidate
+  def produceCandidate(): Unit = {
+    val lambda = (nodeView: CurrentView[History, UtxoState, EncryWallet]) =>
+    {
+      val producingStartTime: Time = System.currentTimeMillis()
+      startTime = producingStartTime
+      val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)
+      bestHeaderOpt match {
+        case Some(h) => logger.info(s"Best header at height ${h.height}")
+        case None => logger.info(s"No best header opt")
+      }
+      val candidate: CandidateEnvelope =
+        if ((bestHeaderOpt.isDefined &&
+          (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+          logger.info(s"Starting candidate generation at " +
+            s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          if (settings.influxDB.isDefined)
+            context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          logger.info("Going to calculate last block:")
+          val envelope: CandidateEnvelope =
+            CandidateEnvelope
+              .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
+          envelope
+        } else CandidateEnvelope.empty
+      candidate
     }
+    nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] (lambda, self)
+  }
 }
 
 object Miner {
@@ -276,6 +289,10 @@ object Miner {
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 
-  def props(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSettings): Props =
-    Props(new Miner(dataHolder, influx, settings))
+  def props(dataHolder: ActorRef,
+            mempool: ActorRef,
+            nvh: ActorRef,
+            influx: Option[ActorRef],
+            settings: EncryAppSettings): Props =
+    Props(new Miner(dataHolder, mempool, nvh, influx, settings))
 }
