@@ -55,6 +55,7 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
     case AwaitingRequest(peer, _, modId, attempts) =>
       logger.info(s"Stop requesting modifier ${Algos.encode(modId)} from peer $peer, qty of attempts $attempts." +
         s" Expected modifier contains: ${expectedModifiers.contains(toKey(modId))}")
+      expectedModifiers -= toKey(modId)
     case ModifierFromNetwork(source, modTypeId, modId, modBytes) =>
       if (expectedModifiers.contains(toKey(modId))) {
         expectedModifiers -= toKey(modId)
