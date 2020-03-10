@@ -1,4 +1,4 @@
-package encry.view.mempool
+package encry.mpg
 
 import akka.actor.{ Actor, Props }
 import com.google.common.base.Charsets
@@ -9,12 +9,12 @@ import encry.network.Messages.MessageToNetwork.{ RequestFromLocal, ResponseFromL
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.{ TransactionProcessing, UpdateMempoolReader }
-import encry.view.mempool.MemoryPoolProcessor.CleanupBloomFilter
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{ InvNetworkMessage, RequestModifiersNetworkMessage }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import encry.mpg.MemoryPool._
+import encry.mpg.MemoryPoolProcessor.CleanupBloomFilter
 
 import scala.collection.IndexedSeq
 

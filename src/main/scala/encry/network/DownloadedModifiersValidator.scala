@@ -14,7 +14,7 @@ import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.NewTransaction
+import encry.mpg.MemoryPool._
 import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 

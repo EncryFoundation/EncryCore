@@ -1,4 +1,4 @@
-package encry.view.mempool
+package encry.mpg
 
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider

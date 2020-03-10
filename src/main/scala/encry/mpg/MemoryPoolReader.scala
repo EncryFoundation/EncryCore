@@ -1,4 +1,4 @@
-package encry.view.mempool
+package encry.mpg
 
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 

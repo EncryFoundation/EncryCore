@@ -1,4 +1,4 @@
-package encry.view.mempool
+package encry.mpg
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
@@ -7,18 +7,18 @@ import com.google.common.base.Charsets
 import com.google.common.hash.{ BloomFilter, Funnels }
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
+import encry.mpg.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
 import encry.network.Messages.MessageToNetwork.{ RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, SuccessfulTransaction }
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
-import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{ InvNetworkMessage, RequestModifiersNetworkMessage }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import encry.mpg.MemoryPool._
 
 import scala.collection.IndexedSeq
 

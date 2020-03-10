@@ -1,4 +1,4 @@
-package encry.view.mempool
+package encry.mpg
 
 import TransactionProto.TransactionProtoMessage
 import akka.actor.{ Actor, ActorRef, Props }
@@ -10,11 +10,11 @@ import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.InvalidModifierBytes
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.NewTransaction
-import encry.view.mempool.TransactionsValidator.InvalidTransaction
 import org.encryfoundation.common.modifiers.mempool.transaction.TransactionProtoSerializer
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
 import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
+import encry.mpg.MemoryPool._
+import encry.mpg.TransactionsValidator.InvalidTransaction
 
 import scala.util.{ Failure, Success, Try }
 

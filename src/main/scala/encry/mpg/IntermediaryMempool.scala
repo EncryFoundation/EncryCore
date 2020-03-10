@@ -1,4 +1,4 @@
-package encry.view.mempool
+package encry.mpg
 
 import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
@@ -9,21 +9,23 @@ import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForTxHandling 
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.{ RolledBackTransactions, TransactionProcessing }
-import encry.view.mempool.TransactionsValidator.{ InvalidTransaction, ModifiersForValidating }
+import encry.mpg.MemoryPool._
+import encry.mpg.TransactionsValidator.{ InvalidTransaction, ModifiersForValidating }
 
-class IntermediaryMempool(settings: EncryAppSettings,
-                          networkTimeProvider: NetworkTimeProvider,
-                          influxReference: Option[ActorRef],
-                          networkRouter: ActorRef)
-    extends Actor
+class IntermediaryMempool(
+  settings: EncryAppSettings,
+  networkTimeProvider: NetworkTimeProvider,
+  influxReference: Option[ActorRef],
+  networkRouter: ActorRef
+) extends Actor
     with StrictLogging {
 
   val mempoolProcessor: ActorRef =
     context.actorOf(MemoryPoolProcessor.props(settings, networkTimeProvider), name = "mempool-processor")
 
   val memoryPool: ActorRef =
-    context.actorOf(MemoryPool.props(settings, networkTimeProvider, influxReference, mempoolProcessor), name = "mempool")
+    context.actorOf(MemoryPool.props(settings, networkTimeProvider, influxReference, mempoolProcessor),
+                    name = "mempool")
 
   val txValidator: ActorRef =
     context.actorOf(

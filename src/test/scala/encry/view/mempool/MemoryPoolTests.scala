@@ -4,9 +4,10 @@ import akka.actor.ActorSystem
 import akka.testkit.{ TestActorRef, TestProbe }
 import com.typesafe.scalalogging.StrictLogging
 import encry.modifiers.InstanceFactory
-import encry.settings.{ EncryAppSettings, TestNetSettings }
+import encry.mpg.MemoryPool._
+import encry.mpg.{ MemoryPool, MemoryPoolStorage }
+import encry.settings.TestNetSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.{ NewTransaction, TransactionsForMiner }
 import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
 
 import scala.concurrent.duration._

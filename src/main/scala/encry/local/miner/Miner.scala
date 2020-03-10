@@ -23,7 +23,7 @@ import encry.utils.NetworkTime.Time
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.TransactionsForMiner
+import encry.mpg.MemoryPool._
 import encry.view.state.UtxoState
 import encry.utils.implicits.UTXO._
 import encry.view.wallet.EncryWallet

@@ -34,7 +34,7 @@ import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
-import encry.view.mempool.MemoryPool.RolledBackTransactions
+import encry.mpg.MemoryPool._
 import org.encryfoundation.common.network.BasicMessagesRepo.{
   InvNetworkMessage,
   RequestChunkMessage,

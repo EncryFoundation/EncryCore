@@ -27,7 +27,7 @@ import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.storage.HistoryStorage
 import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
-import encry.view.mempool.MemoryPool.RolledBackTransactions
+import encry.mpg.MemoryPool._
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
