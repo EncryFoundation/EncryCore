@@ -62,7 +62,7 @@ object ModifiersCache extends StrictLogging {
   }
 
   def popCandidate(history: History): List[PersistentModifier] = synchronized {
-    findCandidateKey(history).flatMap(k => remove(k))
+    findCandidateKey(history).take(1).flatMap(k => remove(k))
   }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
@@ -91,13 +91,6 @@ object ModifiersCache extends StrictLogging {
           List.empty[Key]
       }
 
-    def findApplicablePayloadAtHeight(height: Int): List[Key] = {
-      history.headerIdsAtHeight(height).view.flatMap(history.getHeaderById).collect {
-        case header: Header if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
-          new mutable.WrappedArray.ofByte(header.payloadId)
-      }
-    }.toList
-
     def exhaustiveSearch: List[Key] =
       List(cache.find {
         case (k, v) =>
@@ -108,14 +101,6 @@ object ModifiersCache extends StrictLogging {
               isApplicableMod
           }
       }).collect { case Some(v) => v._1 }
-
-    @tailrec
-    def applicableBestPayloadChain(atHeight: Int = history.getBestBlockHeight,
-                                   prevKeys: List[Key] = List.empty[Key]): List[Key] = {
-      val payloads = findApplicablePayloadAtHeight(atHeight)
-      if (payloads.nonEmpty) applicableBestPayloadChain(atHeight + 1, prevKeys ++ payloads)
-      else prevKeys
-    }
 
     val bestHeadersIds: List[Key] = {
       headersCollection.get(history.getBestHeaderHeight + 1) match {

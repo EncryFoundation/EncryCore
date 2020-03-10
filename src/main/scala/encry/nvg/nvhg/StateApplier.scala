@@ -1,5 +1,9 @@
 package encry.nvg.nvhg
 
-class StateApplier {
+import akka.actor.Actor
 
+class StateApplier extends Actor {
+  override def receive: Receive = {
+    case _ =>
+  }
 }
