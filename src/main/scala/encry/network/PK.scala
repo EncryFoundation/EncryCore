@@ -2,8 +2,9 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, Props}
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
+import encry.api.http.DataHolderForApi.UpdatingPeersInfo
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection.PeerInfo
@@ -12,16 +13,19 @@ import encry.network.Messages.MessageToNetwork.SendPeers
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
-import encry.network.PeerConnectionHandler.{Incoming, Outgoing}
+import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming, Outgoing}
 import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI, PeerForConnection, RequestPeerForConnection}
 import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GetPeersNetworkMessage, PeersNetworkMessage}
 
+import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 class PK(networkSettings: NetworkSettings,
          blacklistSettings: BlackListSettings) extends Actor with StrictLogging {
+
+  import context.dispatcher
 
   val connectWithOnlyKnownPeers: Boolean = networkSettings.connectOnlyWithKnownPeers.getOrElse(true)
 
@@ -44,6 +48,15 @@ class PK(networkSettings: NetworkSettings,
           PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
           GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
+    context.system.scheduler.schedule(5.seconds, 5.seconds) {
+      context.parent ! UpdatingPeersInfo(
+        peersForConnection.keys.toList,
+        connectedPeers.collect[ConnectedPeer](getAllPeers, getConnectedPeers).map(peer =>
+          (peer.socketAddress, peer.handshake.nodeName, peer.direction)
+        ).toList,
+        blackList.getAll.toList
+      )
+    }
   }
 
   override def receive: Receive = banPeersLogic orElse networkMessagesProcessingLogic orElse {
@@ -182,6 +195,9 @@ class PK(networkSettings: NetworkSettings,
     networkSettings.declaredAddress.contains(address) ||
     InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
     InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)).getOrElse(true)
+
+  def getAllPeers: (InetSocketAddress, PeerInfo) => Boolean = (_, _) => true
+  def getConnectedPeers(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
 }
 
 object PK {

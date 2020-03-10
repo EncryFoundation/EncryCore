@@ -413,7 +413,7 @@ class Starter(settings: EncryAppSettings,
 
       val networkRouter = context.system.actorOf(
         NetworkRouter
-          .props(networkSettings, settings.blackList)
+          .props(networkSettings, settings.blackList, dataHolderForApi)
           .withDispatcher("nvsh-dispatcher"),
         "networkRouter"
       )

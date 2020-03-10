@@ -7,6 +7,7 @@ import akka.io.Tcp.{Bind, Bound, CommandFailed, Connect, Connected}
 import akka.io.{IO, Tcp}
 import akka.io.Tcp.SO.KeepAlive
 import com.typesafe.scalalogging.StrictLogging
+import encry.api.http.DataHolderForApi.UpdatingPeersInfo
 import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.Messages.MessageToNetwork
 import encry.network.MessageBuilder.MsgSent
@@ -28,7 +29,8 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class NetworkRouter(settings: NetworkSettings,
-                    blackListSettings: BlackListSettings) extends Actor with StrictLogging {
+                    blackListSettings: BlackListSettings,
+                    dataHolderRef: ActorRef) extends Actor with StrictLogging {
 
   import context.system
   import context.dispatcher
@@ -78,6 +80,7 @@ class NetworkRouter(settings: NetworkSettings,
     case msg: ModifierFromNetwork if msg.modTypeId != Transaction.modifierTypeId => handlerForMods ! msg
     case msg: ModifierFromNetwork => txsHandler ! msg
     case msg: OtherNodeSyncingStatus => peersKeeper ! msg
+    case msg: UpdatingPeersInfo => dataHolderRef ! msg
     case msg: MessageToNetwork =>
       context.actorOf(
         MessageBuilder.props(peersKeeper, deliveryManager),
@@ -138,5 +141,6 @@ object NetworkRouter {
   case object RegisterForTxHandling
 
   def props(settings: NetworkSettings,
-            blackListSettings: BlackListSettings): Props = Props(new NetworkRouter(settings, blackListSettings))
+            blackListSettings: BlackListSettings,
+            dataHolderRef: ActorRef): Props = Props(new NetworkRouter(settings, blackListSettings, dataHolderRef))
 }
