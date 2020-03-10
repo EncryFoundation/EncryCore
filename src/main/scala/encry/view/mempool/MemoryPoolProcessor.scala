@@ -1,11 +1,10 @@
 package encry.view.mempool
 
-import java.net.InetSocketAddress
-
 import akka.actor.{Actor, Props}
 import com.google.common.base.Charsets
 import com.google.common.hash.{BloomFilter, Funnels}
 import com.typesafe.scalalogging.StrictLogging
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.settings.EncryAppSettings
@@ -42,7 +41,7 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
 
     case TransactionProcessing(info) => canProcessTransactions = info
 
-    case IsChainSynced(info) => chainSynced = info
+    case FullBlockChainIsSynced(info) => chainSynced = info
 
     case CleanupBloomFilter =>
       bloomFilterForTransactionsIds = initBloomFilter
