@@ -23,7 +23,7 @@ class IntermediaryMempool(settings: EncryAppSettings,
     context.actorOf(MemoryPoolProcessor.props(settings, networkTimeProvider), name = "mempool-processor")
 
   val memoryPool: ActorRef =
-    context.actorOf(MemoryPool.props(settings, networkTimeProvider, influxReference), name = "mempool")
+    context.actorOf(MemoryPool.props(settings, networkTimeProvider, influxReference, mempoolProcessor), name = "mempool")
 
   val txValidator: ActorRef =
     context.actorOf(

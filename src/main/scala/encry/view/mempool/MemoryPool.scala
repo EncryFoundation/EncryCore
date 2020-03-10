@@ -105,8 +105,6 @@ class MemoryPool(
         case _ => logger.debug(s"MemoryPoolProcessor got invalid type of DataFromPeer message!")
       }
 
-    case IsChainSynced(info) => chainSynced = info
-
     case NewTransaction(transaction) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransaction: Option[Transaction]) =
         memoryPool.validateTransaction(transaction)

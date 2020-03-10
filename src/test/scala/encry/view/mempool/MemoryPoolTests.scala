@@ -63,7 +63,7 @@ class MemoryPoolTests
     "send transactions to miner" in {
       val miner1 = TestProbe()
       val mempool1: TestActorRef[MemoryPool] =
-        TestActorRef[MemoryPool](MemoryPool.props(testNetSettings, timeProvider, miner1.ref, Some(TestProbe().ref)))
+        TestActorRef[MemoryPool](MemoryPool.props(testNetSettings, timeProvider, Some(TestProbe().ref), miner1.ref))
       val transactions1 = (0 until 4).map { k =>
         val a = coinbaseAt(k)
         a
