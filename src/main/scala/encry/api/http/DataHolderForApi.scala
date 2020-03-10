@@ -21,11 +21,11 @@ import encry.network.ConnectedPeersCollection
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeerFromAPI
-import encry.nvg.NodeViewHolder.NodeViewChange
+import encry.nvg.NodeViewHolder.{NodeViewChange, UpdateHistoryReader}
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
-import encry.view.history.History
+import encry.view.history.{History, HistoryReader}
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -55,7 +55,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
 
   def awaitNVHRef: Receive = {
-    case UpdatedHistory(history) =>
+    case UpdateHistoryReader(history) =>
       unstashAll()
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PassForStorage(_) =>
@@ -66,7 +66,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   def workingCycle(nvhRef: ActorRef,
                    blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
                    connectedPeers: Seq[ConnectedPeer] = Seq.empty,
-                   history: Option[History] = None,
+                   history: Option[HistoryReader] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
@@ -122,7 +122,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case ChangedHistory(reader: History) =>
+    case UpdateHistoryReader(reader: HistoryReader) =>
       context.become(
         workingCycle(nvhRef,
                      blackList,
@@ -333,7 +333,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class GetLastHeaderIdAtHeightHelper(i: Int)
 
-  final case class Readers(h: Option[History], s: Option[UtxoStateReader])
+  final case class Readers(h: Option[HistoryReader], s: Option[UtxoStateReader])
 
   final case class PassForStorage(password: String)
 

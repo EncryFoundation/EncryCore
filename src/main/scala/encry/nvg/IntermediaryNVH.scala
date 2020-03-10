@@ -129,7 +129,7 @@ class IntermediaryNVH(
     case msg @ DisableMining                         => //+ to miner
     case msg @ StartMining                           => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)              => dataHolderRef ! msg
-    case msg: UpdatedHistory                         => dataHolderRef ! msg
+    case msg: UpdateHistoryReader                    => dataHolderRef ! msg
     case msg: StatsSenderMessage                     => influxRef.foreach(_ ! msg)
     case msg @ GetDataFromCurrentView(_)             => nodeViewHolder.forward(msg)
     case msg @ RollbackSucceed(_)                    =>
