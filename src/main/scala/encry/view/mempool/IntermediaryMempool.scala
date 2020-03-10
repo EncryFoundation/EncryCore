@@ -8,7 +8,6 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForTxHandling}
 import encry.network.PeersKeeper.BanPeer
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.MemoryPool.{RolledBackTransactions, TransactionProcessing, TransactionsForMiner}
 import encry.view.mempool.TransactionsValidator.{InvalidTransaction, ModifiersForValidating}
@@ -36,7 +35,6 @@ class IntermediaryMempool(settings: EncryAppSettings,
   override def receive(): Receive = {
     case msg: InvalidTransaction             => networkRouter ! msg
     case msg: BanPeer                        => networkRouter ! msg
-    case msg: ValidatedModifierFromNetwork   => influxReference.foreach(_ ! msg)
     case msg: RolledBackTransactions         => memoryPool       ! msg
     case msg: ModifiersForValidating         => memoryPool       ! msg
     case msg: DataFromPeer                   => mempoolProcessor ! msg
@@ -54,6 +52,4 @@ object IntermediaryMempool {
             influxReference: Option[ActorRef],
             networkRouter: ActorRef): Props =
     Props(new IntermediaryMempool(settings, networkTimeProvider, influxReference, networkRouter))
-
-  final case class TransactionsForValidating(tx: Transaction)
 }
