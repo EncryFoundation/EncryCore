@@ -1,9 +1,9 @@
 package encry.view.mempool
 
 import TransactionProto.TransactionProtoMessage
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason.{CorruptedSerializedBytes, SyntacticallyInvalidTransaction}
+import encry.network.BlackList.BanReason.{ CorruptedSerializedBytes, SyntacticallyInvalidTransaction }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import encry.network.PeersKeeper.BanPeer
@@ -11,22 +11,20 @@ import encry.nvg.ModifiersValidator.InvalidModifierBytes
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.mempool.MemoryPool.NewTransaction
-import encry.view.mempool.TransactionsValidator.{InvalidTransaction, ModifiersForValidating}
-import org.encryfoundation.common.modifiers.mempool.transaction.{Transaction, TransactionProtoSerializer}
+import encry.view.mempool.TransactionsValidator.InvalidTransaction
+import org.encryfoundation.common.modifiers.mempool.transaction.TransactionProtoSerializer
 import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
-class TransactionsValidator(settings: EncryAppSettings,
-                            memPool: ActorRef,
-                            networkTimeProvider: NetworkTimeProvider)
+class TransactionsValidator(settings: EncryAppSettings, memPool: ActorRef, networkTimeProvider: NetworkTimeProvider)
     extends Actor
     with StrictLogging {
 
   override def receive(): Receive = {
-    case DataFromPeer(ModifiersNetworkMessage(data), remote) if data._1 == Transaction.modifierTypeId =>
-       data._2.foreach {
+    case DataFromPeer(ModifiersNetworkMessage(data), remote) =>
+      data._2.foreach {
         case (id, bytes) =>
           Try(TransactionProtoSerializer.fromProto(TransactionProtoMessage.parseFrom(bytes))).flatten match {
             case Success(tx) if tx.semanticValidity.isSuccess => memPool ! NewTransaction(tx)
@@ -39,15 +37,17 @@ class TransactionsValidator(settings: EncryAppSettings,
               context.parent ! InvalidModifierBytes(id)
               logger.info(s"Received modifier from $remote can't be parsed cause of: ${ex.getMessage}.")
           }
-       }
+      }
   }
 }
 
 object TransactionsValidator {
 
-  final case class ModifiersForValidating(remote: ConnectedPeer,
-                                          typeId: ModifierTypeId,
-                                          modifiers: Map[ModifierId, Array[Byte]])
+  final case class ModifiersForValidating(
+    remote: ConnectedPeer,
+    typeId: ModifierTypeId,
+    modifiers: Map[ModifierId, Array[Byte]]
+  )
 
   final case class InvalidTransaction(ids: ModifierId) extends AnyVal
 

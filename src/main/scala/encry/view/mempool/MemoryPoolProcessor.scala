@@ -1,19 +1,18 @@
 package encry.view.mempool
 
-import akka.actor.{Actor, Props}
+import akka.actor.{ Actor, Props }
 import com.google.common.base.Charsets
-import com.google.common.hash.{BloomFilter, Funnels}
+import com.google.common.hash.{ BloomFilter, Funnels }
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal}
+import encry.network.Messages.MessageToNetwork.{ RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.IntermediaryMempool.IsChainSynced
-import encry.view.mempool.MemoryPool.TransactionProcessing
+import encry.view.mempool.MemoryPool.{ TransactionProcessing, UpdateMempoolReader }
 import encry.view.mempool.MemoryPoolProcessor.CleanupBloomFilter
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestModifiersNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{ InvNetworkMessage, RequestModifiersNetworkMessage }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
@@ -29,30 +28,27 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
 
   var chainSynced: Boolean = false
 
-  var memoryPool: MemoryPoolStorage = MemoryPoolStorage.empty(settings, ntp)
+  var memoryPoolReader: MemoryPoolReader = MemoryPoolReader.empty
 
   override def preStart(): Unit =
-    context.system.scheduler.schedule(settings.mempool.bloomFilterCleanupInterval,
-                                      settings.mempool.bloomFilterCleanupInterval,
-                                      self,
-                                      CleanupBloomFilter)
+    context.system.scheduler.schedule(
+      settings.mempool.bloomFilterCleanupInterval,
+      settings.mempool.bloomFilterCleanupInterval,
+      self,
+      CleanupBloomFilter
+    )
 
   override def receive: Receive = {
-
+    case UpdateMempoolReader(reader) => memoryPoolReader = reader
     case TransactionProcessing(info) => canProcessTransactions = info
-
-    case FullBlockChainIsSynced(info) => chainSynced = info
-
-    case CleanupBloomFilter =>
-      bloomFilterForTransactionsIds = initBloomFilter
-
+    case FullBlockChainIsSynced      => chainSynced = true
+    case CleanupBloomFilter          => bloomFilterForTransactionsIds = initBloomFilter
     case DataFromPeer(message, remote) =>
       message match {
         case RequestModifiersNetworkMessage((_, requestedIds)) =>
           val modifiersIds: Seq[Transaction] = requestedIds
             .map(Algos.encode)
-            .collect { case id if memoryPool.contains(id) => memoryPool.get(id) }
-            .flatten
+            .flatMap(memoryPoolReader.get)
           logger.debug(
             s"MemoryPool got request modifiers message. Number of requested ids is ${requestedIds.size}." +
               s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote."
@@ -84,8 +80,8 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
 
         case _ => logger.debug(s"MemoryPoolProcessor got invalid type of DataFromPeer message!")
       }
-
   }
+
   def initBloomFilter: BloomFilter[String] = BloomFilter.create(
     Funnels.stringFunnel(Charsets.UTF_8),
     settings.mempool.bloomFilterCapacity,
@@ -102,7 +98,7 @@ class MemoryPoolProcessor(settings: EncryAppSettings, ntp: NetworkTimeProvider) 
 
 object MemoryPoolProcessor {
 
-  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider) = Props(new MemoryPoolProcessor(settings, ntp))
+  def props(settings: EncryAppSettings, ntp: NetworkTimeProvider): Props = Props(new MemoryPoolProcessor(settings, ntp))
 
   case object CleanupBloomFilter
 }

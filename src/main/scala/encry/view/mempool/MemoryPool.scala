@@ -1,32 +1,34 @@
 package encry.view.mempool
 
-import akka.actor.{Actor, ActorRef, ActorSystem, Props}
-import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
+import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
+import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
 import cats.syntax.either._
 import com.google.common.base.Charsets
-import com.google.common.hash.{BloomFilter, Funnels}
+import com.google.common.hash.{ BloomFilter, Funnels }
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal}
+import encry.network.Messages.MessageToNetwork.{ RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.nvg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
+import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, SuccessfulTransaction }
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.mempool.IntermediaryMempool.IsChainSynced
 import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
 import encry.view.mempool.MemoryPool._
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, RequestModifiersNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{ InvNetworkMessage, RequestModifiersNetworkMessage }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.collection.IndexedSeq
 
-class MemoryPool(settings: EncryAppSettings,
-                 networkTimeProvider: NetworkTimeProvider,
-                 intermediaryMempool: ActorRef,
-                 influxReference: Option[ActorRef]) extends Actor with StrictLogging {
+class MemoryPool(
+  settings: EncryAppSettings,
+  networkTimeProvider: NetworkTimeProvider,
+  influxReference: Option[ActorRef],
+  mempoolProcessor: ActorRef
+) extends Actor
+    with StrictLogging {
 
   import context.dispatcher
 
@@ -42,10 +44,16 @@ class MemoryPool(settings: EncryAppSettings,
     logger.debug(s"Starting MemoryPool. Initializing all schedulers")
     context.system.scheduler.schedule(
       settings.mempool.cleanupInterval,
-      settings.mempool.cleanupInterval, self, RemoveExpiredFromPool)
+      settings.mempool.cleanupInterval,
+      self,
+      RemoveExpiredFromPool
+    )
     context.system.scheduler.schedule(
       settings.mempool.txSendingInterval,
-      settings.mempool.txSendingInterval, self, SendTransactionsToMiner)
+      settings.mempool.txSendingInterval,
+      self,
+      SendTransactionsToMiner
+    )
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
   }
 
@@ -103,56 +111,61 @@ class MemoryPool(settings: EncryAppSettings,
       val (newMemoryPool: MemoryPoolStorage, validatedTransaction: Option[Transaction]) =
         memoryPool.validateTransaction(transaction)
       memoryPool = newMemoryPool
+      mempoolProcessor ! UpdateMempoolReader(MemoryPoolReader.apply(memoryPool))
       validatedTransaction.foreach(tx => context.system.eventStream.publish(SuccessfulTransaction(tx)))
       logger.debug(s"MemoryPool got new transactions from remote. New pool size is ${memoryPool.size}.")
       if (currentNumberOfProcessedTransactions > settings.mempool.transactionsLimit) {
-        logger.debug(s"MemoryPool has its limit of processed transactions. " +
-          s"Transit to 'disableTransactionsProcessor' state." +
-          s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
+        logger.debug(
+          s"MemoryPool has its limit of processed transactions. " +
+            s"Transit to 'disableTransactionsProcessor' state." +
+            s"Current number of processed transactions is $currentNumberOfProcessedTransactions."
+        )
         canProcessTransactions = false
         context.parent ! TransactionProcessing(canProcessTransactions)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + 1
-        logger.debug(s"Current number of processed transactions is OK. Continue to process them..." +
-          s" Current number is $currentTransactionsNumber.")
+        logger.debug(
+          s"Current number of processed transactions is OK. Continue to process them..." +
+            s" Current number is $currentTransactionsNumber."
+        )
         context.become(continueProcessing(currentTransactionsNumber))
       }
-
-//    case CompareViews(peer, _, transactions) =>
-//      val notYetRequestedTransactions: IndexedSeq[ModifierId] = notRequestedYet(transactions.toIndexedSeq)
-//      if (notYetRequestedTransactions.nonEmpty) {
-//        sender ! RequestFromLocal(peer, Transaction.modifierTypeId, notYetRequestedTransactions)
-//        logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
-//          s" Not yet requested ids size is ${notYetRequestedTransactions.size}.")
-//      } else logger.debug(s"MemoryPool got inv message with ${transactions.size} ids." +
-//        s" There are no not yet requested ids.")
 
     case RolledBackTransactions(transactions) =>
       val (newMemoryPool: MemoryPoolStorage, validatedTransactions: Seq[Transaction]) =
         memoryPool.validateTransactions(transactions)
       memoryPool = newMemoryPool
-      logger.debug(s"MemoryPool got rolled back transactions. New pool size is ${memoryPool.size}." +
-        s"Number of rolled back transactions is ${validatedTransactions.size}.")
+      mempoolProcessor ! UpdateMempoolReader(MemoryPoolReader.apply(memoryPool))
+      logger.debug(
+        s"MemoryPool got rolled back transactions. New pool size is ${memoryPool.size}." +
+          s"Number of rolled back transactions is ${validatedTransactions.size}."
+      )
       if (currentNumberOfProcessedTransactions > settings.mempool.transactionsLimit) {
-        logger.debug(s"MemoryPool has its limit of processed transactions. " +
-          s"Transit to 'disableTransactionsProcessor' state." +
-          s"Current number of processed transactions is $currentNumberOfProcessedTransactions.")
+        logger.debug(
+          s"MemoryPool has its limit of processed transactions. " +
+            s"Transit to 'disableTransactionsProcessor' state." +
+            s"Current number of processed transactions is $currentNumberOfProcessedTransactions."
+        )
         canProcessTransactions = false
         context.parent ! TransactionProcessing(canProcessTransactions)
         context.become(disableTransactionsProcessor)
       } else {
         val currentTransactionsNumber: Int = currentNumberOfProcessedTransactions + validatedTransactions.size
-        logger.debug(s"Current number of processed transactions is OK. Continue to process them..." +
-          s" Current number is $currentTransactionsNumber.")
+        logger.debug(
+          s"Current number of processed transactions is OK. Continue to process them..." +
+            s" Current number is $currentTransactionsNumber."
+        )
         context.become(continueProcessing(currentTransactionsNumber))
       }
   }
 
   def auxiliaryReceive(state: MemoryPoolStateType): Receive = {
     case SemanticallySuccessfulModifier(modifier) if modifier.modifierTypeId == Block.modifierTypeId =>
-      logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
-        s"Transit to a transactionsProcessor state.")
+      logger.debug(
+        s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
+          s"Transit to a transactionsProcessor state."
+      )
       if (state == NotProcessingNewTransactions)
         Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StartTransactionsValidation)
       canProcessTransactions = true
@@ -160,16 +173,21 @@ class MemoryPool(settings: EncryAppSettings,
       context.become(continueProcessing(currentNumberOfProcessedTransactions = 0))
 
     case SemanticallySuccessfulModifier(_) =>
-      logger.debug(s"MemoryPool got SemanticallySuccessfulModifier with non block modifier" +
-        s"while $state. Do nothing in this case.")
+      logger.debug(
+        s"MemoryPool got SemanticallySuccessfulModifier with non block modifier" +
+          s"while $state. Do nothing in this case."
+      )
 
     case SendTransactionsToMiner =>
       val (newMemoryPool: MemoryPoolStorage, transactionsForMiner: Seq[Transaction]) =
         memoryPool.getTransactionsForMiner
       memoryPool = newMemoryPool
-      intermediaryMempool ! TransactionsForMiner(transactionsForMiner)
-      logger.debug(s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
-        s" New pool size is ${memoryPool.size}. Ids ${transactionsForMiner.map(_.encodedId)}")
+      mempoolProcessor ! UpdateMempoolReader(MemoryPoolReader.apply(memoryPool))
+      context.parent ! TransactionsForMiner(transactionsForMiner)
+      logger.debug(
+        s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
+          s" New pool size is ${memoryPool.size}. Ids ${transactionsForMiner.map(_.encodedId)}"
+      )
 
     case RemoveExpiredFromPool =>
       memoryPool = memoryPool.filter(memoryPool.isExpired)
@@ -220,6 +238,8 @@ object MemoryPool {
 
   sealed trait MemoryPoolStateType
 
+  final case class UpdateMempoolReader(reader: MemoryPoolReader)
+
   object MemoryPoolStateType {
 
     case object ProcessingNewTransaction extends MemoryPoolStateType
@@ -228,18 +248,18 @@ object MemoryPool {
 
   }
 
-  def props(settings: EncryAppSettings,
-            ntp: NetworkTimeProvider,
-            intermediaryMempool: ActorRef,
-            influx: Option[ActorRef]): Props =
-    Props(new MemoryPool(settings, ntp, intermediaryMempool, influx))
+  def props(
+    settings: EncryAppSettings,
+    ntp: NetworkTimeProvider,
+    influx: Option[ActorRef],
+    mempoolProcessor: ActorRef
+  ): Props = Props(new MemoryPool(settings, ntp, influx, mempoolProcessor))
 
   class MemoryPoolPriorityQueue(settings: ActorSystem.Settings, config: Config)
-    extends UnboundedStablePriorityMailbox(
-      PriorityGenerator {
+      extends UnboundedStablePriorityMailbox(PriorityGenerator {
         case RemoveExpiredFromPool | SendTransactionsToMiner => 0
-        case NewTransaction(_) => 1
-        case otherwise => 2
+        case NewTransaction(_)                               => 1
+        case otherwise                                       => 2
       })
 
 }
