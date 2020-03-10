@@ -252,7 +252,7 @@ class Miner(dataHolder: ActorRef,
         } else CandidateEnvelope.empty
       candidate
     }
-    nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] (lambda, self)
+    nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda)
   }
 }
 

@@ -107,7 +107,7 @@ class NodeViewHolder(
           s"is ${(System.currentTimeMillis() - startTime) / 1000}s."
       )
 
-    case GetDataFromCurrentView(f, sender) =>
+    case GetDataFromCurrentView(f) =>
       logger.info("Receive GetDataFromCurrentView on nvh")
       f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet)) match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender)
@@ -518,7 +518,7 @@ object NodeViewHolder {
 
   case class SemanticallySuccessfulModifier(modifier: PersistentNodeViewModifier) extends ModificationOutcome
 
-  case class GetDataFromCurrentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A, sender: ActorRef)
+  case class GetDataFromCurrentView[HIS, MS, VL, A](f: CurrentView[HIS, MS, VL] => A)
 
   final case class DownloadRequest(
     modifierTypeId: ModifierTypeId,

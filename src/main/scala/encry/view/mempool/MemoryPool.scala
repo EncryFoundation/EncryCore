@@ -12,7 +12,6 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.nvg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
-import encry.view.NodeViewHolder.ReceivableMessages.CompareViews
 import encry.view.mempool.IntermediaryMempool.IsChainSynced
 import encry.view.mempool.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
 import encry.view.mempool.MemoryPool._
