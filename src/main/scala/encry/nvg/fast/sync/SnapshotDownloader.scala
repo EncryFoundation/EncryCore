@@ -4,7 +4,7 @@ import akka.actor.{Actor, Cancellable}
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Messages.MessageToNetwork.BroadcastManifestRequest
 import encry.nvg.fast.sync.SnapshotProcessor.{BroadcastManifestRequestMessage, RequiredManifestHeightAndId}
-import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
+import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
 import encry.view.fast.sync.{SnapshotDownloadController, SnapshotHolder}
 import encry.view.history.HistoryReader

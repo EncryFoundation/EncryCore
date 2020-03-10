@@ -1,24 +1,23 @@
-package encry.nvg.nvhg
+package encry.nvg
 
 import java.io.File
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import akka.pattern._
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.local.miner.Miner.{DisableMining, StartMining}
+import encry.local.miner.Miner.{ DisableMining, StartMining }
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.nvg.ModifiersCache
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.fast.sync.SnapshotProcessor.{FastSyncDone, FastSyncFinished, HeaderChainIsSynced, RemoveRedundantManifestIds, SnapshotChunk, TreeChunks}
+import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
+import encry.nvg.NodeViewHolder._
 import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
-import encry.nvg.nvhg.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, LocallyGeneratedModifier}
-import encry.nvg.nvhg.NodeViewHolder.{GetDataFromCurrentView, NodeView, RollbackFailed, RollbackSucceed, SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification, UpdateHistoryReader, UpdateInformation}
+import encry.nvg.fast.sync.SnapshotProcessor._
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
@@ -27,22 +26,23 @@ import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader}
+import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
 import encry.view.mempool.MemoryPool.RolledBackTransactions
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.{PersistentModifier, PersistentNodeViewModifier}
+import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-import scala.collection.{IndexedSeq, Seq, mutable}
+import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
+
+import scala.collection.{ mutable, IndexedSeq, Seq }
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{ Failure, Success, Try }
 
 class NodeViewHolder(
   settings: EncryAppSettings,
@@ -63,7 +63,7 @@ class NodeViewHolder(
 
   context.system.scheduler.schedule(1.seconds, 10.seconds) {
     logger.info(
-      s"\n History best header id is: ${nodeView.history.getBestHeaderId.map(Algos.encode)}.\n " +
+      s"\n\n History best header id is: ${nodeView.history.getBestHeaderId.map(Algos.encode)}.\n " +
         s"History best header height is: ${nodeView.history.getBestHeaderHeight}.\n " +
         s"History best block id is: ${nodeView.history.getBestBlockId.map(Algos.encode)}.\n " +
         s"History best block height is: ${nodeView.history.getBestBlockHeight}.\n " +
@@ -111,7 +111,7 @@ class NodeViewHolder(
       logger.info("Receive GetDataFromCurrentView on nvh")
       f(CurrentView(nodeView.history, nodeView.state, nodeView.wallet)) match {
         case resultFuture: Future[_] => resultFuture.pipeTo(sender)
-        case result => sender ! result
+        case result                  => sender ! result
       }
 
     case FastSyncFinished(state: UtxoState, wallet: EncryWallet) =>
@@ -220,7 +220,6 @@ class NodeViewHolder(
             val additionalBlocks: List[Block] =
               (state.safePointHeight + 1 to branchPointHeight).foldLeft(List.empty[Block]) {
                 case (blocks: List[Block], height: Int) =>
-                  //todo get best header id instead of best header
                   val headerAtHeight: Header = history.getBestHeaderAtHeight(height).get
                   val blockAtHeight: Block   = history.getBlockByHeader(headerAtHeight).get
                   blocks :+ blockAtHeight

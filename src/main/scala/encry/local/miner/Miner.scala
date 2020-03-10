@@ -15,8 +15,8 @@ import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
 import encry.network.DeliveryManager
 import encry.network.DeliveryManager.{BlockchainStatus, FullBlockChainIsSynced}
-import encry.nvg.nvhg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.nvg.nvhg.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier}
+import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.nvg.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time

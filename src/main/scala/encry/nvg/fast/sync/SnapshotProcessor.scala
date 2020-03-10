@@ -11,7 +11,7 @@ import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.ChangedHistory
 import encry.nvg.fast.sync.SnapshotProcessor.{DropProcessedCount, HeaderChainIsSynced, RemoveRedundantManifestIds, TreeChunks}
 import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.{ChunkId, ManifestId}
-import encry.nvg.nvhg.NodeViewHolder.SemanticallySuccessfulModifier
+import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.EncryAppSettings
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.view.fast.sync.{RequestsPerPeriodProcessor, SnapshotDownloadController, SnapshotHolder}

@@ -9,7 +9,7 @@ import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.Messages.MessageToNetwork.{RequestFromLocal, ResponseFromLocal}
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
-import encry.nvg.nvhg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
+import encry.nvg.NodeViewHolder.{SemanticallySuccessfulModifier, SuccessfulTransaction}
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.ReceivableMessages.CompareViews

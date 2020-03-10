@@ -14,7 +14,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMess
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import cats.syntax.option._
-import encry.nvg.nvhg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
+import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
 
 import scala.collection.mutable
 import scala.concurrent.Future
