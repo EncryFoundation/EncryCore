@@ -38,7 +38,7 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
           context.parent ! ModifierFromNetwork(source, data._1, id, bytes)
           expectedModifiers -= toKey(id)
           receivedModifier += toKey(id)
-        } else logger.info("Receive spam!")
+        } else logger.info(s"Receive spam. ModId: ${Algos.encode(id)}!")
       }
     case RequestSent(peer, modTypeId, modId) if !expectedModifiers.contains(toKey(modId))=>
       expectedModifiers += toKey(modId)
@@ -67,8 +67,8 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
     case IsRequested(modIds) =>
       //logger.info(s"Going to check if ${Algos.encode(modId)} has been requested. Res: ${receivedModifier.contains(toKey(modId))}")
       sender ! RequestStatus(
-        modIds.filter(id => receivedModifier.contains(toKey(id)) || expectedModifiers.contains(toKey(id))),
-        modIds.filter(id => !receivedModifier.contains(toKey(id)) && !expectedModifiers.contains(toKey(id)))
+        requested = modIds.filter(id => receivedModifier.contains(toKey(id)) || expectedModifiers.contains(toKey(id))),
+        notRequested = modIds.filter(id => !receivedModifier.contains(toKey(id)) && !expectedModifiers.contains(toKey(id)))
       )
   }
 

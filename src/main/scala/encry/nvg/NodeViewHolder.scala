@@ -283,6 +283,7 @@ class NodeViewHolder(
                 if (settings.node.mining && progressInfo.chainSwitchingNeeded)
                   context.parent ! StartMining
                 context.system.eventStream.publish(SemanticallySuccessfulModifier(modToApply))
+                context.parent ! UpdatedHistory(history)
                 if (newHis.getBestHeaderId.exists(
                       bestHeaderId =>
                         newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))

@@ -51,7 +51,8 @@ class IntermediaryNVH(
   intermediaryNetwork: ActorRef,
   timeProvider: NetworkTimeProvider,
   influxRef: Option[ActorRef],
-  mempoolRef: ActorRef
+  mempoolRef: ActorRef,
+  dataHolderRef: ActorRef
 ) extends Actor
     with StrictLogging {
 
@@ -109,6 +110,7 @@ class IntermediaryNVH(
     case msg @ UpdateHistoryReader(newReader: HistoryReader) =>
       historyReader = newReader
       networkMessagesProcessor ! msg
+      dataHolderRef ! msg
     case msg: LocallyGeneratedModifier               => nodeViewHolder ! msg
     case msg @ BanPeer(_, _)                         => intermediaryNetwork ! msg
     case msg @ InvalidModifierBytes(_)               => intermediaryNetwork ! msg
@@ -126,7 +128,8 @@ class IntermediaryNVH(
     case msg @ RolledBackTransactions(_)             => mempoolRef ! msg
     case msg @ DisableMining                         => //+ to miner
     case msg @ StartMining                           => //+ to miner
-    case msg @ BlockAndHeaderInfo(_, _)              => //+ to data holder
+    case msg @ BlockAndHeaderInfo(_, _)              => dataHolderRef ! msg
+    case msg: UpdatedHistory                         => dataHolderRef ! msg
     case msg: StatsSenderMessage                     => influxRef.foreach(_ ! msg)
     case msg @ GetDataFromCurrentView(_)             => nodeViewHolder.forward(msg)
     case msg @ RollbackSucceed(_)                    =>
@@ -144,6 +147,7 @@ object IntermediaryNVH {
     intermediaryNetwork: ActorRef,
     timeProvider: NetworkTimeProvider,
     influxRef: Option[ActorRef],
-    mempoolRef: ActorRef
-  ): Props = Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef, mempoolRef))
+    mempoolRef: ActorRef,
+    dataHolderRef: ActorRef
+  ): Props = Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef, mempoolRef, dataHolderRef))
 }

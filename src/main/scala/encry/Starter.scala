@@ -406,7 +406,7 @@ class Starter(settings: EncryAppSettings,
         context.system
           .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       }
-      lazy val dataHolderForApi =
+      val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
 
       if (nodePass.nonEmpty) dataHolderForApi ! PassForStorage(nodePass)
@@ -422,7 +422,7 @@ class Starter(settings: EncryAppSettings,
         IntermediaryMempool.props(newSettings, timeProvider, influxRef, networkRouter)
       )
       val nvhRouter: ActorRef = context.system.actorOf(
-        IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef, memoryPool)
+        IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef, memoryPool, dataHolderForApi)
       )
       val miner: ActorRef =
         context.system.actorOf(Miner.props(dataHolderForApi, memoryPool, nvhRouter, influxRef, newSettings), "miner")
