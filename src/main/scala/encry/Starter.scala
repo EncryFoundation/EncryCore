@@ -1,7 +1,6 @@
 package encry
 
 import java.net.InetSocketAddress
-
 import akka.actor.{ Actor, ActorRef }
 import akka.http.scaladsl.Http
 import cats.Functor
@@ -24,12 +23,8 @@ import encry.nvg.IntermediaryNVH
 import encry.settings._
 import encry.stats.StatsSender
 import encry.utils.{ Mnemonic, NetworkTimeProvider }
-import encry.view.mempool.MemoryPool
-import encry.utils.{Mnemonic, NetworkTimeProvider}
-import encry.view.NodeViewHolder
-import encry.view.mempool.{IntermediaryMempool, MemoryPool}
+import encry.view.mempool.IntermediaryMempool
 import encry.view.wallet.AccountManager
-
 import scala.concurrent.Future
 import scala.io.StdIn
 import scala.util.{ Failure, Success, Try }
@@ -411,26 +406,8 @@ class Starter(settings: EncryAppSettings,
       }
       lazy val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
-//      lazy val memoryPool: ActorRef = context.system.actorOf(
-//        MemoryPool
-//          .props(newSettings, timeProvider, miner, influxRef)
-//          .withDispatcher("mempool-dispatcher")
-//      )
-//      val nodeViewHolder: ActorRef = context.system.actorOf(
-//        NodeViewHolder
-//          .props(memoryPool, influxRef, dataHolderForApi, newSettings)
-//          .withDispatcher("nvh-dispatcher"),
-//        "nodeViewHolder"
-//      )
 
       if (nodePass.nonEmpty) dataHolderForApi ! PassForStorage(nodePass)
-
-//      context.system.actorOf(
-//        NodeViewSynchronizer
-//          .props(influxRef, nodeViewHolder, newSettings, memoryPool, dataHolderForApi)
-//          .withDispatcher("nvsh-dispatcher"),
-//        "nodeViewSynchronizer"
-//      )
 
       val networkRouter = context.system.actorOf(
         NetworkRouter
@@ -439,14 +416,12 @@ class Starter(settings: EncryAppSettings,
         "networkRouter"
       )
 
-      val nvhRouter = context.system.actorOf(
-        IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef)
-      )
-
-      val memoryPool = context.system.actorOf(
+      val memoryPool: ActorRef = context.system.actorOf(
         IntermediaryMempool.props(newSettings, timeProvider, influxRef, networkRouter)
       )
-
+      val nvhRouter: ActorRef = context.system.actorOf(
+        IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef, memoryPool)
+      )
       val miner: ActorRef =
         context.system.actorOf(Miner.props(dataHolderForApi, memoryPool, nvhRouter, influxRef, newSettings), "miner")
       if (newSettings.node.mining) miner ! StartMining
@@ -461,15 +436,17 @@ class Starter(settings: EncryAppSettings,
 }
 
 object Starter {
-  final case class InitNodeResult(mnemonic: String,
-                                  walletPassword: String,
-                                  offlineGeneration: Boolean,
-                                  fastSync: Boolean,
-                                  snapshotCreation: Boolean,
-                                  peers: List[InetSocketAddress],
-                                  connectWithOnlyKnownPeers: Boolean,
-                                  nodePass: String = "",
-                                  nodeName: String,
-                                  declaredAddr: Option[InetSocketAddress],
-                                  bindAddr: InetSocketAddress)
+  final case class InitNodeResult(
+    mnemonic: String,
+    walletPassword: String,
+    offlineGeneration: Boolean,
+    fastSync: Boolean,
+    snapshotCreation: Boolean,
+    peers: List[InetSocketAddress],
+    connectWithOnlyKnownPeers: Boolean,
+    nodePass: String = "",
+    nodeName: String,
+    declaredAddr: Option[InetSocketAddress],
+    bindAddr: InetSocketAddress
+  )
 }

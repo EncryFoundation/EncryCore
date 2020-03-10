@@ -50,7 +50,8 @@ class IntermediaryNVH(
   settings: EncryAppSettings,
   intermediaryNetwork: ActorRef,
   timeProvider: NetworkTimeProvider,
-  influxRef: Option[ActorRef]
+  influxRef: Option[ActorRef],
+  mempoolRef: ActorRef
 ) extends Actor
     with StrictLogging {
 
@@ -121,11 +122,11 @@ class IntermediaryNVH(
     case msg @ TreeChunks(_, _)                      => //+ to fast sync
     case msg @ FastSyncDone                          =>
     case msg @ HeaderChainIsSynced                   =>
-    case msg @ FullBlockChainIsSynced                => //+ to miner
+    case msg @ FullBlockChainIsSynced                => mempoolRef ! msg
+    case msg @ RolledBackTransactions(_)             => mempoolRef ! msg
     case msg @ DisableMining                         => //+ to miner
     case msg @ StartMining                           => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)              => //+ to data holder
-    case msg @ RolledBackTransactions(_)             => //+ to memory pool
     case msg: StatsSenderMessage                     => influxRef.foreach(_ ! msg)
     case msg @ GetDataFromCurrentView(_, _)          => nodeViewHolder ! msg
     case msg @ RollbackSucceed(_)                    =>
@@ -142,6 +143,7 @@ object IntermediaryNVH {
     settings: EncryAppSettings,
     intermediaryNetwork: ActorRef,
     timeProvider: NetworkTimeProvider,
-    influxRef: Option[ActorRef]
-  ): Props = Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef))
+    influxRef: Option[ActorRef],
+    mempoolRef: ActorRef
+  ): Props = Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef, mempoolRef))
 }
