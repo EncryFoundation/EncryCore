@@ -39,7 +39,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.{PersistentModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
-
 import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
