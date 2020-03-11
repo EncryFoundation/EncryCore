@@ -19,9 +19,10 @@ import encry.view.wallet.EncryWallet
 import io.circe.syntax._
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.mempool.transaction.{PubKeyLockedContract, Transaction}
-import org.encryfoundation.common.modifiers.state.box.{AssetBox, MonetaryBox, TokenIssuingBox}
+import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBox, EncryProposition, MonetaryBox, TokenIssuingBox}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ADKey
+
 import scala.concurrent.Future
 import scala.util.{Failure, Success, Try}
 
@@ -137,6 +138,13 @@ case class WalletInfoApiRoute(dataHolder: ActorRef,
               case Success(value) => ADKey @@ value
               case Failure(e) => throw new RuntimeException(s"Failed to decode tokeId $s. Cause: $e")
             })
+            val a: Seq[MonetaryBox] = wallet.vault.walletStorage
+              .getAllBoxes()
+              .collect {
+                case ab: AssetBox if ab.tokenIdOpt.isEmpty || ab.tokenIdOpt === decodedTokenOpt => ab
+                case tib: TokenIssuingBox if decodedTokenOpt.exists(_.sameElements(tib.tokenId)) => tib
+              }
+
             val boxes: IndexedSeq[MonetaryBox] = wallet.vault.walletStorage
               .getAllBoxes()
               .collect {
