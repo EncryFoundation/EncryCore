@@ -233,7 +233,7 @@ class NodeViewHolder(
     stateToApplyTry match {
       case Success(stateToApply: UtxoState) =>
         context.parent ! RollbackSucceed(branchingPointOpt)
-        if (settings.node.mining && nodeView.history.isFullChainSynced) context.system.eventStream.publish(EnableMining)
+        if (settings.node.mining && nodeView.history.isFullChainSynced && progressInfo.chainSwitchingNeeded) context.system.eventStream.publish(EnableMining)
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, none, none, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) {
           case (u: UpdateInformation, modToApply: PersistentModifier) =>

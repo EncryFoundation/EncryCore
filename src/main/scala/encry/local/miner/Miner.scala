@@ -253,8 +253,8 @@ class Miner(dataHolder: ActorRef,
         } else CandidateEnvelope.empty
       candidate
     }
-    (mempool ? SendTransactionsToMiner).mapTo[List[Transaction]].foreach { txs =>
-      nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda(txs))
+    (mempool ? SendTransactionsToMiner).mapTo[TransactionsForMiner].foreach { txs =>
+      nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda(txs.txs.toList))
     }
   }
 }
