@@ -61,18 +61,13 @@ class Miner(dataHolder: ActorRef,
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k,
     TestNetConstants.Version, TestNetConstants.PreGenesisHeight, TestNetConstants.MaxTarget)
-  var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
     context.system.eventStream.subscribe(self, classOf[MinerMiningCommands])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.eventStream.subscribe(self, classOf[BlockchainStatus])
-    context.system.scheduler.schedule(5.seconds, 5.seconds)(
-      influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
-    )
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
       logger.info(s"data holder: $dataHolder. Context: $context")
-      dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
     }
   }
@@ -104,7 +99,6 @@ class Miner(dataHolder: ActorRef,
           logger.info("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
-    case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       println(s"Miner -> Disable mining context.children.nonEmpty")
@@ -182,10 +176,11 @@ class Miner(dataHolder: ActorRef,
   }
 
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
+                      txsFromMempool: List[Transaction],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1)
     val timestamp: Time = timeProvider.estimatedTime
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(view.state.validate(_, timestamp, height).isRight).distinct
+    val txsU: List[Transaction] = txsFromMempool.filter(view.state.validate(_, timestamp, height).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
         if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
@@ -224,7 +219,6 @@ class Miner(dataHolder: ActorRef,
     logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height.")
 
-    transactionsPool = IndexedSeq.empty[Transaction]
     candidate
   }
 
@@ -248,7 +242,7 @@ class Miner(dataHolder: ActorRef,
           logger.info("Going to calculate last block:")
           val envelope: CandidateEnvelope =
             CandidateEnvelope
-              .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
+              .fromCandidate(createCandidate(nodeView, txs, bestHeaderOpt))
           envelope
         } else CandidateEnvelope.empty
       candidate
