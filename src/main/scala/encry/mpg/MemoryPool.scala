@@ -48,12 +48,6 @@ class MemoryPool(
       self,
       RemoveExpiredFromPool
     )
-    context.system.scheduler.schedule(
-      settings.mempool.txSendingInterval,
-      settings.mempool.txSendingInterval,
-      self,
-      SendTransactionsToMiner
-    )
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
   }
 
@@ -181,7 +175,7 @@ class MemoryPool(
         memoryPool.getTransactionsForMiner
       memoryPool = newMemoryPool
       mempoolProcessor ! UpdateMempoolReader(MemoryPoolReader.apply(memoryPool))
-      context.parent ! TransactionsForMiner(transactionsForMiner)
+      sender() ! TransactionsForMiner(transactionsForMiner)
       logger.debug(
         s"MemoryPool got SendTransactionsToMiner. Size of transactions for miner ${transactionsForMiner.size}." +
           s" New pool size is ${memoryPool.size}. Ids ${transactionsForMiner.map(_.encodedId)}"
@@ -220,9 +214,9 @@ object MemoryPool {
 
   final case class NewTransaction(tx: Transaction) extends AnyVal
 
-  final case class RolledBackTransactions(txs: IndexedSeq[Transaction]) extends AnyVal
+  final case class RolledBackTransactions(txs: IndexedSeq[Transaction])
 
-  final case class TransactionsForMiner(txs: Seq[Transaction]) extends AnyVal
+  final case class TransactionsForMiner(txs: Seq[Transaction])
 
   case object SendTransactionsToMiner
 

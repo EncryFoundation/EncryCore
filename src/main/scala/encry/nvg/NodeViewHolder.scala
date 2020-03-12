@@ -2,19 +2,19 @@ package encry.nvg
 
 import java.io.File
 
-import akka.actor.{ Actor, ActorRef, Props }
+import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern._
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
-import encry.local.miner.Miner.{ DisableMining, StartMining }
+import encry.local.miner.Miner.{DisableMining, EnableMining, StartMining}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NodeViewHolder.ReceivableMessages.{ CreateAccountManagerFromSeed, LocallyGeneratedModifier }
+import encry.nvg.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, LocallyGeneratedModifier}
 import encry.nvg.NodeViewHolder._
 import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
 import encry.nvg.fast.sync.SnapshotProcessor._
@@ -26,23 +26,23 @@ import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.storage.HistoryStorage
-import encry.view.history.{ History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader }
+import encry.view.history.{History, HistoryHeadersProcessor, HistoryPayloadsProcessor, HistoryReader}
 import encry.mpg.MemoryPool._
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.AvlTree
 import encry.view.wallet.EncryWallet
 import io.iohk.iodb.ByteArrayWrapper
 import org.apache.commons.io.FileUtils
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
+import org.encryfoundation.common.modifiers.{PersistentModifier, PersistentNodeViewModifier}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ADDigest, ModifierId, ModifierTypeId }
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId, ModifierTypeId}
 
-import scala.collection.{ mutable, IndexedSeq, Seq }
+import scala.collection.{IndexedSeq, Seq, mutable}
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class NodeViewHolder(
   settings: EncryAppSettings,
@@ -224,7 +224,7 @@ class NodeViewHolder(
                   val blockAtHeight: Block   = history.getBlockByHeader(headerAtHeight).get
                   blocks :+ blockAtHeight
               }
-            context.parent ! DisableMining
+            context.system.eventStream.publish(DisableMining)
             state.rollbackTo(branchPoint, additionalBlocks) -> trimChainSuffix(suffixApplied,
                                                                                ModifierId !@@ branchPoint)
           } else Success(state) -> IndexedSeq.empty
@@ -233,6 +233,7 @@ class NodeViewHolder(
     stateToApplyTry match {
       case Success(stateToApply: UtxoState) =>
         context.parent ! RollbackSucceed(branchingPointOpt)
+        if (settings.node.mining && nodeView.history.isFullChainSynced) context.system.eventStream.publish(EnableMining)
         val u0: UpdateInformation = UpdateInformation(history, stateToApply, none, none, suffixTrimmed)
         val uf: UpdateInformation = progressInfo.toApply.foldLeft(u0) {
           case (u: UpdateInformation, modToApply: PersistentModifier) =>

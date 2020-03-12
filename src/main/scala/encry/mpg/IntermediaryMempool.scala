@@ -44,6 +44,7 @@ class IntermediaryMempool(
     case msg: RequestFromLocal        => networkRouter ! msg
     case msg: ModifierFromNetwork     => txValidator ! msg
     case msg: TransactionProcessing   => mempoolProcessor ! msg
+    case msg @ SendTransactionsToMiner => memoryPool.forward(msg)
     case msg @ FullBlockChainIsSynced => mempoolProcessor ! msg
   }
 }

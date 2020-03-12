@@ -9,7 +9,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus._
-import encry.local.miner.Miner.{ClIMiner, DisableMining, StartMining}
+import encry.local.miner.Miner.{MinerMiningCommands, DisableMining, StartMining}
 import encry.mpg.MemoryPool._
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}

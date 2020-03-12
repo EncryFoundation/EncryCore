@@ -5,6 +5,7 @@ import java.util.Date
 
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
+import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
@@ -63,7 +64,7 @@ class Miner(dataHolder: ActorRef,
   var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[ClIMiner])
+    context.system.eventStream.subscribe(self, classOf[MinerMiningCommands])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.eventStream.subscribe(self, classOf[BlockchainStatus])
     context.system.scheduler.schedule(5.seconds, 5.seconds)(
@@ -228,7 +229,7 @@ class Miner(dataHolder: ActorRef,
   }
 
   def produceCandidate(): Unit = {
-    val lambda = (nodeView: CurrentView[History, UtxoState, EncryWallet]) =>
+    def lambda(txs: List[Transaction]) = (nodeView: CurrentView[History, UtxoState, EncryWallet]) =>
     {
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
@@ -252,19 +253,21 @@ class Miner(dataHolder: ActorRef,
         } else CandidateEnvelope.empty
       candidate
     }
-    nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda)
+    (mempool ? SendTransactionsToMiner).mapTo[List[Transaction]].foreach { txs =>
+      nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda(txs))
+    }
   }
 }
 
 object Miner {
 
-  sealed trait ClIMiner
+  sealed trait MinerMiningCommands
 
-  case object DisableMining extends ClIMiner
+  case object DisableMining extends MinerMiningCommands
 
-  case object EnableMining extends ClIMiner
+  case object EnableMining extends MinerMiningCommands
 
-  case object StartMining extends ClIMiner
+  case object StartMining extends MinerMiningCommands
 
   case class MinedBlock(block: Block, workerIdx: Int)
 

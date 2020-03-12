@@ -126,7 +126,6 @@ class IntermediaryNVH(
     case msg @ HeaderChainIsSynced                   =>
     case msg @ FullBlockChainIsSynced                => mempoolRef ! msg
     case msg @ RolledBackTransactions(_)             => mempoolRef ! msg
-    case msg @ DisableMining                         => //+ to miner
     case msg @ StartMining                           => //+ to miner
     case msg @ BlockAndHeaderInfo(_, _)              => dataHolderRef ! msg
     case msg: UpdateHistoryReader                    => dataHolderRef ! msg
