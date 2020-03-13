@@ -2,6 +2,7 @@ package encry.mpg
 
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 
@@ -58,8 +59,8 @@ final case class MemoryPoolStorage private (
     }
   }
 
-  def getTransactionsForMiner: (MemoryPoolStorage, Seq[Transaction]) = {
-    val (transactionsForMiner: Seq[Transaction], _) = transactions.toIndexedSeq.sortBy { case (_, tx) => tx.fee }
+  def getTransactionsForMiner: Seq[Transaction] =
+    transactions.toIndexedSeq.sortBy { case (_, tx) => tx.fee }
       .foldLeft(Seq.empty[Transaction], Set.empty[String]) {
         case ((validated, inputs), (_, transaction)) =>
           val transactionInputsIds: Set[String] = transaction.inputs.map(input => Algos.encode(input.boxId)).toSet
@@ -69,8 +70,9 @@ final case class MemoryPoolStorage private (
             (validated :+ transaction, inputs ++ transactionInputsIds)
           else (validated, inputs)
       }
-    (removeSeveral(transactionsForMiner.map(_.encodedId)), transactionsForMiner)
-  }
+      ._1
+
+  def compareWithMod(block: Block): MemoryPoolStorage = removeSeveral(block.payload.txs.map(_.encodedId))
 
   def isValid: Transaction => Boolean = tx => tx.semanticValidity.isSuccess && !contains(tx.encodedId)
 

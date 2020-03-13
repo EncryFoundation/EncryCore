@@ -54,8 +54,7 @@ class MemoryPoolTests
       val mempool         = MemoryPoolStorage.empty(testNetSettings, timeProvider)
       val transactions    = (0 until 10).map(k => coinbaseAt(k))
       val (newMempool, _) = mempool.validateTransactions(transactions)
-      val (uPool, txs)    = newMempool.getTransactionsForMiner
-      uPool.size shouldBe 0
+      val txs    = newMempool.getTransactionsForMiner
       txs.map(_.encodedId).forall(transactions.map(_.encodedId).contains) shouldBe true
       transactions.map(_.encodedId).forall(txs.map(_.encodedId).contains) shouldBe true
     }

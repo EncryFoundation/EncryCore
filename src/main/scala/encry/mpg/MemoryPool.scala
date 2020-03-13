@@ -2,12 +2,11 @@ package encry.mpg
 
 import akka.actor.{ Actor, ActorRef, ActorSystem, Props }
 import akka.dispatch.{ PriorityGenerator, UnboundedStablePriorityMailbox }
-import cats.syntax.either._
 import com.google.common.base.Charsets
 import com.google.common.hash.{ BloomFilter, Funnels }
 import com.typesafe.config.Config
 import com.typesafe.scalalogging.StrictLogging
-import encry.mpg.MemoryPool.MemoryPoolStateType.NotProcessingNewTransactions
+import encry.mpg.MemoryPool._
 import encry.network.Messages.MessageToNetwork.{ RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, SuccessfulTransaction }
@@ -18,7 +17,6 @@ import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{ InvNetworkMessage, RequestModifiersNetworkMessage }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import encry.mpg.MemoryPool._
 
 import scala.collection.IndexedSeq
 
@@ -48,7 +46,6 @@ class MemoryPool(
       self,
       RemoveExpiredFromPool
     )
-    context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
   }
 
   override def receive: Receive = continueProcessing(currentNumberOfProcessedTransactions = 0)
@@ -153,14 +150,13 @@ class MemoryPool(
   }
 
   def auxiliaryReceive(state: MemoryPoolStateType): Receive = {
-    case SemanticallySuccessfulModifier(modifier) if modifier.modifierTypeId == Block.modifierTypeId =>
+    case SemanticallySuccessfulModifier(modifier: Block) =>
       logger.debug(
         s"MemoryPool got SemanticallySuccessfulModifier with new block while $state." +
           s"Transit to a transactionsProcessor state."
       )
-      if (state == NotProcessingNewTransactions)
-        Either.catchNonFatal(context.system.actorSelection("/user/nodeViewSynchronizer") ! StartTransactionsValidation)
       canProcessTransactions = true
+      memoryPool = memoryPool.compareWithMod(modifier)
       context.parent ! TransactionProcessing(canProcessTransactions)
       context.become(continueProcessing(currentNumberOfProcessedTransactions = 0))
 
@@ -171,9 +167,7 @@ class MemoryPool(
       )
 
     case SendTransactionsToMiner =>
-      val (newMemoryPool: MemoryPoolStorage, transactionsForMiner: Seq[Transaction]) =
-        memoryPool.getTransactionsForMiner
-      memoryPool = newMemoryPool
+      val transactionsForMiner: Seq[Transaction] = memoryPool.getTransactionsForMiner
       mempoolProcessor ! UpdateMempoolReader(MemoryPoolReader.apply(memoryPool))
       sender() ! TransactionsForMiner(transactionsForMiner)
       logger.debug(
@@ -184,15 +178,6 @@ class MemoryPool(
     case RemoveExpiredFromPool =>
       memoryPool = memoryPool.filter(memoryPool.isExpired)
       logger.debug(s"MemoryPool got RemoveExpiredFromPool message. After cleaning pool size is: ${memoryPool.size}.")
-
-//    case RequestModifiersForTransactions(remote, ids) =>
-//      val modifiersIds: Seq[Transaction] = ids
-//        .map(Algos.encode)
-//        .collect { case if memorascyPool.contains(id) => memoryPool.get(id) }
-//        .flatten
-//      sender() ! RequestedModifiersForRemote(remote, modifiersIds)
-//      logger.debug(s"MemoryPool got request modifiers message. Number of requested ids is ${ids.size}." +
-//        s" Number of sent transactions is ${modifiersIds.size}. Request was from $remote.")
 
     case message => logger.debug(s"MemoryPool got unhandled message $message.")
   }

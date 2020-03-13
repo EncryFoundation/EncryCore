@@ -5,7 +5,8 @@ import akka.routing.BalancingPool
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
-import encry.local.miner.Miner.{ DisableMining, StartMining }
+import encry.local.miner.Miner.{ DisableMining, EnableMining, StartMining }
+import encry.mpg.MemoryPool._
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
@@ -13,37 +14,20 @@ import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandlin
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.{ InvalidModifierBytes, ModifierForValidation }
+import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.nvg.NodeViewHolder._
 import encry.nvg.fast.sync.SnapshotProcessor
-import encry.nvg.NodeViewHolder.{
-  GetDataFromCurrentView,
-  RollbackFailed,
-  RollbackSucceed,
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification,
-  UpdateHistoryReader
-}
 import encry.nvg.fast.sync.SnapshotProcessor.{
   FastSyncDone,
   HeaderChainIsSynced,
   RequiredManifestHeightAndId,
   TreeChunks
 }
-import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
-import encry.mpg.MemoryPool._
-import org.encryfoundation.common.network.BasicMessagesRepo.{
-  InvNetworkMessage,
-  RequestChunkMessage,
-  RequestManifestMessage,
-  RequestModifiersNetworkMessage,
-  ResponseChunkMessage,
-  ResponseManifestMessage,
-  SyncInfoNetworkMessage
-}
+import org.encryfoundation.common.network.BasicMessagesRepo._
 import org.encryfoundation.common.utils.Algos
 
 class IntermediaryNVH(
@@ -124,18 +108,24 @@ class IntermediaryNVH(
     case msg @ TreeChunks(_, _)                      => //+ to fast sync
     case msg @ FastSyncDone                          =>
     case msg @ HeaderChainIsSynced                   =>
-    case msg @ FullBlockChainIsSynced                => mempoolRef ! msg
-    case msg @ RolledBackTransactions(_)             => mempoolRef ! msg
-    case msg @ StartMining                           => //+ to miner
-    case msg @ BlockAndHeaderInfo(_, _)              => dataHolderRef ! msg
-    case msg: UpdateHistoryReader                    => dataHolderRef ! msg
-    case msg: StatsSenderMessage                     => influxRef.foreach(_ ! msg)
-    case msg @ GetDataFromCurrentView(_)             => nodeViewHolder.forward(msg)
-    case msg @ RollbackSucceed(_)                    =>
-    case msg @ RollbackFailed(_)                     =>
+    case msg @ DisableMining                         => context.system.eventStream.publish(msg)
+    case msg @ EnableMining                          => context.system.eventStream.publish(msg)
+    case msg @ FullBlockChainIsSynced =>
+      context.system.eventStream.publish(msg)
+      mempoolRef ! msg
+    case msg @ RolledBackTransactions(_) => mempoolRef ! msg
+    case msg @ StartMining               => //+ to miner
+    case msg @ BlockAndHeaderInfo(_, _)  => dataHolderRef ! msg
+    case msg: UpdateHistoryReader        => dataHolderRef ! msg
+    case msg: StatsSenderMessage         => influxRef.foreach(_ ! msg)
+    case msg @ GetDataFromCurrentView(_) => nodeViewHolder.forward(msg)
+    case msg @ RollbackSucceed(_)        =>
+    case msg @ RollbackFailed(_)         =>
     case msg @ SemanticallySuccessfulModifier(_) =>
+      context.system.eventStream.publish(msg)
       intermediaryNetwork ! msg
       networkMessagesProcessor ! msg
+      mempoolRef ! msg
     case msg @ SemanticallyFailedModification(_, _) => intermediaryNetwork ! msg
   }
 }
@@ -148,5 +138,6 @@ object IntermediaryNVH {
     influxRef: Option[ActorRef],
     mempoolRef: ActorRef,
     dataHolderRef: ActorRef
-  ): Props = Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef, mempoolRef, dataHolderRef))
+  ): Props =
+    Props(new IntermediaryNVH(settings, intermediaryNetwork, timeProvider, influxRef, mempoolRef, dataHolderRef))
 }
