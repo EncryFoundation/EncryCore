@@ -99,7 +99,7 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
             sender() ! RequestFromLocal(remote.some, invData._1, ids.toList)
           logger.info(s"Time of processing inv message is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
 
-        case RequestModifiersNetworkMessage((typeId, requestedIds)) if typeId == Payload.modifierTypeId =>
+        case RequestModifiersNetworkMessage((typeId, requestedIds)) =>
           val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
             .flatMap(
               (id: ModifierId) =>
