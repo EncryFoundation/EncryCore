@@ -23,10 +23,12 @@ import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, NetworkMessage}
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import scorex.utils.Random
 
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Random => SRand}
 
 class NetworkRouter(settings: NetworkSettings,
                     blackListSettings: BlackListSettings,
@@ -84,7 +86,7 @@ class NetworkRouter(settings: NetworkSettings,
     case msg: MessageToNetwork =>
       context.actorOf(
         MessageBuilder.props(peersKeeper, deliveryManager),
-        s"messageBuilder${System.currentTimeMillis()}"
+        s"messageBuilder${Algos.encode(Random.randomBytes()) ++ SRand.nextLong().toString}"
       ) ! msg
   }
 
