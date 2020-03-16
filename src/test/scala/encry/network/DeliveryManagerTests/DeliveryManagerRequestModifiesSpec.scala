@@ -81,8 +81,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1.socketAddress)
       assert(deliveryManager.underlyingActor.expectedModifiers.isEmpty)
-      assert(deliveryManager.underlyingActor.receivedModifier.size == blocks.size)
-      assert(deliveryManager.underlyingActor.receivedModifier.forall(elem => headersAsKey.contains(elem)))
+      assert(deliveryManager.underlyingActor.receivedModifiers.size == blocks.size)
+      assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => headersAsKey.contains(elem)))
       deliveryManager.stop()
     }
     "Delivery manager should not handle repeating modifiers" in {
@@ -96,8 +96,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
         Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1.socketAddress)
       deliveryManager ! DataFromPeer(ModifiersNetworkMessage(
         Header.modifierTypeId -> blocks.map(k => k.header.id -> headerBytes).toMap), cp1.socketAddress)
-      assert(deliveryManager.underlyingActor.receivedModifier.size == headersIds.size)
-      assert(deliveryManager.underlyingActor.receivedModifier.forall(elem => headersAsKey.contains(elem)))
+      assert(deliveryManager.underlyingActor.receivedModifiers.size == headersIds.size)
+      assert(deliveryManager.underlyingActor.receivedModifiers.forall(elem => headersAsKey.contains(elem)))
       deliveryManager.stop()
     }
     "handle priority request for payload correctly" in {
@@ -260,8 +260,8 @@ class DeliveryManagerRequestModifiesSpec extends WordSpecLike with BeforeAndAfte
       deliveryManager ! RequestSent(cp1.socketAddress, Header.modifierTypeId, header.id)
 
       assert(deliveryManager.underlyingActor.expectedModifiers.isEmpty)
-      assert(deliveryManager.underlyingActor.receivedModifier.size == 1)
-      assert(deliveryManager.underlyingActor.receivedModifier.contains(toKey(header.id)))
+      assert(deliveryManager.underlyingActor.receivedModifiers.size == 1)
+      assert(deliveryManager.underlyingActor.receivedModifiers.contains(toKey(header.id)))
       deliveryManager.stop()
     }
   }
