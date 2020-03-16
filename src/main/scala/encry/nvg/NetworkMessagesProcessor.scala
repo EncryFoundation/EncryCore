@@ -23,7 +23,6 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.concurrent.duration._
 
 class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
