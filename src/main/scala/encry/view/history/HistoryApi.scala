@@ -235,7 +235,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
   }
 
   def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] =
-    if (getBestHeaderId.isEmpty) info.startingPoints.map(_._2)
+    if (getBestHeaderId.isEmpty) Seq.empty
     else if (info.lastHeaderIds.isEmpty) {
       val heightFrom: Int = Math.min(getBestHeaderHeight, size - 1)
       (for {
