@@ -59,19 +59,4 @@ class MemoryPoolTests
       transactions.map(_.encodedId).forall(txs.map(_.encodedId).contains) shouldBe true
     }
   }
-  "Mempool actor" should {
-    "send transactions to miner" in {
-      val miner1 = TestProbe()
-      val mempool1: TestActorRef[MemoryPool] =
-        TestActorRef[MemoryPool](MemoryPool.props(testNetSettings, timeProvider, Some(TestProbe().ref), miner1.ref))
-      val transactions1 = (0 until 4).map { k =>
-        val a = coinbaseAt(k)
-        a
-      }
-      transactions1.foreach(mempool1 ! NewTransaction(_))
-      mempool1.underlyingActor.memoryPool.size shouldBe 4
-      logger.info(s"generated: ${transactions1.map(_.encodedId)}")
-      miner1.expectMsg(20.seconds, TransactionsForMiner(transactions1))
-    }
-  }
 }
