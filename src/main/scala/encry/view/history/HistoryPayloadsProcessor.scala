@@ -64,7 +64,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
           (fullBlock.header.height > bestHeaderHeight) || (
             (fullBlock.header.height == bestHeaderHeight) &&
               scoreOf(fullBlock.id)
-                .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
+                .flatMap(fbScore => getBestHeaderId.flatMap(scoreOf(_).map(_ < fbScore)))
                 .getOrElse(false)
           )
         val updatedHeadersAtHeightIds =

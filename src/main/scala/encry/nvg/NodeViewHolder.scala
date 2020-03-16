@@ -123,7 +123,7 @@ class NodeViewHolder(
       FileUtils.deleteDirectory(new File(s"${settings.directory}/keysTmp"))
       FileUtils.deleteDirectory(new File(s"${settings.directory}/walletTmp"))
       val newHistory = new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
-        override val settings: EncryAppSettings        = settings
+        override val settings: EncryAppSettings        = settings //todo incorrect
         override var isFullChainSynced: Boolean        = settings.node.offlineGeneration
         override val timeProvider: NetworkTimeProvider = ntp
         override val historyStorage: HistoryStorage    = nodeView.history.historyStorage
