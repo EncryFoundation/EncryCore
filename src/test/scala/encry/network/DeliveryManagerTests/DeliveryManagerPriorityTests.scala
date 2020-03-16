@@ -2,12 +2,14 @@ package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
 
-//import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
+import encry.network.DM
+import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks, initialiseDeliveryManager}
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestKit}
 import encry.consensus.HistoryConsensus
 import encry.consensus.HistoryConsensus.{Equal, Older, Younger}
 import encry.modifiers.InstanceFactory
+import encry.network.DM.RequestStatus
 import encry.network.DeliveryManager
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 //import encry.network.NodeViewSynchronizer.ReceivableMessages.RequestFromLocal
@@ -32,7 +34,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecL
 //
 //  override def afterAll: Unit = TestKit.shutdownActorSystem(system)
 //
-//  def initialiseState: (TestActorRef[DeliveryManager], ConnectedPeer, ConnectedPeer, ConnectedPeer,
+//  def initialiseState: (TestActorRef[DM], ConnectedPeer, ConnectedPeer, ConnectedPeer,
 //    ConnectedPeer, ConnectedPeer, ConnectedPeer, ConnectedPeer, ConnectedPeer, ConnectedPeer,
 //    List[Block], List[ModifierId]) = {
 //    val (deliveryManager, _) = initialiseDeliveryManager(isBlockChainSynced = true, isMining = true, testNetSettings)
@@ -66,8 +68,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecL
 //      val (deliveryManager, cp1, _, _, _, _, _, _, _, _, _, headersIds) = initialiseState
 //      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
 //        Map(cp1.socketAddress -> (cp1, Older, InitialPriority))
-//      deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
-//      deliveryManager ! RequestFromLocal(cp1, Header.modifierTypeId, headersIds)
+//      deliveryManager ! RequestStatus(cp1, Header.modifierTypeId, headersIds)
 //      val (result, _) = deliveryManager.underlyingActor.priorityCalculator.accumulatePeersStatistic
 //      assert(result.contains(cp1.socketAddress))
 //      assert(result(cp1.socketAddress) == BadNode)

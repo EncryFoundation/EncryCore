@@ -40,7 +40,7 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
           receivedModifier += toKey(id)
         } else logger.info(s"Receive spam. ModId: ${Algos.encode(id)}!")
       }
-    case RequestSent(peer, modTypeId, modId) if !expectedModifiers.contains(toKey(modId))=>
+    case RequestSent(peer, modTypeId, modId) if !(expectedModifiers.contains(toKey(modId)) || receivedModifier.contains(toKey(modId))) =>
       expectedModifiers += toKey(modId)
       context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(
         self ! AwaitingRequest(peer, modTypeId, modId, 1)
