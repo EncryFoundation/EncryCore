@@ -84,7 +84,7 @@ class NetworkRouter(settings: NetworkSettings,
     case msg: MessageToNetwork =>
       context.actorOf(
         MessageBuilder.props(peersKeeper, deliveryManager),
-        s"messageBuilder${Random.nextInt()}"
+        s"messageBuilder${System.currentTimeMillis()}"
       ) ! msg
   }
 
