@@ -3,7 +3,7 @@ package encry.nvg
 import akka.actor.{ Actor, Cancellable, Props }
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Younger }
+import encry.consensus.HistoryConsensus.HistoryComparisonResult
 import encry.network.DeliveryManager.CheckPayloadsToDownload
 import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
 import encry.network.ModifiersToNetworkUtils.toProto
@@ -13,7 +13,7 @@ import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, UpdateHistoryR
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader
-import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
+import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.network.BasicMessagesRepo.BasicMsgDataTypes.InvData
 import org.encryfoundation.common.network.BasicMessagesRepo.{
@@ -23,7 +23,7 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{
 }
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.concurrent.duration._
 
@@ -118,7 +118,7 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
 
     case CheckPayloadsToDownload =>
       val newIds: Seq[ModifierId] = historyReader.payloadsIdsToDownload(settings.network.networkChunkSize)
-      logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")
+      logger.debug(s"newIds: ${newIds.map(Algos.encode).mkString(",")}")
       if (newIds.nonEmpty) context.parent ! RequestFromLocal(none, Payload.modifierTypeId, newIds.toList)
       val nextCheckModsScheduler: Cancellable =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)

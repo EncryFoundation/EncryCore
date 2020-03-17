@@ -6,10 +6,10 @@ import akka.actor.{ ActorRef, ActorSystem }
 import akka.testkit.{ TestActorRef, TestKit, TestProbe }
 import cats.syntax.eq._
 import cats.syntax.option._
-import encry.consensus.HistoryConsensus.{ Equal, Fork, Older, Unknown, Younger }
+import encry.consensus.HistoryConsensus._
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.CheckPayloadsToDownload
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
 import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, UpdateHistoryReader }
@@ -23,13 +23,12 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{
   RequestModifiersNetworkMessage,
   SyncInfoNetworkMessage
 }
-import org.encryfoundation.common.utils.TaggedTypes
 import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
 import scorex.utils.Random
-import supertagged.@@
 
 import scala.collection.immutable
+import scala.concurrent.duration._
 
 class NetworkMessagesProcessorTests
     extends TestKit(ActorSystem("Tested-Akka-System"))
@@ -429,7 +428,79 @@ class NetworkMessagesProcessorTests
       }
     }
     "have correct logic with check payloads to download" should {
+      "request required modifiers" in {
+        val parentActor = TestProbe()
 
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val (_, blocks) = NetworkMessagesProcessorTests.formHistory
+
+        val history = blocks.take(5).foldLeft(generateDummyHistory(settings)) {
+          case (h, block) =>
+            h.append(block.header).right.get._1.reportModifierIsValid(block.header)
+        }
+
+        history.isFullChainSynced = true
+
+        val historyReader = HistoryReader(history)
+
+        networkProcessor ! UpdateHistoryReader(historyReader)
+
+        val requiredResponse = RequestFromLocal(none, Payload.modifierTypeId, blocks.take(5).map(_.payload.id))
+
+        parentActor.expectMsgPF(settings.network.syncInterval + 1.seconds) {
+          case _: SendSyncInfo       =>
+          case msg: RequestFromLocal => msg.eqv(requiredResponse) shouldBe true
+        }
+
+        parentActor.expectMsgPF(settings.network.syncInterval + 1.seconds) {
+          case _: SendSyncInfo       =>
+          case msg: RequestFromLocal => msg.eqv(requiredResponse) shouldBe true
+        }
+
+        val updHistory = blocks.drop(5).foldLeft(history) {
+          case (h, block) =>
+            h.append(block.header).right.get._1.reportModifierIsValid(block.header)
+        }
+
+        val updHistory2 = blocks.take(3).foldLeft(updHistory) {
+          case (h, block) =>
+            h.append(block.payload).right.get._1.reportModifierIsValid(block.payload).reportModifierIsValid(block)
+        }
+
+        val historyReader1 = HistoryReader(updHistory2)
+
+        networkProcessor ! UpdateHistoryReader(historyReader1)
+
+        val requiredResponse1 = RequestFromLocal(none, Payload.modifierTypeId, blocks.drop(3).map(_.payload.id))
+
+        parentActor.expectMsgPF(settings.network.syncInterval + 1.seconds) {
+          case _: SendSyncInfo       =>
+          case msg: RequestFromLocal => msg.eqv(requiredResponse1) shouldBe true
+        }
+      }
+      "not request if headers chain is not synced" in {
+        val parentActor = TestProbe()
+
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val (_, blocks) = NetworkMessagesProcessorTests.formHistory
+
+        val history = blocks.foldLeft(generateDummyHistory(settings)) {
+          case (h, block) =>
+            h.append(block.header).right.get._1.reportModifierIsValid(block.header)
+        }
+
+        history.isFullChainSynced = false
+
+        val historyReader = HistoryReader(history)
+
+        networkProcessor ! UpdateHistoryReader(historyReader)
+
+        parentActor.expectMsgPF(settings.network.syncInterval + 2.seconds) {
+          case _: SendSyncInfo =>
+        }
+      }
     }
   }
 }
