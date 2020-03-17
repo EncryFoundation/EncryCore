@@ -1,9 +1,9 @@
 package encry.view.history
 
-import encry.consensus.HistoryConsensus.{HistoryComparisonResult, Older}
+import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Older }
 import encry.modifiers.history.HeaderChain
 import io.iohk.iodb.ByteArrayWrapper
-import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 

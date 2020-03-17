@@ -58,7 +58,7 @@ class IntermediaryNVH(
   val modifiersValidatorRouter: ActorRef =
     context.actorOf(
       BalancingPool(5)
-        .props(ModifiersValidator.props(nodeViewHolder, settings)),
+        .props(ModifiersValidator.props(nodeViewHolder, self, settings)),
       name = "Modifiers-validator-router"
     )
   val snapshotProcessor: Option[ActorRef] =
@@ -98,7 +98,7 @@ class IntermediaryNVH(
     case msg: LocallyGeneratedModifier               => nodeViewHolder ! msg
     case msg @ BanPeer(_, _)                         => intermediaryNetwork ! msg
     case msg @ InvalidModifierBytes(_)               => intermediaryNetwork ! msg
-    case msg @ OtherNodeSyncingStatus(_, _)       => intermediaryNetwork ! msg
+    case msg @ OtherNodeSyncingStatus(_, _)          => intermediaryNetwork ! msg
     case msg @ RequestFromLocal(_, _, _)             => intermediaryNetwork ! msg
     case msg @ ResponseFromLocal(_, _, _)            => intermediaryNetwork ! msg
     case msg @ BroadcastModifier(_, _)               => intermediaryNetwork ! msg

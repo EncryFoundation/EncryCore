@@ -38,6 +38,7 @@ object BlackList {
     case object SyntacticallyInvalidPersistentModifier extends BanReason
     case object SyntacticallyInvalidTransaction extends BanReason
     case object CorruptedSerializedBytes extends BanReason
+    case object ModifierIdInTheNetworkMessageIsNotTheSameAsIdOfModifierInThisMessage extends BanReason
     case object SpamSender extends BanReason
     case object SentPeersMessageWithoutRequest extends BanReason
     case object SentInvForPayload extends BanReason

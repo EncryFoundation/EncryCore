@@ -11,6 +11,7 @@ import encry.modifiers.history.HeaderUtils.{ IllegalHeight, PreSemanticValidatio
 import encry.modifiers.history.{ HeaderUtils, PayloadUtils }
 import encry.network.BlackList.BanReason.{
   CorruptedSerializedBytes,
+  ModifierIdInTheNetworkMessageIsNotTheSameAsIdOfModifierInThisMessage,
   PreSemanticInvalidModifier,
   SyntacticallyInvalidPersistentModifier
 }
@@ -24,36 +25,67 @@ import org.encryfoundation.common.modifiers.history.{ Header, HeaderProtoSeriali
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
 
-class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with StrictLogging {
+import scala.util.Try
+
+class ModifiersValidator(
+  nodeViewHolderRef: ActorRef,
+  intermediaryNVH: ActorRef,
+  settings: EncryAppSettings
+) extends Actor
+    with StrictLogging {
 
   override def receive: Receive = {
-    case ModifierForValidation(reader, modifierId, modifierTypeId, modifierBytes, remote) =>
-      fromProto(modifierTypeId, modifierBytes) match {
+    case ModifierForValidation(reader, id, modifierTypeId, modifierBytes, remote) if !reader.isModifierDefined(id) =>
+      ModifiersValidator.fromProto(modifierTypeId, modifierBytes) match {
         case Left(error) =>
-          logger.info(s"Modifier ${Algos.encode(modifierId)} is incorrect cause: ${error.getMessage}.")
-          context.parent ! BanPeer(remote, CorruptedSerializedBytes)
-          context.parent ! InvalidModifierBytes(modifierId)
+          logger.info(s"Modifier ${Algos.encode(id)} is incorrect cause: ${error.getMessage}.")
+          intermediaryNVH ! BanPeer(remote, CorruptedSerializedBytes)
+          intermediaryNVH ! InvalidModifierBytes(id)
         case Right(modifier) =>
           val preSemanticValidation: Either[PreSemanticValidationException, Unit] =
-            isPreSemanticValid(modifier, reader, settings)
+            ModifiersValidator.isPreSemanticValid(modifier, reader, settings)
           val syntacticValidation: Boolean =
-            isSyntacticallyValid(modifier, settings.constants.ModifierIdSize)
+            ModifiersValidator.isSyntacticallyValid(modifier, settings.constants.ModifierIdSize)
           if (preSemanticValidation.isRight && syntacticValidation) {
-            logger.debug(s"Modifier ${modifier.encodedId} is valid.")
-            nodeViewHolderRef ! ValidatedModifier(modifier)
+            if (modifier.id.sameElements(id)) {
+              logger.debug(s"Modifier ${modifier.encodedId} is valid.")
+              nodeViewHolderRef ! ValidatedModifier(modifier)
+            } else {
+              logger.info(s"Modifier ${modifier.encodedId} should have ${Algos.encode(id)} id!")
+              intermediaryNVH ! BanPeer(remote, ModifierIdInTheNetworkMessageIsNotTheSameAsIdOfModifierInThisMessage)
+              intermediaryNVH ! SyntacticallyFailedModification(modifier, List.empty)
+            }
           } else if (!syntacticValidation) {
             logger.info(s"Modifier ${modifier.encodedId} is syntactically invalid.")
-            context.parent ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
-            context.parent ! SyntacticallyFailedModification(modifier, List.empty)
+            intermediaryNVH ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
+            intermediaryNVH ! SyntacticallyFailedModification(modifier, List.empty)
           } else
             preSemanticValidation.leftMap {
               case IllegalHeight(error) =>
                 logger.info(s"Modifier ${modifier.encodedId} is invalid cause: $error.")
-                context.parent ! BanPeer(remote, PreSemanticInvalidModifier(error))
-                context.parent ! SyntacticallyFailedModification(modifier, List.empty)
+                intermediaryNVH ! BanPeer(remote, PreSemanticInvalidModifier(error))
+                intermediaryNVH ! SyntacticallyFailedModification(modifier, List.empty)
             }
       }
+    case m: ModifierForValidation =>
+      logger.info(s"Got modifier ${Algos.encode(m.modifierId)} but this mod is already in history.")
   }
+
+}
+
+object ModifiersValidator {
+
+  final case class ModifierForValidation(
+    historyReader: HistoryReader,
+    modifierId: ModifierId,
+    modifierTypeId: ModifierTypeId,
+    modifierBytes: Array[Byte],
+    remote: InetSocketAddress
+  )
+
+  final case class ValidatedModifier(modifier: PersistentModifier) extends AnyVal
+
+  final case class InvalidModifierBytes(id: ModifierId) extends AnyVal
 
   private def isPreSemanticValid(
     modifier: PersistentModifier,
@@ -77,8 +109,8 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
     bytes: Array[Byte]
   ): Either[Throwable, PersistentModifier] =
     Either.fromTry(modType match {
-      case Header.modifierTypeId  => HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes))
-      case Payload.modifierTypeId => PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes))
+      case Header.modifierTypeId  => Try(HeaderProtoSerializer.fromProto(HeaderProtoMessage.parseFrom(bytes))).flatten
+      case Payload.modifierTypeId => Try(PayloadProtoSerializer.fromProto(PayloadProtoMessage.parseFrom(bytes))).flatten
     })
 
   def isSyntacticallyValid(
@@ -88,22 +120,7 @@ class ModifiersValidator(nodeViewHolderRef: ActorRef, settings: EncryAppSettings
     case h: Header  => HeaderUtils.syntacticallyValidity(h, modifierIdSize).isSuccess
     case p: Payload => PayloadUtils.syntacticallyValidity(p, modifierIdSize).isSuccess
   }
-}
 
-object ModifiersValidator {
-
-  final case class ModifierForValidation(
-    historyReader: HistoryReader,
-    modifierId: ModifierId,
-    modifierTypeId: ModifierTypeId,
-    modifierBytes: Array[Byte],
-    remote: InetSocketAddress
-  )
-
-  final case class ValidatedModifier(modifier: PersistentModifier) extends AnyVal
-
-  final case class InvalidModifierBytes(id: ModifierId) extends AnyVal
-
-  def props(nodeViewHolderRef: ActorRef, settings: EncryAppSettings): Props =
-    Props(new ModifiersValidator(nodeViewHolderRef, settings))
+  def props(nodeViewHolderRef: ActorRef, intermediaryNVH: ActorRef, settings: EncryAppSettings): Props =
+    Props(new ModifiersValidator(nodeViewHolderRef, intermediaryNVH, settings))
 }
