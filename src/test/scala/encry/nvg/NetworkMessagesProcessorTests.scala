@@ -1,7 +1,6 @@
 package encry.nvg
 
 import java.net.InetSocketAddress
-
 import akka.actor.{ ActorRef, ActorSystem }
 import akka.testkit.{ TestActorRef, TestKit, TestProbe }
 import cats.syntax.eq._
