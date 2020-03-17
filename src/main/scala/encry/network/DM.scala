@@ -26,7 +26,7 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
   type ModifierIdAsKey = scala.collection.mutable.WrappedArray.ofByte
 
   var expectedModifiers: Set[ModifierIdAsKey] = Set.empty
-  var receivedModifier: Set[ModifierIdAsKey] = Set.empty
+  var receivedModifiers: Set[ModifierIdAsKey] = Set.empty
 
   override def preStart(): Unit =
     context.parent ! RegisterMessagesHandler(Seq(ModifiersNetworkMessage.NetworkMessageTypeID -> "ModifiersNetworkMessage"), self)
@@ -37,16 +37,16 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
         if (expectedModifiers.contains(toKey(id))) {
           context.parent ! ModifierFromNetwork(source, data._1, id, bytes)
           expectedModifiers -= toKey(id)
-          receivedModifier += toKey(id)
+          receivedModifiers += toKey(id)
         } else logger.info(s"Receive spam. ModId: ${Algos.encode(id)}!")
       }
-    case RequestSent(peer, modTypeId, modId) if !(expectedModifiers.contains(toKey(modId)) || receivedModifier.contains(toKey(modId))) =>
+    case RequestSent(peer, modTypeId, modId) if !(expectedModifiers.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId))) =>
       expectedModifiers += toKey(modId)
       context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(
         self ! AwaitingRequest(peer, modTypeId, modId, 1)
       )
     case RequestSent(_, _, _) => //do nothing
-    case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts <= networkSettings.maxDeliveryChecks && expectedModifiers.contains(toKey(modId))=>
+    case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts < networkSettings.maxDeliveryChecks && expectedModifiers.contains(toKey(modId))=>
       context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))
       logger.info(s"Re-request modifier ${Algos.encode(modId)}")
       context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(self !
@@ -59,16 +59,16 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
     case ModifierFromNetwork(source, modTypeId, modId, modBytes) =>
       if (expectedModifiers.contains(toKey(modId))) {
         expectedModifiers -= toKey(modId)
-        receivedModifier += toKey(modId)
+        receivedModifiers += toKey(modId)
         context.parent ! ModifierFromNetwork(source, modTypeId, modId, modBytes)
       } else logger.info(s"Peer $source sent spam mod of type $modTypeId and id ${Algos.encode(modId)}")
-    case SemanticallySuccessfulModifier(mod) => receivedModifier -= toKey(mod.id)
-    case SemanticallyFailedModification(mod, _) => receivedModifier -= toKey(mod.id)
+    case SemanticallySuccessfulModifier(mod) => receivedModifiers -= toKey(mod.id)
+    case SemanticallyFailedModification(mod, _) => receivedModifiers -= toKey(mod.id)
     case IsRequested(modIds) =>
       //logger.info(s"Going to check if ${Algos.encode(modId)} has been requested. Res: ${receivedModifier.contains(toKey(modId))}")
       sender ! RequestStatus(
-        requested = modIds.filter(id => receivedModifier.contains(toKey(id)) || expectedModifiers.contains(toKey(id))),
-        notRequested = modIds.filter(id => !receivedModifier.contains(toKey(id)) && !expectedModifiers.contains(toKey(id)))
+        requested = modIds.filter(id => receivedModifiers.contains(toKey(id)) || expectedModifiers.contains(toKey(id))),
+        notRequested = modIds.filter(id => !receivedModifiers.contains(toKey(id)) && !expectedModifiers.contains(toKey(id)))
       )
   }
 

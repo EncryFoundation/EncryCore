@@ -57,6 +57,7 @@ class PK(networkSettings: NetworkSettings,
         blackList.getAll.toList
       )
     }
+    context.system.scheduler.schedule(600.millis, blacklistSettings.cleanupTime){blackList = blackList.cleanupBlackList}
   }
 
   override def receive: Receive = banPeersLogic orElse networkMessagesProcessingLogic orElse {
