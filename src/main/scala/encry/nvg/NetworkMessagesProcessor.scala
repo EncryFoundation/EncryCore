@@ -13,7 +13,7 @@ import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, UpdateHistoryR
 import encry.settings.EncryAppSettings
 import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader
-import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.{ PersistentModifier, PersistentNodeViewModifier }
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.network.BasicMessagesRepo.BasicMsgDataTypes.InvData
 import org.encryfoundation.common.network.BasicMessagesRepo.{
@@ -48,23 +48,20 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
     )
 
   def workingCycle(modifiersRequester: Option[Cancellable]): Receive = {
-    case UpdateHistoryReader(newReader: HistoryReader) =>
-      historyReader = newReader
-    case SemanticallySuccessfulModifier(mod) =>
-      //todo possible way to call CheckPayloadsToDownload
-      mod match {
-        case block: Block if historyReader.isFullChainSynced =>
-          List(block.header, block.payload).foreach { mod: PersistentModifier =>
-            logger.info(s"Going to broadcast inv for modifier of type ${mod.modifierTypeId} with id: ${mod.encodedId}.")
-            context.parent ! BroadcastModifier(mod.modifierTypeId, mod.id)
-          }
-          modifiersRequestCache = Map(
-            block.encodedId         -> toProto(block.header),
-            block.payload.encodedId -> toProto(block.payload)
-          )
-        case _ =>
-      }
+    case UpdateHistoryReader(newReader: HistoryReader) => historyReader = newReader
 
+    //todo possible way to call CheckPayloadsToDownload
+    case SemanticallySuccessfulModifier(block: Block) if historyReader.isFullChainSynced =>
+      List(block.header, block.payload).foreach { mod: PersistentModifier =>
+        logger.info(s"Going to broadcast inv for modifier of type ${mod.modifierTypeId} with id: ${mod.encodedId}.")
+        context.parent ! BroadcastModifier(mod.modifierTypeId, mod.id)
+      }
+      modifiersRequestCache = Map(
+        block.encodedId         -> toProto(block.header),
+        block.payload.encodedId -> toProto(block.payload)
+      )
+
+    case SemanticallySuccessfulModifier(_) =>
     case DataFromPeer(SyncInfoNetworkMessage(syncInfo: SyncInfo), remote) =>
       val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
       logger.info(
@@ -94,30 +91,31 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
           )
       }
 
-    case DataFromPeer(message, remote) =>
-      message match {
-        case RequestModifiersNetworkMessage((typeId, requestedIds)) =>
-          val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
-            .flatMap(
-              (id: ModifierId) =>
-                modifiersRequestCache
-                  .get(Algos.encode(id))
-                  .map(id -> _)
-            )
-            .toMap
-          if (modifiersFromCache.nonEmpty) context.parent ! ResponseFromLocal(remote, typeId, modifiersFromCache)
-          val unrequestedModifiers: List[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains).toList
+    case DataFromPeer(RequestModifiersNetworkMessage((typeId, requestedIds)), remote) =>
+      val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds.flatMap { id: ModifierId =>
+        modifiersRequestCache
+          .get(Algos.encode(id))
+          .map(id -> _)
+      }.toMap
+      if (modifiersFromCache.nonEmpty) {
+        logger.info(
+          s"Send response from local with mods from cache: " +
+            s" ${modifiersFromCache.keys.toList.map(Algos.encode).mkString(",")} to $remote."
+        )
+        context.parent ! ResponseFromLocal(remote, typeId, modifiersFromCache)
+      }
+      val unrequestedModifiers: List[ModifierId] = requestedIds.filterNot(modifiersFromCache.contains).toList
 
-          typeId match {
-            case h if h == Header.modifierTypeId =>
-              context.parent ! ResponseFromLocal(remote, typeId, getModsForRemote(unrequestedModifiers, historyReader))
-            case _ =>
-              getModsForRemote(unrequestedModifiers, historyReader).foreach {
-                case (id: ModifierId, bytes: Array[Byte]) =>
-                  context.parent ! ResponseFromLocal(remote, typeId, Map(id -> bytes))
-              }
+      typeId match {
+        case h if h == Header.modifierTypeId =>
+          context.parent ! ResponseFromLocal(remote, typeId, getModsForRemote(unrequestedModifiers, historyReader))
+        case _ =>
+          getModsForRemote(unrequestedModifiers, historyReader).foreach {
+            case (id: ModifierId, bytes: Array[Byte]) =>
+              context.parent ! ResponseFromLocal(remote, typeId, Map(id -> bytes))
           }
       }
+
     case CheckPayloadsToDownload =>
       val newIds: Seq[ModifierId] = historyReader.payloadsIdsToDownload(settings.network.networkChunkSize)
       logger.debug(s"newIds: ${newIds.map(elem => Algos.encode(elem)).mkString(",")}")

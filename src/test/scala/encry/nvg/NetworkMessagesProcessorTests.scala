@@ -2,25 +2,30 @@ package encry.nvg
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ActorRef, ActorSystem}
-import akka.testkit.{TestActorRef, TestKit, TestProbe}
+import akka.actor.{ ActorRef, ActorSystem }
+import akka.testkit.{ TestActorRef, TestKit, TestProbe }
 import cats.syntax.eq._
 import cats.syntax.option._
-import encry.consensus.HistoryConsensus.{Equal, Fork, Older, Unknown, Younger}
+import encry.consensus.HistoryConsensus.{ Equal, Fork, Older, Unknown, Younger }
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.CheckPayloadsToDownload
-import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal }
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
-import encry.nvg.NodeViewHolder.UpdateHistoryReader
+import encry.nvg.NodeViewHolder.{ SemanticallySuccessfulModifier, UpdateHistoryReader }
 import encry.nvg.Utils.instances._
 import encry.settings.EncryAppSettings
-import encry.view.history.{History, HistoryReader}
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
-import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, NetworkMessage, SyncInfoNetworkMessage}
+import encry.view.history.{ History, HistoryReader }
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.network.BasicMessagesRepo.{
+  InvNetworkMessage,
+  NetworkMessage,
+  RequestModifiersNetworkMessage,
+  SyncInfoNetworkMessage
+}
 import org.encryfoundation.common.utils.TaggedTypes
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
+import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
+import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
 import scorex.utils.Random
 import supertagged.@@
 
@@ -62,7 +67,6 @@ class NetworkMessagesProcessorTests
         parentActor.expectMsgPF() {
           case msg: OtherNodeSyncingStatus => (msg eqv expectedResult) shouldBe true
           case CheckPayloadsToDownload     =>
-          case _                           => true shouldBe false
         }
       }
       "determine younger extension" in {
@@ -89,7 +93,6 @@ class NetworkMessagesProcessorTests
         parentActor.expectMsgPF() {
           case msg: OtherNodeSyncingStatus => (msg eqv expectedResult) shouldBe true
           case CheckPayloadsToDownload     =>
-          case _                           => true shouldBe false
         }
       }
       "determine equals extension" in {
@@ -116,7 +119,6 @@ class NetworkMessagesProcessorTests
         parentActor.expectMsgPF() {
           case msg: OtherNodeSyncingStatus => (msg eqv expectedResult) shouldBe true
           case CheckPayloadsToDownload     =>
-          case _                           => true shouldBe false
         }
       }
       "determine unknown extension" in {
@@ -142,7 +144,6 @@ class NetworkMessagesProcessorTests
         parentActor.expectMsgPF() {
           case msg: OtherNodeSyncingStatus => (msg eqv expectedResult) shouldBe true
           case CheckPayloadsToDownload     =>
-          case _                           => true shouldBe false
         }
       }
       "determine fork extension" in {
@@ -169,7 +170,6 @@ class NetworkMessagesProcessorTests
         parentActor.expectMsgPF() {
           case msg: OtherNodeSyncingStatus => (msg eqv expectedResult) shouldBe true
           case CheckPayloadsToDownload     =>
-          case _                           => true shouldBe false
         }
       }
     }
@@ -231,7 +231,7 @@ class NetworkMessagesProcessorTests
 
         parentActor.expectMsgPF() {
           case CheckPayloadsToDownload =>
-          case msg: RequestFromLocal => (msg eqv requiredRequestFromLocal) shouldBe true
+          case msg: RequestFromLocal   => (msg eqv requiredRequestFromLocal) shouldBe true
         }
       }
       "request only unique new modifiers" in {
@@ -259,13 +259,178 @@ class NetworkMessagesProcessorTests
 
         parentActor.expectMsgPF() {
           case CheckPayloadsToDownload =>
-          case msg: RequestFromLocal => (msg eqv requiredRequestFromLocal) shouldBe true
+          case msg: RequestFromLocal   => (msg eqv requiredRequestFromLocal) shouldBe true
         }
       }
     }
-    "process request for modifier correctly" in {}
-    "have correct logic with check payloads to download" in {}
-    "have correct logic with semantically successful modifier" in {}
+    "process semantically successful modifier correctly" should {
+      "update local cache with last semantically successful modifier" in {
+        val networkMessagesProcessor: TestActorRef[NetworkMessagesProcessor] =
+          NetworkMessagesProcessorTests.initActorState(settings)
+
+        val reader = HistoryReader.empty
+
+        reader.isFullChainSynced = true
+
+        networkMessagesProcessor ! UpdateHistoryReader(reader)
+
+        val block = generateGenesisBlock(Height @@ 1)
+
+        networkMessagesProcessor ! SemanticallySuccessfulModifier(block)
+
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache.size shouldBe 2
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache.get(block.encodedId).nonEmpty shouldBe true
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache
+          .get(block.payload.encodedId)
+          .nonEmpty shouldBe true
+
+        val block2 = generateGenesisBlock(Height @@ 2)
+
+        networkMessagesProcessor ! SemanticallySuccessfulModifier(block2)
+
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache.size shouldBe 2
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache.get(block.encodedId).nonEmpty shouldBe false
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache
+          .get(block.payload.encodedId)
+          .nonEmpty shouldBe false
+
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache.get(block2.encodedId).nonEmpty shouldBe true
+        networkMessagesProcessor.underlyingActor.modifiersRequestCache
+          .get(block2.payload.encodedId)
+          .nonEmpty shouldBe true
+      }
+      "send broadcast message for new modifier" in {
+        val parentActor = TestProbe()
+
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val reader = HistoryReader.empty
+
+        reader.isFullChainSynced = true
+
+        networkProcessor ! UpdateHistoryReader(reader)
+
+        val block = generateGenesisBlock(Height @@ 1)
+
+        networkProcessor ! SemanticallySuccessfulModifier(block)
+
+        parentActor.expectMsgPF() {
+          case CheckPayloadsToDownload =>
+          case BroadcastModifier(modType, id) if modType == Header.modifierTypeId =>
+            id.sameElements(block.id) shouldBe true
+          case BroadcastModifier(modType, id) if modType == Payload.modifierTypeId =>
+            id.sameElements(block.payload.id) shouldBe true
+        }
+      }
+    }
+    "process request for modifier correctly" should {
+      "response for modifiers which are in cache by using this cache" in {
+        val parentActor = TestProbe()
+
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+
+        val historyReader = HistoryReader(history)
+
+        historyReader.isFullChainSynced = true
+
+        val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9001)
+
+        networkProcessor ! UpdateHistoryReader(historyReader)
+
+        val block = generateGenesisBlock(Height @@ 1)
+
+        networkProcessor ! SemanticallySuccessfulModifier(block)
+
+        networkProcessor ! DataFromPeer(
+          RequestModifiersNetworkMessage(Header.modifierTypeId -> (blocks.headOption.get.id :: block.id :: Nil)),
+          address
+        )
+
+        parentActor.expectMsgPF() {
+          case ResponseFromLocal(_, _, ids) if ids.size == 1 =>
+            ids.forall {
+              case (id, _) =>
+                id.sameElements(block.id)
+            } shouldBe true
+          case ResponseFromLocal(_, _, ids) =>
+            ids.forall {
+              case (id, _) =>
+                id.sameElements(blocks.headOption.get.id)
+            } shouldBe true
+          case CheckPayloadsToDownload =>
+          case _: BroadcastModifier    =>
+        }
+      }
+      "response for headers in 1 message for all headers" in {
+        val parentActor = TestProbe()
+
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+
+        val historyReader = HistoryReader(history)
+
+        historyReader.isFullChainSynced = true
+
+        val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9001)
+
+        networkProcessor ! UpdateHistoryReader(historyReader)
+
+        val block = generateGenesisBlock(Height @@ 1)
+
+        networkProcessor ! SemanticallySuccessfulModifier(block)
+
+        networkProcessor ! DataFromPeer(
+          RequestModifiersNetworkMessage(Header.modifierTypeId -> blocks.take(2).map(_.id)),
+          address
+        )
+
+        parentActor.expectMsgPF() {
+          case ResponseFromLocal(_, _, ids) if ids.size == 2 =>
+            ids.keys.toList.zip(blocks.take(2).map(_.id)).forall { case (id, id1) => id.sameElements(id1) } shouldBe true
+          case CheckPayloadsToDownload =>
+          case _: BroadcastModifier    =>
+        }
+      }
+      "response for payloads in 1 message for 1 payload" in {
+        val parentActor = TestProbe()
+
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+
+        val historyReader = HistoryReader(history)
+
+        historyReader.isFullChainSynced = true
+
+        val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9001)
+
+        networkProcessor ! UpdateHistoryReader(historyReader)
+
+        val block = generateGenesisBlock(Height @@ 1)
+
+        networkProcessor ! SemanticallySuccessfulModifier(block)
+
+        networkProcessor ! DataFromPeer(
+          RequestModifiersNetworkMessage(Payload.modifierTypeId -> blocks.take(2).map(_.payload.id)),
+          address
+        )
+
+        parentActor.expectMsgPF() {
+          case ResponseFromLocal(_, _, ids) if ids.size == 1 =>
+            ids.keys.toList.forall { id =>
+              id.sameElements(blocks(1).payload.id) || id.sameElements(blocks.head.payload.id)
+            } shouldBe true
+          case CheckPayloadsToDownload =>
+          case _: BroadcastModifier    =>
+        }
+      }
+    }
+    "have correct logic with check payloads to download" should {
+
+    }
   }
 }
 
