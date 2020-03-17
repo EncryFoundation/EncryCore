@@ -27,7 +27,7 @@ import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 
 import scala.concurrent.duration._
 
-class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
+class NodeViewNMProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
 
   import context.dispatcher
 
@@ -132,6 +132,6 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
       .toMap
 }
 
-object NetworkMessagesProcessor {
-  def props(settings: EncryAppSettings): Props = Props(new NetworkMessagesProcessor(settings))
+object NodeViewNMProcessor {
+  def props(settings: EncryAppSettings): Props = Props(new NodeViewNMProcessor(settings))
 }

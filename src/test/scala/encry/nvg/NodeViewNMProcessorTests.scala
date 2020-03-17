@@ -30,7 +30,7 @@ import scorex.utils.Random
 import scala.collection.immutable
 import scala.concurrent.duration._
 
-class NetworkMessagesProcessorTests
+class NodeViewNMProcessorTests
     extends TestKit(ActorSystem("Tested-Akka-System"))
     with WordSpecLike
     with Matchers
@@ -45,10 +45,10 @@ class NetworkMessagesProcessorTests
       "determine older extension" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val (historyMain: History, historyOlder: History) =
-          NetworkMessagesProcessorTests.formYoungerActorState(10, 10)
+          NodeViewNMProcessorTests.formYoungerActorState(10, 10)
 
         val historyReader: HistoryReader = HistoryReader(historyMain)
 
@@ -57,7 +57,7 @@ class NetworkMessagesProcessorTests
         val syncInfoMessage: SyncInfoNetworkMessage = SyncInfoNetworkMessage(historyOlder.syncInfo)
 
         val (dataFromPeerMsg, address) =
-          NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
+          NodeViewNMProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
 
         val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Older)
 
@@ -71,10 +71,10 @@ class NetworkMessagesProcessorTests
       "determine younger extension" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val (historyMain: History, historyYounger: History) =
-          NetworkMessagesProcessorTests.formOlderActorState(10, 10)
+          NodeViewNMProcessorTests.formOlderActorState(10, 10)
 
         val historyReader: HistoryReader = HistoryReader(historyMain)
 
@@ -83,7 +83,7 @@ class NetworkMessagesProcessorTests
         val syncInfoMessage: SyncInfoNetworkMessage = SyncInfoNetworkMessage(historyYounger.syncInfo)
 
         val (dataFromPeerMsg, address) =
-          NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
+          NodeViewNMProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
 
         val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Younger)
 
@@ -97,10 +97,10 @@ class NetworkMessagesProcessorTests
       "determine equals extension" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val (history1: History, history2: History) =
-          NetworkMessagesProcessorTests.formEqualActorState(10, 10)
+          NodeViewNMProcessorTests.formEqualActorState(10, 10)
 
         val historyReader: HistoryReader = HistoryReader(history1)
 
@@ -109,7 +109,7 @@ class NetworkMessagesProcessorTests
         val syncInfoMessage: SyncInfoNetworkMessage = SyncInfoNetworkMessage(history2.syncInfo)
 
         val (dataFromPeerMsg, address) =
-          NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
+          NodeViewNMProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
 
         val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Equal)
 
@@ -123,9 +123,9 @@ class NetworkMessagesProcessorTests
       "determine unknown extension" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
-        val (h1: History, h2: History) = NetworkMessagesProcessorTests.formUnknownActorState
+        val (h1: History, h2: History) = NodeViewNMProcessorTests.formUnknownActorState
 
         val historyReader: HistoryReader = HistoryReader(h1)
 
@@ -134,7 +134,7 @@ class NetworkMessagesProcessorTests
         val syncInfoMessage: SyncInfoNetworkMessage = SyncInfoNetworkMessage(h2.syncInfo)
 
         val (dataFromPeerMsg, address) =
-          NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
+          NodeViewNMProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
 
         val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Unknown)
 
@@ -148,10 +148,10 @@ class NetworkMessagesProcessorTests
       "determine fork extension" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val (h1: History, h2: History) =
-          NetworkMessagesProcessorTests.formForkActorState(10, 20, 5)
+          NodeViewNMProcessorTests.formForkActorState(10, 20, 5)
 
         val historyReader: HistoryReader = HistoryReader(h1)
 
@@ -160,7 +160,7 @@ class NetworkMessagesProcessorTests
         val syncInfoMessage: SyncInfoNetworkMessage = SyncInfoNetworkMessage(h2.syncInfo)
 
         val (dataFromPeerMsg, address) =
-          NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
+          NodeViewNMProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
 
         val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Fork)
 
@@ -176,7 +176,7 @@ class NetworkMessagesProcessorTests
       "not process inv for payload while full chain is not synced" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val ids: immutable.IndexedSeq[ModifierId] = (0 to 10).map(_ => ModifierId @@ Random.randomBytes())
 
@@ -189,7 +189,7 @@ class NetworkMessagesProcessorTests
       "not create response from local for payloads if header's chain is not synced" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val ids: immutable.IndexedSeq[ModifierId] = (0 to 10).map(_ => ModifierId @@ Random.randomBytes())
 
@@ -210,7 +210,7 @@ class NetworkMessagesProcessorTests
       "create response from local for payloads if header's chain is synced" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val ids: immutable.IndexedSeq[ModifierId] = (0 to 10).map(_ => ModifierId @@ Random.randomBytes())
 
@@ -236,13 +236,13 @@ class NetworkMessagesProcessorTests
       "request only unique new modifiers" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val ids: immutable.IndexedSeq[ModifierId] = (0 to 10).map(_ => ModifierId @@ Random.randomBytes())
 
         val address: InetSocketAddress = new InetSocketAddress("0.0.0.0", 9001)
 
-        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+        val (history, blocks) = NodeViewNMProcessorTests.formHistory
 
         val historyReader = HistoryReader(history)
 
@@ -264,8 +264,8 @@ class NetworkMessagesProcessorTests
     }
     "process semantically successful modifier correctly" should {
       "update local cache with last semantically successful modifier" in {
-        val networkMessagesProcessor: TestActorRef[NetworkMessagesProcessor] =
-          NetworkMessagesProcessorTests.initActorState(settings)
+        val networkMessagesProcessor: TestActorRef[NodeViewNMProcessor] =
+          NodeViewNMProcessorTests.initActorState(settings)
 
         val reader = HistoryReader.empty
 
@@ -301,7 +301,7 @@ class NetworkMessagesProcessorTests
       "send broadcast message for new modifier" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
         val reader = HistoryReader.empty
 
@@ -326,9 +326,9 @@ class NetworkMessagesProcessorTests
       "response for modifiers which are in cache by using this cache" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
-        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+        val (history, blocks) = NodeViewNMProcessorTests.formHistory
 
         val historyReader = HistoryReader(history)
 
@@ -365,9 +365,9 @@ class NetworkMessagesProcessorTests
       "response for headers in 1 message for all headers" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
-        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+        val (history, blocks) = NodeViewNMProcessorTests.formHistory
 
         val historyReader = HistoryReader(history)
 
@@ -396,9 +396,9 @@ class NetworkMessagesProcessorTests
       "response for payloads in 1 message for 1 payload" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
-        val (history, blocks) = NetworkMessagesProcessorTests.formHistory
+        val (history, blocks) = NodeViewNMProcessorTests.formHistory
 
         val historyReader = HistoryReader(history)
 
@@ -431,9 +431,9 @@ class NetworkMessagesProcessorTests
       "request required modifiers" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
-        val (_, blocks) = NetworkMessagesProcessorTests.formHistory
+        val (_, blocks) = NodeViewNMProcessorTests.formHistory
 
         val history = blocks.take(5).foldLeft(generateDummyHistory(settings)) {
           case (h, block) =>
@@ -482,9 +482,9 @@ class NetworkMessagesProcessorTests
       "not request if headers chain is not synced" in {
         val parentActor = TestProbe()
 
-        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+        val networkProcessor: ActorRef = parentActor.childActorOf(NodeViewNMProcessor.props(settings))
 
-        val (_, blocks) = NetworkMessagesProcessorTests.formHistory
+        val (_, blocks) = NodeViewNMProcessorTests.formHistory
 
         val history = blocks.foldLeft(generateDummyHistory(settings)) {
           case (h, block) =>
@@ -505,11 +505,11 @@ class NetworkMessagesProcessorTests
   }
 }
 
-object NetworkMessagesProcessorTests extends InstanceFactory {
+object NodeViewNMProcessorTests extends InstanceFactory {
 
-  def initActorState(settings: EncryAppSettings)(implicit AS: ActorSystem): TestActorRef[NetworkMessagesProcessor] = {
-    val networkProcessor: TestActorRef[NetworkMessagesProcessor] =
-      TestActorRef[NetworkMessagesProcessor](NetworkMessagesProcessor.props(settings))
+  def initActorState(settings: EncryAppSettings)(implicit AS: ActorSystem): TestActorRef[NodeViewNMProcessor] = {
+    val networkProcessor: TestActorRef[NodeViewNMProcessor] =
+      TestActorRef[NodeViewNMProcessor](NodeViewNMProcessor.props(settings))
     networkProcessor
   }
 
