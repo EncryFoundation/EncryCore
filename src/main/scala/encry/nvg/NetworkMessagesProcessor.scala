@@ -15,6 +15,7 @@ import encry.utils.Utils.idsToString
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.network.BasicMessagesRepo.BasicMsgDataTypes.InvData
 import org.encryfoundation.common.network.BasicMessagesRepo.{
   InvNetworkMessage,
   RequestModifiersNetworkMessage,
@@ -22,7 +23,8 @@ import org.encryfoundation.common.network.BasicMessagesRepo.{
 }
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
+
 import scala.concurrent.duration._
 
 class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with StrictLogging {
@@ -67,34 +69,33 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
       val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
       logger.info(
         s"\n\n Comparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n" +
-          s"Comparison result is $comparison. \n "
+          s"Comparison result is $comparison.\n "
       )
       context.parent ! OtherNodeSyncingStatus(remote, comparison)
 
+    case DataFromPeer(InvNetworkMessage(invData: InvData), remote) =>
+      if (invData._1 == Payload.modifierTypeId && !historyReader.isFullChainSynced)
+        logger.info(s"Got inv message from $remote with ${invData._2.size} ids but full chain is not synced.")
+      else {
+        val isHeader: Boolean = invData._1 == Header.modifierTypeId
+        val isPayloadAvailable: Boolean =
+          historyReader.isHeadersChainSyncedVar && invData._1 == Payload.modifierTypeId
+        val isRequestAvailable: Boolean = isHeader || isPayloadAvailable
+        if (isRequestAvailable) {
+          val ids: Seq[ModifierId] = invData._2.filterNot { mid: ModifierId =>
+            historyReader.isModifierDefined(mid) || ModifiersCache.contains(NodeViewHolder.toKey(mid))
+          }
+          logger.info(s"Sending request from local to $remote with ${ids.size} ids of type ${invData._1}.")
+          if (ids.nonEmpty) context.parent ! RequestFromLocal(remote.some, invData._1, ids.toList)
+        } else
+          logger.info(
+            s"Got inv message from $remote but response is unavailable cause:" +
+              s" is header - $isHeader || is payload available - $isPayloadAvailable."
+          )
+      }
+
     case DataFromPeer(message, remote) =>
       message match {
-        case InvNetworkMessage(invData) if invData._1 == Payload.modifierTypeId && !historyReader.isFullChainSynced =>
-          logger.info(
-            s"Got inv message with payloads: ${invData._2.map(Algos.encode).mkString(",")}. " +
-              s"But full chain is not synced. Ignore them."
-          )
-
-        case InvNetworkMessage(invData) =>
-          val startTime: Long = System.currentTimeMillis()
-          val ids: Seq[ModifierId] = invData._2.filterNot(
-            (mid: ModifierId) =>
-              historyReader.isModifierDefined(mid) || ModifiersCache.contains(NodeViewHolder.toKey(mid))
-          )
-          logger.info(
-            s"Got inv message from $remote. Type of nested ids is: ${invData._1}. " +
-              s"Ids for request are: ${ids.map(Algos.encode).mkString(",")}."
-          )
-          if (ids.nonEmpty &&
-              (invData._1 == Header.modifierTypeId ||
-              (historyReader.isHeadersChainSyncedVar && invData._1 == Payload.modifierTypeId)))
-            sender() ! RequestFromLocal(remote.some, invData._1, ids.toList)
-          logger.info(s"Time of processing inv message is: ${(System.currentTimeMillis() - startTime) / 1000}s.")
-
         case RequestModifiersNetworkMessage((typeId, requestedIds)) =>
           val modifiersFromCache: Map[ModifierId, Array[Byte]] = requestedIds
             .flatMap(
