@@ -62,17 +62,17 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
           )
         case _ =>
       }
+
+    case DataFromPeer(SyncInfoNetworkMessage(syncInfo: SyncInfo), remote) =>
+      val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
+      logger.info(
+        s"\n\n Comparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n" +
+          s"Comparison result is $comparison. \n "
+      )
+      context.parent ! OtherNodeSyncingStatus(remote, comparison)
+
     case DataFromPeer(message, remote) =>
       message match {
-        case SyncInfoNetworkMessage(syncInfo: SyncInfo) =>
-          logger.info(s"Got sync info network message. This message includes ${syncInfo.lastHeaderIds.size} ids.")
-          val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
-          logger.info(
-            s"\n\n Comparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n " +
-              s"Comparison result is $comparison. \n "
-          )
-          context.parent ! OtherNodeSyncingStatus(remote, comparison)
-
         case InvNetworkMessage(invData) if invData._1 == Payload.modifierTypeId && !historyReader.isFullChainSynced =>
           logger.info(
             s"Got inv message with payloads: ${invData._2.map(Algos.encode).mkString(",")}. " +

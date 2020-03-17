@@ -1,10 +1,11 @@
 package encry.nvg
 
 import java.net.InetSocketAddress
-import akka.actor.{ ActorRef, ActorSystem }
-import akka.testkit.{ TestActorRef, TestKit, TestProbe }
+
+import akka.actor.{ActorRef, ActorSystem}
+import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import cats.syntax.eq._
-import encry.consensus.HistoryConsensus.{ Equal, Older, Unknown, Younger }
+import encry.consensus.HistoryConsensus.{Equal, Fork, Older, Unknown, Younger}
 import encry.modifiers.InstanceFactory
 import encry.network.DeliveryManager.CheckPayloadsToDownload
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
@@ -12,10 +13,10 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingSta
 import encry.nvg.NodeViewHolder.UpdateHistoryReader
 import encry.nvg.Utils.instances._
 import encry.settings.EncryAppSettings
-import encry.view.history.{ History, HistoryReader }
+import encry.view.history.{History, HistoryReader}
 import org.encryfoundation.common.modifiers.history.Block
-import org.encryfoundation.common.network.BasicMessagesRepo.{ NetworkMessage, SyncInfoNetworkMessage }
-import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
+import org.encryfoundation.common.network.BasicMessagesRepo.{NetworkMessage, SyncInfoNetworkMessage}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class NetworkMessagesProcessorTests
     extends TestKit(ActorSystem("Tested-Akka-System"))
@@ -87,7 +88,7 @@ class NetworkMessagesProcessorTests
         val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
 
         val (history1: History, history2: History) =
-          NetworkMessagesProcessorTests.fromEqualActorState(10, 10)
+          NetworkMessagesProcessorTests.formEqualActorState(10, 10)
 
         val historyReader: HistoryReader = HistoryReader(history1)
 
@@ -113,7 +114,7 @@ class NetworkMessagesProcessorTests
 
         val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
 
-        val (h1: History, h2: History) = NetworkMessagesProcessorTests.fromEUnknownActorState
+        val (h1: History, h2: History) = NetworkMessagesProcessorTests.formUnknownActorState
 
         val historyReader: HistoryReader = HistoryReader(h1)
 
@@ -125,6 +126,33 @@ class NetworkMessagesProcessorTests
           NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
 
         val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Unknown)
+
+        networkProcessor ! dataFromPeerMsg
+
+        parentActor.expectMsgPF() {
+          case msg: OtherNodeSyncingStatus => msg eqv expectedResult
+          case CheckPayloadsToDownload     =>
+          case _                           => true shouldBe false
+        }
+      }
+      "determine fork extension" in {
+        val parentActor = TestProbe()
+
+        val networkProcessor: ActorRef = parentActor.childActorOf(NetworkMessagesProcessor.props(settings))
+
+        val (h1: History, h2: History) =
+          NetworkMessagesProcessorTests.formForkActorState(10, 20, 5)
+
+        val historyReader: HistoryReader = HistoryReader(h1)
+
+        networkProcessor ! UpdateHistoryReader(historyReader)
+
+        val syncInfoMessage: SyncInfoNetworkMessage = SyncInfoNetworkMessage(h2.syncInfo)
+
+        val (dataFromPeerMsg, address) =
+          NetworkMessagesProcessorTests.formDataFromPeerMessage(syncInfoMessage, "0.0.0.0", 9001)
+
+        val expectedResult: OtherNodeSyncingStatus = OtherNodeSyncingStatus(address, Fork)
 
         networkProcessor ! dataFromPeerMsg
 
@@ -211,7 +239,7 @@ object NetworkMessagesProcessorTests extends InstanceFactory {
     (historyOlder, historyYounger)
   }
 
-  def fromEqualActorState(blocksQty: Int, olderBlocksQty: Int): (History, History) =
+  def formEqualActorState(blocksQty: Int, olderBlocksQty: Int): (History, History) =
     (0 until blocksQty).foldLeft(
       generateDummyHistory(settings),
       generateDummyHistory(settings)
@@ -242,8 +270,8 @@ object NetworkMessagesProcessorTests extends InstanceFactory {
         (hEq1, hEq2)
     }
 
-  def fromEUnknownActorState: (History, History) = {
-    val history1 = (0 until 100).foldLeft(
+  def formUnknownActorState: (History, History) = {
+    val history1 = (0 until 10).foldLeft(
       generateDummyHistory(settings)
     ) {
       case (h1, _) =>
@@ -278,6 +306,69 @@ object NetworkMessagesProcessorTests extends InstanceFactory {
         hEq2
     }
     history1 -> history2
+  }
+
+  def formForkActorState(forkOn: Int, forkSize: Int, mainChainSize: Int): (History, History) = {
+    val (h1, h2) = (0 until forkOn).foldLeft(
+      generateDummyHistory(settings),
+      generateDummyHistory(settings)
+    ) {
+      case ((historyMain, historyOlder), _) =>
+        val block: Block = generateNextBlock(historyMain)
+        val hEq1: History = historyMain
+          .append(block.header)
+          .right
+          .get
+          ._1
+          .append(block.payload)
+          .right
+          .get
+          ._1
+          .reportModifierIsValid(block)
+
+        val hEq2 = historyOlder
+          .append(block.header)
+          .right
+          .get
+          ._1
+          .append(block.payload)
+          .right
+          .get
+          ._1
+          .reportModifierIsValid(block)
+        (hEq1, hEq2)
+    }
+    val fork = (0 until forkSize).foldLeft(h1) {
+      case (historyMain, _) =>
+        val block: Block = generateNextBlock(historyMain)
+        val hEq1: History = historyMain
+          .append(block.header)
+          .right
+          .get
+          ._1
+          .append(block.payload)
+          .right
+          .get
+          ._1
+          .reportModifierIsValid(block)
+        hEq1
+    }
+    val mch = (0 until mainChainSize).foldLeft(h2) {
+      case (historyMain, _) =>
+        val block: Block = generateNextBlock(historyMain)
+        val hEq1: History = historyMain
+          .append(block.header)
+          .right
+          .get
+          ._1
+          .append(block.payload)
+          .right
+          .get
+          ._1
+          .reportModifierIsValid(block)
+        hEq1
+    }
+    mch -> fork
   }
 
 }
