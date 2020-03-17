@@ -220,9 +220,7 @@ object NodeViewSynchronizer {
 
     case object SendLocalSyncInfo
 
-    final case class OtherNodeSyncingStatus(remote: InetSocketAddress,
-                                            status: encry.consensus.HistoryConsensus.HistoryComparisonResult,
-                                            extension: Option[Seq[(ModifierTypeId, ModifierId)]])
+    final case class OtherNodeSyncingStatus(remote: InetSocketAddress, status: HistoryComparisonResult)
 
     sealed trait CLIPeer
 

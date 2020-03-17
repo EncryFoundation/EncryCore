@@ -352,7 +352,7 @@ object PeersKeeper {
   class PeersKeeperPriorityQueue(settings: ActorSystem.Settings, config: Config)
     extends UnboundedStablePriorityMailbox(
       PriorityGenerator {
-        case OtherNodeSyncingStatus(_, _, _) => 0
+        case OtherNodeSyncingStatus(_, _) => 0
         case AccumulatedPeersStatistic(_)    => 1
         case BanPeer(_, _)                   => 1
         case SendLocalSyncInfo               => 1

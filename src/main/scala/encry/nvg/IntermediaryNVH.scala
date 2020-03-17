@@ -98,7 +98,7 @@ class IntermediaryNVH(
     case msg: LocallyGeneratedModifier               => nodeViewHolder ! msg
     case msg @ BanPeer(_, _)                         => intermediaryNetwork ! msg
     case msg @ InvalidModifierBytes(_)               => intermediaryNetwork ! msg
-    case msg @ OtherNodeSyncingStatus(_, _, _)       => intermediaryNetwork ! msg
+    case msg @ OtherNodeSyncingStatus(_, _)       => intermediaryNetwork ! msg
     case msg @ RequestFromLocal(_, _, _)             => intermediaryNetwork ! msg
     case msg @ ResponseFromLocal(_, _, _)            => intermediaryNetwork ! msg
     case msg @ BroadcastModifier(_, _)               => intermediaryNetwork ! msg

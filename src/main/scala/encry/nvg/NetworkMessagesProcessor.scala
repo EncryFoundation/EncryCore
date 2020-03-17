@@ -65,15 +65,13 @@ class NetworkMessagesProcessor(settings: EncryAppSettings) extends Actor with St
     case DataFromPeer(message, remote) =>
       message match {
         case SyncInfoNetworkMessage(syncInfo: SyncInfo) =>
-          val ext: Seq[ModifierId] =
-            historyReader.continuationIds(syncInfo, settings.network.syncPacketLength)
+          logger.info(s"Got sync info network message. This message includes ${syncInfo.lastHeaderIds.size} ids.")
           val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
           logger.info(
-            s"Comparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}. " +
-              s"Comparison result is $comparison. Sending extension of length ${ext.length}."
+            s"\n\n Comparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n " +
+              s"Comparison result is $comparison. \n "
           )
-          if (!(ext.nonEmpty || comparison != Younger)) logger.info("Extension is empty while comparison is younger")
-          context.parent ! OtherNodeSyncingStatus(remote, comparison, Some(ext.map(h => Header.modifierTypeId -> h)))
+          context.parent ! OtherNodeSyncingStatus(remote, comparison)
 
         case InvNetworkMessage(invData) if invData._1 == Payload.modifierTypeId && !historyReader.isFullChainSynced =>
           logger.info(

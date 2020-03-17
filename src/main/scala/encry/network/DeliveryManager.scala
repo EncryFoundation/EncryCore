@@ -538,7 +538,7 @@ object DeliveryManager {
 
         case StartTransactionsValidation => 2
 
-        case OtherNodeSyncingStatus(_, _, _) => 1
+        case OtherNodeSyncingStatus(_, _) => 1
 
         case ConnectionStopped(_) => 1
 

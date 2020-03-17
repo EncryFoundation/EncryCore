@@ -85,7 +85,7 @@ class PK(networkSettings: NetworkSettings,
           logger.info(s"Adding new peer: $peer to awaitingHandshakeConnections." +
             s" Current is: ${awaitingHandshakeConnections.mkString(",")}")
         }
-    case OtherNodeSyncingStatus(remote, comparison, _) =>
+    case OtherNodeSyncingStatus(remote, comparison) =>
       connectedPeers = connectedPeers.updateHistoryComparisonResult(Map(remote -> comparison))
     case NewConnection(remote, remoteConnection) if connectedPeers.size < networkSettings.maxConnections && !isSelf(remote) =>
       logger.info(s"Peers keeper got request for verifying the connection with remote: $remote. " +
