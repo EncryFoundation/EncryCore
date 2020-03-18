@@ -19,6 +19,7 @@ import encry.network.PeersKeeper.BanPeer
 import encry.nvg.ModifiersValidator.{ InvalidModifierBytes, ModifierForValidation, ValidatedModifier }
 import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
 import encry.settings.EncryAppSettings
+import encry.stats.StatsSender.ValidatedModifierFromNetwork
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer }
@@ -49,6 +50,7 @@ class ModifiersValidator(
           if (preSemanticValidation.isRight && syntacticValidation) {
             if (modifier.id.sameElements(id)) {
               logger.debug(s"Modifier ${modifier.encodedId} is valid.")
+              intermediaryNVH ! ValidatedModifierFromNetwork(modifierTypeId)
               nodeViewHolderRef ! ValidatedModifier(modifier)
             } else {
               logger.info(s"Modifier ${modifier.encodedId} should have ${Algos.encode(id)} id!")
