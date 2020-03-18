@@ -146,9 +146,13 @@ class ConnectWithNewPeerTests extends WordSpecLike
         "remove peer from available we can't connect to" in {
           val networkController: TestProbe = TestProbe()
           val peersKeeper: TestActorRef[PK] = TestActorRef[PK](
-            PK.props(settings.network.copy(maxConnections = 2), settings.blackList),
+            PK.props(settings.network.copy(maxConnections = 2, knownPeers = List(new InetSocketAddress("1.1.1.1", 1234))), settings.blackList),
             networkController.ref
           )
+          networkController.expectMsg(RegisterMessagesHandler(Seq(
+            PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
+            GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
+          ), peersKeeper.underlying.self))
 
           val availablePeers: Set[InetSocketAddress] = peersKeeper.underlyingActor.knownPeers
 
@@ -165,8 +169,6 @@ class ConnectWithNewPeerTests extends WordSpecLike
           networkController.send(peersKeeper, OutgoingConnectionFailed(nextPeer.peer))
           peersKeeper.underlyingActor.outgoingConnections.contains(nextPeer.peer) shouldBe false
           peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(nextPeer.peer) shouldBe false
-          peersKeeper.underlyingActor.knownPeers.contains(nextPeer.peer) shouldBe false
-          peersKeeper.underlyingActor.blackList.contains(nextPeer.peer) shouldBe true
         }
 //    "remove peer from available if it has been banned" in {
 //      val networkController = TestProbe()
