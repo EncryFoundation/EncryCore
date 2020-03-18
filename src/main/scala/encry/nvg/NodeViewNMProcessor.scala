@@ -65,7 +65,7 @@ class NodeViewNMProcessor(settings: EncryAppSettings) extends Actor with StrictL
     case DataFromPeer(SyncInfoNetworkMessage(syncInfo: SyncInfo), remote) =>
       val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
       logger.info(
-        s"\n\n Comparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n" +
+        s"\n\nComparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n" +
           s"Comparison result is $comparison.\n "
       )
       context.parent ! OtherNodeSyncingStatus(remote, comparison)
