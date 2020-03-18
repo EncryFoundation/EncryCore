@@ -15,7 +15,7 @@ import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingSta
 import encry.network.PeerConnectionHandler.ReceivableMessages.CloseConnection
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming, Outgoing}
 import encry.network.PeersKeeper.{BanPeer, BanPeerFromAPI, PeerForConnection, RequestPeerForConnection}
-import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection}
+import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, ConnectionVerified, HandshakedDone, NewConnection, OutgoingConnectionFailed}
 import encry.settings.{BlackListSettings, NetworkSettings}
 import org.encryfoundation.common.network.BasicMessagesRepo.{GetPeersNetworkMessage, PeersNetworkMessage}
 
@@ -76,6 +76,17 @@ class PK(networkSettings: NetworkSettings,
           logger.info(s"Adding new peer: $peer to awaitingHandshakeConnections." +
             s" Current is: ${awaitingHandshakeConnections.mkString(",")}")
         }
+    case OutgoingConnectionFailed(peer) =>
+      logger.info(s"Connection failed for: $peer.")
+      outgoingConnections -= peer
+      awaitingHandshakeConnections -= peer
+      val connectionAttempts: Int = peersForConnection.getOrElse(peer, 0) + 1
+      if (connectionAttempts >= networkSettings.maxNumberOfReConnections) {
+        logger.info(s"Removing peer: $peer from available peers for ExpiredNumberOfConnections.")
+        //todo think about penalty for the less time than general ban
+        //blackList.banPeer(ExpiredNumberOfConnections, peer.getAddress)
+        peersForConnection -= peer
+      } else peersForConnection = peersForConnection.updated(peer, connectionAttempts)
     case OtherNodeSyncingStatus(remote, comparison) =>
       connectedPeers = connectedPeers.updateHistoryComparisonResult(Map(remote -> comparison))
     case NewConnection(remote, remoteConnection) if connectedPeers.size < networkSettings.maxConnections && !isSelf(remote) =>
