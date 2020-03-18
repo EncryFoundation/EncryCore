@@ -10,7 +10,7 @@ import encry.consensus.HistoryConsensus.{Equal, Older, Younger}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.DM.{IsRequested, RequestSent, RequestStatus}
 import encry.network.MessageBuilder.{GetPeerInfo, GetPeers, MsgSent}
-import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendPeers, SendSyncInfo}
+import encry.network.Messages.MessageToNetwork.{BroadcastModifier, NotifyNodeAboutModifier, RequestFromLocal, ResponseFromLocal, SendPeers, SendSyncInfo}
 import encry.network.PeerConnectionHandler.ConnectedPeer
 import org.encryfoundation.common.network.BasicMessagesRepo.{InvNetworkMessage, ModifiersNetworkMessage, PeersNetworkMessage, RequestModifiersNetworkMessage, SyncInfoNetworkMessage}
 import org.encryfoundation.common.utils.Algos
@@ -63,13 +63,18 @@ case class MessageBuilder(peersKeeper: ActorRef,
           context.parent ! MsgSent(ModifiersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
         }
       }
-      context.stop(self)
+    case NotifyNodeAboutModifier(peer, modTypeId, modsIds) =>
+      Try {
+        (peersKeeper ? GetPeerInfo(peer)).mapTo[ConnectedPeer].map { peer =>
+          peer.handlerRef ! InvNetworkMessage(modTypeId -> modsIds)
+          context.parent ! MsgSent(InvNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
+        }
+      }
     case BroadcastModifier(modTypeId, modInfo) =>
       (peersKeeper ? GetPeers).mapTo[List[ConnectedPeer]].map { peers =>
         peers.foreach(_.handlerRef ! InvNetworkMessage(modTypeId -> List(modInfo)))
         context.parent ! MsgSent(InvNetworkMessage.NetworkMessageTypeID, peers.head.socketAddress)
       }
-      context.stop(self)
     case SendPeers(peers, remote) =>
       Try {
         (peersKeeper ? GetPeerInfo(remote)).mapTo[ConnectedPeer].map { peer =>
