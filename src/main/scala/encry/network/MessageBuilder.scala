@@ -77,7 +77,6 @@ case class MessageBuilder(peersKeeper: ActorRef,
           context.parent ! MsgSent(PeersNetworkMessage.NetworkMessageTypeID, peer.socketAddress)
         }
       }
-
   }
 }
 
