@@ -25,7 +25,6 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Header, HeaderProtoSerializer, Payload, PayloadProtoSerializer }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
-
 import scala.util.Try
 
 class ModifiersValidator(
