@@ -166,7 +166,7 @@ class ConnectWithNewPeerTests extends WordSpecLike
           peersKeeper.underlyingActor.outgoingConnections.contains(nextPeer.peer) shouldBe false
           peersKeeper.underlyingActor.awaitingHandshakeConnections.contains(nextPeer.peer) shouldBe false
           peersKeeper.underlyingActor.knownPeers.contains(nextPeer.peer) shouldBe false
-          peersKeeper.underlyingActor.blackList.contains(nextPeer.peer) shouldBe true
+          //peersKeeper.underlyingActor.blackList.contains(nextPeer.peer) shouldBe true
         }
 //    "remove peer from available if it has been banned" in {
 //      val networkController = TestProbe()

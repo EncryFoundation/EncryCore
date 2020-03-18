@@ -159,6 +159,24 @@ trait EncryGenerator extends Settings {
     )
   }
 
+  def generatePaymentTransactions(privKey: PrivateKey25519,
+                                   boxes: IndexedSeq[AssetBox],
+                                  numberOfInputs: Int,
+                                  numberOfOutputs: Int): Vector[Transaction] =
+    (0 until boxes.size / numberOfInputs).foldLeft(boxes, Vector.empty[Transaction]) {
+      case ((boxesLocal, transactions), _) =>
+        val tx: Transaction = defaultPaymentTransactionScratch(
+          privKey,
+          fee = 11,
+          timestamp = 11L,
+          useBoxes = boxesLocal.take(numberOfInputs),
+          recipient = randomAddress,
+          amount = 1,
+          numOfOutputs = numberOfOutputs
+        )
+        (boxesLocal.drop(numberOfInputs), transactions :+ tx)
+    }._2
+
   def generatePaymentTransactions(boxes: IndexedSeq[AssetBox],
                                   numberOfInputs: Int,
                                   numberOfOutputs: Int): Vector[Transaction] =
@@ -166,11 +184,11 @@ trait EncryGenerator extends Settings {
       case ((boxesLocal, transactions), _) =>
         val tx: Transaction = defaultPaymentTransactionScratch(
           privKey,
-          fee = 111,
+          fee = 0,
           timestamp = 11L,
           useBoxes = boxesLocal.take(numberOfInputs),
           recipient = randomAddress,
-          amount = 10000,
+          amount = 1,
           numOfOutputs = numberOfOutputs
         )
         (boxesLocal.drop(numberOfInputs), transactions :+ tx)
