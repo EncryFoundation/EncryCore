@@ -5,7 +5,13 @@ import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.HistoryComparisonResult
 import encry.network.DeliveryManager.CheckPayloadsToDownload
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
+import encry.network.Messages.MessageToNetwork.{
+  BroadcastModifier,
+  NotifyNodeAboutModifier,
+  RequestFromLocal,
+  ResponseFromLocal,
+  SendSyncInfo
+}
 import encry.network.ModifiersToNetworkUtils.toProto
 import encry.network.NetworkController.ReceivableMessages.DataFromPeer
 import encry.network.NodeViewSynchronizer.ReceivableMessages.OtherNodeSyncingStatus
@@ -63,12 +69,15 @@ class NodeViewNMProcessor(settings: EncryAppSettings) extends Actor with StrictL
 
     case SemanticallySuccessfulModifier(_) =>
     case DataFromPeer(SyncInfoNetworkMessage(syncInfo: SyncInfo), remote) =>
+      val extension: Seq[ModifierId] =
+        historyReader.continuationIds(syncInfo, settings.network.syncPacketLength)
       val comparison: HistoryComparisonResult = historyReader.compare(syncInfo)
       logger.info(
         s"\n\nComparison with $remote has starting points ${idsToString(syncInfo.startingPoints)}.\n" +
-          s"Comparison result is $comparison.\n "
+          s"Comparison result is $comparison. Extension length is: ${extension.size}.\n "
       )
       context.parent ! OtherNodeSyncingStatus(remote, comparison)
+      context.parent ! NotifyNodeAboutModifier(remote, Header.modifierTypeId, extension.toList)
 
     case DataFromPeer(InvNetworkMessage(invData: InvData), remote) =>
       if (invData._1 == Payload.modifierTypeId && !historyReader.isFullChainSynced)

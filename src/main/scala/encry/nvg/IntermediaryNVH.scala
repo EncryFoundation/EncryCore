@@ -8,7 +8,13 @@ import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.{ DisableMining, EnableMining, StartMining }
 import encry.mpg.MemoryPool._
 import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, ResponseFromLocal, SendSyncInfo }
+import encry.network.Messages.MessageToNetwork.{
+  BroadcastModifier,
+  NotifyNodeAboutModifier,
+  RequestFromLocal,
+  ResponseFromLocal,
+  SendSyncInfo
+}
 import encry.network.NetworkController.ReceivableMessages.{ DataFromPeer, RegisterMessagesHandler }
 import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
@@ -104,6 +110,7 @@ class IntermediaryNVH(
     case msg @ BroadcastModifier(_, _)               => intermediaryNetwork ! msg
     case msg @ SyntacticallyFailedModification(_, _) => intermediaryNetwork ! msg
     case msg @ SendSyncInfo(_)                       => intermediaryNetwork ! msg
+    case msg @ NotifyNodeAboutModifier(_, _, _)      => intermediaryNetwork ! msg
     case msg @ RequiredManifestHeightAndId(_, _)     => //+ to fast sync
     case msg @ TreeChunks(_, _)                      => //+ to fast sync
     case msg @ FastSyncDone                          =>
