@@ -2,7 +2,6 @@ package encry.view.history
 
 import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Older }
 import encry.modifiers.history.HeaderChain
-import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -44,6 +43,10 @@ trait HistoryReader {
   def syncInfo: SyncInfo
 
   def isFastSyncInProcess: Boolean
+
+  def getBestHeader: Option[Header]
+
+  def getBestBlock: Option[Block]
 }
 
 object HistoryReader {
@@ -64,6 +67,8 @@ object HistoryReader {
     def getBlockByHeader(header: Header): Option[Block]             = None
     def headerIdsAtHeight(height: Int): List[ModifierId]            = List.empty[ModifierId]
     def lastHeaders(count: Int): HeaderChain                        = HeaderChain.empty
+    def getBestHeader: Option[Header]                               = None
+    def getBestBlock: Option[Block]                                 = None
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -83,5 +88,7 @@ object HistoryReader {
     def getBlockByHeaderId(id: ModifierId): Option[Block]           = history.getBlockByHeaderId(id)
     def getBlockByHeader(header: Header): Option[Block]             = history.getBlockByHeader(header)
     def lastHeaders(count: Int): HeaderChain                        = history.lastHeaders(count)
+    def getBestHeader: Option[Header]                               = history.getBestHeader
+    def getBestBlock: Option[Block]                                 = history.getBestBlock
   }
 }
