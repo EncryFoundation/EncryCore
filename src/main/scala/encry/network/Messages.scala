@@ -21,6 +21,6 @@ object Messages {
     final case class BroadcastManifestRequest(manifestId: Array[Byte]) extends MessageToNetwork
     final case class NotifyNodeAboutModifier(source: InetSocketAddress,
                                              modifierTypeId: ModifierTypeId,
-                                             modifierId: ModifierId) extends MessageToNetwork
+                                             modifierId: List[ModifierId]) extends MessageToNetwork
   }
 }
