@@ -33,8 +33,8 @@ class PK(networkSettings: NetworkSettings,
 
   var blackList: BlackList = BlackList(blacklistSettings)
 
-  var knownPeers: Set[InetAddress] = networkSettings.knownPeers
-    .collect { case peer: InetSocketAddress if !isSelf(peer) => peer.getAddress }.toSet
+  var knownPeers: Set[InetSocketAddress] = networkSettings.knownPeers
+    .collect { case peer: InetSocketAddress if !isSelf(peer) => peer }.toSet
 
   var outgoingConnections: Set[InetSocketAddress] = Set.empty
 
@@ -48,15 +48,6 @@ class PK(networkSettings: NetworkSettings,
           PeersNetworkMessage.NetworkMessageTypeID -> "PeersNetworkMessage",
           GetPeersNetworkMessage.NetworkMessageTypeID -> "GetPeersNetworkMessage"
     ), self)
-    context.system.scheduler.schedule(5.seconds, 5.seconds) {
-      context.parent ! UpdatingPeersInfo(
-        peersForConnection.keys.toList,
-        connectedPeers.collect[ConnectedPeer](getAllPeers, getConnectedPeers).map(peer =>
-          (peer.socketAddress, peer.handshake.nodeName, peer.direction)
-        ).toList,
-        blackList.getAll.toList
-      )
-    }
     context.system.scheduler.schedule(600.millis, blacklistSettings.cleanupTime){blackList = blackList.cleanupBlackList}
   }
 
@@ -100,14 +91,16 @@ class PK(networkSettings: NetworkSettings,
           outgoingConnections -= remote
           sender() ! ConnectionVerified(remote, remoteConnection, Outgoing)
         }
-        else if (connectWithOnlyKnownPeers && knownPeers.contains(remote.getAddress)) {
+        else if (connectWithOnlyKnownPeers && knownPeers.contains(remote)) {
           logger.info(s"connectWithOnlyKnownPeers - true, but connected peer is contained in known peers collection.")
+          awaitingHandshakeConnections += remote
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
         else if (connectWithOnlyKnownPeers)
           logger.info(s"Got incoming connection but we can connect only with known peers.")
         else {
           logger.info(s"Got new incoming connection. Sending to network controller approvement for connect.")
+          awaitingHandshakeConnections += remote
           sender() ! ConnectionVerified(remote, remoteConnection, Incoming)
         }
       } else logger.info(s"Connection for requested peer: $remote is unavailable cause of:" +
@@ -126,7 +119,7 @@ class PK(networkSettings: NetworkSettings,
       peersForConnection = peersForConnection.updated(connectedPeer.socketAddress, 0)
       logger.info(s"Adding new peer: ${connectedPeer.socketAddress} to available collection." +
         s" Current collection is: ${peersForConnection.keys.mkString(",")}.")
-
+      updatePeersCollection()
     case ConnectionStopped(peer) =>
       logger.info(s"Connection stopped for: $peer.")
       awaitingHandshakeConnections -= peer
@@ -136,6 +129,7 @@ class PK(networkSettings: NetworkSettings,
         logger.info(s"Peer: $peer removed from availablePeers cause of it has been banned. " +
           s"Current is: ${peersForConnection.mkString(",")}.")
       }
+      updatePeersCollection()
     case predicate: GetPeerByPredicate => connectedPeers.getAll.find {
       case (_, info) => predicate.predicate(info)
     }.map {
@@ -196,6 +190,14 @@ class PK(networkSettings: NetworkSettings,
     networkSettings.declaredAddress.contains(address) ||
     InetAddress.getLocalHost.getAddress.sameElements(address.getAddress.getAddress) ||
     InetAddress.getLoopbackAddress.getAddress.sameElements(address.getAddress.getAddress)).getOrElse(true)
+
+  def updatePeersCollection(): Unit = context.parent ! UpdatingPeersInfo(
+    peersForConnection.keys.toList,
+    connectedPeers.collect[ConnectedPeer](getAllPeers, getConnectedPeers).map(peer =>
+      (peer.socketAddress, peer.handshake.nodeName, peer.direction)
+    ).toList,
+    blackList.getAll.toList
+  )
 
   def getAllPeers: (InetSocketAddress, PeerInfo) => Boolean = (_, _) => true
   def getConnectedPeers(add: InetSocketAddress, info: PeerInfo): ConnectedPeer = info.connectedPeer
