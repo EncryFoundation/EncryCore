@@ -4,30 +4,23 @@ import java.net.InetSocketAddress
 
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
-import encry.consensus.HistoryConsensus
-import encry.consensus.HistoryConsensus.Older
 import encry.modifiers.InstanceFactory
+import encry.network.DM
 import encry.network.DM.RequestSent
-import encry.network.{DM, DeliveryManager}
 import encry.network.DeliveryManagerTests.DMUtils._
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NodeViewSynchronizer.ReceivableMessages._
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
-import encry.network.PeersKeeper.UpdatedPeersCollection
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus.InitialPriority
-import encry.network.PrioritiesCalculator.PeersPriorityStatus.PeersPriorityStatus
-import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
 import encry.settings.TestNetSettings
 import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-import org.encryfoundation.common.network.BasicMessagesRepo.{GetPeersNetworkMessage, Handshake, ModifiersNetworkMessage, PeersNetworkMessage, RequestModifiersNetworkMessage}
+import org.encryfoundation.common.network.BasicMessagesRepo.{Handshake, ModifiersNetworkMessage}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
-import scala.concurrent.duration._
 import scala.collection.mutable.WrappedArray
+import scala.concurrent.duration._
 
 class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   with BeforeAndAfterAll
@@ -55,35 +48,31 @@ class DeliveryManagerReRequestModifiesSpec extends WordSpecLike
   "ReRequestModifies" should {
     "re-ask necessary modifier several times (number of attempts from testNetSettings) and remove modifier from " +
         //todo: move to message builder tests
-//      "expectedModifiers collection after all attempts will expire" in {
-//      val (deliveryManager, _, _, _, _, headersIds, _, _) = initialiseState()
-//
-//      val address1 = new InetSocketAddress("123.123.123.123", 9001)
-//      val handler1: TestProbe = TestProbe()
-//      val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
-//        Handshake(protocolToBytes(testNetSettings.network.appVersion),
-//          "123.123.123.123", Some(address1), System.currentTimeMillis()))
-//
-//      val updatedPeersCollection: Map[InetSocketAddress, (ConnectedPeer, HistoryConsensus.Older.type, PeersPriorityStatus)] =
-//        Map(address1 -> (cp1, Older, InitialPriority))
-//
-//      deliveryManager ! UpdatedPeersCollection(updatedPeersCollection)
-//
-//      val header: ModifierId = headersIds.head
-//
-//      deliveryManager ! RequestSent(cp1.socketAddress, Header.modifierTypeId, header)
-//      handler1.expectMsgAllOf(
-//        testNetSettings.network.deliveryTimeout * (testNetSettings.network.maxDeliveryChecks + 2),
-//        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
-//        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header)),
-//        RequestModifiersNetworkMessage(Header.modifierTypeId -> Seq(header))
-//      )
-//      //this thread sleep is using for expecting modifier removal
-//      Thread.sleep(6000)
-//
-//      assert(deliveryManager.underlyingActor.expectedModifiers.isEmpty)
-//      deliveryManager.stop()
-//    }
+      "expectedModifiers collection after all attempts will expire" in {
+      val (networkRouter, deliveryManager, _, _, _, _, headersIds, _, _) = initialiseState()
+      networkRouter.expectMsg(RegisterMessagesHandler(Seq(
+        ModifiersNetworkMessage.NetworkMessageTypeID -> "ModifiersNetworkMessage",
+      ), deliveryManager.underlying.self))
+      val address1 = new InetSocketAddress("123.123.123.123", 9001)
+      val handler1: TestProbe = TestProbe()
+      val cp1: ConnectedPeer = ConnectedPeer(address1, handler1.ref, Incoming,
+        Handshake(protocolToBytes(testNetSettings.network.appVersion),
+          "123.123.123.123", Some(address1), System.currentTimeMillis()))
+
+      val header: ModifierId = headersIds.head
+
+      deliveryManager ! RequestSent(cp1.socketAddress, Header.modifierTypeId, header)
+      networkRouter.expectMsgAllOf(
+        testNetSettings.network.deliveryTimeout * (testNetSettings.network.maxDeliveryChecks + 2),
+        RequestFromLocal(Some(cp1.socketAddress), Header.modifierTypeId, List(header)),
+        RequestFromLocal(Some(cp1.socketAddress), Header.modifierTypeId, List(header)),
+      )
+      //this thread sleep is using for expecting modifier removal
+      Thread.sleep(6000)
+
+      assert(deliveryManager.underlyingActor.expectedModifiers.isEmpty)
+      deliveryManager.stop()
+    }
     "not re-ask unnecessary modifiers" in {
       val (networkRouter, deliveryManager, _, _, _, _, headersIds, _, _) = initialiseState()
       networkRouter.expectMsg(RegisterMessagesHandler(Seq(

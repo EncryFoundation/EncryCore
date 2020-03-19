@@ -53,8 +53,8 @@ class BlackListTests extends WordSpecLike
       val newBL1 = newBL.cleanupBlackList
       newBL1.contains(peer) shouldBe false
     }
-    "don't remove peer from black list before ban time expired" in {
-      val blackList: BlackList = BlackList(settings.blackList.copy(banTime = 1 millisecond))
+    "not remove peer from black list before ban time expired" in {
+      val blackList: BlackList = BlackList(settings.blackList.copy(banTime = 1 minute))
       val peer: InetAddress = new InetSocketAddress("0.0.0.0", 9000).getAddress
       val newBL = blackList.banPeer(SentInvForPayload, peer)
       val newBL1 = newBL.cleanupBlackList

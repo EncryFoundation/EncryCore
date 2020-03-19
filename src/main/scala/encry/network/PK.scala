@@ -2,7 +2,7 @@ package encry.network
 
 import java.net.{InetAddress, InetSocketAddress}
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.UpdatingPeersInfo
 import encry.network.BlackList.BanReason.SentPeersMessageWithoutRequest

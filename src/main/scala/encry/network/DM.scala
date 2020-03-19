@@ -1,9 +1,7 @@
 package encry.network
 
 import java.net.InetSocketAddress
-
 import akka.actor.{Actor, Props}
-import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.network.DM.{AwaitingRequest, IsRequested, RequestSent, RequestStatus}
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
@@ -16,9 +14,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import cats.syntax.option._
 import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
-
 import scala.collection.mutable
-import scala.concurrent.Future
 
 case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging {
 
