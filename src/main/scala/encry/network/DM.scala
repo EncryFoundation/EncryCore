@@ -15,6 +15,7 @@ import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 import cats.syntax.option._
 import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier}
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 
 import scala.collection.mutable
 import scala.concurrent.Future
@@ -40,18 +41,19 @@ case class DM(networkSettings: NetworkSettings) extends Actor with StrictLogging
           receivedModifiers += toKey(id)
         } else logger.info(s"Receive spam. ModId: ${Algos.encode(id)}!")
       }
-    case RequestSent(peer, modTypeId, modId) if !(expectedModifiers.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId))) =>
+    case RequestSent(peer, modTypeId, modId) if !(expectedModifiers.contains(toKey(modId)) || receivedModifiers.contains(toKey(modId)))=>
       expectedModifiers += toKey(modId)
       context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(
         self ! AwaitingRequest(peer, modTypeId, modId, 1)
       )
     case RequestSent(_, _, _) => //do nothing
-    case AwaitingRequest(peer, modTypeId, modId, attempts) if attempts < networkSettings.maxDeliveryChecks && expectedModifiers.contains(toKey(modId))=>
-      context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))
-      logger.info(s"Re-request modifier ${Algos.encode(modId)}")
-      context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(self !
-        AwaitingRequest(peer, modTypeId, modId, attempts + 1)
-      )
+    case AwaitingRequest(peer, modTypeId, modId, attempts) if
+      attempts <= networkSettings.maxDeliveryChecks && expectedModifiers.contains(toKey(modId)) && modTypeId != Transaction.modifierTypeId =>
+        context.parent ! RequestFromLocal(peer.some, modTypeId, List(modId))
+        logger.info(s"Re-request modifier ${Algos.encode(modId)}")
+        context.system.scheduler.scheduleOnce(networkSettings.deliveryTimeout)(self !
+          AwaitingRequest(peer, modTypeId, modId, attempts + 1)
+        )
     case AwaitingRequest(peer, _, modId, attempts) =>
       logger.info(s"Stop requesting modifier ${Algos.encode(modId)} from peer $peer, qty of attempts $attempts." +
         s" Expected modifier contains: ${expectedModifiers.contains(toKey(modId))}")

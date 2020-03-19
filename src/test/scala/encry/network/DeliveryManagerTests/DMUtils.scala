@@ -24,14 +24,15 @@ object DMUtils extends InstanceFactory {
   def initialiseDeliveryManager(isBlockChainSynced: Boolean,
                                 isMining: Boolean,
                                 settings: EncryAppSettings)
-                               (implicit actorSystem: ActorSystem): (TestActorRef[DM], History) = {
+                               (implicit actorSystem: ActorSystem): (TestProbe, TestActorRef[DM], History) = {
     val history: History = generateDummyHistory(settings)
-    val deliveryManager: TestActorRef[DM] = TestActorRef[DM](DM.props(settings.network))
+    val networkRouter = TestProbe()
+    val deliveryManager: TestActorRef[DM] = TestActorRef[DM](DM.props(settings.network), networkRouter.ref)
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     else deliveryManager ! DisableMining
     if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
-    (deliveryManager, history)
+    (networkRouter, deliveryManager, history)
   }
 
   def generateBlocks(qty: Int, history: History): (History, List[Block]) =
