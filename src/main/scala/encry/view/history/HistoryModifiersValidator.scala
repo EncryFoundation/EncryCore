@@ -64,14 +64,14 @@ trait HistoryModifiersValidator extends HistoryApi {
         s" not greater by 1 than parent's ${parent.height}"))
     _ <- Either.cond(!historyStorage.containsMod(h.id), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
-    _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
+    _ <- Either.cond( if (settings.node.isTestMod) true else realDifficulty(h) >= h.requiredDifficulty, (),
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-    _ <- Either.cond(requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
+    _ <- Either.cond( if (settings.node.isTestMod) true else requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
       HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
     _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < settings.constants.MaxRollbackDepth), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
     powSchemeValidationResult = powScheme.verify(h)
-    _ <- Either.cond(if (settings.node.isTestMod) true else powSchemeValidationResult.isRight, (),
+    _ <- Either.cond( if (settings.node.isTestMod) true else powSchemeValidationResult.isRight, (),
       HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId}" +
         s" caused: $powSchemeValidationResult"))
     _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
