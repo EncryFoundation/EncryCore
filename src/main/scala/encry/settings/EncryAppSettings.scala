@@ -164,4 +164,5 @@ final case class NodeSettings(blocksToKeep: Int,
                               numberOfMiningWorkers: Int,
                               miningDelay: FiniteDuration,
                               offlineGeneration: Boolean,
-                              useCli: Boolean)
+                              useCli: Boolean,
+                              isTestMod: Boolean)

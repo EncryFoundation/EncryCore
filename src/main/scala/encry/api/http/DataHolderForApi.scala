@@ -1,6 +1,7 @@
 package encry.api.http
 
 import java.net.{InetAddress, InetSocketAddress}
+
 import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.pattern._
 import akka.util.Timeout
@@ -18,12 +19,13 @@ import encry.network.BlackList.BanReason.InvalidNetworkMessage
 import encry.network.BlackList.{BanReason, BanTime, BanType}
 import encry.network.ConnectedPeersCollection
 import encry.network.NodeViewSynchronizer.ReceivableMessages._
-import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PeerConnectionHandler.{ConnectedPeer, ConnectionType}
 import encry.network.PeersKeeper.BanPeerFromAPI
+import encry.nvg.NodeViewHolder.{NodeViewChange, UpdateHistoryReader}
 import encry.settings.EncryAppSettings
 import encry.utils.{NetworkTime, NetworkTimeProvider}
-import encry.view.NodeViewHolder.ReceivableMessages.{CreateAccountManagerFromSeed, GetDataFromCurrentView}
-import encry.view.history.History
+import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
+import encry.view.history.{History, HistoryReader}
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -31,6 +33,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.concurrent.Future
 
 class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
@@ -52,7 +55,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
 
   def awaitNVHRef: Receive = {
-    case UpdatedHistory(history) =>
+    case UpdateHistoryReader(history) =>
       unstashAll()
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PassForStorage(_) =>
@@ -61,14 +64,14 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   }
 
   def workingCycle(nvhRef: ActorRef,
-                   blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))] = Seq.empty,
-                   connectedPeers: Seq[ConnectedPeer] = Seq.empty,
-                   history: Option[History] = None,
+                   blackList: List[(InetAddress, (BanReason, BanTime, BanType))] = List.empty,
+                   connectedPeers: List[(InetSocketAddress, String, ConnectionType)] = List.empty,
+                   history: Option[HistoryReader] = None,
                    state: Option[UtxoStateReader] = None,
                    transactionsOnMinerActor: Int = 0,
                    minerStatus: MinerStatus = MinerStatus(isMining = false, None),
                    blockInfo: BlockAndHeaderInfo = BlockAndHeaderInfo(None, None),
-                   allPeers: Seq[InetSocketAddress] = Seq.empty,
+                   allPeers: List[InetSocketAddress] = List.empty,
                    connectedPeersCollection: ConnectedPeersCollection = ConnectedPeersCollection()): Receive = {
 
     case UpdatingTransactionsNumberForApi(qty) =>
@@ -119,7 +122,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case ChangedHistory(reader: History) =>
+    case UpdateHistoryReader(reader: HistoryReader) =>
       context.become(
         workingCycle(nvhRef,
                      blackList,
@@ -227,18 +230,13 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case GetBannedPeersHelper => sender() ! blackList
 
     case GetConnectedPeersHelper => sender() ! connectedPeers
-      .map(
-        peer =>
-              PeerInfoResponse(peer.socketAddress.toString,
-                               Some(peer.handshake.nodeName),
-                               Some(peer.direction.toString)))
-
+      .map(peer => PeerInfoResponse(peer._1.toString, peer._2, peer._3.toString))
 
     case GetLastHeaderIdAtHeightHelper(i) =>
       sender() ! history.toList.flatMap(_.headerIdsAtHeight(i).map(Algos.encode))
 
     case CreateAccountManagerFromSeedHelper(seed) =>
-      (nvhRef ? CreateAccountManagerFromSeed(seed)).mapTo[Either[String, EncryWallet]].pipeTo(sender())
+      //(nvhRef ? CreateAccountManagerFromSeed(seed)).mapTo[Either[String, EncryWallet]].pipeTo(sender())
 
     case GetAllInfoHelper =>
 
@@ -314,9 +312,9 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class UpdatingMinerStatus(minerStatus: MinerStatus) extends AnyVal
 
-  final case class UpdatingPeersInfo(allPeers: Seq[InetSocketAddress],
-                                     connectedPeers: Seq[ConnectedPeer],
-                                     blackList: Seq[(InetAddress, (BanReason, BanTime, BanType))])
+  final case class UpdatingPeersInfo(allPeers: List[InetSocketAddress],
+                                     connectedPeers: List[(InetSocketAddress, String, ConnectionType)],
+                                     blackList: List[(InetAddress, (BanReason, BanTime, BanType))])
 
   final case class BlockAndHeaderInfo(header: Option[Header], block: Option[Block])
 
@@ -330,7 +328,7 @@ object DataHolderForApi { //scalastyle:ignore
 
   final case class GetLastHeaderIdAtHeightHelper(i: Int)
 
-  final case class Readers(h: Option[History], s: Option[UtxoStateReader])
+  final case class Readers(h: Option[HistoryReader], s: Option[UtxoStateReader])
 
   final case class PassForStorage(password: String)
 

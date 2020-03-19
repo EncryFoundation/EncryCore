@@ -1,11 +1,12 @@
 package encry.network.DeliveryManagerTests
 
 import java.net.InetSocketAddress
+
 import akka.actor.ActorSystem
 import akka.testkit.{TestActorRef, TestProbe}
 import encry.local.miner.Miner.{DisableMining, StartMining}
 import encry.modifiers.InstanceFactory
-import encry.network.DeliveryManager
+import encry.network.{DM, DeliveryManager}
 import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.NodeViewSynchronizer.ReceivableMessages.UpdatedHistory
 import encry.network.PeerConnectionHandler.{ConnectedPeer, Incoming}
@@ -14,6 +15,7 @@ import encry.view.history.History
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.network.BasicMessagesRepo.Handshake
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.mutable
 import scala.collection.mutable.WrappedArray
 
@@ -22,16 +24,15 @@ object DMUtils extends InstanceFactory {
   def initialiseDeliveryManager(isBlockChainSynced: Boolean,
                                 isMining: Boolean,
                                 settings: EncryAppSettings)
-                               (implicit actorSystem: ActorSystem): (TestActorRef[DeliveryManager], History) = {
+                               (implicit actorSystem: ActorSystem): (TestProbe, TestActorRef[DM], History) = {
     val history: History = generateDummyHistory(settings)
-    val deliveryManager: TestActorRef[DeliveryManager] =
-      TestActorRef[DeliveryManager](DeliveryManager
-        .props(None, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, TestProbe().ref, settings))
+    val networkRouter = TestProbe()
+    val deliveryManager: TestActorRef[DM] = TestActorRef[DM](DM.props(settings.network), networkRouter.ref)
     deliveryManager ! UpdatedHistory(history)
     if (isMining) deliveryManager ! StartMining
     else deliveryManager ! DisableMining
     if (isBlockChainSynced) deliveryManager ! FullBlockChainIsSynced
-    (deliveryManager, history)
+    (networkRouter, deliveryManager, history)
   }
 
   def generateBlocks(qty: Int, history: History): (History, List[Block]) =

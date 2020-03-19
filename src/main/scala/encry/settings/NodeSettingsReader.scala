@@ -14,6 +14,7 @@ trait NodeSettingsReader {
       cfg.as[Int](s"$path.numberOfMiningWorkers"),
       cfg.as[FiniteDuration](s"$path.miningDelay"),
       cfg.as[Boolean](s"$path.offlineGeneration"),
-      cfg.as[Boolean](s"$path.useCli")
+      cfg.as[Boolean](s"$path.useCli"),
+      cfg.as[Boolean](s"$path.isTestMod")
     )
 }

@@ -2,8 +2,10 @@ package encry.local.miner
 
 import java.text.SimpleDateFormat
 import java.util.Date
+
 import akka.actor.{Actor, ActorRef, Props}
 import akka.util.Timeout
+import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.EncryApp._
@@ -12,16 +14,17 @@ import encry.consensus.{CandidateBlock, EncrySupplyController, EquihashPowScheme
 import encry.local.miner.Miner._
 import encry.local.miner.Worker.NextChallenge
 import encry.modifiers.mempool.TransactionFactory
-import encry.network.DeliveryManager.FullBlockChainIsSynced
-import encry.network.NodeViewSynchronizer.ReceivableMessages.SemanticallySuccessfulModifier
+import encry.network.DeliveryManager
+import encry.network.DeliveryManager.{BlockchainStatus, FullBlockChainIsSynced}
+import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
+import encry.nvg.NodeViewHolder.{GetDataFromCurrentView, SemanticallySuccessfulModifier}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.NodeViewHolder.CurrentView
-import encry.view.NodeViewHolder.ReceivableMessages.{GetDataFromCurrentView, LocallyGeneratedModifier}
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.TransactionsForMiner
+import encry.mpg.MemoryPool._
 import encry.view.state.UtxoState
 import encry.utils.implicits.UTXO._
 import encry.view.wallet.EncryWallet
@@ -34,10 +37,13 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height, ModifierId}
 import org.encryfoundation.common.utils.constants.TestNetConstants
+
 import scala.collection._
 import scala.concurrent.duration._
 
 class Miner(dataHolder: ActorRef,
+            mempool: ActorRef,
+            nvh: ActorRef,
             influx: Option[ActorRef],
             settings: EncryAppSettings) extends Actor with StrictLogging {
 
@@ -55,17 +61,13 @@ class Miner(dataHolder: ActorRef,
   val numberOfWorkers: Int = settings.node.numberOfMiningWorkers
   val powScheme: EquihashPowScheme = EquihashPowScheme(TestNetConstants.n, TestNetConstants.k,
     TestNetConstants.Version, TestNetConstants.PreGenesisHeight, TestNetConstants.MaxTarget)
-  var transactionsPool: IndexedSeq[Transaction] = IndexedSeq.empty[Transaction]
 
   override def preStart(): Unit = {
-    context.system.eventStream.subscribe(self, classOf[ClIMiner])
+    context.system.eventStream.subscribe(self, classOf[MinerMiningCommands])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
-    context.system.scheduler.schedule(5.seconds, 5.seconds)(
-      influx.foreach(_ ! InfoAboutTransactionsFromMiner(transactionsPool.size))
-    )
+    context.system.eventStream.subscribe(self, classOf[BlockchainStatus])
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
       logger.info(s"data holder: $dataHolder. Context: $context")
-      dataHolder ! UpdatingTransactionsNumberForApi(transactionsPool.length)
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
     }
   }
@@ -77,7 +79,10 @@ class Miner(dataHolder: ActorRef,
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
 
-  override def receive: Receive = if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
+  override def receive: Receive = {
+    logger.info(s"settings.node.mining: ${settings.node.mining}. syncingDone: ${syncingDone}")
+    if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
+  }
 
   def mining: Receive = {
     case StartMining if context.children.nonEmpty & syncingDone =>
@@ -94,7 +99,6 @@ class Miner(dataHolder: ActorRef,
           logger.info("Candidate is empty! Producing new candidate!")
           produceCandidate()
       }
-    case TransactionsForMiner(txs) => transactionsPool = transactionsPool ++ txs
     case StartMining => logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       println(s"Miner -> Disable mining context.children.nonEmpty")
@@ -111,7 +115,7 @@ class Miner(dataHolder: ActorRef,
         s" from worker $workerIdx with nonce: ${block.header.nonce}.")
       logger.debug(s"Set previousSelfMinedBlockId: ${Algos.encode(block.id)}")
       killAllWorkers()
-      context.actorSelection("/user/nodeViewHolder") ! LocallyGeneratedModifier(block)
+      nvh ! LocallyGeneratedModifier(block)
       if (settings.influxDB.isDefined) {
         context.actorSelection("/user/statsSender") ! MiningEnd(block.header, workerIdx, context.children.size)
         context.actorSelection("/user/statsSender") ! MiningTime(System.currentTimeMillis() - startTime)
@@ -129,9 +133,11 @@ class Miner(dataHolder: ActorRef,
 
   def miningDisabled: Receive = {
     case EnableMining =>
+      logger.info("Enable mining on miner!")
       context.become(miningEnabled)
       self ! StartMining
     case FullBlockChainIsSynced =>
+      logger.info("Set syncingDone to true")
       syncingDone = true
       if (settings.node.mining) self ! EnableMining
     case DisableMining | SemanticallySuccessfulModifier(_) =>
@@ -142,7 +148,7 @@ class Miner(dataHolder: ActorRef,
       logger.info(s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
         s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
       produceCandidate()
-    case SemanticallySuccessfulModifier(_) =>
+    case SemanticallySuccessfulModifier(_) => logger.info("Got new block. But needNewCandidate - false")
   }
 
   def receiverCandidateBlock: Receive = {
@@ -158,7 +164,9 @@ class Miner(dataHolder: ActorRef,
   }
 
   def chainEvents: Receive = {
-    case FullBlockChainIsSynced => syncingDone = true
+    case FullBlockChainIsSynced =>
+      logger.info("Set syncingDone on miner to true")
+      syncingDone = true
   }
 
   def procCandidateBlock(c: CandidateBlock): Unit = {
@@ -168,10 +176,11 @@ class Miner(dataHolder: ActorRef,
   }
 
   def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
+                      txsFromMempool: List[Transaction],
                       bestHeaderOpt: Option[Header]): CandidateBlock = {
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1)
     val timestamp: Time = timeProvider.estimatedTime
-    val txsU: IndexedSeq[Transaction] = transactionsPool.filter(view.state.validate(_, timestamp, height).isRight).distinct
+    val txsU: List[Transaction] = txsFromMempool.filter(view.state.validate(_, timestamp, height).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
         if (tx.inputs.forall(input => !usedInputsIds.contains(Algos.encode(input.boxId)))) {
@@ -210,46 +219,49 @@ class Miner(dataHolder: ActorRef,
     logger.info(s"Sending candidate block with ${candidate.transactions.length - 1} transactions " +
       s"and 1 coinbase for height $height.")
 
-    transactionsPool = IndexedSeq.empty[Transaction]
     candidate
   }
 
-  def produceCandidate(): Unit =
-    context.actorSelection("/user/nodeViewHolder") ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope] {
-      nodeView =>
-        val producingStartTime: Time = System.currentTimeMillis()
-        startTime = producingStartTime
-        val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)
-        bestHeaderOpt match {
-          case Some(h) => logger.info(s"Best header at height ${h.height}")
-          case None => logger.info(s"No best header opt")
-        }
-        val candidate: CandidateEnvelope =
-          if ((bestHeaderOpt.isDefined &&
-            (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
-            logger.info(s"Starting candidate generation at " +
-              s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
-            if (settings.influxDB.isDefined)
-              context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
-            logger.info("Going to calculate last block:")
-            val envelope: CandidateEnvelope =
-              CandidateEnvelope
-                .fromCandidate(createCandidate(nodeView, bestHeaderOpt))
-            envelope
-          } else CandidateEnvelope.empty
-        candidate
+  def produceCandidate(): Unit = {
+    def lambda(txs: List[Transaction]) = (nodeView: CurrentView[History, UtxoState, EncryWallet]) =>
+    {
+      val producingStartTime: Time = System.currentTimeMillis()
+      startTime = producingStartTime
+      val bestHeaderOpt: Option[Header] = nodeView.history.getBestBlock.map(_.header)
+      bestHeaderOpt match {
+        case Some(h) => logger.info(s"Best header at height ${h.height}")
+        case None => logger.info(s"No best header opt")
+      }
+      val candidate: CandidateEnvelope =
+        if ((bestHeaderOpt.isDefined &&
+          (syncingDone || nodeView.history.isFullChainSynced)) || settings.node.offlineGeneration) {
+          logger.info(s"Starting candidate generation at " +
+            s"${dateFormat.format(new Date(System.currentTimeMillis()))}")
+          if (settings.influxDB.isDefined)
+            context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
+          logger.info("Going to calculate last block:")
+          val envelope: CandidateEnvelope =
+            CandidateEnvelope
+              .fromCandidate(createCandidate(nodeView, txs, bestHeaderOpt))
+          envelope
+        } else CandidateEnvelope.empty
+      candidate
     }
+    (mempool ? SendTransactionsToMiner).mapTo[TransactionsForMiner].foreach { txs =>
+      nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda(txs.txs.toList))
+    }
+  }
 }
 
 object Miner {
 
-  sealed trait ClIMiner
+  sealed trait MinerMiningCommands
 
-  case object DisableMining extends ClIMiner
+  case object DisableMining extends MinerMiningCommands
 
-  case object EnableMining extends ClIMiner
+  case object EnableMining extends MinerMiningCommands
 
-  case object StartMining extends ClIMiner
+  case object StartMining extends MinerMiningCommands
 
   case class MinedBlock(block: Block, workerIdx: Int)
 
@@ -274,6 +286,10 @@ object Miner {
     "candidateBlock" -> r.candidateBlock.map(_.asJson).getOrElse("None".asJson)
   ).asJson
 
-  def props(dataHolder: ActorRef, influx: Option[ActorRef], settings: EncryAppSettings): Props =
-    Props(new Miner(dataHolder, influx, settings))
+  def props(dataHolder: ActorRef,
+            mempool: ActorRef,
+            nvh: ActorRef,
+            influx: Option[ActorRef],
+            settings: EncryAppSettings): Props =
+    Props(new Miner(dataHolder, mempool, nvh, influx, settings))
 }

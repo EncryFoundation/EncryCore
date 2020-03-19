@@ -4,14 +4,14 @@ import java.io.File
 import java.net.InetAddress
 import java.nio.file.Files
 import akka.actor.SupervisorStrategy.Restart
-import akka.actor.{ActorRef, ActorSystem, OneForOneStrategy, Props}
+import akka.actor.{ ActorRef, ActorSystem, OneForOneStrategy, Props }
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model.HttpResponse
 import akka.http.scaladsl.server.ExceptionHandler
 import akka.stream.ActorMaterializer
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.routes._
-import encry.api.http.{ApiRoute, CompositeHttpService}
+import encry.api.http.{ ApiRoute, CompositeHttpService }
 import encry.settings.EncryAppSettings
 import encry.stats.Zombie
 import encry.utils.NetworkTimeProvider
@@ -20,7 +20,7 @@ import kamon.influxdb.InfluxDBReporter
 import kamon.system.SystemMetrics
 import org.encryfoundation.common.utils.Algos
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
+import scala.concurrent.{ Await, ExecutionContextExecutor, Future }
 import scala.io.Source
 import scala.language.postfixOps
 

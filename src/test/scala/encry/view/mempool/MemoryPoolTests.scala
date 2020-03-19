@@ -1,15 +1,25 @@
 package encry.view.mempool
 
-import akka.actor.ActorSystem
-import akka.testkit.{ TestActorRef, TestProbe }
-import com.typesafe.scalalogging.StrictLogging
-import encry.modifiers.InstanceFactory
-import encry.settings.{ EncryAppSettings, TestNetSettings }
-import encry.utils.NetworkTimeProvider
-import encry.view.mempool.MemoryPool.{ NewTransaction, TransactionsForMiner }
-import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
+import java.net.InetSocketAddress
 
 import scala.concurrent.duration._
+import akka.actor.ActorSystem
+import akka.testkit.{TestActorRef, TestProbe}
+import com.typesafe.scalalogging.StrictLogging
+import encry.modifiers.InstanceFactory
+import encry.mpg.MemoryPool.{RolledBackTransactions, TransactionProcessing, UpdateMempoolReader}
+import encry.mpg.{IntermediaryMempool, MemoryPool, MemoryPoolProcessor, MemoryPoolReader, MemoryPoolStorage, TransactionsValidator}
+import encry.network.BlackList.BanReason.SemanticallyInvalidPersistentModifier
+import encry.network.DeliveryManager.FullBlockChainIsSynced
+import encry.network.DeliveryManagerTests.DMUtils.{createPeer, generateBlocks}
+import encry.network.NetworkController.ReceivableMessages.DataFromPeer
+import encry.network.PeerConnectionHandler.ConnectedPeer
+import encry.network.PeersKeeper.BanPeer
+import encry.settings.TestNetSettings
+import encry.utils.NetworkTimeProvider
+import org.encryfoundation.common.modifiers.history.{Block, Header, HeaderProtoSerializer, Payload}
+import org.encryfoundation.common.network.BasicMessagesRepo.ModifiersNetworkMessage
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class MemoryPoolTests
     extends WordSpecLike
@@ -53,25 +63,31 @@ class MemoryPoolTests
       val mempool         = MemoryPoolStorage.empty(testNetSettings, timeProvider)
       val transactions    = (0 until 10).map(k => coinbaseAt(k))
       val (newMempool, _) = mempool.validateTransactions(transactions)
-      val (uPool, txs)    = newMempool.getTransactionsForMiner
-      uPool.size shouldBe 0
+      val txs    = newMempool.getTransactionsForMiner
       txs.map(_.encodedId).forall(transactions.map(_.encodedId).contains) shouldBe true
       transactions.map(_.encodedId).forall(txs.map(_.encodedId).contains) shouldBe true
     }
-  }
-  "Mempool actor" should {
-    "send transactions to miner" in {
-      val miner1 = TestProbe()
-      val mempool1: TestActorRef[MemoryPool] =
-        TestActorRef[MemoryPool](MemoryPool.props(testNetSettings, timeProvider, miner1.ref, Some(TestProbe().ref)))
-      val transactions1 = (0 until 4).map { k =>
-        val a = coinbaseAt(k)
-        a
-      }
-      transactions1.foreach(mempool1 ! NewTransaction(_))
-      mempool1.underlyingActor.memoryPool.size shouldBe 4
-      logger.info(s"generated: ${transactions1.map(_.encodedId)}")
-      miner1.expectMsg(20.seconds, TransactionsForMiner(transactions1))
+    "chainSynced is true on FullBlockChainIsSynced" in {
+      val mP = TestActorRef[MemoryPoolProcessor](MemoryPoolProcessor.props(settings, timeProvider))
+      mP ! FullBlockChainIsSynced
+      mP.underlyingActor.chainSynced shouldBe true
     }
+    "storage changes on RolledBackTransactions" in {
+      val fakeActor = TestProbe()
+      val storage = MemoryPoolStorage.empty(testNetSettings, timeProvider)
+      val memPool = TestActorRef[MemoryPool](MemoryPool.props(settings, timeProvider, Some(fakeActor.ref), fakeActor.ref))
+      val txs = (0 until 10).map(k => coinbaseAt(k))
+      memPool ! RolledBackTransactions(txs)
+      assert(memPool.underlyingActor.memoryPool != storage)
+      memPool.underlyingActor.memoryPool.size shouldBe txs.length
+    }
+    "TransactionProcessing" in {
+      val mP = TestActorRef[MemoryPoolProcessor](MemoryPoolProcessor.props(settings, timeProvider))
+      mP ! TransactionProcessing(true)
+      mP.underlyingActor.canProcessTransactions shouldBe true
+      mP ! TransactionProcessing(false)
+      mP.underlyingActor.canProcessTransactions shouldBe false
+    }
+
   }
 }

@@ -5,8 +5,9 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
-import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
 
 trait HistoryPayloadsProcessor extends HistoryApi {
 
@@ -27,7 +28,8 @@ trait HistoryPayloadsProcessor extends HistoryApi {
         processValidFirstBlock(blockToProcess, header, bestFullChain)
       case Some(header) if isBestBlockDefined && isBetterChain(header.id) =>
         processBetterChain(blockToProcess, header, Seq.empty, settings.node.blocksToKeep)
-      case Some(_) =>
+      case Some(header) =>
+        logger.info(s"\n\nnonBestBlock. id: ${blockToProcess.header.encodedId}. cause: ${isBestBlockDefined} or ${ isBetterChain(header.id)}\n\n")
         nonBestBlock(blockToProcess)
       case None =>
         logger.debug(s"Best full chain is empty. Returning empty progress info")
@@ -54,7 +56,10 @@ trait HistoryPayloadsProcessor extends HistoryApi {
       val toApply: Seq[Block] = newChain.tail.headers
         .flatMap(h => if (h == fullBlock.header) fullBlock.some else getBlockByHeader(h))
       toApply.foreach(addBlockToCacheIfNecessary)
-      if (toApply.lengthCompare(newChain.length - 1) != 0) nonBestBlock(fullBlock)
+      if (toApply.lengthCompare(newChain.length - 1) != 0) {
+        logger.info(s"To apply. processBetterChain. nonBestBlock.")
+        nonBestBlock(fullBlock)
+      }
       else {
         //application of this block leads to full chain with higher score
         logger.info(s"Appending ${fullBlock.encodedId}|${fullBlock.header.height} as a better chain")
@@ -64,7 +69,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
           (fullBlock.header.height > bestHeaderHeight) || (
             (fullBlock.header.height == bestHeaderHeight) &&
               scoreOf(fullBlock.id)
-                .flatMap(fbScore => getBestHeaderId.flatMap(id => scoreOf(id).map(_ < fbScore)))
+                .flatMap(fbScore => getBestHeaderId.flatMap(scoreOf(_).map(_ < fbScore)))
                 .getOrElse(false)
           )
         val updatedHeadersAtHeightIds =
@@ -104,8 +109,19 @@ trait HistoryPayloadsProcessor extends HistoryApi {
       prevBestScore      <- scoreOf(bestFullBlockId)
       score              <- scoreOf(id)
       bestBlockHeight    = getBestBlockHeight
-    } yield (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore))
-      .getOrElse(false)
+    } yield {
+      logger.info(s"isBetterChain. id: ${Algos.encode(id)}. \n " +
+        s"bestBlockHeight: $bestBlockHeight.\n " +
+        s"heightOfThisHeader $heightOfThisHeader.\n " +
+        s"score: $score.\n " +
+        s"prevBestScore: $prevBestScore.\n " +
+        s"res is: ${(bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)}")
+      (bestBlockHeight < heightOfThisHeader) || (bestBlockHeight == heightOfThisHeader && score > prevBestScore)
+    })
+      .getOrElse {
+        logger.info(s"isBetterChain. id: ${Algos.encode(id)}. getOrElse. false.")
+        false
+      }
 
   private def calculateBestFullChain(block: Block): Seq[Block] = {
     val continuations: Seq[Seq[Header]] = continuationHeaderChains(block.header, h => isBlockDefined(h)).map(_.tail)

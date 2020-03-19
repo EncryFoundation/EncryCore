@@ -1,388 +1,330 @@
 package encry.view.fast.sync
 
-import SnapshotChunkProto.SnapshotChunkMessage
-import SnapshotManifestProto.SnapshotManifestProtoMessage
-import akka.actor.{Actor, ActorRef, Cancellable, Props}
+import java.io.File
+
+import akka.actor.ActorRef
 import cats.syntax.either._
 import cats.syntax.option._
-import com.google.protobuf.ByteString
+import com.google.common.primitives.Ints
 import com.typesafe.scalalogging.StrictLogging
-import encry.network.BlackList.BanReason.{InvalidChunkMessage, InvalidResponseManifestMessage, InvalidStateAfterFastSync}
-import encry.network.NetworkController.ReceivableMessages.{DataFromPeer, RegisterMessagesHandler}
-import encry.network.NodeViewSynchronizer.ReceivableMessages.{ChangedHistory, SemanticallySuccessfulModifier}
-import encry.network.PeersKeeper.{BanPeer, SendToNetwork}
-import encry.network.{Broadcast, PeerConnectionHandler}
+import encry.nvg.fast.sync.SnapshotProcessor.{SnapshotChunk, SnapshotChunkSerializer, SnapshotManifest, SnapshotManifestSerializer}
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotChunk
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
 import encry.settings.EncryAppSettings
-import encry.storage.VersionalStorage.{StorageKey, StorageValue}
-import encry.view.fast.sync.FastSyncExceptions.{ApplicableChunkIsAbsent, FastSyncException, UnexpectedChunkMessage}
-import encry.view.fast.sync.SnapshotHolder.SnapshotManifest.{ChunkId, ManifestId}
-import encry.view.fast.sync.SnapshotHolder._
+import encry.storage.{RootNodesStorage, VersionalStorage}
+import encry.storage.VersionalStorage.{StorageKey, StorageType, StorageValue, StorageVersion}
+import encry.storage.iodb.versionalIODB.IODBWrapper
+import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.view.fast.sync.FastSyncExceptions._
 import encry.view.history.History
 import encry.view.state.UtxoState
-import encry.view.state.avlTree.{Node, NodeSerilalizer}
+import encry.view.state.avlTree._
+import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.wallet.EncryWallet
+import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
 import org.encryfoundation.common.modifiers.history.Block
-import org.encryfoundation.common.network.BasicMessagesRepo._
+import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
-import supertagged.TaggedType
-import scala.util.Try
+import org.encryfoundation.common.utils.TaggedTypes.{Height, ModifierId}
+import org.iq80.leveldb.{DB, Options}
+import scorex.utils.Random
 
-class SnapshotHolder(settings: EncryAppSettings,
-                     networkController: ActorRef,
-                     nodeViewHolder: ActorRef,
-                     nodeViewSynchronizer: ActorRef)
-    extends Actor
-    with StrictLogging {
+import scala.collection.immutable.{HashMap, HashSet}
+import scala.language.postfixOps
+import scala.util.{Failure, Success}
 
-  import context.dispatcher
+final case class SnapshotHolder(
+  settings: EncryAppSettings,
+  storage: VersionalStorage,
+  applicableChunks: HashSet[ByteArrayWrapper],
+  chunksCache: HashMap[ByteArrayWrapper, SnapshotChunk],
+  wallet: Option[EncryWallet]
+) extends StrictLogging
+    with SnapshotProcessorStorageAPI
+    with AutoCloseable {
 
-  //todo 1. Add connection agreement (case while peer reconnects with other handler.ref)
+  def updateCache(chunk: SnapshotChunk): SnapshotHolder =
+    this.copy(chunksCache = chunksCache.updated(ByteArrayWrapper(chunk.id), chunk))
 
-  var snapshotProcessor: SnapshotProcessor =
-    SnapshotProcessor.initialize(
-      settings,
-      if (settings.snapshotSettings.enableFastSynchronization) settings.storage.state
-      else settings.storage.snapshotHolder
-    )
-  var snapshotDownloadController: SnapshotDownloadController = SnapshotDownloadController.empty(settings)
-  var requestsProcessor: RequestsPerPeriodProcessor          = RequestsPerPeriodProcessor.empty(settings)
+  def initializeApplicableChunksCache(history: History, height: Int): Either[FastSyncException, SnapshotHolder] =
+    for {
+      stateRoot <- Either.fromOption(
+                    history.getBestHeaderAtHeight(height).map(_.stateRoot),
+                    BestHeaderAtHeightIsAbsent(s"There is no best header at required height $height")
+                  )
+      processor: SnapshotHolder = this.copy(applicableChunks = HashSet(ByteArrayWrapper(stateRoot)))
+      resultedProcessor <- processor.initializeHeightAndRootKeys(stateRoot, height) match {
+                            case Left(error) =>
+                              InitializeHeightAndRootKeysException(error.getMessage).asLeft[SnapshotHolder]
+                            case Right(newProcessor) => newProcessor.asRight[FastSyncException]
+                          }
+    } yield resultedProcessor
 
-  override def preStart(): Unit =
-    if (settings.constants.SnapshotCreationHeight <= settings.constants.MaxRollbackDepth ||
-        (!settings.snapshotSettings.enableFastSynchronization && !settings.snapshotSettings.enableSnapshotCreation)) {
-      logger.info(s"Stop self(~_~)SnapshotHolder(~_~)")
-      context.stop(self)
-    } else {
-      context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
-      logger.info(s"SnapshotHolder started.")
-      networkController ! RegisterMessagesHandler(
-        Seq(
-          RequestManifestMessage.NetworkMessageTypeID  -> "RequestManifest",
-          ResponseManifestMessage.NetworkMessageTypeID -> "ResponseManifestMessage",
-          RequestChunkMessage.NetworkMessageTypeID     -> "RequestChunkMessage",
-          ResponseChunkMessage.NetworkMessageTypeID    -> "ResponseChunkMessage"
-        ),
-        self
+  private def initializeHeightAndRootKeys(rootNodeId: Array[Byte], height: Int): Either[Throwable, SnapshotHolder] =
+    Either.catchNonFatal {
+      storage.insert(
+        StorageVersion @@ Random.randomBytes(),
+        AvlTree.rootNodeKey       -> StorageValue @@ rootNodeId ::
+          UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(height) :: Nil
       )
+      this
     }
 
-  override def receive: Receive = awaitingHistory
+  def reInitStorage: SnapshotHolder =
+    try {
+      storage.close()
+      wallet.foreach(_.close())
+      val stateDir: File  = new File(s"${settings.directory}/state")
+      val walletDir: File = new File(s"${settings.directory}/wallet")
+      import org.apache.commons.io.FileUtils
+      FileUtils.deleteDirectory(stateDir)
+      FileUtils.deleteDirectory(walletDir)
+      SnapshotHolder.initialize(settings, settings.storage.state)
+    } catch {
+      case err: Throwable =>
+        throw new Exception(s"Exception ${err.getMessage} has occurred while restarting fast sync process")
+    }
 
-  def awaitingHistory: Receive = {
-    case ChangedHistory(history) =>
-      if (settings.snapshotSettings.enableFastSynchronization && !history.isBestBlockDefined &&
-          !settings.node.offlineGeneration) {
-        logger.info(s"Start in fast sync regime")
-        context.become(fastSyncMod(history, none).orElse(commonMessages))
-      } else {
-        logger.info(s"Start in snapshot processing regime")
-        context.system.scheduler
-          .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
-        context.become(workMod(history).orElse(commonMessages))
-      }
-    case nonsense => logger.info(s"Snapshot holder got $nonsense while history awaiting")
+  private def flatten(node: Node[StorageKey, StorageValue]): List[Node[StorageKey, StorageValue]] = node match {
+    case shadowNode: ShadowNode[StorageKey, StorageValue] => shadowNode :: Nil
+    case leaf: LeafNode[StorageKey, StorageValue]         => leaf :: Nil
+    case internalNode: InternalNode[StorageKey, StorageValue] =>
+      internalNode :: flatten(internalNode.leftChild) ::: flatten(internalNode.rightChild)
+    case emptyNode: EmptyNode[StorageKey, StorageValue] => List.empty[Node[StorageKey, StorageValue]]
   }
 
-  def fastSyncMod(
-    history: History,
-    responseTimeout: Option[Cancellable]
-  ): Receive = {
-    case DataFromPeer(message, remote) =>
-      logger.debug(s"Snapshot holder got from ${remote.socketAddress} message ${message.NetworkMessageTypeID}.")
-      message match {
-        case ResponseManifestMessage(manifest) =>
-          logger.info(
-            s"Got new manifest message ${Algos.encode(manifest.manifestId.toByteArray)} while processing chunks."
+  def applyChunk(chunk: SnapshotChunk): Either[ChunkApplyError, SnapshotHolder] = {
+    val kSerializer: Serializer[StorageKey]         = implicitly[Serializer[StorageKey]]
+    val vSerializer: Serializer[StorageValue]       = implicitly[Serializer[StorageValue]]
+    val nodes: List[Node[StorageKey, StorageValue]] = flatten(chunk.node)
+    logger.debug(s"applyChunk -> nodes -> ${nodes.map(l => Algos.encode(l.hash) -> Algos.encode(l.key))}")
+    val toApplicable = nodes.collect { case node: ShadowNode[StorageKey, StorageValue] => node }
+    val toStorage = nodes.collect {
+      case leaf: LeafNode[StorageKey, StorageValue]         => leaf
+      case internal: InternalNode[StorageKey, StorageValue] => internal
+    }
+    val nodesToInsert: List[(StorageKey, StorageValue)] = toStorage.flatMap { node =>
+      val fullData: (StorageKey, StorageValue) =
+        StorageKey @@ Algos.hash(kSerializer.toBytes(node.key).reverse) -> StorageValue @@ vSerializer.toBytes(
+          node.value
+        )
+      val shadowData: (StorageKey, StorageValue) =
+        StorageKey @@ node.hash -> StorageValue @@ NodeSerilalizer.toBytes(ShadowNode.childsToShadowNode(node)) //todo probably probably probably
+      fullData :: shadowData :: Nil
+    }
+    val startTime = System.currentTimeMillis()
+    Either.catchNonFatal {
+      storage.insert(StorageVersion @@ Random.randomBytes(), nodesToInsert, List.empty)
+      val boxesToInsert: List[EncryBaseBox] = toStorage.foldLeft(List.empty[EncryBaseBox]) {
+        case (toInsert, i: InternalNode[StorageKey, StorageValue]) =>
+          StateModifierSerializer.parseBytes(i.value, i.key.head) match {
+            case Failure(_) => toInsert
+            case Success(box)
+                if wallet.exists(_.propositions.exists(_.contractHash sameElements box.proposition.contractHash)) =>
+              box :: toInsert
+            case Success(_) => toInsert
+          }
+        case (toInsert, l: LeafNode[StorageKey, StorageValue]) =>
+          StateModifierSerializer.parseBytes(l.value, l.key.head) match {
+            case Failure(_) => toInsert
+            case Success(box)
+                if wallet.exists(_.propositions.exists(_.contractHash sameElements box.proposition.contractHash)) =>
+              box :: toInsert
+            case Success(box) => toInsert
+          }
+      }
+      if (boxesToInsert.nonEmpty)
+        wallet.foreach(
+          _.walletStorage.updateWallet(
+            ModifierId !@@ boxesToInsert.head.id,
+            boxesToInsert,
+            List.empty,
+            settings.constants.IntrinsicTokenId
           )
-        case ResponseChunkMessage(chunk) if snapshotDownloadController.canChunkBeProcessed(remote) =>
-          (for {
-            controllerAndChunk  <- snapshotDownloadController.processRequestedChunk(chunk, remote)
-            (controller, chunk) = controllerAndChunk
-            validChunk          <- snapshotProcessor.validateChunkId(chunk)
-            processor           = snapshotProcessor.updateCache(validChunk)
-            newProcessor <- processor.processNextApplicableChunk(processor).leftFlatMap {
-                             case e: ApplicableChunkIsAbsent => e.processor.asRight[FastSyncException]
-                             case t                          => t.asLeft[SnapshotProcessor]
-                           }
-          } yield (newProcessor, controller)) match {
-            case Left(err: UnexpectedChunkMessage) =>
-              logger.info(s"Error has occurred ${err.error} with peer $remote")
-            case Left(error) =>
-              logger.info(s"Error has occurred: $error")
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage(error.error))
-              restartFastSync(history)
-            case Right((processor, controller))
-                if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty && processor.chunksCache.nonEmpty =>
-              nodeViewSynchronizer ! BanPeer(remote, InvalidChunkMessage("For request is empty, buffer is nonEmpty"))
-              restartFastSync(history)
-            case Right((processor, controller)) if controller.awaitedChunks.isEmpty && controller.isBatchesSizeEmpty =>
-              processor.assembleUTXOState() match {
-                case Right(state) =>
-                  logger.info(s"Tree is valid on Snapshot holder!")
-                  processor.wallet.foreach { wallet: EncryWallet =>
-                    (nodeViewHolder ! FastSyncFinished(state, wallet)).asRight[FastSyncException]
-                  }
-                case _ =>
-                  nodeViewSynchronizer ! BanPeer(remote, InvalidStateAfterFastSync("State after fast sync is invalid"))
-                  restartFastSync(history).asLeft[Unit]
-              }
-            case Right((processor, controller)) =>
-              snapshotDownloadController = controller
-              snapshotProcessor = processor
-              if (snapshotDownloadController.awaitedChunks.isEmpty) self ! RequestNextChunks
-          }
-
-        case ResponseChunkMessage(_) =>
-          logger.info(s"Received chunk from unexpected peer ${remote.socketAddress}")
-
-        case _ =>
-      }
-
-    case RequestNextChunks =>
-      responseTimeout.foreach(_.cancel())
-      (for {
-        controllerAndIds <- snapshotDownloadController.getNextBatchAndRemoveItFromController
-        _                = logger.info(s"Current notYetRequested batches is ${snapshotDownloadController.batchesSize}.")
-      } yield controllerAndIds) match {
-        case Left(err) =>
-          logger.info(s"Error has occurred: ${err.error}")
-          throw new Exception(s"Error has occurred: ${err.error}")
-        case Right(controllerAndIds) =>
-          snapshotDownloadController = controllerAndIds._1
-          controllerAndIds._2.foreach { msg =>
-            snapshotDownloadController.cp.foreach { peer: PeerConnectionHandler.ConnectedPeer =>
-              peer.handlerRef ! msg
-            }
-          }
-          context.become(fastSyncMod(history, timer).orElse(commonMessages))
-      }
-
-    case RequiredManifestHeightAndId(height, manifestId) =>
-      logger.info(
-        s"Snapshot holder while header sync got message RequiredManifestHeight with height $height." +
-          s"New required manifest id is ${Algos.encode(manifestId)}."
-      )
-      snapshotDownloadController = snapshotDownloadController.copy(
-        requiredManifestHeight = height,
-        requiredManifestId = manifestId
-      )
-      restartFastSync(history)
-      self ! BroadcastManifestRequestMessage
-      context.become(awaitManifestMod(none, history).orElse(commonMessages))
-
-    case CheckDelivery =>
-      snapshotDownloadController.awaitedChunks.map { id =>
-        RequestChunkMessage(id.data)
-      }.foreach { msg =>
-        snapshotDownloadController.cp.foreach(peer => peer.handlerRef ! msg)
-      }
-      context.become(fastSyncMod(history, timer).orElse(commonMessages))
-
-    case FastSyncDone =>
-      if (settings.snapshotSettings.enableSnapshotCreation) {
-        logger.info(s"Snapshot holder context.become to snapshot processing")
-        snapshotProcessor = SnapshotProcessor.recreateAfterFastSyncIsDone(settings)
-        snapshotDownloadController.storage.close()
-        context.system.scheduler
-          .scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
-        context.become(workMod(history).orElse(commonMessages))
-      } else {
-        logger.info(s"Stop processing snapshots")
-        context.stop(self)
-      }
+        )
+      logger.debug(s"Time of chunk's insertion into db is: ${(System.currentTimeMillis() - startTime) / 1000}s")
+    } match {
+      case Right(_) =>
+        logger.info(s"Chunk ${Algos.encode(chunk.id)} applied successfully.")
+        val newApplicableChunk = (applicableChunks -- toStorage.map(node => ByteArrayWrapper(node.hash))) ++
+          toApplicable.map(node => ByteArrayWrapper(node.hash))
+        this.copy(applicableChunks = newApplicableChunk).asRight[ChunkApplyError]
+      case Left(exception) => ChunkApplyError(exception.getMessage).asLeft[SnapshotHolder]
+    }
   }
 
-  def awaitManifestMod(
-    responseManifestTimeout: Option[Cancellable],
-    history: History
-  ): Receive = {
-    case BroadcastManifestRequestMessage =>
-      logger.info(
-        s"Snapshot holder got HeaderChainIsSynced. Broadcasts request for new manifest with id " +
-          s"${Algos.encode(snapshotDownloadController.requiredManifestId)}"
-      )
-      nodeViewSynchronizer ! SendToNetwork(RequestManifestMessage(snapshotDownloadController.requiredManifestId),
-                                           Broadcast)
-      val newScheduler = context.system.scheduler.scheduleOnce(settings.snapshotSettings.manifestReAskTimeout) {
-        logger.info(s"Trigger scheduler for re-request manifest")
-        self ! BroadcastManifestRequestMessage
-      }
-      logger.info(s"Start awaiting manifest network message.")
-      context.become(awaitManifestMod(newScheduler.some, history).orElse(commonMessages))
+  def validateChunkId(chunk: SnapshotChunk): Either[ChunkValidationError, SnapshotChunk] =
+    if (chunk.node.hash.sameElements(chunk.id)) chunk.asRight[ChunkValidationError]
+    else
+      InconsistentChunkId(
+        s"Node hash:(${Algos.encode(chunk.node.hash)}) doesn't equal to chunk id:(${Algos.encode(chunk.id)})"
+      ).asLeft[SnapshotChunk]
 
-    case DataFromPeer(message, remote) =>
-      message match {
-        case ResponseManifestMessage(manifest) =>
-          val isValidManifest: Boolean =
-            snapshotDownloadController.checkManifestValidity(manifest.manifestId.toByteArray, history)
-          val canBeProcessed: Boolean = snapshotDownloadController.canNewManifestBeProcessed
-          if (isValidManifest && canBeProcessed) {
-            (for {
-              controller <- snapshotDownloadController.processManifest(manifest, remote, history)
-              processor <- snapshotProcessor.initializeApplicableChunksCache(
-                            history,
-                            snapshotDownloadController.requiredManifestHeight
-                          )
-            } yield (controller, processor)) match {
-              case Left(error) =>
-                nodeViewSynchronizer ! BanPeer(remote, InvalidResponseManifestMessage(error.error))
-              case Right((controller, processor)) =>
-                logger.debug(s"Request manifest message successfully processed.")
-                responseManifestTimeout.foreach(_.cancel())
-                snapshotDownloadController = controller
-                snapshotProcessor = processor
-                self ! RequestNextChunks
-                logger.debug("Manifest processed successfully.")
-                context.become(fastSyncMod(history, none))
-            }
-          } else if (!isValidManifest) {
-            logger.info(s"Got manifest with invalid id ${Algos.encode(manifest.manifestId.toByteArray)}")
-            nodeViewSynchronizer ! BanPeer(
-              remote,
-              InvalidResponseManifestMessage(s"Invalid manifest id ${Algos.encode(manifest.manifestId.toByteArray)}")
-            )
-          } else logger.info(s"Doesn't need to process new manifest.")
-        case _ =>
-      }
+  private def getNextApplicableChunk: Either[FastSyncException, (SnapshotChunk, SnapshotHolder)] =
+    for {
+      idAndChunk <- Either.fromOption(chunksCache.find { case (id, _) => applicableChunks.contains(id) },
+                                      ApplicableChunkIsAbsent("There are no applicable chunks in cache", this))
+      (id: ByteArrayWrapper, chunk: SnapshotChunk)             = idAndChunk
+      newChunksCache: HashMap[ByteArrayWrapper, SnapshotChunk] = chunksCache - id
+    } yield {
+      logger.debug(s"getNextApplicableChunk get from cache -> ${Algos.encode(id.data)}")
+      (chunk, this.copy(chunksCache = newChunksCache))
+    }
 
-    case msg @ RequiredManifestHeightAndId(_, _) =>
-      self ! msg
-      responseManifestTimeout.foreach(_.cancel())
-      logger.info(s"Got RequiredManifestHeightAndId while awaitManifestMod")
-      context.become(fastSyncMod(history, none))
+  def processNextApplicableChunk(snapshotProcessor: SnapshotHolder): Either[FastSyncException, SnapshotHolder] =
+    for {
+      chunkAndProcessor  <- snapshotProcessor.getNextApplicableChunk
+      (chunk, processor) = chunkAndProcessor
+      resultedProcessor  <- processor.applyChunk(chunk)
+      processor          <- resultedProcessor.processNextApplicableChunk(resultedProcessor)
+    } yield processor
+
+  def assembleUTXOState(influxRef: Option[ActorRef] = None): Either[UtxoCreationError, UtxoState] =
+    for {
+      rootNode <- getRootNode
+      height   <- getHeight
+      //todo: remove RootNodesStorage.emptyRootStorage
+      avlTree = new AvlTree[StorageKey, StorageValue](rootNode, storage, RootNodesStorage.emptyRootStorage)
+    } yield UtxoState(avlTree, height, settings.constants, influxRef)
+
+  private def getHeight: Either[EmptyHeightKey, Height] =
+    Either.fromOption(storage.get(UtxoState.bestHeightKey).map(Height @@ Ints.fromByteArray(_)),
+                      EmptyHeightKey("bestHeightKey is empty"))
+
+  private def getRootNodeId: Either[EmptyRootNodeError, StorageKey] =
+    Either.fromOption(
+      storage.get(AvlTree.rootNodeKey).map(StorageKey !@@ _),
+      EmptyRootNodeError("Root node key doesn't exist")
+    )
+
+  private def getNode(nodeId: Array[Byte]): Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
+    Either.fromOption(
+      storage.get(StorageKey @@ nodeId).map(NodeSerilalizer.fromBytes[StorageKey, StorageValue](_)),
+      EmptyRootNodeError(s"Node with id ${Algos.encode(nodeId)} doesn't exist")
+    )
+
+  private def getRootNode: Either[EmptyRootNodeError, Node[StorageKey, StorageValue]] =
+    for {
+      rootNodeId <- getRootNodeId
+      node       <- getNode(rootNodeId)
+    } yield node
+
+  def processNewBlock(block: Block, history: History): Either[ProcessNewBlockError, SnapshotHolder] = {
+    logger.info(
+      s"Start updating actual manifest to new one at height " +
+        s"${block.header.height} with block id ${block.encodedId}."
+    )
+    updateActualSnapshot(history, block.header.height - settings.constants.MaxRollbackDepth)
   }
 
-  def workMod(history: History): Receive = {
-    case TreeChunks(chunks, id) =>
-      val manifestIds: Seq[Array[Byte]] = snapshotProcessor.potentialManifestsIds
-      if (!manifestIds.exists(_.sameElements(id))) {
-        snapshotProcessor.createNewSnapshot(ManifestId @@ id, manifestIds, chunks)
-      } else logger.info(s"Doesn't need to create snapshot")
+  def createNewSnapshot(
+    id: ManifestId,
+    manifestIds: Seq[Array[Byte]],
+    newChunks: List[SnapshotChunk]
+  ): Either[ProcessNewSnapshotError, SnapshotHolder] = {
+    //todo add only exists chunks
+    val manifest: SnapshotManifest = SnapshotManifest(id, newChunks.map(_.id))
+    val snapshotToDB: List[(StorageKey, StorageValue)] = newChunks.map { elem =>
+      val bytes: Array[Byte] = SnapshotChunkSerializer.toProto(elem).toByteArray
+      StorageKey @@ elem.id -> StorageValue @@ bytes
+    }
+    val manifestToDB: (StorageKey, StorageValue) =
+      StorageKey @@ manifest.manifestId -> StorageValue @@ SnapshotManifestSerializer
+        .toProto(manifest)
+        .toByteArray
+    val updateList: (StorageKey, StorageValue) =
+      PotentialManifestsIdsKey -> StorageValue @@ (manifest.manifestId :: manifestIds.toList).flatten.toArray
+    val toApply: List[(StorageKey, StorageValue)] = manifestToDB :: updateList :: snapshotToDB
+    logger.info(s"A new snapshot created successfully. Insertion started.")
+    Either.catchNonFatal(storage.insert(StorageVersion @@ Random.randomBytes(), toApply, List.empty)) match {
+      case Left(value) => ProcessNewSnapshotError(value.getMessage).asLeft[SnapshotHolder]
+      case Right(_)    => this.asRight[ProcessNewSnapshotError]
+    }
+  }
 
-    case SemanticallySuccessfulModifier(block: Block) if history.isFullChainSynced =>
-      logger.info(s"Snapshot holder got semantically successful modifier message. Started processing it.")
-      val condition: Int =
-        (block.header.height - settings.constants.MaxRollbackDepth) % settings.constants.SnapshotCreationHeight
-      logger.info(s"condition = $condition")
-      if (condition == 0) snapshotProcessor.processNewBlock(block, history) match {
-        case Left(_) =>
-        case Right(newProcessor) =>
-          snapshotProcessor = newProcessor
-          requestsProcessor = RequestsPerPeriodProcessor.empty(settings)
-          nodeViewHolder ! RemoveRedundantManifestIds
+  private def updateActualSnapshot(history: History, height: Int): Either[ProcessNewBlockError, SnapshotHolder] =
+    for {
+      bestManifestId <- Either.fromOption(
+                         history.getBestHeaderAtHeight(height).map(header => Algos.hash(header.stateRoot ++ header.id)),
+                         ProcessNewBlockError(s"There is no best header at height $height")
+                       )
+      processor <- {
+        logger.info(s"Expected manifest id at height $height is ${Algos.encode(bestManifestId)}")
+        val manifestIdsToRemove: Seq[Array[Byte]]    = potentialManifestsIds.filterNot(_.sameElements(bestManifestId))
+        val manifestsToRemove: Seq[SnapshotManifest] = manifestIdsToRemove.flatMap(l => manifestById(StorageKey @@ l))
+        val chunksToRemove: Set[ByteArrayWrapper] =
+          manifestsToRemove.flatMap(_.chunksKeys.map(ByteArrayWrapper(_))).toSet
+        val newActualManifest: Option[SnapshotManifest] = manifestById(StorageKey @@ bestManifestId)
+        val excludedIds: Set[ByteArrayWrapper] =
+          newActualManifest.toList.flatMap(_.chunksKeys.map(ByteArrayWrapper(_))).toSet
+        val resultedChunksToRemove: List[Array[Byte]] = chunksToRemove.diff(excludedIds).map(_.data).toList
+        val toDelete: List[Array[Byte]] =
+          PotentialManifestsIdsKey :: manifestIdsToRemove.toList ::: resultedChunksToRemove
+        val toApply: (StorageKey, StorageValue) = ActualManifestKey -> StorageValue @@ bestManifestId
+        Either.catchNonFatal(
+          storage.insert(StorageVersion @@ Random.randomBytes(), List(toApply), toDelete.map(StorageKey @@ _))
+        ) match {
+          case Left(error) => ProcessNewBlockError(error.getMessage).asLeft[SnapshotHolder]
+          case Right(_)    => this.asRight[ProcessNewBlockError]
+        }
       }
+    } yield processor
 
-    case DataFromPeer(message, remote) =>
-      message match {
-        case RequestManifestMessage(requiredManifestId)
-            if requestsProcessor.canBeProcessed(snapshotProcessor, requiredManifestId) =>
-          snapshotProcessor.actualManifest.foreach { m =>
-            logger.info(s"Sent to remote actual manifest with id ${Algos.encode(requiredManifestId)}")
-            remote.handlerRef ! ResponseManifestMessage(SnapshotManifestSerializer.toProto(m))
-          }
-        case RequestManifestMessage(manifest) =>
-          logger.debug(s"Got request for manifest with ${Algos.encode(manifest)}")
-        case RequestChunkMessage(chunkId) if requestsProcessor.canProcessRequest(remote) =>
-          logger.debug(s"Got RequestChunkMessage. Current handledRequests ${requestsProcessor.handledRequests}.")
-          val chunkFromDB: Option[SnapshotChunkMessage] = snapshotProcessor.getChunkById(chunkId)
-          chunkFromDB.foreach { chunk =>
-            logger.debug(s"Sent to $remote chunk $chunk.")
-            val networkMessage: NetworkMessage = ResponseChunkMessage(chunk)
-            remote.handlerRef ! networkMessage
-          }
-          requestsProcessor = requestsProcessor.processRequest(remote)
-        case RequestChunkMessage(_) =>
-        case _                      =>
-      }
-    case DropProcessedCount =>
-      requestsProcessor = requestsProcessor.iterationProcessing
-      context.system.scheduler.scheduleOnce(settings.snapshotSettings.updateRequestsPerTime)(self ! DropProcessedCount)
-  }
-
-  def commonMessages: Receive = {
-    case HeaderChainIsSynced               =>
-    case SemanticallySuccessfulModifier(_) =>
-    case nonsense                          => logger.info(s"Snapshot holder got strange message $nonsense.")
-  }
-
-  def restartFastSync(history: History): Unit = {
-    logger.info(s"Restart fast sync!")
-    snapshotDownloadController = snapshotDownloadController.reInitFastSync
-    snapshotProcessor = snapshotProcessor.reInitStorage
-  }
-
-  def timer: Option[Cancellable] =
-    context.system.scheduler.scheduleOnce(settings.snapshotSettings.responseTimeout)(self ! CheckDelivery).some
+  override def close(): Unit = storage.close()
 }
 
-object SnapshotHolder {
+object SnapshotHolder extends StrictLogging {
 
-  case object RemoveRedundantManifestIds
+  def initialize(settings: EncryAppSettings, storageType: StorageType): SnapshotHolder =
+    if (settings.snapshotSettings.enableFastSynchronization)
+      create(settings, new File(s"${settings.directory}/state"), storageType)
+    else
+      create(settings, getDirProcessSnapshots(settings), storageType)
 
-  final case object BroadcastManifestRequestMessage
-
-  final case class FastSyncFinished(state: UtxoState, wallet: EncryWallet)
-
-  final case class TreeChunks(list: List[SnapshotChunk], id: Array[Byte])
-
-  case object DropProcessedCount
-
-  final case class RequiredManifestHeightAndId(height: Int, manifestId: Array[Byte])
-
-  final case class UpdateSnapshot(bestBlock: Block, state: UtxoState)
-
-  case object FastSyncDone
-
-  case object CheckDelivery
-
-  case object RequestNextChunks
-
-  case object HeaderChainIsSynced
-
-  import encry.view.state.avlTree.utils.implicits.Instances._
-
-  final case class SnapshotManifest(manifestId: ManifestId, chunksKeys: List[ChunkId])
-  object SnapshotManifest {
-    type ChunkId = ChunkId.Type
-    object ChunkId extends TaggedType[Array[Byte]]
-    type ManifestId = ManifestId.Type
-    object ManifestId extends TaggedType[Array[Byte]]
+  def recreateAfterFastSyncIsDone(settings: EncryAppSettings): SnapshotHolder = {
+    val snapshotStorage = getDirProcessSnapshots(settings)
+    snapshotStorage.mkdirs()
+    val storage: VersionalStorage =
+      settings.storage.snapshotHolder match {
+        case VersionalStorage.IODB =>
+          logger.info("Init snapshots holder with iodb storage")
+          IODBWrapper(new LSMStore(snapshotStorage, keepVersions = settings.constants.DefaultKeepVersions))
+        case VersionalStorage.LevelDB =>
+          logger.info("Init snapshots holder with levelDB storage")
+          val levelDBInit: DB = LevelDbFactory.factory.open(snapshotStorage, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+      }
+    new SnapshotHolder(settings, storage, HashSet.empty, HashMap.empty, none[EncryWallet])
   }
 
-  final case class SnapshotChunk(node: Node[StorageKey, StorageValue], id: ChunkId)
+  def getDirProcessSnapshots(settings: EncryAppSettings): File = new File(s"${settings.directory}/snapshots")
 
-  object SnapshotManifestSerializer {
+  def create(settings: EncryAppSettings, snapshotsDir: File, storageType: StorageType): SnapshotHolder = {
+    snapshotsDir.mkdirs()
+    val storage: VersionalStorage =
+      storageType match {
+        case VersionalStorage.IODB =>
+          logger.info("Init snapshots holder with iodb storage")
+          IODBWrapper(new LSMStore(snapshotsDir, keepVersions = settings.constants.DefaultKeepVersions))
+        case VersionalStorage.LevelDB =>
+          logger.info("Init snapshots holder with levelDB storage")
+          val levelDBInit: DB = LevelDbFactory.factory.open(snapshotsDir, new Options)
+          VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB, keySize = 32))
+      }
 
-    def toProto(manifest: SnapshotManifest): SnapshotManifestProtoMessage =
-      SnapshotManifestProtoMessage()
-        .withManifestId(ByteString.copyFrom(manifest.manifestId))
-        .withChunksIds(manifest.chunksKeys.map(ByteString.copyFrom))
+    val wallet: Option[EncryWallet] =
+      if (settings.snapshotSettings.enableFastSynchronization)
+        EncryWallet
+          .readOrGenerate(
+            new File(s"${settings.directory}/wallet"),
+            new File(s"${settings.directory}/keys"),
+            settings
+          )
+          .some
+      else none[EncryWallet]
 
-    def fromProto(manifest: SnapshotManifestProtoMessage): Try[SnapshotManifest] = Try(
-      SnapshotManifest(
-        ManifestId @@ manifest.manifestId.toByteArray,
-        manifest.chunksIds.map(raw => ChunkId @@ raw.toByteArray).toList
-      )
-    )
+    new SnapshotHolder(settings, storage, HashSet.empty, HashMap.empty, wallet)
   }
-
-  object SnapshotChunkSerializer extends StrictLogging {
-
-    def toProto(chunk: SnapshotChunk): SnapshotChunkMessage =
-      SnapshotChunkMessage()
-        .withChunk(NodeSerilalizer.toProto(chunk.node))
-        .withId(ByteString.copyFrom(chunk.id))
-
-    def fromProto[K, V](chunk: SnapshotChunkMessage): Try[SnapshotChunk] = Try(
-      SnapshotChunk(NodeSerilalizer.fromProto(chunk.chunk.get), ChunkId @@ chunk.id.toByteArray)
-    )
-  }
-
-  def props(settings: EncryAppSettings,
-            networkController: ActorRef,
-            nodeViewHolderRef: ActorRef,
-            nodeViewSynchronizer: ActorRef): Props = Props(
-    new SnapshotHolder(settings, networkController, nodeViewHolderRef, nodeViewSynchronizer)
-  )
-
 }

@@ -12,7 +12,7 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp.timeProvider
 import encry.network.PeerConnectionHandler.{AwaitingHandshake, CommunicationState, _}
 import encry.network.PeerConnectionHandler.ReceivableMessages._
-import encry.network.PeersKeeper.{ConnectionStopped, HandshakedDone}
+import encry.network.PeersKeeper.ConnectionStatusMessages.{ConnectionStopped, HandshakedDone}
 import encry.settings.NetworkSettings
 import org.encryfoundation.common.network.BasicMessagesRepo.{GeneralizedNetworkMessage, Handshake, NetworkMessage}
 import org.encryfoundation.common.utils.Algos

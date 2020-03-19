@@ -1,17 +1,20 @@
 package encry.storage
 
-import java.io.{ BufferedOutputStream, File, FileOutputStream }
-import java.nio.file.{ Files, Paths }
-import cats.kernel.{ Monoid, Order }
+import java.io.{BufferedOutputStream, File, FileOutputStream}
+import java.nio.file.{Files, Paths}
+
+import cats.kernel.{Monoid, Order}
 import com.google.common.primitives.Ints
+import com.typesafe.scalalogging.StrictLogging
 import encry.storage.VersionalStorage.StorageVersion
-import encry.view.state.avlTree.utils.implicits.{ Hashable, Serializer }
-import encry.view.state.avlTree.{ AvlTree, EmptyNode, Node, NodeSerilalizer }
+import encry.view.state.avlTree.utils.implicits.{Hashable, Serializer}
+import encry.view.state.avlTree.{AvlTree, EmptyNode, Node, NodeSerilalizer}
 import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.Height
-import org.iq80.leveldb.{ DB, ReadOptions }
+import org.iq80.leveldb.{DB, ReadOptions}
 import scorex.utils.Random
+
 import scala.util.Try
 
 trait RootNodesStorage[K, V] extends AutoCloseable {
@@ -29,7 +32,7 @@ object RootNodesStorage {
   def apply[K: Serializer: Monoid: Hashable: Order,
             V: Serializer: Monoid: Hashable](storage: DB,
                                              rollbackDepth: Int,
-                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] with AutoCloseable {
+                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] with AutoCloseable with StrictLogging {
 
     private def atHeightKey(height: Height): Array[Byte] = Ints.toByteArray(height)
 
@@ -47,6 +50,8 @@ object RootNodesStorage {
         val bos       = new BufferedOutputStream(new FileOutputStream(fileToAdd))
         try {
           val newSafePointHeight     = Math.max(0, height - rollbackDepth)
+          logger.info(s"new safe point height: ${newSafePointHeight}")
+          logger.info(s"write to file root node with hash: ${Algos.encode(rootNode.hash)}")
           val newSafePointSerialized = Ints.toByteArray(newSafePointHeight)
           val fileToDelete           = new File(rootsPath.getAbsolutePath ++ s"/${newSafePointHeight - rollbackDepth}")
           if (fileToDelete.exists()) fileToDelete.delete()
@@ -73,11 +78,14 @@ object RootNodesStorage {
         val newRootNode = insertionInfo
           .foldLeft(avlTree) {
             case (tree, (height, (toInsert, toDelete))) =>
+              logger.info(s"Previous tree hash: ${Algos.encode(tree.rootNode.hash)}")
               val newTree = tree.insertAndDeleteMany(
                 StorageVersion @@ Random.randomBytes(),
                 toInsert,
                 toDelete
               )
+              logger.info(s"Current safe point: ${safePointHeight}")
+              logger.info(s"After insertion at height ${height} state root: ${Algos.encode(newTree.rootNode.hash)}")
               if (height == currentSafePoint + rollbackDepth) {
                 batch.put(Ints.toByteArray(currentSafePoint + rollbackDepth), NodeSerilalizer.toBytes(newTree.rootNode))
               }

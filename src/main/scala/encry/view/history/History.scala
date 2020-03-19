@@ -1,6 +1,8 @@
 package encry.view.history
 
 import java.io.File
+
+import cats.syntax.either._
 import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
@@ -10,14 +12,12 @@ import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
 import encry.utils.NetworkTimeProvider
 import encry.view.history.storage.HistoryStorage
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
-import cats.syntax.either._
-import supertagged.@@
 
 /**
   * History implementation. It is processing persistent modifiers generated locally or received from the network.
@@ -177,17 +177,16 @@ object History extends StrictLogging {
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
       new History with HistoryHeadersProcessor with FastSyncProcessor {
         override val settings: EncryAppSettings = settingsEncry
-        override var isFullChainSynced: Boolean = settings.node.offlineGeneration
+        override var isFullChainSynced: Boolean = settingsEncry.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
     else
       new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
         override val settings: EncryAppSettings = settingsEncry
-        override var isFullChainSynced: Boolean = settings.node.offlineGeneration
+        override var isFullChainSynced: Boolean = settingsEncry.node.offlineGeneration
         override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
-
   }
 }
