@@ -57,6 +57,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   def awaitNVHRef: Receive = {
     case UpdateHistoryReader(history) =>
       unstashAll()
+      logger.info("Got updated history at nvh")
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
     case PassForStorage(_) =>
       stash()
