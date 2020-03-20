@@ -80,7 +80,7 @@ object NVHState extends StrictLogging {
     val stateDir: File = UtxoState.getStateDir(settings)
     val rootsDir: File = UtxoState.getRootsDir(settings)
     val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
-    Props(new NVHState(influxRef, state))
+    Props(new NVHState(influxRef, state, settings))
   }
 
   //restoreConsistentState
@@ -95,7 +95,7 @@ object NVHState extends StrictLogging {
       influxRef,
       settings
     )
-    Props(new NVHState(influxRef, state))
+    Props(new NVHState(influxRef, state, settings))
   }
 
   //rollback
@@ -141,7 +141,7 @@ object NVHState extends StrictLogging {
       constants,
       influxRef
     ).get
-    Props(new NVHState(influxRef, state))
+    Props(new NVHState(influxRef, state, settings))
   }
 
   def restoreConsistentState(stateIn: UtxoState,
