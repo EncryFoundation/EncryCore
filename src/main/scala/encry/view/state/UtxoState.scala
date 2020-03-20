@@ -260,7 +260,7 @@ object UtxoState extends StrictLogging {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions, keySize = 33))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
@@ -297,7 +297,8 @@ object UtxoState extends StrictLogging {
     }
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
-      initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))
+      initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes)) :+
+        (StorageKey @@ UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(-1))
     )
     UtxoState(AvlTree[StorageKey, StorageValue](storage, rootStorage), Height @@ 0, settings.constants, influxRef)
   }

@@ -35,7 +35,8 @@ import encry.view.state.avlTree.utils.implicits.Instances._
 
 import scala.util.Try
 
-class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: EncryAppSettings) extends Actor {
+class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: EncryAppSettings)
+  extends Actor with StrictLogging with AutoCloseable {
 
   override def preStart(): Unit = context.parent ! RegisterState
 
@@ -50,6 +51,7 @@ class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: Encr
             case _                                     =>
           }
           state = stateAfterApply
+          logger.info(s"Successfully apply modifier: ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId}")
           context.parent ! ModifierApplied(modifier.id)
         case Left(e: List[ModifierApplyError]) =>
           logger.info(s"Application to state failed cause $e")
@@ -62,6 +64,13 @@ class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: Encr
         state.tree.avlStorage
       )
   }
+
+  override def postStop(): Unit = {
+    logger.info("Close state!")
+    state.close()
+  }
+
+  override def close(): Unit = state.close()
 }
 
 object NVHState extends StrictLogging {
@@ -83,7 +92,9 @@ object NVHState extends StrictLogging {
   //genesis state
   def genesisProps(settings: EncryAppSettings, influxRef: Option[ActorRef]): Props = {
     val stateDir: File = UtxoState.getStateDir(settings)
+    stateDir.mkdir()
     val rootsDir: File = UtxoState.getRootsDir(settings)
+    rootsDir.mkdir()
     val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
     Props(new NVHState(influxRef, state, settings))
   }
@@ -91,10 +102,12 @@ object NVHState extends StrictLogging {
   //restoreConsistentState
   def restoreConsistentStateProps(settings: EncryAppSettings,
                                   historyReader: HistoryReader,
-                                  influxRef: Option[ActorRef]): Option[Props] = {
+                                  influxRef: Option[ActorRef]): Try[Props] = {
     Try {
       val stateDir: File = UtxoState.getStateDir(settings)
+      stateDir.mkdirs()
       val rootsDir: File = UtxoState.getRootsDir(settings)
+      rootsDir.mkdir()
       val state: UtxoState = restoreConsistentState(
         UtxoState.create(stateDir, rootsDir, settings, influxRef),
         historyReader,
@@ -102,7 +115,7 @@ object NVHState extends StrictLogging {
         settings
       )
       Props(new NVHState(influxRef, state, settings))
-    }.toOption
+    }
   }
 
   //rollback
