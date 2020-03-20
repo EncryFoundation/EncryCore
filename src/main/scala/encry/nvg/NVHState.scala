@@ -7,6 +7,7 @@ import cats.syntax.option.none
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterState
 import encry.nvg.NVHState.StateAction.{ApplyFailed, ApplyModifier, CreateTreeChunks, ModifierApplied}
 import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, UpdateInformation}
 import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
@@ -32,7 +33,11 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.iq80.leveldb.Options
 import encry.view.state.avlTree.utils.implicits.Instances._
 
+import scala.util.Try
+
 class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: EncryAppSettings) extends Actor {
+
+  override def preStart(): Unit = context.parent ! RegisterState
 
   override def receive: Receive = {
     case ApplyModifier(modifier: PersistentModifier,
@@ -76,7 +81,7 @@ object NVHState extends StrictLogging {
   }
 
   //genesis state
-  def props(settings: EncryAppSettings, branchPoint: ModifierId, influxRef: Option[ActorRef]): Props = {
+  def genesisProps(settings: EncryAppSettings, influxRef: Option[ActorRef]): Props = {
     val stateDir: File = UtxoState.getStateDir(settings)
     val rootsDir: File = UtxoState.getRootsDir(settings)
     val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
@@ -84,18 +89,20 @@ object NVHState extends StrictLogging {
   }
 
   //restoreConsistentState
-  def props(settings: EncryAppSettings,
-            historyReader: HistoryReader,
-            influxRef: Option[ActorRef]): Props = {
-    val stateDir: File = UtxoState.getStateDir(settings)
-    val rootsDir: File = UtxoState.getRootsDir(settings)
-    val state: UtxoState = restoreConsistentState(
-      UtxoState.create(stateDir, rootsDir, settings, influxRef),
-      historyReader,
-      influxRef,
-      settings
-    )
-    Props(new NVHState(influxRef, state, settings))
+  def restoreConsistentStateProps(settings: EncryAppSettings,
+                                  historyReader: HistoryReader,
+                                  influxRef: Option[ActorRef]): Option[Props] = {
+    Try {
+      val stateDir: File = UtxoState.getStateDir(settings)
+      val rootsDir: File = UtxoState.getRootsDir(settings)
+      val state: UtxoState = restoreConsistentState(
+        UtxoState.create(stateDir, rootsDir, settings, influxRef),
+        historyReader,
+        influxRef,
+        settings
+      )
+      Props(new NVHState(influxRef, state, settings))
+    }.toOption
   }
 
   //rollback
