@@ -22,6 +22,9 @@ trait HistoryReader {
 
   def getHeaderById(id: ModifierId): Option[Header]
 
+  def getChainToHeader(fromHeaderOpt: Option[Header],
+                       toHeader: Header): (Option[ModifierId], HeaderChain)
+
   def getBlockByHeaderId(id: ModifierId): Option[Block]
 
   def getBlockByHeader(header: Header): Option[Block]
@@ -69,6 +72,8 @@ object HistoryReader {
     def lastHeaders(count: Int): HeaderChain                        = HeaderChain.empty
     def getBestHeader: Option[Header]                               = None
     def getBestBlock: Option[Block]                                 = None
+    def getChainToHeader(fromHeaderOpt: Option[Header],
+                         toHeader: Header): (Option[ModifierId], HeaderChain) = (None, HeaderChain.empty)
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -90,5 +95,8 @@ object HistoryReader {
     def lastHeaders(count: Int): HeaderChain                        = history.lastHeaders(count)
     def getBestHeader: Option[Header]                               = history.getBestHeader
     def getBestBlock: Option[Block]                                 = history.getBestBlock
+    def getChainToHeader(fromHeaderOpt: Option[Header],
+                         toHeader: Header): (Option[ModifierId], HeaderChain) = history.getChainToHeader(fromHeaderOpt,
+                                                                                                         toHeader)
   }
 }

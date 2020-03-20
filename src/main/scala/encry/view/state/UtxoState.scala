@@ -226,6 +226,19 @@ object UtxoState extends StrictLogging {
 
   def initialStateBoxes: List[AssetBox] = List(AssetBox(EncryProposition.open, -9, 0))
 
+  def rollbackTo(version: VersionTag,
+                 additionalBlocks: List[Block],
+                 avlStorage: VersionalStorage,
+                 rootNodesStorage: RootNodesStorage[StorageKey, StorageValue],
+                 constants: Constants,
+                 influxRef: Option[ActorRef]): Try[UtxoState] = Try {
+    logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
+    val rollbackedAvl = AvlTree.rollbackTo(StorageVersion !@@ version, additionalBlocks, avlStorage, rootNodesStorage).get
+    logger.info(s"UTXO -> rollbackTo -> ${avlStorage.get(UtxoState.bestHeightKey).map(Ints.fromByteArray)}.")
+    val height: Height = Height !@@ Ints.fromByteArray(avlStorage.get(UtxoState.bestHeightKey).get)
+    UtxoState(rollbackedAvl, height, constants, influxRef)
+  }
+
   def getStateDir(settings: EncryAppSettings): File = {
     logger.info(s"Invoke getStateDir")
     if (settings.snapshotSettings.enableFastSynchronization) {
