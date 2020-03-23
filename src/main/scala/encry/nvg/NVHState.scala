@@ -5,40 +5,35 @@ import java.io.File
 import akka.actor.{Actor, ActorRef, Props}
 import cats.syntax.option.none
 import com.typesafe.scalalogging.StrictLogging
-import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
-import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterState
 import encry.nvg.NVHState.StateAction.{ApplyFailed, ApplyModifier, CreateTreeChunks, ModifierApplied}
-import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, UpdateInformation}
-import encry.nvg.fast.sync.SnapshotProcessor.SnapshotManifest.ManifestId
-import encry.nvg.fast.sync.SnapshotProcessor.{SnapshotChunk, TreeChunks}
-import encry.settings.{EncryAppSettings, NodeSettings}
-import encry.stats.StatsSender.{HeightStatistics, ModifierAppendedToState, TransactionsInBlock}
-import encry.storage.{RootNodesStorage, VersionalStorage}
+import encry.nvg.fast.sync.SnapshotProcessor.SnapshotChunk
+import encry.settings.EncryAppSettings
+import encry.stats.StatsSender.TransactionsInBlock
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.storage.iodb.versionalIODB.IODBWrapper
 import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError
-import encry.view.history.{History, HistoryReader}
-import encry.view.state.UtxoState
-import encry.view.state.UtxoState.logger
+import encry.view.history.HistoryReader
+import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.state.avlTree.AvlTree
-import io.iohk.iodb.{ByteArrayWrapper, LSMStore}
+import encry.view.state.avlTree.utils.implicits.Instances._
+import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
 import org.encryfoundation.common.utils.constants.Constants
 import org.iq80.leveldb.Options
-import encry.view.state.avlTree.utils.implicits.Instances._
 
 import scala.util.Try
 
 class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: EncryAppSettings)
   extends Actor with StrictLogging with AutoCloseable {
 
-  override def preStart(): Unit = context.parent ! RegisterState
+  override def preStart(): Unit = context.parent ! RegisterState(UtxoStateReader(state))
 
   override def receive: Receive = {
     case ApplyModifier(modifier: PersistentModifier,
@@ -48,7 +43,7 @@ class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: Encr
         case Right(stateAfterApply) =>
           modifier match {
             case b: Block if isFullChainSynced => context.parent ! TransactionsInBlock(b.payload.txs.size)
-            case _                                     =>
+            case _  =>
           }
           state = stateAfterApply
           logger.info(s"Successfully apply modifier: ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId}")

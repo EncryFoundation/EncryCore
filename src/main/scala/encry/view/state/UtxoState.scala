@@ -1,7 +1,6 @@
 package encry.view.state
 
 import java.io.File
-
 import akka.actor.ActorRef
 import cats.data.Validated
 import cats.instances.list._
@@ -35,12 +34,11 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, Height}
 import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
-
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
@@ -208,6 +206,23 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
 
+  override def version: VersionTag = VersionTag !@@ tree.avlStorage.currentVersion
+
+  override def stateSafePointHeight: Unit = tree.rootNodesStorage.safePointHeight
+
+  override def boxById(boxId: ADKey): Option[EncryBaseBox] = tree.get(StorageKey !@@ boxId)
+    .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
+
+  override def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] =
+    ids.foldLeft(Seq.empty[EncryBaseBox])((acc, id) =>
+      boxById(id).map(bx => acc :+ bx).getOrElse(acc)
+    )
+
+  override def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
+    boxById(boxId) match {
+      case Some(bx: B@unchecked) if bx.isInstanceOf[B] => Some(bx)
+      case _ => None
+    }
 
   def close(): Unit = tree.close()
 }

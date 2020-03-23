@@ -1,17 +1,18 @@
 package encry.nvg
 
-import akka.actor.{ Actor, ActorRef, Props }
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
-import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
+import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
+import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
+import encry.view.state.UtxoStateReader
 import org.encryfoundation.common.modifiers.PersistentModifier
 
 class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, influx: Option[ActorRef])
@@ -41,7 +42,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       )
     case RegisterHistory(_) =>
       context.become(viewReceive(sender(), state.get))
-    case RegisterState if history.isEmpty =>
+    case RegisterState(_) if history.isEmpty =>
       context.become(awaitingViewActors(history, Some(sender())), discardOld = true)
     case RegisterHistory =>
       context.become(viewReceive(history.get, sender()))
@@ -75,9 +76,11 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           isLocallyGenerated = false
         )
       if (!isModifierProcessingInProgress) getNextModifier()
-    case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
+    case ModifierAppliedToHistory => isModifierProcessingInProgress = false; getNextModifier()
     case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded => //todo work with state starts here
+
     case msg: ProgressInfoForState => //todo work with state starts here
+
     case msg: StateAction.ApplyFailed         => historyRef ! msg
     case msg: StateAction.ModifierApplied     => historyRef ! msg
     case msg: SyntacticallyFailedModification => context.parent ! msg
@@ -102,7 +105,7 @@ object IntermediaryNVHView {
   sealed trait IntermediaryNVHViewActions
   object IntermediaryNVHViewActions {
     case class RegisterHistory(historyReader: HistoryReader) extends IntermediaryNVHViewActions
-    case object RegisterState                                extends IntermediaryNVHViewActions
+    case class RegisterState(stateReader: UtxoStateReader) extends IntermediaryNVHViewActions
   }
 
   final case class ModifierToAppend(modifier: PersistentModifier, isLocallyGenerated: Boolean)

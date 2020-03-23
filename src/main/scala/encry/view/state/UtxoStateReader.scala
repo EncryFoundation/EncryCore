@@ -13,21 +13,34 @@ trait UtxoStateReader {
 
   implicit val hf: Algos.HF = Algos.hash
 
-  val tree: AvlTree[StorageKey, StorageValue]
+  //val tree: AvlTree[StorageKey, StorageValue]
 
-  def version: VersionTag = VersionTag !@@ tree.avlStorage.currentVersion
+  def version: VersionTag// = VersionTag !@@ tree.avlStorage.currentVersion
 
-  def stateSafePointHeight = tree.rootNodesStorage.safePointHeight
+  def stateSafePointHeight// = tree.rootNodesStorage.safePointHeight
 
-  def boxById(boxId: ADKey): Option[EncryBaseBox] = tree.get(StorageKey !@@ boxId)
-    .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
+  def boxById(boxId: ADKey): Option[EncryBaseBox]// =
+//    tree.get(StorageKey !@@ boxId)
+//    .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
 
-  def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] = ids.foldLeft(Seq[EncryBaseBox]())((acc, id) =>
-    boxById(id).map(bx => acc :+ bx).getOrElse(acc))
+  def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] //=
+//    ids.foldLeft(Seq[EncryBaseBox]())((acc, id) =>
+//    boxById(id).map(bx => acc :+ bx).getOrElse(acc))
 
-  def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
-    boxById(boxId) match {
-      case Some(bx: B@unchecked) if bx.isInstanceOf[B] => Some(bx)
-      case _ => None
-    }
+  def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] //=
+//    boxById(boxId) match {
+//      case Some(bx: B@unchecked) if bx.isInstanceOf[B] => Some(bx)
+//      case _ => None
+//    }
+}
+
+object UtxoStateReader {
+
+  def apply(state: UtxoState): UtxoStateReader = new UtxoStateReader {
+    override def version: VersionTag = state.version
+    override def stateSafePointHeight: Unit = state.safePointHeight
+    override def boxById(boxId: ADKey): Option[EncryBaseBox] = state.boxById(boxId)
+    override def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] = state.boxesByIds(ids)
+    override def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] = state.typedBoxById()
+  }
 }
