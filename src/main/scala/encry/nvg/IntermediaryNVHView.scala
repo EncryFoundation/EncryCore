@@ -1,19 +1,18 @@
 package encry.nvg
 
-import akka.actor.{ Actor, ActorRef, Props }
+import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
-import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
+import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
+import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
+import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.PersistentModifier
-
-import scala.collection.mutable
 
 class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, influx: Option[ActorRef])
     extends Actor
@@ -49,6 +48,16 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   }
 
   def viewReceive(history: ActorRef, state: ActorRef): Receive = {
+    case LocallyGeneratedModifier(modifier: PersistentModifier) =>
+      ModifiersCache.put(
+        NodeViewHolder.toKey(modifier.id),
+        modifier,
+        historyReader,
+        settings,
+        isLocallyGenerated = true
+      )
+      if (!isModifierProcessingInProgress) getNextModifier()
+
     case ValidatedModifier(modifier: PersistentModifier) =>
       val isInHistory: Boolean = historyReader.isModifierDefined(modifier.id)
       val isInCache: Boolean   = ModifiersCache.contains(NodeViewHolder.toKey(modifier.id))
@@ -57,7 +66,14 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           s"Modifier ${modifier.encodedId} can't be placed into the cache cause: " +
             s"contains in cache: $isInCache, contains in history: $isInHistory."
         )
-      else ModifiersCache.put(NodeViewHolder.toKey(modifier.id), modifier, historyReader, settings)
+      else
+        ModifiersCache.put(
+          NodeViewHolder.toKey(modifier.id),
+          modifier,
+          historyReader,
+          settings,
+          isLocallyGenerated = false
+        )
       if (!isModifierProcessingInProgress) getNextModifier()
     case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
     case msg: ProgressInfoForState            => //todo work with state starts here
@@ -71,10 +87,11 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   def getNextModifier(): Unit =
     ModifiersCache
       .popCandidate(historyReader, settings)
-      .foreach { mod: PersistentModifier =>
-        isModifierProcessingInProgress = true
-        logger.info(s"Got new modifiers in compute application function: ${mod.encodedId}.")
-        historyRef ! ModifierToAppend(mod, isLocallyGenerated = false)
+      .foreach {
+        case (mod: PersistentModifier, isLocallyGenerated) =>
+          isModifierProcessingInProgress = true
+          logger.info(s"Got new modifiers in compute application function: ${mod.encodedId}.")
+          historyRef ! ModifierToAppend(mod, isLocallyGenerated)
       }
 
 }

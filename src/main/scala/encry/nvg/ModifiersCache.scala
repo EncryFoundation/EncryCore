@@ -8,7 +8,6 @@ import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
@@ -17,7 +16,7 @@ object ModifiersCache extends StrictLogging {
 
   private type Key = mutable.WrappedArray[Byte]
 
-  val cache: TrieMap[Key, PersistentModifier] = TrieMap.empty
+  val cache: TrieMap[Key, (PersistentModifier, Boolean)] = TrieMap.empty
 
   private var headersCollection: SortedMap[Int, List[ModifierId]] = SortedMap.empty[Int, List[ModifierId]]
 
@@ -31,10 +30,16 @@ object ModifiersCache extends StrictLogging {
 
   def contains(key: Key): Boolean = cache.contains(key)
 
-  def put(key: Key, value: PersistentModifier, history: HistoryReader, settings: EncryAppSettings): Unit =
+  def put(
+    key: Key,
+    value: PersistentModifier,
+    history: HistoryReader,
+    settings: EncryAppSettings,
+    isLocallyGenerated: Boolean
+  ): Unit =
     if (!contains(key)) {
       logger.debug(s"Put ${value.encodedId} of type ${value.modifierTypeId} to cache.")
-      cache.put(key, value)
+      cache.put(key, value -> isLocallyGenerated)
       value match {
         case header: Header =>
           val possibleHeadersAtCurrentHeight: List[ModifierId] = headersCollection.getOrElse(header.height, List())
@@ -50,7 +55,7 @@ object ModifiersCache extends StrictLogging {
       }
 
       if (size > settings.node.modifiersCacheSize) cache.find {
-        case (_, modifier) =>
+        case (_, (modifier, _)) =>
           history.testApplicable(modifier) match {
             case Right(_) | Left(_: NonFatalValidationError) => false
             case _                                           => true
@@ -58,14 +63,15 @@ object ModifiersCache extends StrictLogging {
       }.map(mod => remove(mod._1))
     }
 
-  def remove(key: Key): Option[PersistentModifier] = {
+  def remove(key: Key): Option[(PersistentModifier, Boolean)] = {
     logger.debug(s"Going to delete ${Algos.encode(key.toArray)}. Cache contains: ${cache.get(key).isDefined}.")
     cache.remove(key)
   }
 
-  def popCandidate(history: HistoryReader, settings: EncryAppSettings): List[PersistentModifier] = synchronized {
-    findCandidateKey(history, settings).take(1).flatMap(k => remove(k))
-  }
+  def popCandidate(history: HistoryReader, settings: EncryAppSettings): List[(PersistentModifier, Boolean)] =
+    synchronized {
+      findCandidateKey(history, settings).take(1).flatMap(k => remove(k))
+    }
 
   override def toString: String = cache.keys.map(key => Algos.encode(key.toArray)).mkString(",")
 
@@ -74,14 +80,14 @@ object ModifiersCache extends StrictLogging {
     def isApplicable(key: Key): Boolean =
       cache
         .get(key)
-        .exists(
-          modifier =>
+        .exists {
+          case (modifier, _) =>
             history.testApplicable(modifier) match {
               case Left(_: FatalValidationError) => remove(key); false
               case Right(_)                      => true
               case Left(_)                       => false
-          }
-        )
+            }
+        }
 
     def getHeadersKeysAtHeight(height: Int): List[Key] =
       headersCollection.get(height) match {
@@ -96,8 +102,8 @@ object ModifiersCache extends StrictLogging {
     def exhaustiveSearch: List[Key] =
       List(cache.find {
         case (k, v) =>
-          v match {
-            case _: Header if history.getBestHeaderId.exists(_ sameElements v.parentId) => true
+          v._1 match {
+            case _: Header if history.getBestHeaderId.exists(_ sameElements v._1.parentId) => true
             case _ =>
               val isApplicableMod: Boolean = isApplicable(k)
               isApplicableMod
@@ -111,7 +117,7 @@ object ModifiersCache extends StrictLogging {
           logger.debug(s"HeadersCollection size is: ${headersCollection.size}")
           logger.debug(s"Drop height ${history.getBestHeaderHeight + 1} in HeadersCollection")
           val res = value.map(cache.get(_)).collect {
-            case Some(v: Header)
+            case Some((v: Header, _))
                 if (history.getBestHeaderHeight == settings.constants.PreGenesisHeight &&
                   (v.parentId sameElements Header.GenesisParentId) ||
                   history.getHeaderById(v.parentId).nonEmpty) && isApplicable(new mutable.WrappedArray.ofByte(v.id)) =>
