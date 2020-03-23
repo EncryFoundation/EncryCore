@@ -4,23 +4,25 @@ import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
-import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
+import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
 import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.nvg.NodeViewHolder.{
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification
-}
+import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
 import encry.view.state.UtxoStateReader
 import org.encryfoundation.common.modifiers.PersistentModifier
+import org.encryfoundation.common.modifiers.history.{Block, Header}
+import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
+import scala.collection.IndexedSeq
+import scala.util.{Failure, Success}
 
 class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, influx: Option[ActorRef])
     extends Actor
@@ -34,7 +36,9 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   override def receive: Receive = awaitingViewActors()
 
-  def awaitingViewActors(history: Option[ActorRef] = None, state: Option[ActorRef] = None): Receive = {
+  def awaitingViewActors(history: Option[ActorRef] = None,
+                         state: Option[ActorRef] = None,
+                         stateReader: Option[UtxoStateReader] = None): Receive = {
     case RegisterHistory(reader) if state.isEmpty =>
       historyReader = reader
       logger.info(s"NodeViewParent actor got init history. Going to init state actor.")
@@ -48,14 +52,17 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           }
       )
     case RegisterHistory(_) =>
-      context.become(viewReceive(sender(), state.get))
-    case RegisterState(_) if history.isEmpty =>
-      context.become(awaitingViewActors(history, Some(sender())), discardOld = true)
+      context.become(viewReceive(sender(), state.get, stateReader.get))
+    case RegisterState(reader) if history.isEmpty =>
+      context.become(awaitingViewActors(history, Some(sender()), Some(reader)), discardOld = true)
     case RegisterHistory =>
-      context.become(viewReceive(history.get, sender()))
+      context.become(viewReceive(history.get, sender(), stateReader.get))
   }
 
-  def viewReceive(history: ActorRef, state: ActorRef): Receive = {
+  def viewReceive(history: ActorRef, state: ActorRef, stateReader: UtxoStateReader): Receive = {
+
+    case RegisterState(reader) => context.become(viewReceive(history, sender(), reader))
+
     case LocallyGeneratedModifier(modifier: PersistentModifier) =>
       ModifiersCache.put(
         NodeViewHolder.toKey(modifier.id),
@@ -84,7 +91,21 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         )
       if (!isModifierProcessingInProgress) getNextModifier()
     case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
-    case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded => //todo work with state starts here
+    case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded =>
+      context.become(viewReceive(
+        history,
+        context.actorOf(
+          NVHState.rollbackProps(
+            settings,
+            influx,
+            stateReader.safePointHeight,
+            msg.pi.branchPoint.get,
+            historyReader,
+            settings.constants
+          )
+        ),
+        stateReader
+      ))
     case msg: ProgressInfoForState => //todo work with state starts here
     case msg: StateAction.ApplyFailed         => historyRef ! msg
     case msg: StateAction.ModifierApplied     => historyRef ! msg

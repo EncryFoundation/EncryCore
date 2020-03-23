@@ -116,12 +116,12 @@ object NVHState extends StrictLogging {
   }
 
   //rollback
-  def props(settings: EncryAppSettings,
-            influxRef: Option[ActorRef],
-            safePointHeight: Int,
-            branchPoint: VersionTag,
-            historyReader: HistoryReader,
-            constants: Constants): Props = {
+  def rollbackProps(settings: EncryAppSettings,
+                    influxRef: Option[ActorRef],
+                    safePointHeight: Int,
+                    branchPoint: ModifierId,
+                    historyReader: HistoryReader,
+                    constants: Constants): Props = {
     val branchPointHeight: Int = historyReader.getHeaderById(ModifierId !@@ branchPoint).get.height
     val additionalBlocks: List[Block] =
       (safePointHeight + 1 to branchPointHeight).foldLeft(List.empty[Block]) {
@@ -151,7 +151,7 @@ object NVHState extends StrictLogging {
       RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth, rootsDir)
     }
     val state: UtxoState = UtxoState.rollbackTo(
-      branchPoint,
+      VersionTag !@@ branchPoint,
       additionalBlocks,
       versionalStorage,
       rootStorage,
