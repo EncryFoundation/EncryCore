@@ -6,6 +6,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import cats.syntax.option.none
 import encry.network.NetworkRouter.ModifierFromNetwork
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
+import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.NodeView
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -42,6 +43,9 @@ class IntermediaryNVHView(settings: EncryAppSettings,
 
   def viewReceive(history: ActorRef, state: ActorRef): Receive = {
     case ModifierFromNetwork(remote, typeId, modifierId, modifierBytes) => history ! ModifierFromNetwork
+    case StateAction.ApplyFailed(modId, errs) =>
+    // todo: Notify history
+
   }
 }
 
