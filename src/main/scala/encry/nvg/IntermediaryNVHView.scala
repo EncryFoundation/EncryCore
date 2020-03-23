@@ -2,14 +2,21 @@ package encry.nvg
 
 import akka.actor.{Actor, ActorRef, Props}
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
-import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
+import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
+import encry.network.Messages.MessageToNetwork.RequestFromLocal
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
+import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
 import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
+import encry.nvg.NodeViewHolder.{
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification
+}
 import encry.settings.EncryAppSettings
+import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
 import encry.view.state.UtxoStateReader
@@ -76,14 +83,18 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           isLocallyGenerated = false
         )
       if (!isModifierProcessingInProgress) getNextModifier()
-    case ModifierAppliedToHistory => isModifierProcessingInProgress = false; getNextModifier()
+    case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
     case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded => //todo work with state starts here
-
     case msg: ProgressInfoForState => //todo work with state starts here
-
     case msg: StateAction.ApplyFailed         => historyRef ! msg
     case msg: StateAction.ModifierApplied     => historyRef ! msg
     case msg: SyntacticallyFailedModification => context.parent ! msg
+    case msg: StatsSenderMessage              => context.parent ! msg
+    case msg: RequestFromLocal                => context.parent ! msg
+    case msg: SemanticallyFailedModification  => context.parent ! msg
+    case msg: SemanticallySuccessfulModifier  => context.parent ! msg
+    case msg: BlockAndHeaderInfo              => context.parent ! msg
+    case msg: HistoryReader                   => historyReader = msg; context.parent ! msg
   }
 
   def awaitingHistoryBranchPoint(history: ActorRef): Receive = ???
