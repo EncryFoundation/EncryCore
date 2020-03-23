@@ -7,13 +7,13 @@ import encry.consensus.HistoryConsensus
 import encry.consensus.HistoryConsensus.Equal
 import encry.modifiers.InstanceFactory
 import encry.modifiers.history.HeaderChain
-import encry.nvg.NVHState.StateAction.{ApplyModifier, ModifierApplied}
+import encry.nvg.NVHState.StateAction.ApplyModifier
 import encry.utils.FileHelper
 import encry.view.history.HistoryReader
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Matchers, OneInstancePerTest, WordSpecLike}
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 class NVHStateTest
   extends TestKit(ActorSystem("Tested-Akka-System"))

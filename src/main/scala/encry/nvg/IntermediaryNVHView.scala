@@ -28,7 +28,7 @@ class IntermediaryNVHView(settings: EncryAppSettings,
     case RegisterHistory(reader) if state.isEmpty =>
       context.become(awaitingViewActors(Some(sender()), state), discardOld = true)
       context.actorOf(
-        NVHState.restoreConsistentStateProps(settings, reader, influx).getOrElse(
+        NVHState.restoreConsistentStateProps(settings, reader, influx).getOrElse (
           NVHState.genesisProps(settings, influx)
         )
       )

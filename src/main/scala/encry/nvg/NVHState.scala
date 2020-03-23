@@ -93,8 +93,10 @@ object NVHState extends StrictLogging {
   def genesisProps(settings: EncryAppSettings, influxRef: Option[ActorRef]): Props = {
     val stateDir: File = UtxoState.getStateDir(settings)
     stateDir.mkdir()
+    stateDir.listFiles.foreach(_.delete())
     val rootsDir: File = UtxoState.getRootsDir(settings)
     rootsDir.mkdir()
+    rootsDir.listFiles.foreach(_.delete())
     val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
     Props(new NVHState(influxRef, state, settings))
   }
@@ -108,7 +110,7 @@ object NVHState extends StrictLogging {
       stateDir.mkdirs()
       val rootsDir: File = UtxoState.getRootsDir(settings)
       rootsDir.mkdir()
-      val state: UtxoState = restoreConsistentState(
+      val state: UtxoState = restoreConsistentState (
         UtxoState.create(stateDir, rootsDir, settings, influxRef),
         historyReader,
         influxRef,

@@ -2,19 +2,19 @@ package encry.nvg
 
 import java.net.InetSocketAddress
 
-import akka.actor.{ ActorRef, ActorSystem }
-import akka.testkit.{ TestActorRef, TestKit, TestProbe }
+import akka.actor.{ActorRef, ActorSystem}
+import akka.testkit.{TestActorRef, TestKit, TestProbe}
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.consensus.EncrySupplyController
 import encry.modifiers.InstanceFactory
 import encry.modifiers.mempool.TransactionFactory
-import encry.network.Messages.MessageToNetwork.{ BroadcastModifier, RequestFromLocal, SendSyncInfo }
+import encry.network.Messages.MessageToNetwork.{BroadcastModifier, RequestFromLocal, SendSyncInfo}
 import encry.network.NetworkController.ReceivableMessages.RegisterMessagesHandler
-import encry.network.NetworkRouter.{ ModifierFromNetwork, RegisterForModsHandling }
+import encry.network.NetworkRouter.{ModifierFromNetwork, RegisterForModsHandling}
 import encry.nvg.NodeViewHolder.SemanticallySuccessfulModifier
-import encry.utils.implicits.UTXO.{ combineAll, _ }
-import encry.utils.{ FileHelper, Mnemonic, NetworkTimeProvider, TestHelper }
+import encry.utils.implicits.UTXO.{combineAll, _}
+import encry.utils.{FileHelper, Mnemonic, NetworkTimeProvider, TestHelper}
 import encry.view.history.History
 import encry.view.state.UtxoState
 import encry.view.state.avlTree.utils.implicits.Instances._
@@ -24,9 +24,10 @@ import org.encryfoundation.common.crypto.equihash.EquihashSolution
 import org.encryfoundation.common.modifiers.history._
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.box.AssetBox
-import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, Height }
+import org.encryfoundation.common.utils.Algos
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, Height}
 import org.encryfoundation.common.utils.constants.TestNetConstants
-import org.scalatest.{ BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike }
+import org.scalatest.{BeforeAndAfterAll, Matchers, OneInstancePerTest, WordSpecLike}
 
 import scala.concurrent.duration._
 
@@ -195,9 +196,9 @@ class PipelinesTests
 
       intermediary.underlyingActor.historyReader.getBestHeaderHeight shouldBe 300
       intermediary.underlyingActor.historyReader.getBestBlockHeight shouldBe 300
-
     }
     "work with forks correctly" in {
+      logger.info("================ work with forks correctly start ====================")
       val tmpFile = FileHelper.getRandomTempDir
       val path    = tmpFile.getAbsolutePath
       val settingsWithNewPath =
@@ -205,6 +206,7 @@ class PipelinesTests
           .copy(directory = path)
           .copy(wallet = settings.wallet.map(_.copy(password = "123")))
           .copy(node = settings.node.copy(isTestMod = true))
+
       AccountManager.init(Mnemonic.entropyToMnemonicCode(scorex.utils.Random.randomBytes(16)),
                           "123",
                           settingsWithNewPath)
@@ -271,6 +273,8 @@ class PipelinesTests
 
       Thread.sleep(5000)
 
+      println("getBestBlock = " + Algos.encode(intermediary.underlyingActor.historyReader.getBestBlock.get.id))
+      println("b2 = " + Algos.encode(b2.last.id))
       intermediary.underlyingActor.historyReader.getBestBlock.get.id.sameElements(b2.last.id) shouldBe true
       intermediary.underlyingActor.historyReader.getBestHeader.get.id.sameElements(b2.last.id) shouldBe true
 
@@ -545,6 +549,6 @@ object PipelinesTests extends InstanceFactory with StrictLogging {
     }
     val (h11, s11, b11) = generateValidForHistoryAndStateBlocks(5, h, s, h.getBestBlockHeight + 1)
     val (h22, s22, b22) = generateValidForHistoryAndStateBlocks(10, h1, s1, h1.getBestBlockHeight + 1)
-    ((h11, s11, b11 ++ b), (h22, s22, b22))
+    ((h11, s11, (b11 ++ b).sortBy(_.header.height)), (h22, s22, b22.sortBy(_.header.height)))
   }
 }
