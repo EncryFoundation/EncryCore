@@ -70,7 +70,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       isProcessingModifierByHistory = false
       getNextModifier()
 
-    case ProgressInfoForState(pi, flag, isFullChainSynced) => //todo work with state starts here
+    case ProgressInfoForState(pi, flag, isFullChainSynced, reader) => //todo work with state starts here
     case msg: StateAction.ApplyFailed                      => historyRef ! msg
     case msg: StateAction.ModifierApplied                  => historyRef ! msg
   }

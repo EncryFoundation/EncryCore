@@ -127,7 +127,10 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
 }
 
 object NVHHistory {
-  final case class ProgressInfoForState(pi: ProgressInfo, saveRootNodeFlag: Boolean, isFullChainSynced: Boolean)
+  final case class ProgressInfoForState(pi: ProgressInfo,
+                                        saveRootNodeFlag: Boolean,
+                                        isFullChainSynced: Boolean,
+                                        reader: HistoryReader)
   case object ModifierAppliedToHistory
   final case object InsertNewUpdates
 }
