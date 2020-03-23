@@ -82,6 +82,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           isLocallyGenerated = false
         )
       if (!isModifierProcessingInProgress) getNextModifier()
+
     case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
     case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded => //todo work with state starts here
     case msg: ProgressInfoForState => //todo work with state starts here
