@@ -2,32 +2,28 @@ package encry.nvg
 
 import java.io.File
 
-import akka.actor.Actor
+import akka.actor.{Actor, Props}
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterHistory
-import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
-import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
+import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
+import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
-import encry.nvg.NodeViewHolder.{
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification
-}
+import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.history.History.HistoryUpdateInfoAcc
-import encry.view.history.{ History, HistoryReader }
+import encry.view.history.{History, HistoryReader}
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
@@ -153,4 +149,5 @@ object NVHHistory {
                                         reader: HistoryReader)
   case object ModifierAppliedToHistory
   final case object InsertNewUpdates
+  def props(ntp: NetworkTimeProvider, settings: EncryAppSettings): Props = Props(new NVHHistory(settings, ntp))
 }

@@ -1,11 +1,11 @@
 package encry.nvg
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
-import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
+import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
+import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
@@ -20,7 +20,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   var historyReader: HistoryReader = HistoryReader.empty
 
-  val historyRef: ActorRef = ActorRef.noSender
+  val historyRef: ActorRef = context.actorOf(NVHHistory.props(ntp, settings))
 
   var isModifierProcessingInProgress: Boolean = false
 
