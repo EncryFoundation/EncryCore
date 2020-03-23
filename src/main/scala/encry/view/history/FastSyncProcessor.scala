@@ -3,12 +3,12 @@ package encry.view.history
 import cats.syntax.option.none
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
-import encry.view.history.History.AwaitingAppendToHistory
+import encry.view.history.History.HistoryUpdateInfoAcc
 import org.encryfoundation.common.modifiers.history.Payload
 
 trait FastSyncProcessor extends HistoryApi {
 
-  def processPayload(payload: Payload): (ProgressInfo, Option[AwaitingAppendToHistory]) = {
+  def processPayload(payload: Payload): (ProgressInfo, Option[HistoryUpdateInfoAcc]) = {
     val startTime: Long = System.currentTimeMillis()
     getBlockByPayload(payload).foreach { block =>
       logger.info(s"processPayloadFastSync")

@@ -207,10 +207,10 @@ class NodeViewHolder(
     isLocallyGenerated: Boolean = false
   ): (History, UtxoState, Seq[PersistentModifier]) = {
     logger.info(s"Starting updating state in updateState function!")
-    if (!isLocallyGenerated) progressInfo.toApply.foreach {
-      case header: Header => requestDownloads(progressInfo, header.id.some)
-      case _              => requestDownloads(progressInfo, none)
-    }
+//    if (!isLocallyGenerated) progressInfo.toApply.foreach {
+//      case header: Header => requestDownloads(progressInfo, header.id.some)
+//      case _              => requestDownloads(progressInfo, none)
+//    }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier] @unchecked) =
       if (progressInfo.chainSwitchingNeeded) {

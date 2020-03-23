@@ -11,7 +11,7 @@ import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
 import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.utils.NetworkTimeProvider
-import encry.view.history.History.AwaitingAppendToHistory
+import encry.view.history.History.HistoryUpdateInfoAcc
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -30,7 +30,7 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
   /** Appends modifier to the history if it is applicable. */
   def append(
     modifier: PersistentModifier
-  ): Either[Throwable, (ProgressInfo, Option[AwaitingAppendToHistory])] = {
+  ): Either[Throwable, (ProgressInfo, Option[HistoryUpdateInfoAcc])] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
       case header: Header =>
@@ -40,9 +40,16 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
     })
   }
 
-  def processHeader(h: Header): (ProgressInfo, Option[AwaitingAppendToHistory])
+  def insertUpdateInfo(updateInfo: Option[HistoryUpdateInfoAcc]): Unit =
+    updateInfo.foreach { info: HistoryUpdateInfoAcc =>
+      logger.info(s"Going to update history in insertUpdateInfo function.")
+      if (info.insertToObjectStore) historyStorage.insertObjects(Seq(info.modifier))
+      else historyStorage.bulkInsert(info.modifier.id, info.toUpdate, Seq(info.modifier))
+    }
 
-  def processPayload(payload: Payload): (ProgressInfo, Option[AwaitingAppendToHistory])
+  def processHeader(h: Header): (ProgressInfo, Option[HistoryUpdateInfoAcc])
+
+  def processPayload(payload: Payload): (ProgressInfo, Option[HistoryUpdateInfoAcc])
 
   /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
@@ -160,9 +167,10 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
 
 object History extends StrictLogging {
 
-  final case class AwaitingAppendToHistory(
+  final case class HistoryUpdateInfoAcc(
     toUpdate: Seq[(StorageKey, StorageValue)],
-    modifier: PersistentModifier
+    modifier: PersistentModifier,
+    insertToObjectStore: Boolean
   )
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {

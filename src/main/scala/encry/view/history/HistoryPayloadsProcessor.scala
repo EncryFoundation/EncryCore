@@ -5,7 +5,7 @@ import cats.syntax.option._
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.modifiers.history.HeaderChain
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.history.History.AwaitingAppendToHistory
+import encry.view.history.History.HistoryUpdateInfoAcc
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.Algos
@@ -13,16 +13,16 @@ import org.encryfoundation.common.utils.TaggedTypes.{ Height, ModifierId }
 
 trait HistoryPayloadsProcessor extends HistoryApi {
 
-  def processPayload(payload: Payload): (ProgressInfo, Option[AwaitingAppendToHistory]) =
+  def processPayload(payload: Payload): (ProgressInfo, Option[HistoryUpdateInfoAcc]) =
     getBlockByPayload(payload).flatMap { block =>
       logger.info(s"proc block ${block.header.encodedId}!")
       processBlock(block).some
-    }.getOrElse {
-      //putToHistory(payload)
-      ProgressInfo(none, Seq.empty, Seq.empty, none) -> Some(AwaitingAppendToHistory(Seq.empty, payload))
-    }
+    }.getOrElse(
+      ProgressInfo(none, Seq.empty, Seq.empty, none) ->
+        HistoryUpdateInfoAcc(Seq.empty, payload, insertToObjectStore = true).some
+    )
 
-  private def processBlock(blockToProcess: Block): (ProgressInfo, Option[AwaitingAppendToHistory]) = {
+  private def processBlock(blockToProcess: Block): (ProgressInfo, Option[HistoryUpdateInfoAcc]) = {
     logger.info(
       s"Starting processing block to history ||${blockToProcess.encodedId}||${blockToProcess.header.height}||"
     )
@@ -40,7 +40,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
         nonBestBlock(blockToProcess)
       case None =>
         logger.debug(s"Best full chain is empty. Returning empty progress info")
-        ProgressInfo(none, Seq.empty, Seq.empty, none) -> None
+        ProgressInfo(none, Seq.empty, Seq.empty, none) -> none
     }
   }
 
@@ -48,7 +48,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
     fullBlock: Block,
     newBestHeader: Header,
     newBestChain: Seq[Block]
-  ): (ProgressInfo, Option[AwaitingAppendToHistory]) = {
+  ): (ProgressInfo, Option[HistoryUpdateInfoAcc]) = {
     logger.info(s"Appending ${fullBlock.encodedId} as a valid first block with height ${fullBlock.header.height}")
     ProgressInfo(none, Seq.empty, newBestChain, none) -> Some(updateStorage(fullBlock.payload, newBestHeader.id))
   }
@@ -58,7 +58,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
     newBestHeader: Header,
     newBestChain: Seq[Block],
     blocksToKeep: Int
-  ): (ProgressInfo, Option[AwaitingAppendToHistory]) =
+  ): (ProgressInfo, Option[HistoryUpdateInfoAcc]) =
     getHeaderOfBestBlock.map { header =>
       val (prevChain: HeaderChain, newChain: HeaderChain) = commonBlockThenSuffixes(header, newBestHeader)
       val toRemove: Seq[Block] = prevChain.tail.headers
@@ -83,7 +83,7 @@ trait HistoryPayloadsProcessor extends HistoryApi {
           )
         val updatedHeadersAtHeightIds =
           newChain.headers.map(header => updatedBestHeaderAtHeightRaw(header.id, Height @@ header.height)).toList
-        val toUpdateInfo: AwaitingAppendToHistory =
+        val toUpdateInfo: HistoryUpdateInfoAcc =
           updateStorage(fullBlock.payload, newBestHeader.id, updateBestHeader, updatedHeadersAtHeightIds)
         if (blocksToKeep >= 0) {
           val lastKept: Int   = blockDownloadProcessor.updateBestBlock(fullBlock.header)
@@ -95,21 +95,17 @@ trait HistoryPayloadsProcessor extends HistoryApi {
       }
     }.getOrElse(ProgressInfo(none, Seq.empty, Seq.empty, none) -> None)
 
-  private def nonBestBlock(fullBlock: Block): (ProgressInfo, Option[AwaitingAppendToHistory]) = {
+  private def nonBestBlock(fullBlock: Block): (ProgressInfo, Option[HistoryUpdateInfoAcc]) = {
     //Orphaned block or full chain is not initialized yet
     logger.info(s"Process block to history ${fullBlock.encodedId}||${fullBlock.header.height}||")
-    //historyStorage.bulkInsert(fullBlock.payload.id, Seq.empty, Seq(fullBlock.payload))
-    ProgressInfo(none, Seq.empty, Seq.empty, none) -> Some(AwaitingAppendToHistory(Seq.empty, fullBlock.payload))
+    ProgressInfo(none, Seq.empty, Seq.empty, none) ->
+      HistoryUpdateInfoAcc(Seq.empty, fullBlock.payload, insertToObjectStore = false).some
   }
 
   private def updatedBestHeaderAtHeightRaw(headerId: ModifierId, height: Height): (Array[Byte], Array[Byte]) =
     heightIdsKey(height) ->
       (Seq(headerId) ++
         headerIdsAtHeight(height).filterNot(_ sameElements headerId)).flatten.toArray
-
-  private def putToHistory(payload: Payload): ProgressInfo =
-    //historyStorage.insertObjects(Seq(payload))
-    ProgressInfo(none, Seq.empty, Seq.empty, none)
 
   private def isBetterChain(id: ModifierId): Boolean =
     (for {
@@ -154,15 +150,14 @@ trait HistoryPayloadsProcessor extends HistoryApi {
     bestFullHeaderId: ModifierId,
     updateHeaderInfo: Boolean = false,
     additionalIndexes: List[(Array[Byte], Array[Byte])] = List.empty
-  ): AwaitingAppendToHistory = {
+  ): HistoryUpdateInfoAcc = {
     val indicesToInsert: Seq[(Array[Byte], Array[Byte])] =
       if (updateHeaderInfo) Seq(BestBlockKey -> bestFullHeaderId, BestHeaderKey -> bestFullHeaderId)
       else Seq(BestBlockKey                  -> bestFullHeaderId)
-    AwaitingAppendToHistory((indicesToInsert ++ additionalIndexes).map {
+    HistoryUpdateInfoAcc((indicesToInsert ++ additionalIndexes).map {
       case (bytes, bytes1) =>
         StorageKey @@ bytes -> StorageValue @@ bytes1
-    }, newModRow)
-    //historyStorage.bulkInsert(newModRow.id, indicesToInsert ++ additionalIndexes, Seq(newModRow))
+    }, newModRow, insertToObjectStore = false)
   }
 
   private def isValidFirstBlock(header: Header): Boolean =

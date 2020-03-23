@@ -1,11 +1,11 @@
 package encry.nvg
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
 import encry.nvg.IntermediaryNVHView.ModifierToAppend
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.ProgressInfoForState
+import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
@@ -30,6 +30,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   def awaitingViewActors(history: Option[ActorRef] = None, state: Option[ActorRef] = None): Receive = {
     case RegisterHistory(reader) if state.isEmpty =>
+      historyReader = reader
       logger.info(s"NodeViewParent actor got init history. Going to init state actor.")
       context.become(awaitingViewActors(Some(sender()), state), discardOld = true)
       context.actorOf(
@@ -62,25 +63,28 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         )
       else ModifiersCache.put(wrappedKey, modifier, historyReader, settings)
 
-      if (!isProcessingModifierByHistory && !isProcessingModifierByState) {
-        isProcessingModifierByHistory = true
-        ModifiersCache
-          .popCandidate(historyReader, settings)
-          .foreach { mod: PersistentModifier =>
-            logger.info(s"Got new modifiers in compute application function: ${mod.encodedId}.")
-            historyRef ! ModifierToAppend(mod, isLocallyGenerated = false)
-          }
-      }
+      if (!isProcessingModifierByHistory && !isProcessingModifierByState)
+        getNextModifier()
 
-    case ProgressInfoForState(pi) =>
-    //todo work with state starts here
-    case StateAction.ApplyFailed(modId, errs) =>
-    // todo: Notify history
-    case StateAction.ModifierApplied(modId) =>
-    //todo: Notify history
+    case ModifierAppliedToHistory =>
+      isProcessingModifierByHistory = false
+      getNextModifier()
+
+    case ProgressInfoForState(pi, flag, isFullChainSynced) => //todo work with state starts here
+    case msg: StateAction.ApplyFailed                      => historyRef ! msg
+    case msg: StateAction.ModifierApplied                  => historyRef ! msg
   }
 
   def awaitingHistoryBranchPoint(history: ActorRef): Receive = ???
+
+  def getNextModifier(): Unit =
+    ModifiersCache
+      .popCandidate(historyReader, settings)
+      .foreach { mod: PersistentModifier =>
+        isProcessingModifierByHistory = true
+        logger.info(s"Got new modifiers in compute application function: ${mod.encodedId}.")
+        historyRef ! ModifierToAppend(mod, isLocallyGenerated = false)
+      }
 
 }
 

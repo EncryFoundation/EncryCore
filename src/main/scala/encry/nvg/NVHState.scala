@@ -52,10 +52,10 @@ class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: Encr
           }
           state = stateAfterApply
           logger.info(s"Successfully apply modifier: ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId}")
-          context.parent ! ModifierApplied(modifier.id)
+          context.parent ! ModifierApplied(modifier)
         case Left(e: List[ModifierApplyError]) =>
           logger.info(s"Application to state failed cause $e")
-          context.parent ! ApplyFailed(modifier.id, e)
+          context.parent ! ApplyFailed(modifier, e)
       }
     case CreateTreeChunks =>
       context.parent ! AvlTree.getChunks(
@@ -79,9 +79,9 @@ object NVHState extends StrictLogging {
 
   sealed trait StateAction
   object StateAction {
-    case class ModifierApplied(modifierId: ModifierId) extends StateAction
+    case class ModifierApplied(modifierId: PersistentModifier) extends StateAction
     case class Rollback(branchPoint: ModifierId) extends StateAction
-    case class ApplyFailed(modifierId: ModifierId, errs: List[ModifierApplyError]) extends StateAction
+    case class ApplyFailed(modifierId: PersistentModifier, errs: List[ModifierApplyError]) extends StateAction
     case class ApplyModifier(modifier: PersistentModifier,
                              saveRootNodesFlag: Boolean,
                              isFullChainSynced: Boolean) extends StateAction

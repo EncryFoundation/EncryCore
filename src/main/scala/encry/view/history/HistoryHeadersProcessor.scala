@@ -6,19 +6,18 @@ import encry.EncryApp.forceStopApplication
 import encry.consensus.ConsensusSchemeReaders
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.storage.VersionalStorage.{ StorageKey, StorageValue }
-import encry.view.history.History.AwaitingAppendToHistory
+import encry.view.history.History.HistoryUpdateInfoAcc
 import org.encryfoundation.common.modifiers.history.Header
 import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, ModifierId }
 
 trait HistoryHeadersProcessor extends HistoryApi {
 
-  def processHeader(h: Header): (ProgressInfo, Option[AwaitingAppendToHistory]) = getHeaderInfoUpdate(h) match {
+  def processHeader(h: Header): (ProgressInfo, Option[HistoryUpdateInfoAcc]) = getHeaderInfoUpdate(h) match {
     case (bestHeaderId, dataToUpdate: Seq[_]) if dataToUpdate.nonEmpty =>
-      //historyStorage.bulkInsert(h.id, dataToUpdate, Seq(h))
       bestHeaderId match {
         case Some(bestHeaderId) =>
           ProgressInfo(none, Seq.empty, if (!bestHeaderId.sameElements(h.id)) Seq.empty else Seq(h), toDownload(h)) ->
-            Some(AwaitingAppendToHistory(dataToUpdate, h))
+            Some(HistoryUpdateInfoAcc(dataToUpdate, h, insertToObjectStore = false))
         case _ =>
           forceStopApplication(errorMessage = "Should always have best header after header application")
       }
