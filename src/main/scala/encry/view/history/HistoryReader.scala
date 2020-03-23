@@ -2,13 +2,16 @@ package encry.view.history
 
 import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Older }
 import encry.modifiers.history.HeaderChain
+import encry.view.history.ValidationError.HistoryApiError
+import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.network.SyncInfo
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
-
 import scala.collection.immutable.HashSet
 
 trait HistoryReader {
+
+  def getBestHeaderId: Option[ModifierId]
 
   def getBestHeaderHeight: Int
 
@@ -22,8 +25,7 @@ trait HistoryReader {
 
   def getHeaderById(id: ModifierId): Option[Header]
 
-  def getChainToHeader(fromHeaderOpt: Option[Header],
-                       toHeader: Header): (Option[ModifierId], HeaderChain)
+  def getChainToHeader(fromHeaderOpt: Option[Header], toHeader: Header): (Option[ModifierId], HeaderChain)
 
   def getBlockByHeaderId(id: ModifierId): Option[Block]
 
@@ -50,6 +52,8 @@ trait HistoryReader {
   def getBestHeader: Option[Header]
 
   def getBestBlock: Option[Block]
+
+  def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier]
 }
 
 object HistoryReader {
@@ -72,8 +76,14 @@ object HistoryReader {
     def lastHeaders(count: Int): HeaderChain                        = HeaderChain.empty
     def getBestHeader: Option[Header]                               = None
     def getBestBlock: Option[Block]                                 = None
-    def getChainToHeader(fromHeaderOpt: Option[Header],
-                         toHeader: Header): (Option[ModifierId], HeaderChain) = (None, HeaderChain.empty)
+    def getChainToHeader(
+      fromHeaderOpt: Option[Header],
+      toHeader: Header
+    ): (Option[ModifierId], HeaderChain) =
+      (None, HeaderChain.empty)
+    def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
+      Left(HistoryApiError(""))
+    def getBestHeaderId: Option[ModifierId] = None
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -95,8 +105,13 @@ object HistoryReader {
     def lastHeaders(count: Int): HeaderChain                        = history.lastHeaders(count)
     def getBestHeader: Option[Header]                               = history.getBestHeader
     def getBestBlock: Option[Block]                                 = history.getBestBlock
-    def getChainToHeader(fromHeaderOpt: Option[Header],
-                         toHeader: Header): (Option[ModifierId], HeaderChain) = history.getChainToHeader(fromHeaderOpt,
-                                                                                                         toHeader)
+    def getChainToHeader(
+      fromHeaderOpt: Option[Header],
+      toHeader: Header
+    ): (Option[ModifierId], HeaderChain) =
+      history.getChainToHeader(fromHeaderOpt, toHeader)
+    def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
+      history.testApplicable(modifier)
+    def getBestHeaderId: Option[ModifierId] = history.getBestHeaderId
   }
 }

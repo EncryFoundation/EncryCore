@@ -21,6 +21,8 @@ import scala.util.{Random => ScRand}
 
 trait EncryGenerator extends Settings {
 
+  Box
+
   val mnemonicKey: String = "index another island accuse valid aerobic little absurd bunker keep insect scissors"
   val privKey: PrivateKey25519 = createPrivKey(Some(mnemonicKey))
 

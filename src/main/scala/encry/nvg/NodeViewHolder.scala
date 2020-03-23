@@ -369,7 +369,8 @@ class NodeViewHolder(
           logger.debug(s"Can't apply modifier ${modifier.encodedId}, contents: $modifier to history cause $e.")
           context.parent ! SyntacticallyFailedModification(modifier, List(HistoryApplyError(e.getMessage)))
       }
-    } else logger.info(s"Trying to apply modifier ${modifier.encodedId} that's already in history.")
+    }
+    else logger.info(s"Trying to apply modifier ${modifier.encodedId} that's already in history.")
 
   def sendUpdatedInfoToMemoryPool(toRemove: Seq[PersistentModifier], toApply: Seq[PersistentModifier]): Unit = {
     val toRemoveTxs: IndexedSeq[Transaction] = toRemove

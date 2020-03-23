@@ -7,39 +7,42 @@ import com.typesafe.scalalogging.StrictLogging
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.settings._
 import encry.storage.VersionalStorage
-import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
+import encry.storage.VersionalStorage.{ StorageKey, StorageValue, StorageVersion }
 import encry.storage.iodb.versionalIODB.IODBHistoryWrapper
-import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion}
+import encry.storage.levelDb.versionalLevelDB.{ LevelDbFactory, VLDBWrapper, VersionalLevelDBCompanion }
 import encry.utils.NetworkTimeProvider
+import encry.view.history.History.AwaitingAppendToHistory
 import encry.view.history.storage.HistoryStorage
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
 import org.iq80.leveldb.Options
 
 /**
-  * History implementation. It is processing persistent modifiers generated locally or received from the network.
+ * History implementation. It is processing persistent modifiers generated locally or received from the network.
   **/
 trait History extends HistoryModifiersValidator with AutoCloseable {
 
   var isFullChainSynced: Boolean
 
   /** Appends modifier to the history if it is applicable. */
-  def append(modifier: PersistentModifier): Either[Throwable, (History, ProgressInfo)] = {
+  def append(
+    modifier: PersistentModifier
+  ): Either[Throwable, (ProgressInfo, Option[AwaitingAppendToHistory])] = {
     logger.info(s"Trying to append modifier ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId} to history")
     Either.catchNonFatal(modifier match {
-      case header: Header   =>
+      case header: Header =>
         logger.info(s"Append header ${header.encodedId} at height ${header.height} to history")
-        (this, processHeader(header))
-      case payload: Payload => (this, processPayload(payload))
+        processHeader(header)
+      case payload: Payload => processPayload(payload)
     })
   }
 
-  def processHeader(h: Header): ProgressInfo
+  def processHeader(h: Header): (ProgressInfo, Option[AwaitingAppendToHistory])
 
-  def processPayload(payload: Payload): ProgressInfo
+  def processPayload(payload: Payload): (ProgressInfo, Option[AwaitingAppendToHistory])
 
   /** @return header, that corresponds to modifier */
   private def correspondingHeader(modifier: PersistentModifier): Option[Header] = modifier match {
@@ -49,22 +52,28 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
   }
 
   /**
-    * Marks modifier and all modifiers in child chains as invalid
-    *
-    * @param modifier that is invalid against the State
-    * @return ProgressInfo with next modifier to try to apply
-    */
+   * Marks modifier and all modifiers in child chains as invalid
+   *
+   * @param modifier that is invalid against the State
+   * @return ProgressInfo with next modifier to try to apply
+   */
   def reportModifierIsInvalid(modifier: PersistentModifier): (History, ProgressInfo) = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as invalid")
     correspondingHeader(modifier) match {
       case Some(invalidatedHeader) =>
         val invalidatedHeaders: Seq[Header] = continuationHeaderChains(invalidatedHeader, _ => true).flatten.distinct
         val validityRow: List[(StorageKey, StorageValue)] = invalidatedHeaders
-          .flatMap(h => Seq(h.id, h.payloadId)
-            .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))).toList
+          .flatMap(
+            h =>
+              Seq(h.id, h.payloadId)
+                .map(id => validityKey(id) -> StorageValue @@ Array(0.toByte))
+          )
+          .toList
         logger.info(s"Going to invalidate ${invalidatedHeader.encodedId} and ${invalidatedHeaders.map(_.encodedId)}")
-        val bestHeaderIsInvalidated: Boolean = getBestHeaderId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
-        val bestFullIsInvalidated: Boolean = getBestBlockId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
+        val bestHeaderIsInvalidated: Boolean =
+          getBestHeaderId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
+        val bestFullIsInvalidated: Boolean =
+          getBestBlockId.exists(id => invalidatedHeaders.exists(_.id sameElements id))
         (bestHeaderIsInvalidated, bestFullIsInvalidated) match {
           case (false, false) =>
             // Modifiers from best header and best full chain are not involved, no rollback and links change required.
@@ -86,17 +95,20 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
               this -> ProgressInfo(None, Seq.empty, Seq.empty, None)
             } else {
               val invalidatedChain: Seq[Block] = getBestBlock.toSeq
-                .flatMap(f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers)
+                .flatMap(
+                  f => headerChainBack(getBestBlockHeight + 1, f.header, h => !invalidatedHeaders.contains(h)).headers
+                )
                 .flatMap(h => getBlockByHeader(h))
                 .ensuring(_.lengthCompare(1) > 0, "invalidatedChain should contain at least bestFullBlock and parent")
               val branchPoint: Block = invalidatedChain.head
               val validChain: Seq[Block] =
-                continuationHeaderChains(branchPoint.header, h => getBlockByHeader(h).isDefined && !invalidatedHeaders.contains(h))
+                continuationHeaderChains(branchPoint.header,
+                                         h => getBlockByHeader(h).isDefined && !invalidatedHeaders.contains(h))
                   .maxBy(chain => scoreOf(chain.last.id).getOrElse(BigInt(0)))
                   .flatMap(h => getBlockByHeader(h))
               val changedLinks: Seq[(StorageKey, StorageValue)] =
                 List(
-                  BestBlockKey -> StorageValue @@ validChain.last.id.untag(ModifierId),
+                  BestBlockKey  -> StorageValue @@ validChain.last.id.untag(ModifierId),
                   BestHeaderKey -> StorageValue @@ newBestHeader.id.untag(ModifierId)
                 )
               val toInsert: List[(StorageKey, StorageValue)] = validityRow ++ changedLinks
@@ -115,21 +127,22 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
   }
 
   /**
-    * Marks modifier as valid
-    *
-    * @param modifier that is valid against the State
-    * @return ProgressInfo with next modifier to try to apply
-    */
+   * Marks modifier as valid
+   *
+   * @param modifier that is valid against the State
+   * @return ProgressInfo with next modifier to try to apply
+   */
   def reportModifierIsValid(modifier: PersistentModifier): History = {
     logger.info(s"Modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} is marked as valid ")
     modifier match {
       case block: Block =>
         val nonMarkedIds: Seq[ModifierId] = Seq(block.header.id, block.payload.id)
           .filter(id => historyStorage.get(validityKey(id)).isEmpty)
-        if (nonMarkedIds.nonEmpty) historyStorage.insert(
-          StorageVersion @@ validityKey(nonMarkedIds.head).untag(StorageKey),
-          nonMarkedIds.map(id => validityKey(id) -> StorageValue @@ Array(1.toByte)).toList
-        )
+        if (nonMarkedIds.nonEmpty)
+          historyStorage.insert(
+            StorageVersion @@ validityKey(nonMarkedIds.head).untag(StorageKey),
+            nonMarkedIds.map(id => validityKey(id) -> StorageValue @@ Array(1.toByte)).toList
+          )
         this
       case _ =>
         historyStorage.insert(
@@ -146,6 +159,11 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
 }
 
 object History extends StrictLogging {
+
+  final case class AwaitingAppendToHistory(
+    toUpdate: Seq[(StorageKey, StorageValue)],
+    modifier: PersistentModifier
+  )
 
   def getHistoryIndexDir(settings: EncryAppSettings): File = {
     val dir: File = new File(s"${settings.directory}/history/index")
@@ -166,8 +184,8 @@ object History extends StrictLogging {
       case VersionalStorage.IODB =>
         logger.info("Init history with iodb storage")
         val historyObjectsDir: File = getHistoryObjectsDir(settingsEncry)
-        val indexStore: LSMStore = new LSMStore(historyIndexDir, keepVersions = 0)
-        val objectsStore: LSMStore = new LSMStore(historyObjectsDir, keepVersions = 0)
+        val indexStore: LSMStore    = new LSMStore(historyIndexDir, keepVersions = 0)
+        val objectsStore: LSMStore  = new LSMStore(historyObjectsDir, keepVersions = 0)
         IODBHistoryWrapper(indexStore, objectsStore)
       case VersionalStorage.LevelDB =>
         logger.info("Init history with levelDB storage")
@@ -176,16 +194,15 @@ object History extends StrictLogging {
     }
     if (settingsEncry.snapshotSettings.enableFastSynchronization && !settingsEncry.node.offlineGeneration)
       new History with HistoryHeadersProcessor with FastSyncProcessor {
-        override val settings: EncryAppSettings = settingsEncry
-        override var isFullChainSynced: Boolean = settingsEncry.node.offlineGeneration
-        override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
+        override val settings: EncryAppSettings        = settingsEncry
+        override var isFullChainSynced: Boolean        = settingsEncry.node.offlineGeneration
+        override val historyStorage: HistoryStorage    = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
-      }
-    else
+      } else
       new History with HistoryHeadersProcessor with HistoryPayloadsProcessor {
-        override val settings: EncryAppSettings = settingsEncry
-        override var isFullChainSynced: Boolean = settingsEncry.node.offlineGeneration
-        override val historyStorage: HistoryStorage = HistoryStorage(vldbInit)
+        override val settings: EncryAppSettings        = settingsEncry
+        override var isFullChainSynced: Boolean        = settingsEncry.node.offlineGeneration
+        override val historyStorage: HistoryStorage    = HistoryStorage(vldbInit)
         override val timeProvider: NetworkTimeProvider = new NetworkTimeProvider(settingsEncry.ntp)
       }
   }
