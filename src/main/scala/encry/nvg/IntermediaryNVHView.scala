@@ -45,8 +45,11 @@ class IntermediaryNVHView(settings: EncryAppSettings,
     case ModifierFromNetwork(remote, typeId, modifierId, modifierBytes) => history ! ModifierFromNetwork
     case StateAction.ApplyFailed(modId, errs) =>
     // todo: Notify history
-
+    case StateAction.ModifierApplied(modId) =>
+    //todo: Notify history
   }
+
+  def awaitingHistoryBranchPoint(history: ActorRef): Receive = ???
 }
 
 object IntermediaryNVHView {
