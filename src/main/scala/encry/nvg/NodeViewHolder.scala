@@ -207,10 +207,6 @@ class NodeViewHolder(
     isLocallyGenerated: Boolean = false
   ): (History, UtxoState, Seq[PersistentModifier]) = {
     logger.info(s"Starting updating state in updateState function!")
-//    if (!isLocallyGenerated) progressInfo.toApply.foreach {
-//      case header: Header => requestDownloads(progressInfo, header.id.some)
-//      case _              => requestDownloads(progressInfo, none)
-//    }
     val branchingPointOpt: Option[VersionTag] = progressInfo.branchPoint.map(VersionTag !@@ _)
     val (stateToApplyTry: Try[UtxoState], suffixTrimmed: IndexedSeq[PersistentModifier] @unchecked) =
       if (progressInfo.chainSwitchingNeeded) {
@@ -284,17 +280,6 @@ class NodeViewHolder(
                 }
                 if (settings.node.mining && progressInfo.chainSwitchingNeeded)
                   context.parent ! StartMining
-                context.parent ! SemanticallySuccessfulModifier(modToApply)
-                if (newHis.getBestHeaderId.exists(
-                      bestHeaderId =>
-                        newHis.getBestBlockId.exists(bId => ByteArrayWrapper(bId) == ByteArrayWrapper(bestHeaderId))
-                    )) newHis.isFullChainSynced = true
-                context.parent ! HeightStatistics(newHis.getBestHeaderHeight, stateAfterApply.height)
-                if (modToApply match {
-                      case _: Block   => true
-                      case _: Payload => true
-                      case _          => false
-                    }) context.parent ! ModifierAppendedToState(success = true)
                 UpdateInformation(newHis, stateAfterApply, none, none, u.suffix :+ modToApply)
               case Left(e: List[ModifierApplyError]) =>
                 logger.info(s"Application to state failed cause $e")
@@ -325,20 +310,6 @@ class NodeViewHolder(
       context.parent ! StartApplyingModifier(modifier.id, modifier.modifierTypeId, System.currentTimeMillis())
       nodeView.history.append(modifier) match {
         case Right((historyBeforeStUpdate, progressInfo)) =>
-          logger.info(
-            s"Successfully applied modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} to the history. " +
-              s"Time of applying is: ${(System.currentTimeMillis() - startApplicationToTheHistory) / 1000}s."
-          )
-          if (modifier.modifierTypeId == Header.modifierTypeId) historyBeforeStUpdate.updateIdsForSyncInfo()
-          context.parent ! EndOfApplyingModifier(modifier.id)
-          context.parent ! ModifierAppendedToHistory(modifier match {
-            case _: Header  => true
-            case _: Payload => false
-          }, success = true)
-          logger.info(
-            s"Going to apply modifier ${modifier.encodedId} of type ${modifier.modifierTypeId} to the state. " +
-              s"Progress info is: $progressInfo."
-          )
           if (progressInfo.toApply.nonEmpty) {
             val startPoint: Long = System.currentTimeMillis()
             logger.info(s"Progress info is non empty. To apply is: ${progressInfo.toApply.map(_.encodedId)}.")
@@ -359,10 +330,6 @@ class NodeViewHolder(
             }
             updateNodeView(newHistory.some, newState.some, nodeView.wallet.some)
           } else {
-            logger.info(s"Progress info is empty.")
-            context.parent ! HeightStatistics(historyBeforeStUpdate.getBestHeaderHeight, nodeView.state.height)
-            if (!isLocallyGenerated) requestDownloads(progressInfo, modifier.id.some)
-            context.parent ! SemanticallySuccessfulModifier(modifier)
             updateNodeView(updatedHistory = historyBeforeStUpdate.some)
           }
         case Left(e: Throwable) =>

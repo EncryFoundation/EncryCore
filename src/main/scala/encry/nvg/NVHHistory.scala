@@ -5,10 +5,11 @@ import java.io.File
 import akka.actor.Actor
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
+import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterHistory
-import encry.nvg.IntermediaryNVHView.ModifierToAppend
+import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
 import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.{
@@ -17,20 +18,22 @@ import encry.nvg.NodeViewHolder.{
   SyntacticallyFailedModification
 }
 import encry.settings.EncryAppSettings
-import encry.stats.StatsSender.{ ModifierAppendedToHistory, StartApplyingModifier }
+import encry.stats.StatsSender._
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.history.History.HistoryUpdateInfoAcc
 import encry.view.history.{ History, HistoryReader }
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Header, Payload }
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
 
 class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
   var history: History = initializeHistory
+
+  var lastProgressInfo: ProgressInfo = ProgressInfo(none, Seq.empty, Seq.empty, none)
 
   context.parent ! RegisterHistory(HistoryReader(history))
 
@@ -52,6 +55,9 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
             s"Modifier ${mod.encodedId} of type ${mod.modifierTypeId} processed successfully by history. " +
               s"Time of processing is: ${(System.currentTimeMillis() - startProcessingTime) / 1000}s."
           )
+          history.insertUpdateInfo(newUpdateInformation)
+          if (mod.modifierTypeId == Header.modifierTypeId) history.updateIdsForSyncInfo()
+          context.parent ! EndOfApplyingModifier(mod.id)
           context.parent ! ModifierAppendedToHistory(mod match {
             case _: Header  => true
             case _: Payload => false
@@ -61,9 +67,10 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
             context.parent ! ProgressInfoForState(
               progressInfo,
               (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,
-              history.isFullChainSynced
+              history.isFullChainSynced,
+              HistoryReader(history)
             )
-            history.insertUpdateInfo(newUpdateInformation)
+            lastProgressInfo = progressInfo
             if (!isLocallyGenerated) progressInfo.toApply.foreach {
               case header: Header => requestDownloads(progressInfo, header.id.some)
               case _              => requestDownloads(progressInfo, none)
@@ -71,6 +78,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
           } else {
             logger.info(s"Progress info contains an empty toApply. Going to form request download.")
             if (!isLocallyGenerated) requestDownloads(progressInfo, mod.id.some)
+            context.parent ! HeightStatistics(history.getBestHeaderHeight, -1) //todo incorrect state height
             context.parent ! SemanticallySuccessfulModifier(mod)
           }
       }
@@ -82,7 +90,16 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
     case StateAction.ModifierApplied(mod: PersistentModifier) =>
       history = history.reportModifierIsValid(mod)
       context.parent ! HistoryReader(history)
-      context.parent ! ModifierAppliedToHistory
+      context.parent ! BlockAndHeaderInfo(history.getBestHeader, history.getBestBlock)
+      context.parent ! SemanticallySuccessfulModifier(mod)
+      if (history.getBestHeaderId.exists(besId => history.getBestBlockId.exists(_.sameElements(besId))))
+        history.isFullChainSynced = true
+      context.parent ! HeightStatistics(history.getBestHeaderHeight, -1) //todo incorrect state height
+      if (mod match {
+            case _: Block   => true
+            case _: Payload => true
+            case _          => false
+          }) context.parent ! ModifierAppendedToState(success = true)
 
     case StateAction.ApplyFailed(mod, e) =>
       val (newHistory: History, progressInfo: ProgressInfo) = history.reportModifierIsInvalid(mod)
@@ -90,10 +107,13 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
       context.parent ! ProgressInfoForState(
         progressInfo,
         (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,
-        history.isFullChainSynced
+        history.isFullChainSynced,
+        HistoryReader(history)
       )
+      lastProgressInfo = progressInfo
       history = newHistory
 
+    case InitGenesisHistory => history = initializeHistory
   }
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = none): Unit =

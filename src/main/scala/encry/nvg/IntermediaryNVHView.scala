@@ -3,10 +3,11 @@ package encry.nvg
 import akka.actor.{ Actor, ActorRef, Props }
 import com.typesafe.scalalogging.StrictLogging
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterHistory, RegisterState }
-import encry.nvg.IntermediaryNVHView.ModifierToAppend
+import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
 import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
+import encry.nvg.NodeViewHolder.SyntacticallyFailedModification
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
@@ -22,9 +23,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   val historyRef: ActorRef = ActorRef.noSender
 
-  var isProcessingModifierByHistory: Boolean = false
-
-  var isProcessingModifierByState: Boolean = false
+  var isModifierProcessingInProgress: Boolean = false
 
   override def receive: Receive = awaitingViewActors()
 
@@ -36,9 +35,10 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       context.actorOf(
         NVHState
           .restoreConsistentStateProps(settings, reader, influx)
-          .getOrElse(
+          .getOrElse {
+            historyRef ! InitGenesisHistory
             NVHState.genesisProps(settings, influx)
-          )
+          }
       )
     case RegisterHistory(_) =>
       context.become(viewReceive(sender(), state.get))
@@ -50,29 +50,20 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   def viewReceive(history: ActorRef, state: ActorRef): Receive = {
     case ValidatedModifier(modifier: PersistentModifier) =>
-      val wrappedKey: mutable.WrappedArray.ofByte = NodeViewHolder.toKey(modifier.id)
-
       val isInHistory: Boolean = historyReader.isModifierDefined(modifier.id)
-
-      val isInCache: Boolean = ModifiersCache.contains(wrappedKey)
-
+      val isInCache: Boolean   = ModifiersCache.contains(NodeViewHolder.toKey(modifier.id))
       if (isInHistory || isInCache)
         logger.info(
           s"Modifier ${modifier.encodedId} can't be placed into the cache cause: " +
             s"contains in cache: $isInCache, contains in history: $isInHistory."
         )
-      else ModifiersCache.put(wrappedKey, modifier, historyReader, settings)
-
-      if (!isProcessingModifierByHistory && !isProcessingModifierByState)
-        getNextModifier()
-
-    case ModifierAppliedToHistory =>
-      isProcessingModifierByHistory = false
-      getNextModifier()
-
-    case ProgressInfoForState(pi, flag, isFullChainSynced, reader) => //todo work with state starts here
-    case msg: StateAction.ApplyFailed                      => historyRef ! msg
-    case msg: StateAction.ModifierApplied                  => historyRef ! msg
+      else ModifiersCache.put(NodeViewHolder.toKey(modifier.id), modifier, historyReader, settings)
+      if (!isModifierProcessingInProgress) getNextModifier()
+    case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
+    case msg: ProgressInfoForState            => //todo work with state starts here
+    case msg: StateAction.ApplyFailed         => historyRef ! msg
+    case msg: StateAction.ModifierApplied     => historyRef ! msg
+    case msg: SyntacticallyFailedModification => context.parent ! msg
   }
 
   def awaitingHistoryBranchPoint(history: ActorRef): Receive = ???
@@ -81,7 +72,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
     ModifiersCache
       .popCandidate(historyReader, settings)
       .foreach { mod: PersistentModifier =>
-        isProcessingModifierByHistory = true
+        isModifierProcessingInProgress = true
         logger.info(s"Got new modifiers in compute application function: ${mod.encodedId}.")
         historyRef ! ModifierToAppend(mod, isLocallyGenerated = false)
       }
@@ -97,6 +88,7 @@ object IntermediaryNVHView {
   }
 
   final case class ModifierToAppend(modifier: PersistentModifier, isLocallyGenerated: Boolean)
+  case object InitGenesisHistory
 
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, influxRef: Option[ActorRef]): Props =
     Props(new IntermediaryNVHView(settings, ntp, influxRef))
