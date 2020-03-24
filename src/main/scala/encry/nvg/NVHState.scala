@@ -27,6 +27,7 @@ import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
 import org.encryfoundation.common.utils.constants.Constants
+import org.encryfoundation.prismlang.core.Constants
 import org.iq80.leveldb.Options
 
 import scala.util.{Failure, Success, Try}
@@ -80,7 +81,7 @@ class NVHState(influxRef: Option[ActorRef], var historyReader: HistoryReader, se
   def restoreState(settings: EncryAppSettings,
                    historyReader: HistoryReader,
                    influxRef: Option[ActorRef]): Option[UtxoState] =
-    if (History.getHistoryIndexDir(settings).listFiles.nonEmpty) {
+    if (historyReader.getBestHeaderHeight != settings.constants.PreGenesisHeight) {
       Try {
         val stateDir: File = UtxoState.getStateDir(settings)
         stateDir.mkdirs()
