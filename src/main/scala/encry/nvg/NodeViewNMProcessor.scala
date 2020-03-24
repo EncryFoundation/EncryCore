@@ -54,7 +54,7 @@ class NodeViewNMProcessor(settings: EncryAppSettings) extends Actor with StrictL
     )
 
   def workingCycle(modifiersRequester: Option[Cancellable]): Receive = {
-    case UpdateHistoryReader(newReader: HistoryReader) => historyReader = newReader
+    case msg: HistoryReader => historyReader = msg
 
     //todo possible way to call CheckPayloadsToDownload
     case SemanticallySuccessfulModifier(block: Block) if historyReader.isFullChainSynced =>

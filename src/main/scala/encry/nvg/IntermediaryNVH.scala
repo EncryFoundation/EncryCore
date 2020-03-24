@@ -97,8 +97,8 @@ class IntermediaryNVH(
     case msg @ DataFromPeer(_: ResponseManifestMessage, _)        => snapshotProcessor.foreach(_ ! msg)
     case msg @ DataFromPeer(_: RequestChunkMessage, _)            => snapshotProcessor.foreach(_ ! msg)
     case msg @ DataFromPeer(_: ResponseChunkMessage, _)           => snapshotProcessor.foreach(_ ! msg)
-    case msg @ UpdateHistoryReader(newReader: HistoryReader) =>
-      historyReader = newReader
+    case msg: HistoryReader =>
+      historyReader = msg
       networkMessagesProcessor ! msg
       dataHolderRef ! msg
     case msg: LocallyGeneratedModifier               => nodeViewHolder ! msg
