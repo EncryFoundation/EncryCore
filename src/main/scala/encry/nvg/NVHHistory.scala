@@ -9,9 +9,9 @@ import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterHistory
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterNodeView
 import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
-import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
+import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.{
   SemanticallyFailedModification,
@@ -20,10 +20,12 @@ import encry.nvg.NodeViewHolder.{
 }
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
+import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.history.History.HistoryUpdateInfoAcc
 import encry.view.history.{ History, HistoryReader }
+import encry.view.wallet.{ EncryWallet, WalletReader }
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
@@ -35,21 +37,22 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     with StrictLogging
     with AutoCloseable {
 
-  println("start here!")
-  var history: History = initializeHistory.getOrElse(genesis)
+  final case class HistoryView(history: History, wallet: EncryWallet)
+
+  var historyView: HistoryView = initializeHistory.getOrElse(genesis)
 
   var lastProgressInfo: ProgressInfo = ProgressInfo(none, Seq.empty, Seq.empty, none)
 
-  context.parent ! RegisterHistory(HistoryReader(history))
+  context.parent ! RegisterNodeView(HistoryReader(historyView.history), WalletReader(historyView.wallet))
 
   override def postStop(): Unit = println("stop!")
 
   override def receive: Receive = {
-    case ModifierToAppend(mod, isLocallyGenerated) if !history.isModifierDefined(mod.id) =>
+    case ModifierToAppend(mod, isLocallyGenerated) if !historyView.history.isModifierDefined(mod.id) =>
       val startProcessingTime: Long = System.currentTimeMillis()
       logger.info(s"Start modifier ${mod.encodedId} of type ${mod.modifierTypeId} processing by history.")
       context.parent ! StartApplyingModifier(mod.id, mod.modifierTypeId, startProcessingTime)
-      history.append(mod) match {
+      historyView.history.append(mod) match {
         case Left(error: Throwable) =>
           logger.info(
             s"Error ${error.getMessage} has occurred during processing modifier by history component. " +
@@ -62,8 +65,8 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
             s"Modifier ${mod.encodedId} of type ${mod.modifierTypeId} processed successfully by history. " +
               s"Time of processing is: ${(System.currentTimeMillis() - startProcessingTime) / 1000}s."
           )
-          history.insertUpdateInfo(newUpdateInformation)
-          if (mod.modifierTypeId == Header.modifierTypeId) history.updateIdsForSyncInfo()
+          historyView.history.insertUpdateInfo(newUpdateInformation)
+          if (mod.modifierTypeId == Header.modifierTypeId) historyView.history.updateIdsForSyncInfo()
           context.parent ! EndOfApplyingModifier(mod.id)
           context.parent ! ModifierAppendedToHistory(mod match {
             case _: Header  => true
@@ -73,9 +76,9 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
             logger.info(s"Progress info contains an non empty toApply. Going to notify state about new toApply.")
             context.parent ! ProgressInfoForState(
               progressInfo,
-              (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,
-              history.isFullChainSynced,
-              HistoryReader(history)
+              (historyView.history.getBestHeaderHeight - historyView.history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,
+              historyView.history.isFullChainSynced,
+              HistoryReader(historyView.history)
             )
             lastProgressInfo = progressInfo
             if (!isLocallyGenerated) progressInfo.toApply.foreach {
@@ -85,7 +88,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
           } else {
             logger.info(s"Progress info contains an empty toApply. Going to form request download.")
             if (!isLocallyGenerated) requestDownloads(progressInfo, mod.id.some)
-            context.parent ! HeightStatistics(history.getBestHeaderHeight, -1) //todo incorrect state height
+            context.parent ! HeightStatistics(historyView.history.getBestHeaderHeight, -1) //todo incorrect state height
             context.parent ! SemanticallySuccessfulModifier(mod)
           }
       }
@@ -95,41 +98,51 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       logger.info(s"Got modifier ${mod.encodedId} on history actor which already contains in history.")
 
     case StateAction.ModifierApplied(mod: PersistentModifier) =>
-      history = history.reportModifierIsValid(mod)
-      context.parent ! HistoryReader(history)
-      context.parent ! BlockAndHeaderInfo(history.getBestHeader, history.getBestBlock)
-      context.parent ! SemanticallySuccessfulModifier(mod)
-      if (history.getBestHeaderId.exists(besId => history.getBestBlockId.exists(_.sameElements(besId))))
-        history.isFullChainSynced = true
-      context.parent ! HeightStatistics(history.getBestHeaderHeight, -1) //todo incorrect state height
+      val newHistory = historyView.history.reportModifierIsValid(mod)
+      historyView = historyView.copy(history = newHistory)
+      context.parent ! HistoryReader(historyView.history)
+      context.parent ! BlockAndHeaderInfo(historyView.history.getBestHeader, historyView.history.getBestBlock)
+      if (historyView.history.getBestHeaderId.exists(
+            besId => historyView.history.getBestBlockId.exists(_.sameElements(besId))
+          ))
+        historyView.history.isFullChainSynced = true
+      context.parent ! HeightStatistics(historyView.history.getBestHeaderHeight, -1) //todo incorrect state height
       if (mod match {
             case _: Block   => true
             case _: Payload => true
             case _          => false
           }) context.parent ! ModifierAppendedToState(success = true)
+      if (lastProgressInfo.chainSwitchingNeeded)
+        historyView.wallet.rollback(VersionTag !@@ lastProgressInfo.branchPoint.get).get
+      historyView.wallet.scanPersistent(mod)
+      context.parent ! NewWalletReader(WalletReader(historyView.wallet))
       context.parent ! ModifierAppliedToHistory
+      context.parent ! SemanticallySuccessfulModifier(mod)
+
     case StateAction.ApplyFailed(mod, e) =>
-      val (newHistory: History, progressInfo: ProgressInfo) = history.reportModifierIsInvalid(mod)
+      val (newHistory: History, progressInfo: ProgressInfo) = historyView.history.reportModifierIsInvalid(mod)
       context.parent ! SemanticallyFailedModification(mod, e)
       context.parent ! ProgressInfoForState(
         progressInfo,
-        (history.getBestHeaderHeight - history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,
-        history.isFullChainSynced,
-        HistoryReader(history)
+        (historyView.history.getBestHeaderHeight - historyView.history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,
+        historyView.history.isFullChainSynced,
+        HistoryReader(historyView.history)
       )
       lastProgressInfo = progressInfo
-      history = newHistory
+      historyView = historyView.copy(history = newHistory)
 
     case InitGenesisHistory =>
       logger.info("Init in InitGenesisHistory")
-      history.close()
-      history = genesis
+      historyView.history.close()
+      historyView.wallet.close()
+      historyView = genesis
+
   }
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = none): Unit =
     pi.toDownload.foreach {
       case (tid: ModifierTypeId, id: ModifierId) =>
-        if (tid != Payload.modifierTypeId || (history.isFullChainSynced && tid == Payload.modifierTypeId)) {
+        if (tid != Payload.modifierTypeId || (historyView.history.isFullChainSynced && tid == Payload.modifierTypeId)) {
           logger.info(
             s"History holder created download request for modifier ${Algos.encode(id)} of type $tid. " +
               s"Previous modifier is ${previousModifier.map(Algos.encode)}."
@@ -141,35 +154,43 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
           )
     }
 
-  def initializeHistory: Option[History] =
+  def initializeHistory: Option[HistoryView] =
     try {
       val history: History = History.readOrGenerate(settings, ntp)
       history.updateIdsForSyncInfo()
+      val wallet: EncryWallet =
+        EncryWallet.readOrGenerate(EncryWallet.getWalletDir(settings), EncryWallet.getKeysDir(settings), settings)
       logger.info(s"History best block height: ${history.getBestBlockHeight}")
       logger.info(s"History best header height: ${history.getBestHeaderHeight}")
-      Some(history)
+      Some(HistoryView(history, wallet))
     } catch {
       case error: Throwable =>
         logger.info(s"During history initialization error ${error.getMessage} has happened.")
         None
     }
 
-  def genesis: History =
+  def genesis: HistoryView =
     try {
       new File(s"${settings.directory}/history/").listFiles.foreach(FileUtils.cleanDirectory)
+      new File(s"${settings.directory}/wallet/").listFiles.foreach(FileUtils.cleanDirectory)
+      new File(s"${settings.directory}/keys/").listFiles.foreach(FileUtils.cleanDirectory)
       val history: History = History.readOrGenerate(settings, ntp)
       history.updateIdsForSyncInfo()
+      val wallet: EncryWallet =
+        EncryWallet.readOrGenerate(EncryWallet.getWalletDir(settings), EncryWallet.getKeysDir(settings), settings)
       logger.info(s"History best block height: ${history.getBestBlockHeight}")
       logger.info(s"History best header height: ${history.getBestHeaderHeight}")
-      history
+      HistoryView(history, wallet)
     } catch {
       case error: Throwable =>
-        println("123")
         EncryApp.forceStopApplication(1,
                                       s"During genesis history initialization error ${error.getMessage} has happened.")
     }
 
-  override def close(): Unit = history.close()
+  override def close(): Unit = {
+    historyView.history.close()
+    historyView.wallet.close()
+  }
 }
 
 object NVHHistory {
@@ -179,5 +200,6 @@ object NVHHistory {
                                         reader: HistoryReader)
   case object ModifierAppliedToHistory
   final case object InsertNewUpdates
+  final case class NewWalletReader(reader: WalletReader)
   def props(ntp: NetworkTimeProvider, settings: EncryAppSettings): Props = Props(new NVHHistory(settings, ntp))
 }

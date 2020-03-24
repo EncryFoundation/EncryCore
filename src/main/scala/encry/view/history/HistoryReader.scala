@@ -6,7 +6,8 @@ import encry.view.history.ValidationError.HistoryApiError
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{ Block, Header }
 import org.encryfoundation.common.network.SyncInfo
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, ModifierId }
+
 import scala.collection.immutable.HashSet
 
 trait HistoryReader {
@@ -54,6 +55,8 @@ trait HistoryReader {
   def getBestBlock: Option[Block]
 
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier]
+
+  def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty]
 }
 
 object HistoryReader {
@@ -83,7 +86,8 @@ object HistoryReader {
       (None, HeaderChain.empty)
     def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
       Left(HistoryApiError(""))
-    def getBestHeaderId: Option[ModifierId] = None
+    def getBestHeaderId: Option[ModifierId]                                          = None
+    def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = Left(HistoryApiError(""))
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -113,5 +117,7 @@ object HistoryReader {
     def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
       history.testApplicable(modifier)
     def getBestHeaderId: Option[ModifierId] = history.getBestHeaderId
+    def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] =
+      history.requiredDifficultyAfter(parent)
   }
 }

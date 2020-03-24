@@ -5,10 +5,13 @@ import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.state.avlTree.{AvlTree, Node}
 import encry.view.state.avlTree.utils.implicits.Instances._
+import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
+import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
+import org.encryfoundation.common.validation.ValidationResult
 
 import scala.util.Try
 
@@ -37,6 +40,10 @@ trait UtxoStateReader {
   def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox]
 
   def safePointHeight: Height
+
+  val tree: AvlTree[StorageKey, StorageValue]
+
+  def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction]
 }
 
 object UtxoStateReader {
@@ -53,5 +60,8 @@ object UtxoStateReader {
     override def safePointHeight: Height = state.safePointHeight
     override def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
                                        toDelete: List[StorageKey]): Try[Array[Byte]] = state.getOperationsRootHash(toInsert, toDelete)
+    def validate(tx: Transaction, blockTimeStamp: Long, blockHeight: Height, allowedOutputDelta: Amount = 0L): Either[ValidationResult, Transaction] =
+      state.validate(tx, blockTimeStamp, blockHeight, allowedOutputDelta)
+    val tree: AvlTree[StorageKey, StorageValue] = state.tree
   }
 }

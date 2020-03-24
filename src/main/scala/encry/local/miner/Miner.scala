@@ -3,7 +3,7 @@ package encry.local.miner
 import java.text.SimpleDateFormat
 import java.util.Date
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.util.Timeout
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
@@ -23,11 +23,12 @@ import encry.stats.StatsSender._
 import encry.utils.NetworkTime.Time
 import encry.view.state.avlTree.utils.implicits.Instances._
 import encry.view.NodeViewHolder.CurrentView
-import encry.view.history.History
+import encry.view.history.{History, HistoryReader}
 import encry.mpg.MemoryPool._
-import encry.view.state.UtxoState
+import encry.nvg.IntermediaryNVHView.NodeViewStarted
+import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.utils.implicits.UTXO._
-import encry.view.wallet.EncryWallet
+import encry.view.wallet.{EncryWallet, WalletReader}
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.encryfoundation.common.crypto.PrivateKey25519
@@ -45,7 +46,7 @@ class Miner(dataHolder: ActorRef,
             mempool: ActorRef,
             nvh: ActorRef,
             influx: Option[ActorRef],
-            settings: EncryAppSettings) extends Actor with StrictLogging {
+            settings: EncryAppSettings) extends Actor with StrictLogging with Stash {
 
   implicit val timeout: Timeout = Timeout(5.seconds)
 
@@ -66,6 +67,7 @@ class Miner(dataHolder: ActorRef,
     context.system.eventStream.subscribe(self, classOf[MinerMiningCommands])
     context.system.eventStream.subscribe(self, classOf[SemanticallySuccessfulModifier])
     context.system.eventStream.subscribe(self, classOf[BlockchainStatus])
+    context.system.eventStream.subscribe(self, classOf[NodeViewStarted])
     context.system.scheduler.schedule(5.seconds, 5.seconds) {
       logger.info(s"data holder: $dataHolder. Context: $context")
       dataHolder ! UpdatingMinerStatus(MinerStatus(context.children.nonEmpty && candidateOpt.nonEmpty, candidateOpt))
@@ -79,9 +81,15 @@ class Miner(dataHolder: ActorRef,
   def needNewCandidate(b: Block): Boolean =
     !candidateOpt.flatMap(_.parentOpt).map(_.id).exists(id => Algos.encode(id) == Algos.encode(b.header.id))
 
-  override def receive: Receive = {
-    logger.info(s"settings.node.mining: ${settings.node.mining}. syncingDone: ${syncingDone}")
-    if (settings.node.mining && syncingDone) miningEnabled else miningDisabled
+  override def receive: Receive = awaitNodeView
+
+  def awaitNodeView: Receive = {
+    case _: NodeViewStarted =>
+      logger.info(s"settings.node.mining: ${settings.node.mining}. syncingDone: ${syncingDone}")
+      if (settings.node.mining && syncingDone) {
+        context.self ! StartMining
+        context.become(miningEnabled)
+      } else context.become(miningDisabled)
   }
 
   def mining: Receive = {
@@ -89,6 +97,7 @@ class Miner(dataHolder: ActorRef,
       killAllWorkers()
       self ! StartMining
     case StartMining if syncingDone =>
+      println(s"got start mining from ${sender()}")
       for (i <- 0 until numberOfWorkers) yield context.actorOf(
         Props(classOf[Worker], i, numberOfWorkers, self).withDispatcher("mining-dispatcher").withMailbox("mining-mailbox"))
       candidateOpt match {
@@ -96,10 +105,11 @@ class Miner(dataHolder: ActorRef,
           logger.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None =>
-          logger.info("Candidate is empty! Producing new candidate!")
+          println(s"Candidate is empty! Producing new candidate! ${timeProvider.estimatedTime}")
           produceCandidate()
       }
-    case StartMining => logger.info("Can't start mining because of chain is not synced!")
+    case StartMining =>
+      logger.info("Can't start mining because of chain is not synced!")
     case DisableMining if context.children.nonEmpty =>
       println(s"Miner -> Disable mining context.children.nonEmpty")
       killAllWorkers()
@@ -160,7 +170,9 @@ class Miner(dataHolder: ActorRef,
   }
 
   def unknownMessage: Receive = {
-    case m => logger.debug(s"Unexpected message $m")
+    case m =>
+      println(m)
+      logger.debug(s"Unexpected message $m")
   }
 
   def chainEvents: Receive = {
@@ -175,11 +187,11 @@ class Miner(dataHolder: ActorRef,
     self ! StartMining
   }
 
-  def createCandidate(view: CurrentView[History, UtxoState, EncryWallet],
+  def createCandidate(view: CurrentView[HistoryReader, UtxoStateReader, WalletReader],
                       txsFromMempool: List[Transaction],
-                      bestHeaderOpt: Option[Header]): CandidateBlock = {
+                      bestHeaderOpt: Option[Header],
+                      timestamp: Time): CandidateBlock = {
     val height: Height = Height @@ (bestHeaderOpt.map(_.height).getOrElse(TestNetConstants.PreGenesisHeight) + 1)
-    val timestamp: Time = timeProvider.estimatedTime
     val txsU: List[Transaction] = txsFromMempool.filter(view.state.validate(_, timestamp, height).isRight).distinct
     val filteredTxsWithoutDuplicateInputs = txsU.foldLeft(List.empty[String], IndexedSeq.empty[Transaction]) {
       case ((usedInputsIds, acc), tx) =>
@@ -223,7 +235,7 @@ class Miner(dataHolder: ActorRef,
   }
 
   def produceCandidate(): Unit = {
-    def lambda(txs: List[Transaction]) = (nodeView: CurrentView[History, UtxoState, EncryWallet]) =>
+    def lambda(txs: List[Transaction], time: Time) = (nodeView: CurrentView[HistoryReader, UtxoStateReader, WalletReader]) =>
     {
       val producingStartTime: Time = System.currentTimeMillis()
       startTime = producingStartTime
@@ -240,15 +252,19 @@ class Miner(dataHolder: ActorRef,
           if (settings.influxDB.isDefined)
             context.actorSelection("user/statsSender") ! SleepTime(System.currentTimeMillis() - sleepTime)
           logger.info("Going to calculate last block:")
+
           val envelope: CandidateEnvelope =
             CandidateEnvelope
-              .fromCandidate(createCandidate(nodeView, txs, bestHeaderOpt))
+              .fromCandidate(createCandidate(nodeView, txs, bestHeaderOpt, time))
           envelope
         } else CandidateEnvelope.empty
       candidate
     }
+    val time = timeProvider.estimatedTime
+    println(s"Estimate time on creation: ${time}")
     (mempool ? SendTransactionsToMiner).mapTo[TransactionsForMiner].foreach { txs =>
-      nvh ! GetDataFromCurrentView[History, UtxoState, EncryWallet, CandidateEnvelope](lambda(txs.txs.toList))
+    println(s"Send ged data lambda to nvh. time: ${timeProvider.estimatedTime}")
+      nvh ! GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, CandidateEnvelope](lambda(txs.txs.toList, time))
     }
   }
 }

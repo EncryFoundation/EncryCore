@@ -1,37 +1,41 @@
 package encry.nvg
 
-import akka.actor.{Actor, ActorRef, Props}
+import akka.actor.{Actor, ActorRef, Props, Stash}
+import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
+import encry.local.miner.Miner.CandidateEnvelope
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterHistory, RegisterState}
-import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterNodeView, RegisterState}
+import encry.nvg.IntermediaryNVHView.{ModifierToAppend, NodeViewStarted}
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
+import encry.nvg.NVHHistory.{ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
-import encry.nvg.NVHState.StateAction.ApplyModifier
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
+import encry.nvg.NodeViewHolder.{GetDataFromCurrentView, SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
-import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
+import encry.view.NodeViewHolder.CurrentView
 import encry.view.history.HistoryReader
 import encry.view.state.UtxoStateReader
+import encry.view.wallet.WalletReader
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header}
-import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+import org.encryfoundation.common.modifiers.history.Block
 
-import scala.collection.IndexedSeq
-import scala.util.{Failure, Success}
+import scala.concurrent.Future
 
 class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, influx: Option[ActorRef])
     extends Actor
-    with StrictLogging {
+    with StrictLogging
+    with Stash {
+
+  import context.dispatcher
 
   var historyReader: HistoryReader = HistoryReader.empty
+
+  var walletReader: WalletReader = WalletReader.empty
 
   val historyRef: ActorRef = context.actorOf(NVHHistory.props(ntp, settings))
 
@@ -44,28 +48,58 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   def awaitingViewActors(history: Option[ActorRef] = None,
                          state: Option[ActorRef] = None,
                          stateReader: Option[UtxoStateReader] = None): Receive = {
-    case RegisterHistory(reader) if state.isEmpty =>
+    case RegisterNodeView(reader, wallet) if state.isEmpty =>
+      walletReader = wallet
       historyReader = reader
       logger.info(s"NodeViewParent actor got init history. Going to init state actor.")
       context.become(awaitingViewActors(Some(sender()), state), discardOld = true)
       context.actorOf(NVHState.restoreProps(settings, reader, influx))
-    case RegisterHistory(_) =>
+    case RegisterNodeView(reader, wallet) =>
+      walletReader = wallet
+      historyReader = reader
       context.become(viewReceive(sender(), state.get, stateReader.get))
     case RegisterState(reader) =>
       context.become(viewReceive(history.get, sender(), reader), discardOld = true)
-    case RegisterHistory =>
+      context.system.eventStream.publish(new NodeViewStarted {})
+    case RegisterNodeView =>
       context.become(viewReceive(history.get, sender(), stateReader.get))
-    case msg => logger.info(s"Receive strange: ${msg} on inter nvh")
+    case msg => println(s"Receive strange: $msg on inter nvh from ${sender()}")
   }
 
   def viewReceive(history: ActorRef, state: ActorRef, stateReader: UtxoStateReader): Receive = {
 
     case RegisterState(reader) => context.become(viewReceive(history, sender(), reader))
 
-    case LocallyGeneratedModifier(modifier: PersistentModifier) =>
+    case GetDataFromCurrentView(f: (CurrentView[HistoryReader, UtxoStateReader, WalletReader] => CandidateEnvelope)) =>
+      logger.info("Receive GetDataFromCurrentView on nvh")
+      f(CurrentView(historyReader, stateReader, walletReader)) match {
+        case res: Future[_] =>
+          res.map(l => println(l.getClass))
+          res.pipeTo(sender)
+        case res: CandidateEnvelope =>
+          println(s"qwe ${res.c.get.timestamp}")
+          sender ! res
+        case res =>
+          sender ! res
+      }
+//      f(CurrentView(historyReader, stateReader, walletReader)) match {
+//        case resultFuture: Future[_] => resultFuture.pipeTo(sender)
+//        case result                  => sender ! result
+//      }
+
+    case LocallyGeneratedModifier(modifier: Block) =>
+      logger.info(s"Self mined block: ${modifier}")
+      println(s"Self mined block timestamp: ${modifier.header.timestamp}")
       ModifiersCache.put(
         NodeViewHolder.toKey(modifier.id),
-        modifier,
+        modifier.header,
+        historyReader,
+        settings,
+        isLocallyGenerated = true
+      )
+      ModifiersCache.put(
+        NodeViewHolder.toKey(modifier.payload.id),
+        modifier.payload,
         historyReader,
         settings,
         isLocallyGenerated = true
@@ -90,17 +124,23 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         )
       if (!isModifierProcessingInProgress) getNextModifier()
     case ModifierAppliedToHistory => isModifierProcessingInProgress = false; getNextModifier()
-    case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(point => !stateReader.version.sameElements(point))=>
-      context.become(viewReceive(
-        history,
-        state,
-        stateReader
-      ))
+    case msg: ProgressInfoForState
+        if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(
+          point => !stateReader.version.sameElements(point)
+        ) =>
+      context.become(
+        viewReceive(
+          history,
+          state,
+          stateReader
+        )
+      )
     case msg: ProgressInfoForState =>
       toApply = msg.pi.toApply.map(mod => ByteArrayWrapper(mod.id)).toSet
       msg.pi.toApply.foreach(mod => state ! StateAction.ApplyModifier(mod, msg.saveRootNodeFlag, msg.isFullChainSynced))
-    case msg: StateAction.ApplyFailed         => historyRef ! msg
-    case msg: StateAction.ModifierApplied     =>
+    case msg: StateAction.ApplyFailed => historyRef ! msg
+    case NewWalletReader(reader)      => walletReader = reader
+    case msg: StateAction.ModifierApplied =>
       historyRef ! msg
     case msg: SyntacticallyFailedModification => context.parent ! msg
     case msg: StatsSenderMessage              => context.parent ! msg
@@ -129,12 +169,13 @@ object IntermediaryNVHView {
 
   sealed trait IntermediaryNVHViewActions
   object IntermediaryNVHViewActions {
-    case class RegisterHistory(historyReader: HistoryReader) extends IntermediaryNVHViewActions
-    case class RegisterState(stateReader: UtxoStateReader) extends IntermediaryNVHViewActions
+    case class RegisterNodeView(historyReader: HistoryReader, walletReader: WalletReader) extends IntermediaryNVHViewActions
+    case class RegisterState(stateReader: UtxoStateReader)   extends IntermediaryNVHViewActions
   }
 
   final case class ModifierToAppend(modifier: PersistentModifier, isLocallyGenerated: Boolean)
   case object InitGenesisHistory
+  trait NodeViewStarted
 
   def props(settings: EncryAppSettings, ntp: NetworkTimeProvider, influxRef: Option[ActorRef]): Props =
     Props(new IntermediaryNVHView(settings, ntp, influxRef))
