@@ -84,11 +84,11 @@ object NVHState extends StrictLogging {
     case class TreeChunks(chunks: List[SnapshotChunk]) extends StateAction
   }
 
-  def restoreProps(settings: EncryAppSettings,
-                   historyReader: HistoryReader,
-                   influxRef: Option[ActorRef]): Props = {
-
-  }
+//  def restoreProps(settings: EncryAppSettings,
+//                   historyReader: HistoryReader,
+//                   influxRef: Option[ActorRef]): Props = {
+//
+//  }
 
   //genesis state
   def genesisProps(settings: EncryAppSettings, influxRef: Option[ActorRef]): Props = {

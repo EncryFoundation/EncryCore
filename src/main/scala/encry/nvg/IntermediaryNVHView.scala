@@ -32,6 +32,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   var historyReader: HistoryReader = HistoryReader.empty
 
+  println("init middle")
   val historyRef: ActorRef = context.actorOf(NVHHistory.props(ntp, settings))
 
   var isModifierProcessingInProgress: Boolean = false

@@ -2,37 +2,47 @@ package encry.nvg
 
 import java.io.File
 
-import akka.actor.{Actor, Props}
+import akka.actor.{ Actor, Props }
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
+import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterHistory
-import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
-import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
+import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
+import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
-import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
+import encry.nvg.NodeViewHolder.{
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification
+}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.history.History.HistoryUpdateInfoAcc
-import encry.view.history.{History, HistoryReader}
+import encry.view.history.{ History, HistoryReader }
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
+import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
 
-class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
+class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
+    extends Actor
+    with StrictLogging
+    with AutoCloseable {
 
-  logger.info("start here!")
-  var history: History = initializeHistory
+  println("start here!")
+  var history: History = initializeHistory.getOrElse(genesis)
 
   var lastProgressInfo: ProgressInfo = ProgressInfo(none, Seq.empty, Seq.empty, none)
 
   context.parent ! RegisterHistory(HistoryReader(history))
+
+  override def postStop(): Unit = println("stop!")
 
   override def receive: Receive = {
     case ModifierToAppend(mod, isLocallyGenerated) if !history.isModifierDefined(mod.id) =>
@@ -112,7 +122,8 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
 
     case InitGenesisHistory =>
       logger.info("Init in InitGenesisHistory")
-      history = initializeHistory
+      history.close()
+      history = genesis
   }
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = none): Unit =
@@ -130,8 +141,22 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
           )
     }
 
-  def initializeHistory: History =
+  def initializeHistory: Option[History] =
     try {
+      val history: History = History.readOrGenerate(settings, ntp)
+      history.updateIdsForSyncInfo()
+      logger.info(s"History best block height: ${history.getBestBlockHeight}")
+      logger.info(s"History best header height: ${history.getBestHeaderHeight}")
+      Some(history)
+    } catch {
+      case error: Throwable =>
+        logger.info(s"During history initialization error ${error.getMessage} has happened.")
+        None
+    }
+
+  def genesis: History =
+    try {
+      new File(s"${settings.directory}/history/").listFiles.foreach(FileUtils.cleanDirectory)
       val history: History = History.readOrGenerate(settings, ntp)
       history.updateIdsForSyncInfo()
       logger.info(s"History best block height: ${history.getBestBlockHeight}")
@@ -139,10 +164,12 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
       history
     } catch {
       case error: Throwable =>
-        logger.info(s"During history initialization error ${error.getMessage} has happened.")
-        new File(settings.directory).listFiles.foreach(FileUtils.cleanDirectory)
-        initializeHistory
+        println("123")
+        EncryApp.forceStopApplication(1,
+                                      s"During genesis history initialization error ${error.getMessage} has happened.")
     }
+
+  override def close(): Unit = history.close()
 }
 
 object NVHHistory {

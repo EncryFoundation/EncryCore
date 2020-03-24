@@ -160,7 +160,9 @@ trait History extends HistoryModifiersValidator with AutoCloseable {
     }
   }
 
-  override def close(): Unit = historyStorage.close()
+  override def close(): Unit = {
+    historyStorage.close()
+  }
 
   def closeStorage(): Unit = historyStorage.close()
 }

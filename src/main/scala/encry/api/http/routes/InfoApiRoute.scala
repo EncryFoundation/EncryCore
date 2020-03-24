@@ -46,7 +46,7 @@ object InfoApiRoute {
                    constants: Constants
                   ): Json = {
     val stateVersion: Option[String] = readers.s.map(_.version).map(Algos.encode)
-    val stateRoot: Option[String] = readers.s.map(_.tree.rootHash).map(Algos.encode)
+    val stateRoot: Option[String] = None//readers.s.map(_.tree.rootHash).map(Algos.encode)
     val prevFullHeaderId: String = block.map(b => Algos.encode(b.header.parentId)).getOrElse("")
     InfoApi(
       nodeName,
