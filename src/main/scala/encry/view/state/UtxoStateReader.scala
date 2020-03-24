@@ -10,6 +10,8 @@ import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{ADKey, Height}
 
+import scala.util.Try
+
 trait UtxoStateReader {
 
   implicit val hf: Algos.HF = Algos.hash
@@ -26,7 +28,7 @@ trait UtxoStateReader {
   def stateSafePointHeight: Height
 
   def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
-                            toDelete: List[StorageKey]): Array[Byte]
+                            toDelete: List[StorageKey]): Try[Array[Byte]]
 
   def boxById(boxId: ADKey): Option[EncryBaseBox]
 
@@ -50,6 +52,6 @@ object UtxoStateReader {
     override def rootHash: Array[Byte] = state.rootHash
     override def safePointHeight: Height = state.safePointHeight
     override def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
-                                       toDelete: List[StorageKey]): Array[Byte] = state.getOperationsRootHash(toInsert, toDelete)
+                                       toDelete: List[StorageKey]): Try[Array[Byte]] = state.getOperationsRootHash(toInsert, toDelete)
   }
 }

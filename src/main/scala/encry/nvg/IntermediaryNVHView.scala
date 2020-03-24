@@ -50,7 +50,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       context.actorOf(NVHState.restoreProps(settings, reader, influx))
     case RegisterHistory(_) =>
       context.become(viewReceive(sender(), state.get, stateReader.get))
-    case RegisterState(reader) if history.isEmpty =>
+    case RegisterState(reader) =>
       context.become(awaitingViewActors(history, Some(sender()), Some(reader)), discardOld = true)
     case RegisterHistory =>
       context.become(viewReceive(history.get, sender(), stateReader.get))

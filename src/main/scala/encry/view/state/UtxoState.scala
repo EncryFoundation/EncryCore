@@ -235,7 +235,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   override def rootHash: Array[Byte] = tree.rootHash
 
   override def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
-                                     toDelete: List[StorageKey]): Array[Byte] = tree.getOperationsRootHash(toInsert, toDelete)
+                                     toDelete: List[StorageKey]): Try[Array[Byte]] = tree.getOperationsRootHash(toInsert, toDelete)
 }
 
 object UtxoState extends StrictLogging {
