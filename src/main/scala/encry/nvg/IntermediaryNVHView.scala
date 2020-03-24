@@ -51,9 +51,10 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
     case RegisterHistory(_) =>
       context.become(viewReceive(sender(), state.get, stateReader.get))
     case RegisterState(reader) =>
-      context.become(awaitingViewActors(history, Some(sender()), Some(reader)), discardOld = true)
+      context.become(viewReceive(history.get, sender(), reader), discardOld = true)
     case RegisterHistory =>
       context.become(viewReceive(history.get, sender(), stateReader.get))
+    case msg => logger.info(s"Receive strange: ${msg} on inter nvh")
   }
 
   def viewReceive(history: ActorRef, state: ActorRef, stateReader: UtxoStateReader): Receive = {
