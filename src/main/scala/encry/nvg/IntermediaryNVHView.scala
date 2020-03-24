@@ -32,7 +32,6 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   var historyReader: HistoryReader = HistoryReader.empty
 
-  println("init middle")
   val historyRef: ActorRef = context.actorOf(NVHHistory.props(ntp, settings))
 
   var isModifierProcessingInProgress: Boolean = false
@@ -48,14 +47,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       historyReader = reader
       logger.info(s"NodeViewParent actor got init history. Going to init state actor.")
       context.become(awaitingViewActors(Some(sender()), state), discardOld = true)
-      context.actorOf(
-        NVHState
-          .restoreConsistentStateProps(settings, reader, influx)
-          .getOrElse {
-            historyRef ! InitGenesisHistory
-            NVHState.genesisProps(settings, influx)
-          }
-      )
+      context.actorOf(NVHState.restoreProps(settings, reader, influx))
     case RegisterHistory(_) =>
       context.become(viewReceive(sender(), state.get, stateReader.get))
     case RegisterState(reader) if history.isEmpty =>
@@ -95,20 +87,11 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           isLocallyGenerated = false
         )
       if (!isModifierProcessingInProgress) getNextModifier()
-    case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
+    case ModifierAppliedToHistory => isModifierProcessingInProgress = false; getNextModifier()
     case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(point => !stateReader.version.sameElements(point))=>
       context.become(viewReceive(
         history,
-        context.actorOf(
-          NVHState.rollbackProps(
-            settings,
-            influx,
-            stateReader.safePointHeight,
-            msg.pi.branchPoint.get,
-            historyReader,
-            settings.constants
-          )
-        ),
+        state,
         stateReader
       ))
     case msg: ProgressInfoForState =>

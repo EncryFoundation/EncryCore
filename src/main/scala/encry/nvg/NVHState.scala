@@ -16,11 +16,12 @@ import encry.storage.levelDb.versionalLevelDB.{LevelDbFactory, VLDBWrapper, Vers
 import encry.storage.{RootNodesStorage, VersionalStorage}
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.view.NodeViewErrors.ModifierApplyError
-import encry.view.history.HistoryReader
+import encry.view.history.{History, HistoryReader}
 import encry.view.state.{UtxoState, UtxoStateReader}
 import encry.view.state.avlTree.AvlTree
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
+import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
@@ -30,8 +31,10 @@ import org.iq80.leveldb.Options
 
 import scala.util.{Failure, Success, Try}
 
-class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: EncryAppSettings)
+class NVHState(influxRef: Option[ActorRef], var historyReader: HistoryReader, settings: EncryAppSettings)
   extends Actor with StrictLogging with AutoCloseable {
+
+  var state: UtxoState = restoreState(settings, historyReader, influxRef).getOrElse(genesis(settings, influxRef))
 
   override def preStart(): Unit = context.parent ! RegisterState(UtxoStateReader(state))
 
@@ -65,114 +68,38 @@ class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: Encr
     state.close()
   }
 
-  override def close(): Unit = state.close()
-}
-
-object NVHState extends StrictLogging {
-
-  import encry.view.state.avlTree.utils.implicits.Instances._
-
-  sealed trait StateAction
-  object StateAction {
-    case class ModifierApplied(modifierId: PersistentModifier) extends StateAction
-    case class Rollback(branchPoint: ModifierId) extends StateAction
-    case class ApplyFailed(modifierId: PersistentModifier, errs: List[ModifierApplyError]) extends StateAction
-    case class ApplyModifier(modifier: PersistentModifier,
-                             saveRootNodesFlag: Boolean,
-                             isFullChainSynced: Boolean) extends StateAction
-    case object CreateTreeChunks extends StateAction
-    case class TreeChunks(chunks: List[SnapshotChunk]) extends StateAction
-  }
-
-//  def restoreProps(settings: EncryAppSettings,
-//                   historyReader: HistoryReader,
-//                   influxRef: Option[ActorRef]): Props = {
-//
-//  }
-
-  //genesis state
-  def genesisProps(settings: EncryAppSettings, influxRef: Option[ActorRef]): Props = {
+  def genesis(settings: EncryAppSettings, influxRef: Option[ActorRef]): UtxoState = {
     logger.info("Init genesis!")
     val stateDir: File = UtxoState.getStateDir(settings)
-    stateDir.listFiles.foreach(_.delete())
     stateDir.mkdir()
     val rootsDir: File = UtxoState.getRootsDir(settings)
-    rootsDir.listFiles.foreach(_.delete())
     rootsDir.mkdir()
-    val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
-    Props(new NVHState(influxRef, state, settings))
+    UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
   }
 
-  //restoreConsistentState
-  def restoreConsistentStateProps(settings: EncryAppSettings,
-                                  historyReader: HistoryReader,
-                                  influxRef: Option[ActorRef]): Try[Props] = {
-    Try {
-      val stateDir: File = UtxoState.getStateDir(settings)
-      stateDir.mkdirs()
-      val rootsDir: File = UtxoState.getRootsDir(settings)
-      rootsDir.mkdir()
-      logger.info("init dirs")
-      val state: UtxoState = restoreConsistentState (
-        UtxoState.create(stateDir, rootsDir, settings, influxRef),
-        historyReader,
-        influxRef,
-        settings
-      )
-      Props(new NVHState(influxRef, state, settings))
-    } match {
-      case a: Success[Props] => a
-      case err: Failure[Props] =>
-        logger.info(s"Err: ${err.exception}")
-        err
-    }
-  }
-
-  //rollback
-  def rollbackProps(settings: EncryAppSettings,
-                    influxRef: Option[ActorRef],
-                    safePointHeight: Int,
-                    branchPoint: ModifierId,
-                    historyReader: HistoryReader,
-                    constants: Constants): Props = {
-    val branchPointHeight: Int = historyReader.getHeaderById(ModifierId !@@ branchPoint).get.height
-    val additionalBlocks: List[Block] =
-      (safePointHeight + 1 to branchPointHeight).foldLeft(List.empty[Block]) {
-        case (blocks: List[Block], height: Int) =>
-          val headerAtHeight: Header = historyReader.getBestHeaderAtHeight(height).get
-          val blockAtHeight: Block   = historyReader.getBlockByHeader(headerAtHeight).get
-          blocks :+ blockAtHeight
+  def restoreState(settings: EncryAppSettings,
+                   historyReader: HistoryReader,
+                   influxRef: Option[ActorRef]): Option[UtxoState] =
+    if (History.getHistoryIndexDir(settings).listFiles.nonEmpty) {
+      Try {
+        val stateDir: File = UtxoState.getStateDir(settings)
+        stateDir.mkdirs()
+        val rootsDir: File = UtxoState.getRootsDir(settings)
+        rootsDir.mkdir()
+        restoreConsistentState(
+          UtxoState.create(stateDir, rootsDir, settings, influxRef),
+          historyReader,
+          influxRef,
+          settings
+        )
+      } match {
+        case fail: Failure[UtxoState] =>
+          logger.info(s"${fail.exception.getMessage} during state restore. Recover from Modifiers holder!")
+          new File(settings.directory).listFiles.foreach(dir => FileUtils.cleanDirectory(dir))
+          fail.toOption
+        case res: Success[UtxoState] => res.toOption
       }
-    val dir: File = UtxoState.getStateDir(settings)
-    dir.mkdirs()
-    dir.listFiles.foreach(_.delete())
-    val stateDir: File = UtxoState.getStateDir(settings)
-    stateDir.mkdirs()
-    val rootsDir: File = UtxoState.getRootsDir(settings)
-    rootsDir.mkdir()
-    val versionalStorage = settings.storage.state match {
-      case VersionalStorage.IODB =>
-        logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
-      case VersionalStorage.LevelDB =>
-        logger.info("Init state with levelDB storage")
-        val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
-        VLDBWrapper(VersionalLevelDBCompanion(levelDBInit, settings.levelDB.copy(keySize = 33), keySize = 33))
-    }
-    val rootStorage = {
-      val levelDBInit = LevelDbFactory.factory.open(rootsDir, new Options)
-      RootNodesStorage[StorageKey, StorageValue](levelDBInit, settings.constants.MaxRollbackDepth, rootsDir)
-    }
-    val state: UtxoState = UtxoState.rollbackTo(
-      VersionTag !@@ branchPoint,
-      additionalBlocks,
-      versionalStorage,
-      rootStorage,
-      constants,
-      influxRef
-    ).get
-    Props(new NVHState(influxRef, state, settings))
-  }
+    } else none
 
   def restoreConsistentState(stateIn: UtxoState,
                              history: HistoryReader,
@@ -221,5 +148,36 @@ object NVHState extends StrictLogging {
     val rootsDir: File = UtxoState.getRootsDir(settings)
     rootsDir.mkdir()
     UtxoState.create(stateDir, rootsDir, settings, influxRef)
+  }
+
+  override def close(): Unit = state.close()
+}
+
+object NVHState extends StrictLogging {
+
+  import encry.view.state.avlTree.utils.implicits.Instances._
+
+  sealed trait StateAction
+  object StateAction {
+    case class ModifierApplied(modifierId: PersistentModifier) extends StateAction
+    case class Rollback(branchPoint: ModifierId) extends StateAction
+    case class ApplyFailed(modifierId: PersistentModifier, errs: List[ModifierApplyError]) extends StateAction
+    case class ApplyModifier(modifier: PersistentModifier,
+                             saveRootNodesFlag: Boolean,
+                             isFullChainSynced: Boolean) extends StateAction
+    case object CreateTreeChunks extends StateAction
+    case class TreeChunks(chunks: List[SnapshotChunk]) extends StateAction
+  }
+
+  def restoreProps(settings: EncryAppSettings,
+                   historyReader: HistoryReader,
+                   influxRef: Option[ActorRef]): Props = {
+    Props(
+      new NVHState(
+        influxRef,
+        historyReader,
+        settings
+      )
+    )
   }
 }
