@@ -25,6 +25,9 @@ trait UtxoStateReader {
 
   def stateSafePointHeight: Height
 
+  def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
+                            toDelete: List[StorageKey]): Array[Byte]
+
   def boxById(boxId: ADKey): Option[EncryBaseBox]
 
   def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox]
@@ -46,5 +49,7 @@ object UtxoStateReader {
     override def avlStorage: VersionalStorage = state.avlStorage
     override def rootHash: Array[Byte] = state.rootHash
     override def safePointHeight: Height = state.safePointHeight
+    override def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
+                                       toDelete: List[StorageKey]): Array[Byte] = state.getOperationsRootHash(toInsert, toDelete)
   }
 }
