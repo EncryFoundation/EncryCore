@@ -1,6 +1,7 @@
 package encry.view.state
 
 import java.io.File
+
 import akka.actor.ActorRef
 import cats.data.Validated
 import cats.instances.list._
@@ -23,7 +24,7 @@ import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.state.UtxoState.StateChange
-import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.{AvlTree, Node}
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -39,6 +40,7 @@ import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
 import org.iq80.leveldb.Options
+
 import scala.util.Try
 
 final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
@@ -208,7 +210,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
 
   override def version: VersionTag = VersionTag !@@ tree.avlStorage.currentVersion
 
-  override def stateSafePointHeight: Unit = tree.rootNodesStorage.safePointHeight
+  override def stateSafePointHeight: Height = tree.rootNodesStorage.safePointHeight
 
   override def boxById(boxId: ADKey): Option[EncryBaseBox] = tree.get(StorageKey !@@ boxId)
     .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
@@ -225,6 +227,12 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
     }
 
   def close(): Unit = tree.close()
+
+  override def rootNode: Node[StorageKey, StorageValue] = tree.rootNode
+
+  override def avlStorage: VersionalStorage = tree.avlStorage
+
+  override def rootHash: Array[Byte] = tree.rootHash
 }
 
 object UtxoState extends StrictLogging {

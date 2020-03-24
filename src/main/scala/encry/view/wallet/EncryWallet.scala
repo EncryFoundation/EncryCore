@@ -74,10 +74,10 @@ case class EncryWallet(walletStorage: WalletVersionalLevelDB, accountManagers: S
   }
 
   def scanWalletFromUtxo(state: UtxoStateReader, props: Set[EncryProposition]): EncryWallet = {
-    val bxsToAdd: Seq[EncryBaseBox] = EncryWallet.scanTree(state.tree.rootNode, state.tree.avlStorage, props)
+    val bxsToAdd: Seq[EncryBaseBox] = EncryWallet.scanTree(state.rootNode, state.avlStorage, props)
     if (bxsToAdd.nonEmpty)
       walletStorage.updateWallet(
-        ModifierId !@@ state.tree.avlStorage.currentVersion,
+        ModifierId !@@ state.avlStorage.currentVersion,
         bxsToAdd,
         List.empty,
         settings.constants.IntrinsicTokenId

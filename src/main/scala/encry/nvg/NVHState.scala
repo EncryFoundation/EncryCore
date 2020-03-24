@@ -28,7 +28,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ModifierId}
 import org.encryfoundation.common.utils.constants.Constants
 import org.iq80.leveldb.Options
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 class NVHState(influxRef: Option[ActorRef], var state: UtxoState, settings: EncryAppSettings)
   extends Actor with StrictLogging with AutoCloseable {
@@ -84,14 +84,21 @@ object NVHState extends StrictLogging {
     case class TreeChunks(chunks: List[SnapshotChunk]) extends StateAction
   }
 
+  def restoreProps(settings: EncryAppSettings,
+                   historyReader: HistoryReader,
+                   influxRef: Option[ActorRef]): Props = {
+
+  }
+
   //genesis state
   def genesisProps(settings: EncryAppSettings, influxRef: Option[ActorRef]): Props = {
+    logger.info("Init genesis!")
     val stateDir: File = UtxoState.getStateDir(settings)
-    stateDir.mkdir()
     stateDir.listFiles.foreach(_.delete())
+    stateDir.mkdir()
     val rootsDir: File = UtxoState.getRootsDir(settings)
-    rootsDir.mkdir()
     rootsDir.listFiles.foreach(_.delete())
+    rootsDir.mkdir()
     val state: UtxoState = UtxoState.genesis(stateDir, rootsDir, settings, influxRef)
     Props(new NVHState(influxRef, state, settings))
   }
@@ -105,6 +112,7 @@ object NVHState extends StrictLogging {
       stateDir.mkdirs()
       val rootsDir: File = UtxoState.getRootsDir(settings)
       rootsDir.mkdir()
+      logger.info("init dirs")
       val state: UtxoState = restoreConsistentState (
         UtxoState.create(stateDir, rootsDir, settings, influxRef),
         historyReader,
@@ -112,6 +120,11 @@ object NVHState extends StrictLogging {
         settings
       )
       Props(new NVHState(influxRef, state, settings))
+    } match {
+      case a: Success[Props] => a
+      case err: Failure[Props] =>
+        logger.info(s"Err: ${err.exception}")
+        err
     }
   }
 

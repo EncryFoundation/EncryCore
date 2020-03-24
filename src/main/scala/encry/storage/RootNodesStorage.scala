@@ -32,7 +32,7 @@ object RootNodesStorage {
   def apply[K: Serializer: Monoid: Hashable: Order,
             V: Serializer: Monoid: Hashable](storage: DB,
                                              rollbackDepth: Int,
-                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] with AutoCloseable with StrictLogging {
+                                             rootsPath: File): RootNodesStorage[K, V] = new RootNodesStorage[K, V] with StrictLogging {
 
     private def atHeightKey(height: Height): Array[Byte] = Ints.toByteArray(height)
 
@@ -99,7 +99,10 @@ object RootNodesStorage {
       }
     }
 
-    override def close(): Unit = storage.close()
+    override def close(): Unit = {
+      storage.close()
+      logger.info("Close tree storage")
+    }
   }
 
   def emptyRootStorage[K: Serializer: Monoid, V: Serializer: Monoid]: RootNodesStorage[K, V] =

@@ -27,6 +27,7 @@ import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends Actor with StrictLogging {
 
+  logger.info("start here!")
   var history: History = initializeHistory
 
   var lastProgressInfo: ProgressInfo = ProgressInfo(none, Seq.empty, Seq.empty, none)
@@ -109,7 +110,9 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider) extends A
       lastProgressInfo = progressInfo
       history = newHistory
 
-    case InitGenesisHistory => history = initializeHistory
+    case InitGenesisHistory =>
+      logger.info("Init in InitGenesisHistory")
+      history = initializeHistory
   }
 
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = none): Unit =

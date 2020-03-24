@@ -4,7 +4,7 @@ import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue, StorageVersion}
 import encry.storage.levelDb.versionalLevelDB.VersionalLevelDBCompanion.{LevelDBVersion, VersionalLevelDbKey, VersionalLevelDbValue}
 
-case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage {
+case class VLDBWrapper(vldb: VersionalLevelDB) extends VersionalStorage with AutoCloseable {
 
   override def get(key: StorageKey): Option[StorageValue] =
     vldb.get(VersionalLevelDbKey @@ key.untag(StorageKey)).map(StorageValue @@ _.untag(VersionalLevelDbValue))

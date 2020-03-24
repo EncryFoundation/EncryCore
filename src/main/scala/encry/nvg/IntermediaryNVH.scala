@@ -60,7 +60,7 @@ class IntermediaryNVH(
   val networkMessagesProcessor: ActorRef =
     context.actorOf(NodeViewNMProcessor.props(settings), name = "Network-messages-processor")
   val nodeViewHolder: ActorRef =
-    context.actorOf(NodeViewHolder.props(settings, timeProvider, influxRef), name = "Node-view-holder")
+    context.actorOf(IntermediaryNVHView.props(settings, timeProvider, influxRef), name = "Node-view-holder")
   val modifiersValidatorRouter: ActorRef =
     context.actorOf(
       BalancingPool(5)

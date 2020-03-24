@@ -9,6 +9,7 @@ import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
 import encry.nvg.ModifiersValidator.ValidatedModifier
 import encry.nvg.NVHHistory.{ModifierAppliedToHistory, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
+import encry.nvg.NVHState.StateAction.ApplyModifier
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
 import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
@@ -17,6 +18,7 @@ import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.history.HistoryReader
 import encry.view.state.UtxoStateReader
+import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
@@ -33,6 +35,8 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   val historyRef: ActorRef = context.actorOf(NVHHistory.props(ntp, settings))
 
   var isModifierProcessingInProgress: Boolean = false
+
+  var toApply = Set.empty[ByteArrayWrapper]
 
   override def receive: Receive = awaitingViewActors()
 
@@ -91,7 +95,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         )
       if (!isModifierProcessingInProgress) getNextModifier()
     case ModifierAppliedToHistory             => isModifierProcessingInProgress = false; getNextModifier()
-    case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded =>
+    case msg: ProgressInfoForState if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(point => !stateReader.version.sameElements(point))=>
       context.become(viewReceive(
         history,
         context.actorOf(
@@ -106,9 +110,12 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         ),
         stateReader
       ))
-    case msg: ProgressInfoForState => //todo work with state starts here
+    case msg: ProgressInfoForState =>
+      toApply = msg.pi.toApply.map(mod => ByteArrayWrapper(mod.id)).toSet
+      msg.pi.toApply.foreach(mod => state ! StateAction.ApplyModifier(mod, msg.saveRootNodeFlag, msg.isFullChainSynced))
     case msg: StateAction.ApplyFailed         => historyRef ! msg
-    case msg: StateAction.ModifierApplied     => historyRef ! msg
+    case msg: StateAction.ModifierApplied     =>
+      historyRef ! msg
     case msg: SyntacticallyFailedModification => context.parent ! msg
     case msg: StatsSenderMessage              => context.parent ! msg
     case msg: RequestFromLocal                => context.parent ! msg

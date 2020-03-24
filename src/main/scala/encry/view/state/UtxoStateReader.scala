@@ -1,8 +1,9 @@
 package encry.view.state
 
+import encry.storage.VersionalStorage
 import encry.storage.VersionalStorage.{StorageKey, StorageValue}
 import encry.utils.CoreTaggedTypes.VersionTag
-import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.{AvlTree, Node}
 import encry.view.state.avlTree.utils.implicits.Instances._
 import org.encryfoundation.common.modifiers.state.StateModifierSerializer
 import org.encryfoundation.common.modifiers.state.box.EncryBaseBox
@@ -14,6 +15,13 @@ trait UtxoStateReader {
   implicit val hf: Algos.HF = Algos.hash
 
   def version: VersionTag
+
+  def rootNode: Node[StorageKey, StorageValue]
+
+  //todo remove
+  def avlStorage: VersionalStorage
+
+  def rootHash: Array[Byte]
 
   def stateSafePointHeight: Height
 
@@ -33,6 +41,10 @@ object UtxoStateReader {
     override def stateSafePointHeight: Height = state.safePointHeight
     override def boxById(boxId: ADKey): Option[EncryBaseBox] = state.boxById(boxId)
     override def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] = state.boxesByIds(ids)
-    override def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] = state.typedBoxById()
+    override def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] = state.typedBoxById[B](boxId)
+    override def rootNode: Node[StorageKey, StorageValue] = state.rootNode
+    override def avlStorage: VersionalStorage = state.avlStorage
+    override def rootHash: Array[Byte] = state.rootHash
+    override def safePointHeight: Height = state.safePointHeight
   }
 }
