@@ -107,7 +107,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
             case _: Payload => true
             case _          => false
           }) context.parent ! ModifierAppendedToState(success = true)
-
+      context.parent ! ModifierAppliedToHistory
     case StateAction.ApplyFailed(mod, e) =>
       val (newHistory: History, progressInfo: ProgressInfo) = history.reportModifierIsInvalid(mod)
       context.parent ! SemanticallyFailedModification(mod, e)
