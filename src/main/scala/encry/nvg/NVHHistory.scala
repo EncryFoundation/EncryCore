@@ -2,35 +2,33 @@ package encry.nvg
 
 import java.io.File
 
-import akka.actor.{ Actor, Props }
+import akka.actor.{Actor, Props}
 import cats.syntax.option._
 import com.typesafe.scalalogging.StrictLogging
 import encry.EncryApp
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.consensus.HistoryConsensus.ProgressInfo
+import encry.local.miner.Miner.EnableMining
+import encry.network.DeliveryManager.FullBlockChainIsSynced
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
 import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.RegisterNodeView
-import encry.nvg.IntermediaryNVHView.{ InitGenesisHistory, ModifierToAppend }
-import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState }
+import encry.nvg.IntermediaryNVHView.{InitGenesisHistory, ModifierToAppend}
+import encry.nvg.NVHHistory.{ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
-import encry.nvg.NodeViewHolder.{
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification
-}
+import encry.nvg.NodeViewHolder.{SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender._
 import encry.utils.CoreTaggedTypes.VersionTag
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewErrors.ModifierApplyError.HistoryApplyError
 import encry.view.history.History.HistoryUpdateInfoAcc
-import encry.view.history.{ History, HistoryReader }
-import encry.view.wallet.{ EncryWallet, WalletReader }
+import encry.view.history.{History, HistoryReader}
+import encry.view.wallet.{EncryWallet, WalletReader}
 import org.apache.commons.io.FileUtils
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ ModifierId, ModifierTypeId }
+import org.encryfoundation.common.utils.TaggedTypes.{ModifierId, ModifierTypeId}
 
 class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     extends Actor
@@ -68,10 +66,10 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
           historyView.history.insertUpdateInfo(newUpdateInformation)
           if (mod.modifierTypeId == Header.modifierTypeId) historyView.history.updateIdsForSyncInfo()
           context.parent ! EndOfApplyingModifier(mod.id)
-          context.parent ! ModifierAppendedToHistory(mod match {
-            case _: Header  => true
-            case _: Payload => false
-          }, success = true)
+          context.parent ! ModifierAppendedToHistory( mod match {
+              case _: Header  => true
+              case _: Payload => false
+            }, success = true )
           if (progressInfo.toApply.nonEmpty) {
             logger.info(s"Progress info contains an non empty toApply. Going to notify state about new toApply.")
             context.parent ! ProgressInfoForState(
@@ -118,7 +116,8 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.parent ! NewWalletReader(WalletReader(historyView.wallet))
       context.parent ! ModifierAppliedToHistory
       context.parent ! SemanticallySuccessfulModifier(mod)
-
+      if (historyView.history.isFullChainSynced) context.system.eventStream.publish(FullBlockChainIsSynced)
+      if (settings.node.mining && historyView.history.isFullChainSynced) context.system.eventStream.publish(EnableMining)
     case StateAction.ApplyFailed(mod, e) =>
       val (newHistory: History, progressInfo: ProgressInfo) = historyView.history.reportModifierIsInvalid(mod)
       context.parent ! SemanticallyFailedModification(mod, e)
