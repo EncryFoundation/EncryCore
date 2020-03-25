@@ -55,7 +55,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   val launchTimeFuture: Future[NetworkTime.Time] = ntp.time()
 
   def awaitNVHRef: Receive = {
-    case UpdateHistoryReader(history) =>
+    case history: HistoryReader =>
       unstashAll()
       logger.info("Got updated history at nvh")
       context.become(workingCycle(nvhRef = sender(), history = Some(history)))
@@ -123,7 +123,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case UpdateHistoryReader(reader: HistoryReader) =>
+    case reader: HistoryReader =>
       context.become(
         workingCycle(nvhRef,
                      blackList,
@@ -137,7 +137,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
                      connectedPeersCollection)
       )
 
-    case ChangedState(reader: UtxoStateReader) =>
+    case reader: UtxoStateReader =>
       context.become(
         workingCycle(nvhRef,
                      blackList,

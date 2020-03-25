@@ -75,10 +75,8 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       logger.info("Receive GetDataFromCurrentView on nvh")
       f(CurrentView(historyReader, stateReader, walletReader)) match {
         case res: Future[_] =>
-          res.map(l => println(l.getClass))
           res.pipeTo(sender)
         case res: CandidateEnvelope =>
-          println(s"qwe ${res.c.get.timestamp}")
           sender ! res
         case res =>
           sender ! res
@@ -90,7 +88,6 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
     case LocallyGeneratedModifier(modifier: Block) =>
       logger.info(s"Self mined block: ${modifier}")
-      println(s"Self mined block timestamp: ${modifier.header.timestamp}")
       ModifiersCache.put(
         NodeViewHolder.toKey(modifier.id),
         modifier.header,

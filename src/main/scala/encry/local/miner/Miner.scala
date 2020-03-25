@@ -105,7 +105,6 @@ class Miner(dataHolder: ActorRef,
       killAllWorkers()
       self ! StartMining
     case StartMining if syncingDone =>
-      println(s"got start mining from ${sender()}")
       for (i <- 0 until numberOfWorkers)
         yield
           context.actorOf(
@@ -118,10 +117,8 @@ class Miner(dataHolder: ActorRef,
           logger.info(s"Starting mining at ${dateFormat.format(new Date(System.currentTimeMillis()))}")
           context.children.foreach(_ ! NextChallenge(candidateBlock))
         case None =>
-          println(s"Candidate is empty! Producing new candidate! ${ntp.estimatedTime}")
-          val time = ntp.estimatedTime
-          println(s"<<<<<<<< $time")
-          produceCandidate(time)
+          logger.info(s"Candidate is empty! Producing new candidate!")
+          produceCandidate(ntp.estimatedTime)
       }
     case StartMining =>
       logger.info("Can't start mining because of chain is not synced!")
@@ -176,9 +173,7 @@ class Miner(dataHolder: ActorRef,
         s"Got new block. Starting to produce candidate at height: ${mod.header.height + 1} " +
           s"at ${dateFormat.format(new Date(System.currentTimeMillis()))}"
       )
-      val time = ntp.estimatedTime
-      println(s">>>><<<<<<>>><<><><. $time")
-      produceCandidate(time)
+      produceCandidate(ntp.estimatedTime)
     case SemanticallySuccessfulModifier(_) => logger.info("Got new block. But needNewCandidate - false")
   }
 
@@ -191,9 +186,7 @@ class Miner(dataHolder: ActorRef,
   }
 
   def unknownMessage: Receive = {
-    case m =>
-      println(m)
-      logger.debug(s"Unexpected message $m")
+    case m => logger.debug(s"Unexpected message $m")
   }
 
   def chainEvents: Receive = {
@@ -294,9 +287,7 @@ class Miner(dataHolder: ActorRef,
           } else CandidateEnvelope.empty
         candidate
       }
-    println(s"Estimate time on creation: ${time}")
     (mempool ? SendTransactionsToMiner).mapTo[TransactionsForMiner].foreach { txs =>
-      println(s"Send ged data lambda to nvh. time: ${ntp.estimatedTime}")
       nvh ! GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, CandidateEnvelope](
         lambda(txs.txs.toList, time)
       )
