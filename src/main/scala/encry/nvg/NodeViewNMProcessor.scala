@@ -127,7 +127,7 @@ class NodeViewNMProcessor(settings: EncryAppSettings) extends Actor with StrictL
 
     case CheckPayloadsToDownload =>
       val newIds: Seq[ModifierId] = historyReader.payloadsIdsToDownload(settings.network.networkChunkSize)
-      logger.debug(s"newIds: ${newIds.map(Algos.encode).mkString(",")}")
+      logger.info(s"newIds: ${newIds.map(Algos.encode).mkString(",")}")
       if (newIds.nonEmpty) context.parent ! RequestFromLocal(none, Payload.modifierTypeId, newIds.toList)
       val nextCheckModsScheduler: Cancellable =
         context.system.scheduler.scheduleOnce(settings.network.modifierDeliverTimeCheck)(self ! CheckPayloadsToDownload)

@@ -41,6 +41,33 @@ class ModifiersValidator(
           logger.info(s"Modifier ${Algos.encode(id)} is incorrect cause: ${error.getMessage}.")
           intermediaryNVH ! BanPeer(remote, CorruptedSerializedBytes)
           intermediaryNVH ! InvalidModifierBytes(id)
+        case Right(modifier: Header) if modifier.height < 59501 =>
+          val preSemanticValidation: Either[PreSemanticValidationException, Unit] =
+            ModifiersValidator.isPreSemanticValid(modifier, reader, settings)
+          val syntacticValidation: Boolean =
+            ModifiersValidator.isSyntacticallyValid(modifier, settings.constants.ModifierIdSize)
+          if (preSemanticValidation.isRight && syntacticValidation) {
+            if (modifier.id.sameElements(id)) {
+              logger.debug(s"Modifier ${modifier.encodedId} is valid.")
+              intermediaryNVH ! ValidatedModifierFromNetwork(modifierTypeId)
+              nodeViewHolderRef ! ValidatedModifier(modifier)
+            } else {
+              logger.info(s"Modifier ${modifier.encodedId} should have ${Algos.encode(id)} id!")
+              intermediaryNVH ! BanPeer(remote, ModifierIdInTheNetworkMessageIsNotTheSameAsIdOfModifierInThisMessage)
+              intermediaryNVH ! SyntacticallyFailedModification(modifier, List.empty)
+            }
+          } else if (!syntacticValidation) {
+            logger.info(s"Modifier ${modifier.encodedId} is syntactically invalid.")
+            intermediaryNVH ! BanPeer(remote, SyntacticallyInvalidPersistentModifier)
+            intermediaryNVH ! SyntacticallyFailedModification(modifier, List.empty)
+          } else
+            preSemanticValidation.leftMap {
+              case IllegalHeight(error) =>
+                logger.info(s"Modifier ${modifier.encodedId} is invalid cause: $error.")
+                intermediaryNVH ! BanPeer(remote, PreSemanticInvalidModifier(error))
+                intermediaryNVH ! SyntacticallyFailedModification(modifier, List.empty)
+            }
+        case Right(modifier: Header)  =>
         case Right(modifier) =>
           val preSemanticValidation: Either[PreSemanticValidationException, Unit] =
             ModifiersValidator.isPreSemanticValid(modifier, reader, settings)

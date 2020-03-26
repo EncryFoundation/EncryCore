@@ -118,6 +118,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.parent ! SemanticallySuccessfulModifier(mod)
       if (historyView.history.isFullChainSynced) context.system.eventStream.publish(FullBlockChainIsSynced)
       if (settings.node.mining && historyView.history.isFullChainSynced) context.system.eventStream.publish(EnableMining)
+
     case StateAction.ApplyFailed(mod, e) =>
       val (newHistory: History, progressInfo: ProgressInfo) = historyView.history.reportModifierIsInvalid(mod)
       context.parent ! SemanticallyFailedModification(mod, e)
