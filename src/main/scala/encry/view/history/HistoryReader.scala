@@ -34,7 +34,7 @@ trait HistoryReader {
 
   var isFullChainSynced: Boolean
 
-  var isHeadersChainSyncedVar: Boolean = false
+  def isHeadersChainSynced: Boolean
 
   def isModifierDefined(id: ModifierId): Boolean
 
@@ -88,6 +88,7 @@ object HistoryReader {
       Left(HistoryApiError(""))
     def getBestHeaderId: Option[ModifierId]                                          = None
     def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = Left(HistoryApiError(""))
+    def isHeadersChainSynced: Boolean = false
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -119,5 +120,6 @@ object HistoryReader {
     def getBestHeaderId: Option[ModifierId] = history.getBestHeaderId
     def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] =
       history.requiredDifficultyAfter(parent)
+    def isHeadersChainSynced: Boolean = history.isHeadersChainSynced
   }
 }

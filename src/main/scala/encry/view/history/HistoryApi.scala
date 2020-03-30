@@ -159,7 +159,8 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     // Already synced and header is not too far back. Download required modifiers
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
-    else if (!isHeadersChainSynced && (header.height == 59500)) {
+    else if (!isHeadersChainSynced && isNewHeader(header)) {
+      logger.info(s"Update header best header at height: ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none
@@ -296,9 +297,9 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
-  def isNewHeader(header: Header): Boolean =
-    timeProvider.estimatedTime - header.timestamp <
-      settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
+  def isNewHeader(header: Header): Boolean = header.height == 55000
+//    timeProvider.estimatedTime - header.timestamp <
+//      settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
