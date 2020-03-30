@@ -1,20 +1,14 @@
 package encry.api.http.routes
 
-import akka.actor.{ ActorRef, ActorRefFactory }
+import akka.actor.{ActorRef, ActorRefFactory}
 import akka.http.scaladsl.server.Route
 import akka.pattern.ask
-import encry.api.http.DataHolderForApi.{
-  GetDataFromHistory,
-  GetFullBlockByIdCommand,
-  GetLastHeaderIdAtHeightHelper,
-  GetLastHeadersHelper,
-  GetMinerStatus
-}
+import encry.api.http.DataHolderForApi.{GetDataFromHistory, GetFullBlockByIdCommand, GetLastHeaderIdAtHeightHelper, GetLastHeadersHelper, GetMinerStatus}
 import encry.local.miner.Miner.MinerStatus
 import encry.settings.RESTApiSettings
-import encry.view.history.History
+import encry.view.history.{History, HistoryReader}
 import io.circe.syntax._
-import org.encryfoundation.common.modifiers.history.{ Block, Header }
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.utils.Algos
 
 case class HistoryApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, nodeId: Array[Byte])(
@@ -32,7 +26,7 @@ case class HistoryApiRoute(dataHolder: ActorRef, settings: RESTApiSettings, node
   }
 
   def getHeaderIdsR: Route = (pathEndOrSingleSlash & get & paging) { (offset, limit) =>
-    (dataHolder ? GetDataFromHistory).mapTo[History]
+    (dataHolder ? GetDataFromHistory).mapTo[HistoryReader]
       .map {
       _.getHeaderIds(offset, limit).map(Algos.encode).asJson
     }.okJson()

@@ -27,7 +27,7 @@ import encry.utils.{NetworkTime, NetworkTimeProvider}
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.{History, HistoryReader}
 import encry.view.state.{UtxoState, UtxoStateReader}
-import encry.view.wallet.EncryWallet
+import encry.view.wallet.{EncryWallet, WalletReader}
 import org.encryfoundation.common.crypto.PrivateKey25519
 import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.modifiers.state.box.Box.Amount
@@ -184,24 +184,24 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case RemovePeerFromBanList(peer) => context.system.eventStream.publish(RemovePeerFromBlackList(peer))
 
     case GetViewPrintAddress =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, String] { view =>
+      (nvhRef ? GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, String] { view =>
         view.vault.publicKeys.foldLeft("") { (str, k) =>
           str + s"Pay2PubKeyAddress : ${k.address.address} , Pay2ContractHashAddress : ${k.address.p2ch.address}" + "\n"
         }
       }).pipeTo(sender)
 
     case GetViewCreateKey =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, PrivateKey25519] { view =>
+      (nvhRef ? GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, PrivateKey25519] { view =>
          view.vault.accountManagers.head.createAccount(None)
       }).pipeTo(sender)
 
     case GetViewPrintPubKeys =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, List[String]] { view =>
+      (nvhRef ? GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, List[String]] { view =>
         view.vault.publicKeys.foldLeft(List.empty[String])((str, k) => str :+ Algos.encode(k.pubKeyBytes))
       }).pipeTo(sender)
 
     case GetViewGetBalance =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, Map[String, List[(String, Amount)]]] { view =>
+      (nvhRef ? GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, Map[String, List[(String, Amount)]]] { view =>
         val balance: Map[String, List[(String, Amount)]] = view.vault.getBalances.map {
           case ((key, token), amount) => Map(key -> List((token, amount)))
         }.foldLeft(Map.empty[String, List[(String, Amount)]]) { case (el1, el2) => el1 |+| el2 }
@@ -209,7 +209,7 @@ class DataHolderForApi(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       }).pipeTo(sender)
 
     case GetViewPrintPrivKeys =>
-      (nvhRef ? GetDataFromCurrentView[History, UtxoState, EncryWallet, String] { view =>
+      (nvhRef ? GetDataFromCurrentView[HistoryReader, UtxoStateReader, WalletReader, String] { view =>
         view.vault.accountManagers.head.accounts.foldLeft("")((str, k) => str + Algos.encode(k.privKeyBytes) + "\n")
       }).pipeTo(sender)
 

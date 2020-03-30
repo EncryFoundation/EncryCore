@@ -57,6 +57,8 @@ trait HistoryReader {
   def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier]
 
   def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty]
+
+  def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId]
 }
 
 object HistoryReader {
@@ -89,6 +91,7 @@ object HistoryReader {
     def getBestHeaderId: Option[ModifierId]                                          = None
     def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = Left(HistoryApiError(""))
     def isHeadersChainSynced: Boolean = false
+    def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] =  Seq.empty
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -121,5 +124,6 @@ object HistoryReader {
     def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] =
       history.requiredDifficultyAfter(parent)
     def isHeadersChainSynced: Boolean = history.isHeadersChainSynced
+    def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = history.getHeaderIds(count, offset)
   }
 }
