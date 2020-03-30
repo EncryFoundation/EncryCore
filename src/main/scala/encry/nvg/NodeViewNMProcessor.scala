@@ -83,8 +83,8 @@ class NodeViewNMProcessor(settings: EncryAppSettings) extends Actor with StrictL
       if (invData._1 == Payload.modifierTypeId && !historyReader.isFullChainSynced)
         logger.info(s"Got inv message from $remote with ${invData._2.size} ids but full chain is not synced.")
       else {
-        val isHeader: Boolean = invData._1 == Header.modifierTypeId && !historyReader.isHeadersChainSynced
-        val isPayloadAvailable: Boolean = false
+        val isHeader: Boolean = invData._1 == Header.modifierTypeId
+        val isPayloadAvailable: Boolean = historyReader.isHeadersChainSynced && invData._1 == Payload.modifierTypeId
         val isRequestAvailable: Boolean = isHeader || isPayloadAvailable
         if (isRequestAvailable) {
           val ids: Seq[ModifierId] = invData._2.filterNot { mid: ModifierId =>

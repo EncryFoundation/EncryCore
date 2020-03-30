@@ -142,7 +142,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
   def requestDownloads(pi: ProgressInfo, previousModifier: Option[ModifierId] = none): Unit =
     pi.toDownload.foreach {
       case (tid: ModifierTypeId, id: ModifierId) =>
-        if (tid != Payload.modifierTypeId) {
+        if (tid != Payload.modifierTypeId || (historyView.history.isFullChainSynced && tid == Payload.modifierTypeId)) {
           logger.info(
             s"History holder created download request for modifier ${Algos.encode(id)} of type $tid. " +
               s"Previous modifier is ${previousModifier.map(Algos.encode)}."

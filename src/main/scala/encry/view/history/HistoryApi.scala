@@ -297,9 +297,9 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     case None => (None, headerChainBack(toHeader.height + 1, toHeader, _ => false))
   }
 
-  def isNewHeader(header: Header): Boolean = header.height == 55000
-//    timeProvider.estimatedTime - header.timestamp <
-//      settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
+  def isNewHeader(header: Header): Boolean =
+    timeProvider.estimatedTime - header.timestamp <
+      settings.constants.DesiredBlockInterval.toMillis * settings.constants.NewHeaderTimeMultiplier
 
   def isHeadersChainSynced: Boolean = isHeadersChainSyncedVar
 
