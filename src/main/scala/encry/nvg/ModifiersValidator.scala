@@ -48,7 +48,7 @@ class ModifiersValidator(
             ModifiersValidator.isSyntacticallyValid(modifier, settings.constants.ModifierIdSize)
           if (preSemanticValidation.isRight && syntacticValidation) {
             if (modifier.id.sameElements(id)) {
-              logger.debug(s"Modifier ${modifier.encodedId} is valid.")
+              logger.info(s"Modifier ${modifier.encodedId} is valid.")
               intermediaryNVH ! ValidatedModifierFromNetwork(modifierTypeId)
               nodeViewHolderRef ! ValidatedModifier(modifier)
             } else {
@@ -75,7 +75,7 @@ class ModifiersValidator(
             ModifiersValidator.isSyntacticallyValid(modifier, settings.constants.ModifierIdSize)
           if (preSemanticValidation.isRight && syntacticValidation) {
             if (modifier.id.sameElements(id)) {
-              logger.debug(s"Modifier ${modifier.encodedId} is valid.")
+              logger.info(s"Modifier ${modifier.encodedId} is valid.")
               intermediaryNVH ! ValidatedModifierFromNetwork(modifierTypeId)
               nodeViewHolderRef ! ValidatedModifier(modifier)
             } else {
