@@ -51,8 +51,8 @@ class NVHState(influxRef: Option[ActorRef], var historyReader: HistoryReader, se
           }
           state = stateAfterApply
           logger.info(s"Successfully apply modifier: ${Algos.encode(modifier.id)} of type ${modifier.modifierTypeId}")
-          context.parent ! ModifierApplied(modifier)
           context.parent ! UtxoStateReader(state)
+          context.parent ! ModifierApplied(modifier)
         case Left(e: List[ModifierApplyError]) =>
           logger.info(s"Application to state failed cause $e")
           context.parent ! ApplyFailed(modifier, e)

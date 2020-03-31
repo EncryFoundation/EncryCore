@@ -69,7 +69,9 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   def viewReceive(history: ActorRef, state: ActorRef, stateReader: UtxoStateReader): Receive = {
 
     case RegisterState(reader) => context.become(viewReceive(history, sender(), reader))
-    case reader: UtxoStateReader => context.become(viewReceive(history, state, reader))
+    case reader: UtxoStateReader =>
+      logger.info("Update reader at inter nvh view")
+      context.become(viewReceive(history, state, reader))
 
     case GetDataFromCurrentView(f: (CurrentView[HistoryReader, UtxoStateReader, WalletReader] => CandidateEnvelope)) =>
       logger.info("Receive GetDataFromCurrentView on nvh")
