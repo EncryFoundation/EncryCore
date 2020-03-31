@@ -6,7 +6,7 @@ import akka.actor.{Actor, ActorRef, Props}
 import akka.pattern._
 import akka.util.Timeout
 import com.typesafe.scalalogging.StrictLogging
-import encry.consensus.HistoryConsensus.{Equal, Older, Unknown, Younger}
+import encry.consensus.HistoryConsensus.{Equal, Fork, Older, Unknown, Younger}
 import encry.network.ConnectedPeersCollection.PeerInfo
 import encry.network.DM.{IsRequested, RequestSent, RequestStatus}
 import encry.network.MessageBuilder.{GetPeerInfo, GetPeers, MsgSent}
@@ -41,7 +41,7 @@ case class MessageBuilder(peersKeeper: ActorRef,
       }
     case RequestFromLocal(None, modTypeId, modsIds) =>
       Try {
-        (peersKeeper ? (MessageBuilder.PeerWithOlderHistory || MessageBuilder.PeerWithEqualHistory || MessageBuilder.PeerWithYoungerHistory || MessageBuilder.PeerWithUnknownHistory)).mapTo[ConnectedPeer].map { peer =>
+        (peersKeeper ? (MessageBuilder.PeerWithOlderHistory || MessageBuilder.PeerWithEqualHistory || MessageBuilder.PeerWithForkHistory)).mapTo[ConnectedPeer].map { peer =>
           logger.info(s"Going to req mods from ${peer.socketAddress} of type ${modTypeId}")
           (deliveryManager ? IsRequested(modsIds)).mapTo[RequestStatus].foreach { status =>
             logger.info(s"Requested or received: ${status.requested.length}. Not request or not received: ${status.notRequested.length}")
@@ -114,6 +114,7 @@ object MessageBuilder {
   val PeerWithOlderHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Older)
   val PeerWithYoungerHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Younger)
   val PeerWithUnknownHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Unknown)
+  val PeerWithForkHistory = GetPeerByPredicate((info: PeerInfo) => info.historyComparisonResult == Fork)
   def props(peersKeeper: ActorRef,
             deliveryManager: ActorRef): Props = Props(new MessageBuilder(peersKeeper, deliveryManager))
 }
