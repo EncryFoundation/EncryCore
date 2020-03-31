@@ -84,10 +84,6 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         case res =>
           sender ! res
       }
-//      f(CurrentView(historyReader, stateReader, walletReader)) match {
-//        case resultFuture: Future[_] => resultFuture.pipeTo(sender)
-//        case result                  => sender ! result
-//      }
 
     case LocallyGeneratedModifier(modifier: Block) =>
       logger.info(s"Self mined block: ${modifier}")
@@ -131,6 +127,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(
           point => !stateReader.version.sameElements(point)
         ) =>
+      //todo drop state here
       context.become(
         viewReceive(
           history,

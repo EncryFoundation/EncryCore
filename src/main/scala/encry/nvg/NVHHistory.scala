@@ -85,6 +85,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
             }
           } else {
             logger.info(s"Progress info contains an empty toApply. Going to form request download.")
+            context.parent ! ModifierAppliedToHistory
             if (!isLocallyGenerated) requestDownloads(progressInfo, mod.id.some)
             context.parent ! HeightStatistics(historyView.history.getBestHeaderHeight, -1) //todo incorrect state height
             context.parent ! SemanticallySuccessfulModifier(mod)
@@ -121,6 +122,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
 
     case StateAction.ApplyFailed(mod, e) =>
       val (newHistory: History, progressInfo: ProgressInfo) = historyView.history.reportModifierIsInvalid(mod)
+      historyView = historyView.copy(history = newHistory)
       context.parent ! SemanticallyFailedModification(mod, e)
       context.parent ! ProgressInfoForState(
         progressInfo,
@@ -129,7 +131,6 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
         HistoryReader(historyView.history)
       )
       lastProgressInfo = progressInfo
-      historyView = historyView.copy(history = newHistory)
 
     case InitGenesisHistory =>
       logger.info("Init in InitGenesisHistory")
