@@ -23,6 +23,7 @@ import encry.view.wallet.WalletReader
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.utils.Algos
 
 import scala.concurrent.Future
 
@@ -107,6 +108,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       if (!isModifierProcessingInProgress) getNextModifier()
 
     case ValidatedModifier(modifier: PersistentModifier) =>
+      logger.info(s"Receive modifier (${Algos.encode(modifier.id)}) at inter nvh view")
       val isInHistory: Boolean = historyReader.isModifierDefined(modifier.id)
       val isInCache: Boolean   = ModifiersCache.contains(NodeViewHolder.toKey(modifier.id))
       if (isInHistory || isInCache)
@@ -122,6 +124,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           settings,
           isLocallyGenerated = false
         )
+      logger.info(s"isModifierProcessingInProgress: ${isModifierProcessingInProgress}")
       if (!isModifierProcessingInProgress) getNextModifier()
     case ModifierAppliedToHistory => isModifierProcessingInProgress = false; getNextModifier()
     case msg: ProgressInfoForState
