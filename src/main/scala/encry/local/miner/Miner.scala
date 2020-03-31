@@ -235,7 +235,7 @@ class Miner(dataHolder: ActorRef,
 
     val combinedStateChange: UtxoState.StateChange = combineAll(txs.map(UtxoState.tx2StateChange).toList)
 
-    logger.info(s"Root node hash before producing candidate: ${view.state.tree.rootNode.hash}")
+    logger.info(s"Root node hash before producing candidate: ${Algos.encode(view.state.tree.rootNode.hash)}")
 
     val newStateRoot = view.state.tree
       .getOperationsRootHash(
