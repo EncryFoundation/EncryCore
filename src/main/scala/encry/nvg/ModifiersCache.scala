@@ -3,11 +3,12 @@ package encry.nvg
 import com.typesafe.scalalogging.StrictLogging
 import encry.settings.EncryAppSettings
 import encry.view.history.HistoryReader
-import encry.view.history.ValidationError.{ FatalValidationError, NonFatalValidationError }
+import encry.view.history.ValidationError.{FatalValidationError, NonFatalValidationError}
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.Header
+import org.encryfoundation.common.modifiers.history.{Header, Payload}
 import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.ModifierId
+
 import scala.collection.concurrent.TrieMap
 import scala.collection.immutable.SortedMap
 import scala.collection.mutable
@@ -104,8 +105,10 @@ object ModifiersCache extends StrictLogging {
         case (k, v) =>
           v._1 match {
             case _: Header if history.getBestHeaderId.exists(_ sameElements v._1.parentId) => true
-            case _ =>
+            case p: Payload =>
               val isApplicableMod: Boolean = isApplicable(k)
+              logger.info(s"exhaustiveSearch. Payload. ${p.encodedId}. ${Algos.encode(p.headerId)}. " +
+                s"isApplicableMod: $isApplicableMod.")
               isApplicableMod
           }
       }).collect { case Some(v) => v._1 }
@@ -140,9 +143,13 @@ object ModifiersCache extends StrictLogging {
       }
     }
     if (bestHeadersIds.nonEmpty) bestHeadersIds
-    else
+    else {
+      logger.info(s"Cache. Else condition. history.getBestBlockHeight: ${history.getBestBlockHeight}" +
+        s" history.headerIdsAtHeight(history.getBestBlockHeight + 1): ${history.headerIdsAtHeight(history.getBestBlockHeight + 1)} " +
+        s" ")
       history.headerIdsAtHeight(history.getBestBlockHeight + 1).headOption match {
         case Some(id) =>
+          logger.info(s"Cache. Some. Id: ${Algos.encode(id)}.")
           history.getHeaderById(id) match {
             case Some(header: Header) if isApplicable(new mutable.WrappedArray.ofByte(header.payloadId)) =>
               List(new mutable.WrappedArray.ofByte(header.payloadId))
@@ -150,11 +157,12 @@ object ModifiersCache extends StrictLogging {
             case _                              => List.empty[Key]
           }
         case None if isChainSynced =>
-          logger.debug(s"No payloads for current history")
+          logger.info(s"No payloads for current history")
           exhaustiveSearch
         case None =>
-          logger.debug(s"No payloads for current history")
+          logger.info(s"No payloads for current history")
           List.empty[Key]
       }
+    }
   }
 }

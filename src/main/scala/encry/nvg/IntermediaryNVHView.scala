@@ -22,7 +22,7 @@ import encry.view.state.UtxoStateReader
 import encry.view.wallet.WalletReader
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.Block
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
 
 import scala.concurrent.Future
@@ -43,6 +43,8 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   var isModifierProcessingInProgress: Boolean = false
 
   var toApply = Set.empty[ByteArrayWrapper]
+
+  var idInAwait: String = ""
 
   override def receive: Receive = awaitingViewActors()
 
@@ -104,7 +106,13 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       if (!isModifierProcessingInProgress) getNextModifier()
 
     case ValidatedModifier(modifier: PersistentModifier) =>
-      logger.info(s"Receive modifier (${Algos.encode(modifier.id)}) at inter nvh view")
+      logger.info(s"Receive modifier (${modifier.encodedId}) at inter nvh view. Additional info about this modifier: ${
+        modifier match {
+          case h: Header => ("header ",h.encodedId, h.height, Algos.encode(h.parentId))
+          case p: Payload => ("payload ", p.encodedId, p.headerId)
+          case b: Block => ("block", b.encodedId, b.header.height, b.payload.encodedId)
+        }
+      }")
       val isInHistory: Boolean = historyReader.isModifierDefined(modifier.id)
       val isInCache: Boolean   = ModifiersCache.contains(NodeViewHolder.toKey(modifier.id))
       if (isInHistory || isInCache)
@@ -112,7 +120,8 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           s"Modifier ${modifier.encodedId} can't be placed into the cache cause: " +
             s"contains in cache: $isInCache, contains in history: $isInHistory."
         )
-      else
+      else {
+        logger.info(s"Going to put mod ${modifier.encodedId} to the cache.")
         ModifiersCache.put(
           NodeViewHolder.toKey(modifier.id),
           modifier,
@@ -120,9 +129,13 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           settings,
           isLocallyGenerated = false
         )
-      logger.info(s"isModifierProcessingInProgress: ${isModifierProcessingInProgress}")
+      }
+      logger.info(s"isModifierProcessingInProgress: $isModifierProcessingInProgress")
       if (!isModifierProcessingInProgress) getNextModifier()
-    case ModifierAppliedToHistory => isModifierProcessingInProgress = false; getNextModifier()
+    case ModifierAppliedToHistory =>
+      logger.info(s"Got ModifierAppliedToHistory. In await: $idInAwait")
+      isModifierProcessingInProgress = false
+      getNextModifier()
     case msg: ProgressInfoForState
         if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(
           point => !stateReader.version.sameElements(point)
@@ -153,15 +166,19 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
 
   def awaitingHistoryBranchPoint(history: ActorRef): Receive = ???
 
-  def getNextModifier(): Unit =
+  def getNextModifier(): Unit = {
+    logger.info(s"Going to getNextModifier!")
     ModifiersCache
       .popCandidate(historyReader, settings)
       .foreach {
         case (mod: PersistentModifier, isLocallyGenerated) =>
           isModifierProcessingInProgress = true
-          logger.info(s"Got new modifiers in compute application function: ${mod.encodedId}.")
+          logger.info(s"Got new modifiers in getNextModifier function: ${mod.encodedId}.")
           historyRef ! ModifierToAppend(mod, isLocallyGenerated)
+          idInAwait = mod.encodedId
+          logger.info(s"Start awaiting $idInAwait for appending. In await. ")
       }
+  }
 
 }
 
