@@ -111,8 +111,13 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       context.parent ! BlockAndHeaderInfo(historyView.history.getBestHeader, historyView.history.getBestBlock)
       if (historyView.history.getBestHeaderId.exists(
             besId => historyView.history.getBestBlockId.exists(_.sameElements(besId))
-          ))
+          )) {
+        logger.info(s"\n\n\nGot message StateAction.ModifierApplied with mod ${mod.encodedId} of type ${mod.modifierTypeId}. " +
+          s"Set up historyView.history.isFullChainSynced = true. Condition is: " +
+          s" (historyView.history.getBestHeaderId: ${(historyView.history.getBestHeaderId.map(Algos.encode))}. " +
+          s" (historyView.history.getBestBlockId.exists(_.sameElements(besId)): ${historyView.history.getBestBlockId.map(Algos.encode)}.\n\n\n")
         historyView.history.isFullChainSynced = true
+      }
       context.parent ! HeightStatistics(historyView.history.getBestHeaderHeight, -1) //todo incorrect state height
       if (mod match {
             case _: Block   => true
