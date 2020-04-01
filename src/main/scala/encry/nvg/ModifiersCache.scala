@@ -110,7 +110,7 @@ object ModifiersCache extends StrictLogging {
               logger.info(s"exhaustiveSearch. Payload. ${p.encodedId}. ${Algos.encode(p.headerId)}. " +
                 s"isApplicableMod: $isApplicableMod.")
               isApplicableMod
-            case sm: _ =>
+            case sm =>
               val isApplicableMod: Boolean = isApplicable(k)
               logger.info(s"exhaustiveSearch. Something. ${sm.encodedId}. isApplicableMod: $isApplicableMod.")
               isApplicableMod
