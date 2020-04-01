@@ -196,7 +196,8 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           logger.info(s"Got new modifiers in getNextModifier function: ${mod.encodedId}.")
           historyRef ! ModifierToAppend(mod, isLocallyGenerated)
           idInAwait = mod.encodedId
-          logger.info(s"Start awaiting $idInAwait for appending. In await. ")
+          logger.info(s"Start awaiting $idInAwait for appending. In await. " +
+            s"reader is full synced ${historyReader.isFullChainSynced}")
       }
   }
 

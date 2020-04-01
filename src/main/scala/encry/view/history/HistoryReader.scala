@@ -1,12 +1,13 @@
 package encry.view.history
 
-import encry.consensus.HistoryConsensus.{ HistoryComparisonResult, Older }
+import com.typesafe.scalalogging.StrictLogging
+import encry.consensus.HistoryConsensus.{HistoryComparisonResult, Older}
 import encry.modifiers.history.HeaderChain
 import encry.view.history.ValidationError.HistoryApiError
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header }
+import org.encryfoundation.common.modifiers.history.{Block, Header}
 import org.encryfoundation.common.network.SyncInfo
-import org.encryfoundation.common.utils.TaggedTypes.{ Difficulty, ModifierId }
+import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 
 import scala.collection.immutable.HashSet
 
@@ -65,7 +66,7 @@ trait HistoryReader {
   def getHeaderOfBestBlock: Option[Header]
 }
 
-object HistoryReader {
+object HistoryReader extends StrictLogging {
   def empty: HistoryReader = new HistoryReader {
     def isModifierDefined(id: ModifierId): Boolean                  = false
     def getBestHeaderHeight: Int                                    = -1
@@ -100,38 +101,41 @@ object HistoryReader {
     def getHeaderOfBestBlock: Option[Header] = None
   }
 
-  def apply(history: History): HistoryReader = new HistoryReader {
-    def isModifierDefined(id: ModifierId): Boolean                  = history.isModifierDefined(id)
-    def getBestHeaderHeight: Int                                    = history.getBestHeaderHeight
-    def getBestBlockHeight: Int                                     = history.getBestBlockHeight
-    def getBestHeaderAtHeight(h: Int): Option[Header]               = history.getBestHeaderAtHeight(h)
-    def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] = history.continuationIds(info, size)
-    def compare(si: SyncInfo): HistoryComparisonResult              = history.compare(si)
-    var isFullChainSynced: Boolean                                  = history.isFullChainSynced
-    def modifierBytesById(id: ModifierId): Option[Array[Byte]]      = history.modifierBytesById(id)
-    def payloadsIdsToDownload(howMany: Int): Seq[ModifierId]        = history.payloadsIdsToDownload(howMany, HashSet.empty)
-    def syncInfo: SyncInfo                                          = history.syncInfo
-    def isFastSyncInProcess: Boolean                                = history.fastSyncInProgress.fastSyncVal
-    def getHeaderById(id: ModifierId): Option[Header]               = history.getHeaderById(id)
-    def headerIdsAtHeight(height: Int): List[ModifierId]            = history.headerIdsAtHeight(height).toList
-    def getBlockByHeaderId(id: ModifierId): Option[Block]           = history.getBlockByHeaderId(id)
-    def getBlockByHeader(header: Header): Option[Block]             = history.getBlockByHeader(header)
-    def lastHeaders(count: Int): HeaderChain                        = history.lastHeaders(count)
-    def getBestHeader: Option[Header]                               = history.getBestHeader
-    def getBestBlock: Option[Block]                                 = history.getBestBlock
-    def getChainToHeader(
-      fromHeaderOpt: Option[Header],
-      toHeader: Header
-    ): (Option[ModifierId], HeaderChain) =
-      history.getChainToHeader(fromHeaderOpt, toHeader)
-    def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
-      history.testApplicable(modifier)
-    def getBestHeaderId: Option[ModifierId] = history.getBestHeaderId
-    def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] =
-      history.requiredDifficultyAfter(parent)
-    def isHeadersChainSynced: Boolean = history.isHeadersChainSynced
-    def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = history.getHeaderIds(count, offset)
-    def getBestBlockId: Option[ModifierId] = history.getBestBlockId
-    def getHeaderOfBestBlock: Option[Header] = history.getHeaderOfBestBlock
+  def apply(history: History): HistoryReader = {
+    logger.info(s"Going to create HistoryReader with isFullChainSynced: ${history.isFullChainSynced}")
+    new HistoryReader {
+      def isModifierDefined(id: ModifierId): Boolean                  = history.isModifierDefined(id)
+      def getBestHeaderHeight: Int                                    = history.getBestHeaderHeight
+      def getBestBlockHeight: Int                                     = history.getBestBlockHeight
+      def getBestHeaderAtHeight(h: Int): Option[Header]               = history.getBestHeaderAtHeight(h)
+      def continuationIds(info: SyncInfo, size: Int): Seq[ModifierId] = history.continuationIds(info, size)
+      def compare(si: SyncInfo): HistoryComparisonResult              = history.compare(si)
+      var isFullChainSynced: Boolean                                  = history.isFullChainSynced
+      def modifierBytesById(id: ModifierId): Option[Array[Byte]]      = history.modifierBytesById(id)
+      def payloadsIdsToDownload(howMany: Int): Seq[ModifierId]        = history.payloadsIdsToDownload(howMany, HashSet.empty)
+      def syncInfo: SyncInfo                                          = history.syncInfo
+      def isFastSyncInProcess: Boolean                                = history.fastSyncInProgress.fastSyncVal
+      def getHeaderById(id: ModifierId): Option[Header]               = history.getHeaderById(id)
+      def headerIdsAtHeight(height: Int): List[ModifierId]            = history.headerIdsAtHeight(height).toList
+      def getBlockByHeaderId(id: ModifierId): Option[Block]           = history.getBlockByHeaderId(id)
+      def getBlockByHeader(header: Header): Option[Block]             = history.getBlockByHeader(header)
+      def lastHeaders(count: Int): HeaderChain                        = history.lastHeaders(count)
+      def getBestHeader: Option[Header]                               = history.getBestHeader
+      def getBestBlock: Option[Block]                                 = history.getBestBlock
+      def getChainToHeader(
+                            fromHeaderOpt: Option[Header],
+                            toHeader: Header
+                          ): (Option[ModifierId], HeaderChain) =
+        history.getChainToHeader(fromHeaderOpt, toHeader)
+      def testApplicable(modifier: PersistentModifier): Either[ValidationError, PersistentModifier] =
+        history.testApplicable(modifier)
+      def getBestHeaderId: Option[ModifierId] = history.getBestHeaderId
+      def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] =
+        history.requiredDifficultyAfter(parent)
+      def isHeadersChainSynced: Boolean = history.isHeadersChainSynced
+      def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = history.getHeaderIds(count, offset)
+      def getBestBlockId: Option[ModifierId] = history.getBestBlockId
+      def getHeaderOfBestBlock: Option[Header] = history.getHeaderOfBestBlock
+    }
   }
 }

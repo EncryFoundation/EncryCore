@@ -426,7 +426,7 @@ class Starter(settings: EncryAppSettings,
       )
       val miner: ActorRef =
         context.system.actorOf(Miner.props(dataHolderForApi, memoryPool, nvhRouter, influxRef, newSettings, timeProvider), "miner")
-      //if (newSettings.node.mining) miner ! StartMining
+      if (newSettings.node.mining) miner ! StartMining
       if (newSettings.node.useCli) {
         context.system
           .actorOf(ConsoleListener.props(newSettings, dataHolderForApi, nodeId, timeProvider), "cliListener")
