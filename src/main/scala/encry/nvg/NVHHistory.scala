@@ -106,6 +106,7 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
     case StateAction.ModifierApplied(mod: PersistentModifier) =>
       val newHistory = historyView.history.reportModifierIsValid(mod)
       historyView = historyView.copy(history = newHistory)
+      historyView.history.getBestHeader.foreach(context.parent ! BestHeaderInChain(_))
       context.parent ! HistoryReader(historyView.history)
       context.parent ! BlockAndHeaderInfo(historyView.history.getBestHeader, historyView.history.getBestBlock)
       if (historyView.history.getBestHeaderId.exists(

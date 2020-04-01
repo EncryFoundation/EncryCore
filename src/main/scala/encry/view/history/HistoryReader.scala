@@ -59,6 +59,10 @@ trait HistoryReader {
   def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty]
 
   def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId]
+
+  def getBestBlockId: Option[ModifierId]
+
+  def getHeaderOfBestBlock: Option[Header]
 }
 
 object HistoryReader {
@@ -92,6 +96,8 @@ object HistoryReader {
     def requiredDifficultyAfter(parent: Header): Either[HistoryApiError, Difficulty] = Left(HistoryApiError(""))
     def isHeadersChainSynced: Boolean = false
     def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] =  Seq.empty
+    def getBestBlockId: Option[ModifierId] = None
+    def getHeaderOfBestBlock: Option[Header] = None
   }
 
   def apply(history: History): HistoryReader = new HistoryReader {
@@ -125,5 +131,7 @@ object HistoryReader {
       history.requiredDifficultyAfter(parent)
     def isHeadersChainSynced: Boolean = history.isHeadersChainSynced
     def getHeaderIds(count: Int, offset: Int = 0): Seq[ModifierId] = history.getHeaderIds(count, offset)
+    def getBestBlockId: Option[ModifierId] = history.getBestBlockId
+    def getHeaderOfBestBlock: Option[Header] = history.getHeaderOfBestBlock
   }
 }

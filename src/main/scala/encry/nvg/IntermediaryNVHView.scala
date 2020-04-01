@@ -1,18 +1,23 @@
 package encry.nvg
 
-import akka.actor.{Actor, ActorRef, Props, Stash}
+import akka.actor.{ Actor, ActorRef, Props, Stash }
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.CandidateEnvelope
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterNodeView, RegisterState}
-import encry.nvg.IntermediaryNVHView.{ModifierToAppend, NodeViewStarted}
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterNodeView, RegisterState }
+import encry.nvg.IntermediaryNVHView.{ ModifierToAppend, NodeViewStarted }
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.{ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState}
+import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState }
 import encry.nvg.NVHState.StateAction
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.nvg.NodeViewHolder.{GetDataFromCurrentView, SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
+import encry.nvg.NodeViewHolder.{
+  GetDataFromCurrentView,
+  SemanticallyFailedModification,
+  SemanticallySuccessfulModifier,
+  SyntacticallyFailedModification
+}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
@@ -22,8 +27,9 @@ import encry.view.state.UtxoStateReader
 import encry.view.wallet.WalletReader
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
+import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
 import org.encryfoundation.common.utils.Algos
+import scala.concurrent.duration._
 
 import scala.concurrent.Future
 
@@ -45,6 +51,20 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
   var toApply = Set.empty[ByteArrayWrapper]
 
   var idInAwait: String = ""
+
+  context.system.scheduler.schedule(1.seconds, 10.seconds) {
+    logger.info(
+      s"\n\n History best header id is: ${historyReader.getBestHeaderId.map(Algos.encode)}.\n " +
+        s"History best header height is: ${historyReader.getBestHeaderHeight}.\n " +
+        s"History best block id is: ${historyReader.getBestBlockId.map(Algos.encode)}.\n " +
+        s"History best block height is: ${historyReader.getBestBlockHeight}.\n " +
+        s"History best block header is: ${historyReader.getHeaderOfBestBlock.map(_.encodedId)}.\n " +
+        s"Cache size is: ${ModifiersCache.size}.\n "
+    )
+    logger.info(
+      s"Cache elements are: ${ModifiersCache.cache.keys.toList.map(key => Algos.encode(key.toArray)).mkString(",")}."
+    )
+  }
 
   override def receive: Receive = awaitingViewActors()
 
@@ -106,13 +126,13 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       if (!isModifierProcessingInProgress) getNextModifier()
 
     case ValidatedModifier(modifier: PersistentModifier) =>
-      logger.info(s"Receive modifier (${modifier.encodedId}) at inter nvh view. Additional info about this modifier: ${
-        modifier match {
-          case h: Header => ("header ",h.encodedId, h.height, Algos.encode(h.parentId))
+      logger.info(
+        s"Receive modifier (${modifier.encodedId}) at inter nvh view. Additional info about this modifier: ${modifier match {
+          case h: Header  => ("header ", h.encodedId, h.height, Algos.encode(h.parentId))
           case p: Payload => ("payload ", p.encodedId, p.headerId)
-          case b: Block => ("block", b.encodedId, b.header.height, b.payload.encodedId)
-        }
-      }")
+          case b: Block   => ("block", b.encodedId, b.header.height, b.payload.encodedId)
+        }}"
+      )
       val isInHistory: Boolean = historyReader.isModifierDefined(modifier.id)
       val isInCache: Boolean   = ModifiersCache.contains(NodeViewHolder.toKey(modifier.id))
       if (isInHistory || isInCache)
@@ -186,8 +206,9 @@ object IntermediaryNVHView {
 
   sealed trait IntermediaryNVHViewActions
   object IntermediaryNVHViewActions {
-    case class RegisterNodeView(historyReader: HistoryReader, walletReader: WalletReader) extends IntermediaryNVHViewActions
-    case class RegisterState(stateReader: UtxoStateReader)   extends IntermediaryNVHViewActions
+    case class RegisterNodeView(historyReader: HistoryReader, walletReader: WalletReader)
+        extends IntermediaryNVHViewActions
+    case class RegisterState(stateReader: UtxoStateReader) extends IntermediaryNVHViewActions
   }
 
   final case class ModifierToAppend(modifier: PersistentModifier, isLocallyGenerated: Boolean)

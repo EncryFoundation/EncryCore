@@ -41,14 +41,14 @@ class StatsSender(influxDBSettings: InfluxDBSettings, networkSettings: NetworkSe
       influxDB.write(
         influxDBSettings.udpPort,
         util.Arrays.asList(
-          s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}", //++
-          s"""height,nodeName=$nodeName header="${fb.encodedId}",height=${fb.height}""", //++
+          s"difficulty,nodeName=$nodeName diff=${fb.difficulty.toString},height=${fb.height}",
+          s"""height,nodeName=$nodeName header="${fb.encodedId}",height=${fb.height}""",
           s"stateWeight,nodeName=$nodeName,height=${fb.height} " +
-            s"value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}", //++
+            s"value=${new File("encry/data/state/").listFiles.foldLeft(0L)(_ + _.length())}",
           s"historyWeight,nodeName=$nodeName,height=${fb.height} " +
-            s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}", //++
+            s"value=${new File("encry/data/history/").listFiles.foldLeft(0L)(_ + _.length())}",
           s"supply,nodeName=$nodeName,height=${fb.height} " +
-            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height], constants)}" //++
+            s"value=${EncrySupplyController.supplyAt(fb.height.asInstanceOf[Height], constants)}"
         )
       )
 

@@ -31,20 +31,7 @@ import scala.collection.{IndexedSeq, mutable}
 //  context.parent ! UpdateHistoryReader(HistoryReader(nodeView.history))
 //  context.parent ! BlockAndHeaderInfo(nodeView.history.getBestHeader, nodeView.history.getBestBlock)
 //
-//  context.system.scheduler.schedule(1.seconds, 10.seconds) {
-//    logger.info(
-//      s"\n\n History best header id is: ${nodeView.history.getBestHeaderId.map(Algos.encode)}.\n " +
-//        s"History best header height is: ${nodeView.history.getBestHeaderHeight}.\n " +
-//        s"History best block id is: ${nodeView.history.getBestBlockId.map(Algos.encode)}.\n " +
-//        s"History best block height is: ${nodeView.history.getBestBlockHeight}.\n " +
-//        s"History best block header is: ${nodeView.history.getHeaderOfBestBlock.map(_.encodedId)}.\n " +
-//        s"State height is: ${nodeView.state.height}.\n " +
-//        s"Cache size is: ${ModifiersCache.size}.\n "
-//    )
-//    logger.info(
-//      s"Cache elements are: ${ModifiersCache.cache.keys.toList.map(key => Algos.encode(key.toArray)).mkString(",")}."
-//    )
-//  }
+
 //
 //  override def receive: Receive = {
 //    case ValidatedModifier(modifier: PersistentModifier) =>
