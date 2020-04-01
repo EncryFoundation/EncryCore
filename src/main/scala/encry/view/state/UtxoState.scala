@@ -79,7 +79,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         logger.info(s"Current root node hash: ${Algos.encode(tree.rootNode.hash)}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-        val validstartTime = System.nanoTime()
+        val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
           if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
             totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
@@ -87,13 +87,13 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         }).toList
           .traverse(Validated.fromEither)
           .toEither
-        val validationTime = System.nanoTime() - validstartTime
+        val validationTime = System.currentTimeMillis() - validstartTime
         //todo: influx ref doesn't init during restart
         influxRef.foreach(_ ! UtxoStat(
           block.payload.txs.length,
           validationTime
         ))
-        logger.info(s"Validation time: ${validationTime/1000000} ms. Txs: ${block.payload.txs.length}")
+        logger.info(s"Validation time: ${validationTime/1000} s. Txs: ${block.payload.txs.length}")
         res.fold(
           err => {
             logger.info(s"Failed to state cause ${err.message}")
