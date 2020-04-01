@@ -77,7 +77,8 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
             case _: Payload => false
           }, success = true)
           if (progressInfo.toApply.nonEmpty) {
-            logger.info(s"Progress info contains an non empty toApply. Going to notify state about new toApply.")
+            logger.info(s"Progress info contains a non empty toApply. Going to notify state about new toApply. " +
+              s"  Mods in toApply: ${progressInfo.toApply.map(_.encodedId).mkString(",")}.")
             modsInToApply = progressInfo.toApply.map(_.encodedId).toList
             context.parent ! ProgressInfoForState(
               progressInfo,

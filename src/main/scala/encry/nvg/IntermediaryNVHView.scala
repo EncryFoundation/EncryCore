@@ -160,6 +160,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         if msg.pi.chainSwitchingNeeded && msg.pi.branchPoint.exists(
           point => !stateReader.version.sameElements(point)
         ) =>
+      logger.info(s"State should be dropped here! Ids: ${msg.pi.toApply.map(_.encodedId).mkString(",")}.")
       //todo drop state here
       context.become(
         viewReceive(
@@ -169,6 +170,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         )
       )
     case msg: ProgressInfoForState =>
+      logger.info(s"Got progress info from history with ids: ${msg.pi.toApply.map(_.encodedId).mkString(",")}.")
       toApply = msg.pi.toApply.map(mod => ByteArrayWrapper(mod.id)).toSet
       msg.pi.toApply.foreach { mod =>
         logger.info(s"mid to state: ${mod.encodedId}.")
