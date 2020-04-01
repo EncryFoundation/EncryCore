@@ -104,6 +104,8 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       logger.info(s"Got modifier ${mod.encodedId} on history actor which already contains in history.")
 
     case StateAction.ModifierApplied(mod: PersistentModifier) =>
+      logger.info(s"History actor got StateAction.ModifierApplied. id: ${mod.encodedId}. " +
+        s"In await: ${modsInToApply.mkString(",")}.")
       val newHistory = historyView.history.reportModifierIsValid(mod)
       historyView = historyView.copy(history = newHistory)
       historyView.history.getBestHeader.foreach(context.parent ! BestHeaderInChain(_))
@@ -134,13 +136,18 @@ class NVHHistory(settings: EncryAppSettings, ntp: NetworkTimeProvider)
       if (settings.node.mining && historyView.history.isFullChainSynced)
         context.system.eventStream.publish(EnableMining)
       modsInToApply = modsInToApply.filterNot(_ == mod.encodedId)
-      if (modsInToApply.isEmpty) context.parent ! ModifierAppliedToHistory
+      logger.info(s"modsInToApply after cleaning is: ${modsInToApply.mkString(",")}.")
+      if (modsInToApply.isEmpty) {
+        context.parent ! ModifierAppliedToHistory
+      }
 
     case StateAction.ApplyFailed(mod, e) =>
+      logger.info(s"Got StateAction.ApplyFailed. Mod: ${mod.encodedId}.")
       val (newHistory: History, progressInfo: ProgressInfo) = historyView.history.reportModifierIsInvalid(mod)
       historyView = historyView.copy(history = newHistory)
       context.parent ! SemanticallyFailedModification(mod, e)
       modsInToApply = progressInfo.toApply.map(_.encodedId).toList
+      logger.info(s"After rollback history new modsInToApply: ${modsInToApply.mkString(",")}.")
       context.parent ! ProgressInfoForState(
         progressInfo,
         (historyView.history.getBestHeaderHeight - historyView.history.getBestBlockHeight - 1) < settings.constants.MaxRollbackDepth * 2,

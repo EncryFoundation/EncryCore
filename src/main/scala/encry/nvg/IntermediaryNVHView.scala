@@ -170,10 +170,16 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       )
     case msg: ProgressInfoForState =>
       toApply = msg.pi.toApply.map(mod => ByteArrayWrapper(mod.id)).toSet
-      msg.pi.toApply.foreach(mod => state ! StateAction.ApplyModifier(mod, msg.saveRootNodeFlag, msg.isFullChainSynced))
-    case msg: StateAction.ApplyFailed => historyRef ! msg
-    case NewWalletReader(reader)      => walletReader = reader
+      msg.pi.toApply.foreach { mod =>
+        logger.info(s"mid to state: ${mod.encodedId}.")
+        state ! StateAction.ApplyModifier(mod, msg.saveRootNodeFlag, msg.isFullChainSynced)
+      }
+    case msg: StateAction.ApplyFailed =>
+      logger.info(s"Mid to history. inWait $idInAwait, StateAction.ApplyFailed mod: ${msg.modifierId.encodedId}.")
+      historyRef ! msg
+    case NewWalletReader(reader) => walletReader = reader
     case msg: StateAction.ModifierApplied =>
+      logger.info(s"Mid to history. inWait $idInAwait, StateAction.ModifierApplied mod: ${msg.modifierId.encodedId}.")
       historyRef ! msg
     case msg: SyntacticallyFailedModification => context.parent ! msg
     case msg: StatsSenderMessage              => context.parent ! msg
@@ -196,8 +202,10 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
           logger.info(s"Got new modifiers in getNextModifier function: ${mod.encodedId}.")
           historyRef ! ModifierToAppend(mod, isLocallyGenerated)
           idInAwait = mod.encodedId
-          logger.info(s"Start awaiting $idInAwait for appending. In await. " +
-            s"reader is full synced ${historyReader.isFullChainSynced}")
+          logger.info(
+            s"Start awaiting $idInAwait for appending. In await. " +
+              s"reader is full synced ${historyReader.isFullChainSynced}"
+          )
       }
   }
 
