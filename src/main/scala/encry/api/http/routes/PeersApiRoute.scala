@@ -76,14 +76,14 @@ case class PeersApiRoute(override val settings: RESTApiSettings, dataHolder: Act
 
 object PeersApiRoute {
 
-  case class PeerInfoResponse(address: String, name: Option[String], connectionType: Option[String])
+  case class PeerInfoResponse(address: String, name: String, connectionType: String)
 
   object PeerInfoResponse {
 
     def fromAddressAndInfo(address: InetSocketAddress, peerInfo: PeerInfo): PeerInfoResponse = PeerInfoResponse(
       address.toString,
-      Some(peerInfo.connectedPeer.toString),
-      Some(peerInfo.connectionType.toString)
+      peerInfo.connectedPeer.toString,
+      peerInfo.connectionType.toString
     )
   }
 

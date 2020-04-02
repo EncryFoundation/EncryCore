@@ -11,7 +11,7 @@ import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.NewTransaction
+import encry.mpg.MemoryPool._
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import org.encryfoundation.common.crypto.PrivateKey25519

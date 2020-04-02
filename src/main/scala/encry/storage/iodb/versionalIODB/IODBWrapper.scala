@@ -13,7 +13,7 @@ import scala.collection.mutable
   * Wrapper, which extends VersionalStorage trait
   * @param store
   */
-case class IODBWrapper(store: Store) extends VersionalStorage with StrictLogging {
+case class IODBWrapper(store: Store) extends VersionalStorage with StrictLogging with AutoCloseable {
 
   override def get(key: StorageKey): Option[StorageValue] =
     store.get(ByteArrayWrapper(key)).map(StorageValue @@ _.data)

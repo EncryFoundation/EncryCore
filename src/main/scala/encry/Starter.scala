@@ -1,10 +1,11 @@
 package encry
 
 import java.net.InetSocketAddress
-import akka.actor.{ Actor, ActorRef }
+
+import akka.actor.{Actor, ActorRef}
 import akka.http.scaladsl.Http
 import cats.Functor
-import cats.data.{ NonEmptyChain, Validated }
+import cats.data.{NonEmptyChain, Validated}
 import cats.instances.future._
 import cats.instances.option._
 import cats.syntax.apply._
@@ -15,19 +16,20 @@ import encry.Starter.InitNodeResult
 import encry.api.http.DataHolderForApi
 import encry.api.http.DataHolderForApi.PassForStorage
 import encry.cli.ConsoleListener
-import encry.cli.ConsoleListener.{ prompt, StartListening }
+import encry.cli.ConsoleListener.{StartListening, prompt}
 import encry.local.miner.Miner
 import encry.local.miner.Miner.StartMining
-import encry.network.NodeViewSynchronizer
+import encry.mpg.IntermediaryMempool
+import encry.network.NetworkRouter
+import encry.nvg.IntermediaryNVH
 import encry.settings._
 import encry.stats.StatsSender
-import encry.utils.{ Mnemonic, NetworkTimeProvider }
-import encry.view.NodeViewHolder
-import encry.view.mempool.MemoryPool
+import encry.utils.{Mnemonic, NetworkTimeProvider}
 import encry.view.wallet.AccountManager
+
 import scala.concurrent.Future
 import scala.io.StdIn
-import scala.util.{ Failure, Success, Try }
+import scala.util.{Failure, Success, Try}
 
 class Starter(settings: EncryAppSettings,
               timeProvider: NetworkTimeProvider,
@@ -40,7 +42,7 @@ class Starter(settings: EncryAppSettings,
 
   var initHttpApiServer: Option[Future[Http.ServerBinding]] = none
 
-  val preview =
+  val preview: String =
     """
       |XXXXXX  XX      XX    XXXXX  XXXXXX   XX    XX
       |XX      XXXX    XX  XX       XX   XX   XXXXXX
@@ -404,31 +406,26 @@ class Starter(settings: EncryAppSettings,
         context.system
           .actorOf(StatsSender.props(influxSettings, newSettings.network, newSettings.constants), "statsSender")
       }
-      lazy val dataHolderForApi =
+      val dataHolderForApi =
         context.system.actorOf(DataHolderForApi.props(newSettings, timeProvider), "dataHolder")
-      lazy val miner: ActorRef =
-        context.system.actorOf(Miner.props(dataHolderForApi, influxRef, newSettings), "miner")
-      lazy val memoryPool: ActorRef = context.system.actorOf(
-        MemoryPool
-          .props(newSettings, timeProvider, miner, influxRef)
-          .withDispatcher("mempool-dispatcher")
-      )
-      val nodeViewHolder: ActorRef = context.system.actorOf(
-        NodeViewHolder
-          .props(memoryPool, influxRef, dataHolderForApi, newSettings)
-          .withDispatcher("nvh-dispatcher"),
-        "nodeViewHolder"
-      )
 
       if (nodePass.nonEmpty) dataHolderForApi ! PassForStorage(nodePass)
 
-      context.system.actorOf(
-        NodeViewSynchronizer
-          .props(influxRef, nodeViewHolder, newSettings, memoryPool, dataHolderForApi)
+      val networkRouter = context.system.actorOf(
+        NetworkRouter
+          .props(networkSettings, settings.blackList, dataHolderForApi)
           .withDispatcher("nvsh-dispatcher"),
-        "nodeViewSynchronizer"
+        "networkRouter"
       )
 
+      val memoryPool: ActorRef = context.system.actorOf(
+        IntermediaryMempool.props(newSettings, timeProvider, influxRef, networkRouter)
+      )
+      val nvhRouter: ActorRef = context.system.actorOf(
+        IntermediaryNVH.props(newSettings, networkRouter, timeProvider, influxRef, memoryPool, dataHolderForApi)
+      )
+      val miner: ActorRef =
+        context.system.actorOf(Miner.props(dataHolderForApi, memoryPool, nvhRouter, influxRef, newSettings, timeProvider), "miner")
       if (newSettings.node.mining) miner ! StartMining
       if (newSettings.node.useCli) {
         context.system
@@ -441,15 +438,17 @@ class Starter(settings: EncryAppSettings,
 }
 
 object Starter {
-  final case class InitNodeResult(mnemonic: String,
-                                  walletPassword: String,
-                                  offlineGeneration: Boolean,
-                                  fastSync: Boolean,
-                                  snapshotCreation: Boolean,
-                                  peers: List[InetSocketAddress],
-                                  connectWithOnlyKnownPeers: Boolean,
-                                  nodePass: String = "",
-                                  nodeName: String,
-                                  declaredAddr: Option[InetSocketAddress],
-                                  bindAddr: InetSocketAddress)
+  final case class InitNodeResult(
+    mnemonic: String,
+    walletPassword: String,
+    offlineGeneration: Boolean,
+    fastSync: Boolean,
+    snapshotCreation: Boolean,
+    peers: List[InetSocketAddress],
+    connectWithOnlyKnownPeers: Boolean,
+    nodePass: String = "",
+    nodeName: String,
+    declaredAddr: Option[InetSocketAddress],
+    bindAddr: InetSocketAddress
+  )
 }

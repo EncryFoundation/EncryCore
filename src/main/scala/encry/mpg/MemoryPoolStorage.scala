@@ -1,13 +1,16 @@
-package encry.view.mempool
+package encry.mpg
 
 import encry.settings.EncryAppSettings
 import encry.utils.NetworkTimeProvider
+import org.encryfoundation.common.modifiers.history.Block
 import org.encryfoundation.common.modifiers.mempool.transaction.Transaction
 import org.encryfoundation.common.utils.Algos
 
-final case class MemoryPoolStorage private(transactions: Map[String, Transaction],
-                                           settings: EncryAppSettings,
-                                           networkTimeProvider: NetworkTimeProvider) {
+final case class MemoryPoolStorage private (
+  transactions: Map[String, Transaction],
+  settings: EncryAppSettings,
+  networkTimeProvider: NetworkTimeProvider
+) {
 
   lazy val size: Int = transactions.size
 
@@ -56,19 +59,20 @@ final case class MemoryPoolStorage private(transactions: Map[String, Transaction
     }
   }
 
-  def getTransactionsForMiner: (MemoryPoolStorage, Seq[Transaction]) = {
-    val (transactionsForMiner: Seq[Transaction], _) = transactions
-      .toIndexedSeq
-      .sortBy { case (_, tx) => tx.fee }
+  def getTransactionsForMiner: Seq[Transaction] =
+    transactions.toIndexedSeq.sortBy { case (_, tx) => tx.fee }
       .foldLeft(Seq.empty[Transaction], Set.empty[String]) {
         case ((validated, inputs), (_, transaction)) =>
           val transactionInputsIds: Set[String] = transaction.inputs.map(input => Algos.encode(input.boxId)).toSet
-          if (transactionInputsIds.size == transaction.inputs.size && transactionInputsIds.forall(id => !inputs.contains(id)))
+          if (transactionInputsIds.size == transaction.inputs.size && transactionInputsIds.forall(
+                id => !inputs.contains(id)
+              ))
             (validated :+ transaction, inputs ++ transactionInputsIds)
           else (validated, inputs)
       }
-    (removeSeveral(transactionsForMiner.map(_.encodedId)), transactionsForMiner)
-  }
+      ._1
+
+  def compareWithMod(block: Block): MemoryPoolStorage = removeSeveral(block.payload.txs.map(_.encodedId))
 
   def isValid: Transaction => Boolean = tx => tx.semanticValidity.isSuccess && !contains(tx.encodedId)
 

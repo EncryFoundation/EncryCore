@@ -24,7 +24,7 @@ import encry.utils.implicits.Validation._
 import encry.view.NodeViewErrors.ModifierApplyError
 import encry.view.NodeViewErrors.ModifierApplyError.StateModifierApplyError
 import encry.view.state.UtxoState.StateChange
-import encry.view.state.avlTree.AvlTree
+import encry.view.state.avlTree.{AvlTree, Node}
 import encry.view.state.avlTree.utils.implicits.Instances._
 import io.iohk.iodb.LSMStore
 import org.encryfoundation.common.modifiers.PersistentModifier
@@ -35,7 +35,7 @@ import org.encryfoundation.common.modifiers.state.box.Box.Amount
 import org.encryfoundation.common.modifiers.state.box.TokenIssuingBox.TokenId
 import org.encryfoundation.common.modifiers.state.box.{AssetBox, EncryBaseBox, EncryProposition}
 import org.encryfoundation.common.utils.Algos
-import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, Height}
+import org.encryfoundation.common.utils.TaggedTypes.{ADDigest, ADKey, Height}
 import org.encryfoundation.common.utils.constants.Constants
 import org.encryfoundation.common.validation.ValidationResult.Invalid
 import org.encryfoundation.common.validation.{MalformedModifierError, ValidationResult}
@@ -76,10 +76,10 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       case block: Block =>
         logger.info(s"\n\nStarting to applyModifier as a Block: ${Algos.encode(mod.id)} to state at height ${block.header.height}")
         logger.info(s"State root should be: ${Algos.encode(block.header.stateRoot)}")
-        logger.info(s"Current root node hash: ${tree.rootNode.hash}")
+        logger.info(s"Current root node hash: ${Algos.encode(tree.rootNode.hash)}")
         val lastTxId = block.payload.txs.last.id
         val totalFees: Amount = block.payload.txs.init.map(_.fee).sum
-        val validstartTime = System.nanoTime()
+        val validstartTime = System.currentTimeMillis()
         val res: Either[ValidationResult, List[Transaction]] = block.payload.txs.map(tx => {
           if (tx.id sameElements lastTxId) validate(tx, block.header.timestamp, Height @@ block.header.height,
             totalFees + EncrySupplyController.supplyAt(Height @@ block.header.height, constants))
@@ -87,13 +87,13 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
         }).toList
           .traverse(Validated.fromEither)
           .toEither
-        val validationTime = System.nanoTime() - validstartTime
+        val validationTime = System.currentTimeMillis() - validstartTime
         //todo: influx ref doesn't init during restart
         influxRef.foreach(_ ! UtxoStat(
           block.payload.txs.length,
           validationTime
         ))
-        logger.info(s"Validation time: ${validationTime/1000000} ms. Txs: ${block.payload.txs.length}")
+        logger.info(s"Validation time: ${validationTime/1000} s. Txs: ${block.payload.txs.length}")
         res.fold(
           err => {
             logger.info(s"Failed to state cause ${err.message}")
@@ -120,7 +120,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
                 s"State root should be ${Algos.encode(block.header.stateRoot)} but got " +
                 s"${Algos.encode(newTree.rootNode.hash)}")).asLeft[UtxoState]
             } else {
-              logger.info(s"After applying root node: ${newTree.rootNode.hash}")
+              logger.info(s"After applying root node: ${Algos.encode(newTree.rootNode.hash)}")
               UtxoState(
                 newTree,
                 Height @@ block.header.height,
@@ -139,7 +139,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def rollbackTo(version: VersionTag, additionalBlocks: List[Block]): Try[UtxoState] = Try{
     logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
     val rollbackedAvl = AvlTree.rollbackTo(StorageVersion !@@ version, additionalBlocks, tree.avlStorage, tree.rootNodesStorage).get
-    logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
+    logger.info(s"UTXO -> rollbackTo -> ${tree.avlStorage.get(UtxoState.bestHeightKey).map(Ints.fromByteArray)}.")
     val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants, influxRef)
   }
@@ -147,7 +147,7 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
   def restore(additionalBlocks: List[Block]): Try[UtxoState] = Try {
     logger.info(s"Rollback utxo from storage: ${Algos.encode(version)}")
     val rollbackedAvl = tree.restore(additionalBlocks).get
-    logger.info(s"UTXO -> rollbackTo ->${tree.avlStorage.get(UtxoState.bestHeightKey)} ")
+    logger.info(s"UTXO -> restore -> ${tree.avlStorage.get(UtxoState.bestHeightKey).map(Ints.fromByteArray)}.")
     val height: Height = Height !@@ Ints.fromByteArray(tree.avlStorage.get(UtxoState.bestHeightKey).get)
     UtxoState(rollbackedAvl, height, constants, influxRef)
   }
@@ -208,8 +208,34 @@ final case class UtxoState(tree: AvlTree[StorageKey, StorageValue],
       .map(err => Invalid(Seq(err)).asLeft[Transaction])
       .getOrElse(tx.asRight[ValidationResult])
 
+  override def version: VersionTag = VersionTag !@@ tree.avlStorage.currentVersion
+
+  override def stateSafePointHeight: Height = tree.rootNodesStorage.safePointHeight
+
+  override def boxById(boxId: ADKey): Option[EncryBaseBox] = tree.get(StorageKey !@@ boxId)
+    .map(bytes => StateModifierSerializer.parseBytes(bytes, boxId.head)).flatMap(_.toOption)
+
+  override def boxesByIds(ids: Seq[ADKey]): Seq[EncryBaseBox] =
+    ids.foldLeft(Seq.empty[EncryBaseBox])((acc, id) =>
+      boxById(id).map(bx => acc :+ bx).getOrElse(acc)
+    )
+
+  override def typedBoxById[B <: EncryBaseBox](boxId: ADKey): Option[EncryBaseBox] =
+    boxById(boxId) match {
+      case Some(bx: B@unchecked) if bx.isInstanceOf[B] => Some(bx)
+      case _ => None
+    }
 
   def close(): Unit = tree.close()
+
+  override def rootNode: Node[StorageKey, StorageValue] = tree.rootNode
+
+  override def avlStorage: VersionalStorage = tree.avlStorage
+
+  override def rootHash: Array[Byte] = tree.rootHash
+
+  override def getOperationsRootHash(toInsert: List[(StorageKey, StorageValue)],
+                                     toDelete: List[StorageKey]): Try[Array[Byte]] = tree.getOperationsRootHash(toInsert, toDelete)
 }
 
 object UtxoState extends StrictLogging {
@@ -225,6 +251,19 @@ object UtxoState extends StrictLogging {
   )
 
   def initialStateBoxes: List[AssetBox] = List(AssetBox(EncryProposition.open, -9, 0))
+
+  def rollbackTo(version: VersionTag,
+                 additionalBlocks: List[Block],
+                 avlStorage: VersionalStorage,
+                 rootNodesStorage: RootNodesStorage[StorageKey, StorageValue],
+                 constants: Constants,
+                 influxRef: Option[ActorRef]): Try[UtxoState] = Try {
+    logger.info(s"Rollback utxo to version: ${Algos.encode(version)}")
+    val rollbackedAvl = AvlTree.rollbackTo(StorageVersion !@@ version, additionalBlocks, avlStorage, rootNodesStorage).get
+    logger.info(s"UTXO -> rollbackTo -> ${avlStorage.get(UtxoState.bestHeightKey).map(Ints.fromByteArray)}.")
+    val height: Height = Height !@@ Ints.fromByteArray(avlStorage.get(UtxoState.bestHeightKey).get)
+    UtxoState(rollbackedAvl, height, constants, influxRef)
+  }
 
   def getStateDir(settings: EncryAppSettings): File = {
     logger.info(s"Invoke getStateDir")
@@ -247,7 +286,7 @@ object UtxoState extends StrictLogging {
     val versionalStorage = settings.storage.state match {
       case VersionalStorage.IODB =>
         logger.info("Init state with iodb storage")
-        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions))
+        IODBWrapper(new LSMStore(stateDir, keepVersions = settings.constants.DefaultKeepVersions, keySize = 33))
       case VersionalStorage.LevelDB =>
         logger.info("Init state with levelDB storage")
         val levelDBInit = LevelDbFactory.factory.open(stateDir, new Options)
@@ -284,7 +323,8 @@ object UtxoState extends StrictLogging {
     }
     storage.insert(
       StorageVersion @@ Array.fill(32)(0: Byte),
-      initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes))
+      initialStateBoxes.map(bx => (StorageKey !@@ AvlTree.elementKey(bx.id), StorageValue @@ bx.bytes)) :+
+        (StorageKey @@ UtxoState.bestHeightKey -> StorageValue @@ Ints.toByteArray(-1))
     )
     UtxoState(AvlTree[StorageKey, StorageValue](storage, rootStorage), Height @@ 0, settings.constants, influxRef)
   }

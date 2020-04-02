@@ -160,6 +160,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
     if (header.height >= blockDownloadProcessor.minimalBlockHeight) (Payload.modifierTypeId -> header.payloadId).some
     // Headers chain is synced after this header. Start downloading full blocks
     else if (!isHeadersChainSynced && isNewHeader(header)) {
+      logger.info(s"Update header best header at height: ${header.height}")
       isHeadersChainSyncedVar = true
       blockDownloadProcessor.updateBestBlock(header)
       none
@@ -216,7 +217,7 @@ trait HistoryApi extends HistoryDBApi { //scalastyle:ignore
       }.toList
     }.getOrElse(List.empty))
 
-  def compare(si: SyncInfo): HistoryComparisonResult = lastSyncInfo.lastHeaderIds.lastOption match {
+  def compare(si: SyncInfo): HistoryComparisonResult = syncInfo.lastHeaderIds.lastOption match {
     //Our best header is the same as other history best header
     case Some(id) if si.lastHeaderIds.lastOption.exists(_ sameElements id) => Equal
     //Our best header is in other history best chain, but not at the last position

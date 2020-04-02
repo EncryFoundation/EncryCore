@@ -8,7 +8,6 @@ import encry.settings.EncryAppSettings
 import encry.EncryApp._
 import encry.api.http.DataHolderForApi.CreateAccountManagerFromSeedHelper
 import encry.utils.NetworkTimeProvider
-import encry.view.NodeViewHolder.ReceivableMessages.CreateAccountManagerFromSeed
 import encry.view.wallet.EncryWallet
 
 import scala.concurrent.Future

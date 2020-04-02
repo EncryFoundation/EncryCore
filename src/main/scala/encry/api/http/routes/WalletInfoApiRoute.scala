@@ -13,7 +13,7 @@ import encry.modifiers.mempool.TransactionFactory
 import encry.settings.RESTApiSettings
 import encry.view.NodeViewHolder.ReceivableMessages.GetDataFromCurrentView
 import encry.view.history.History
-import encry.view.mempool.MemoryPool.NewTransaction
+import encry.mpg.MemoryPool._
 import encry.view.state.UtxoState
 import encry.view.wallet.EncryWallet
 import io.circe.syntax._

@@ -6,6 +6,7 @@ import encry.view.history.ValidationError.FatalValidationError._
 import encry.view.history.ValidationError.NonFatalValidationError._
 import org.encryfoundation.common.modifiers.PersistentModifier
 import org.encryfoundation.common.modifiers.history.{Header, Payload}
+import org.encryfoundation.common.utils.Algos
 import org.encryfoundation.common.utils.TaggedTypes.{Difficulty, ModifierId}
 import org.encryfoundation.common.validation.ModifierSemanticValidity
 
@@ -28,7 +29,7 @@ trait HistoryModifiersValidator extends HistoryApi {
     if (h.isGenesis) genesisBlockHeaderValidator(h)
     else getHeaderById(h.parentId)
       .map(p => headerValidator(h, p))
-      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} parent doesn't contain in history").asLeft[Header])
+      .getOrElse(HeaderNonFatalValidationError(s"Header's ${h.encodedId} at height ${h.height}, parent (${Algos.encode(h.parentId)} at height ${h.height - 1}) doesn't contain in history").asLeft[Header])
 
   private def validatePayload(mod: Payload): Either[ValidationError, PersistentModifier] = getHeaderById(mod.headerId)
     .map(header => payloadValidator(mod, header, blockDownloadProcessor.minimalBlockHeight))
@@ -64,14 +65,14 @@ trait HistoryModifiersValidator extends HistoryApi {
         s" not greater by 1 than parent's ${parent.height}"))
     _ <- Either.cond(!historyStorage.containsMod(h.id), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} is already in history"))
-    _ <- Either.cond(realDifficulty(h) >= h.requiredDifficulty, (),
+    _ <- Either.cond( if (settings.node.isTestMod) true else realDifficulty(h) >= h.requiredDifficulty, (),
       HeaderFatalValidationError(s"Incorrect real difficulty in header ${h.encodedId}"))
-    _ <- Either.cond(requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
+    _ <- Either.cond( if (settings.node.isTestMod) true else requiredDifficultyAfter(parent).exists(_ <= h.difficulty), (),
       HeaderFatalValidationError(s"Incorrect required difficulty in header ${h.encodedId}"))
     _ <- Either.cond(heightOf(h.parentId).exists(h => getBestHeaderHeight - h < settings.constants.MaxRollbackDepth), (),
       HeaderFatalValidationError(s"Header ${h.encodedId} has height greater than max roll back depth"))
     powSchemeValidationResult = powScheme.verify(h)
-    _ <- Either.cond(powSchemeValidationResult.isRight, (),
+    _ <- Either.cond( if (settings.node.isTestMod) true else powSchemeValidationResult.isRight, (),
       HeaderFatalValidationError(s"Wrong proof-of-work solution in header ${h.encodedId}" +
         s" caused: $powSchemeValidationResult"))
     _ <- Either.cond(isSemanticallyValid(h.parentId) != ModifierSemanticValidity.Invalid, (),
