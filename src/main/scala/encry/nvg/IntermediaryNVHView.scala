@@ -1,23 +1,19 @@
 package encry.nvg
 
-import akka.actor.{ Actor, ActorRef, Props, Stash }
+import akka.actor.{Actor, ActorRef, Props, Stash}
 import akka.pattern._
 import com.typesafe.scalalogging.StrictLogging
 import encry.api.http.DataHolderForApi.BlockAndHeaderInfo
 import encry.local.miner.Miner.CandidateEnvelope
 import encry.network.Messages.MessageToNetwork.RequestFromLocal
-import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{ RegisterNodeView, RegisterState }
-import encry.nvg.IntermediaryNVHView.{ ModifierToAppend, NodeViewStarted }
+import encry.nvg.IntermediaryNVHView.IntermediaryNVHViewActions.{RegisterNodeView, RegisterState}
+import encry.nvg.IntermediaryNVHView.{ModifierToAppend, NodeViewStarted}
 import encry.nvg.ModifiersValidator.ValidatedModifier
-import encry.nvg.NVHHistory.{ ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState }
+import encry.nvg.NVHHistory.{ModifierAppliedToHistory, NewWalletReader, ProgressInfoForState}
 import encry.nvg.NVHState.StateAction
+import encry.nvg.NVHState.StateAction.{Restore, RollbackTo, StateStarted}
 import encry.nvg.NodeViewHolder.ReceivableMessages.LocallyGeneratedModifier
-import encry.nvg.NodeViewHolder.{
-  GetDataFromCurrentView,
-  SemanticallyFailedModification,
-  SemanticallySuccessfulModifier,
-  SyntacticallyFailedModification
-}
+import encry.nvg.NodeViewHolder.{GetDataFromCurrentView, SemanticallyFailedModification, SemanticallySuccessfulModifier, SyntacticallyFailedModification}
 import encry.settings.EncryAppSettings
 import encry.stats.StatsSender.StatsSenderMessage
 import encry.utils.NetworkTimeProvider
@@ -27,10 +23,10 @@ import encry.view.state.UtxoStateReader
 import encry.view.wallet.WalletReader
 import io.iohk.iodb.ByteArrayWrapper
 import org.encryfoundation.common.modifiers.PersistentModifier
-import org.encryfoundation.common.modifiers.history.{ Block, Header, Payload }
+import org.encryfoundation.common.modifiers.history.{Block, Header, Payload}
 import org.encryfoundation.common.utils.Algos
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.concurrent.Future
 
 class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, influx: Option[ActorRef])
@@ -77,6 +73,7 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
       logger.info(s"NodeViewParent actor got init history. Going to init state actor.")
       context.become(awaitingViewActors(Some(sender()), state), discardOld = true)
       context.actorOf(NVHState.restoreProps(settings, reader, influx))
+    case StateStarted => sender() ! Restore
     case RegisterNodeView(reader, wallet) =>
       walletReader = wallet
       historyReader = reader
@@ -162,13 +159,8 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
         ) =>
       logger.info(s"State should be dropped here! Ids: ${msg.pi.toApply.map(_.encodedId).mkString(",")}.")
       //todo drop state here
-      context.become(
-        viewReceive(
-          history,
-          state,
-          stateReader
-        )
-      )
+      context.stop(state)
+      context.become(stateRollbackAwaiting(msg, history, stateReader.safePointHeight))
     case msg: ProgressInfoForState =>
       logger.info(s"Got progress info from history with ids: ${msg.pi.toApply.map(_.encodedId).mkString(",")}.")
       toApply = msg.pi.toApply.map(mod => ByteArrayWrapper(mod.id)).toSet
@@ -190,6 +182,14 @@ class IntermediaryNVHView(settings: EncryAppSettings, ntp: NetworkTimeProvider, 
     case msg: SemanticallySuccessfulModifier  => context.parent ! msg
     case msg: BlockAndHeaderInfo              => context.parent ! msg
     case msg: HistoryReader                   => historyReader = msg; context.parent ! msg
+  }
+
+  def stateRollbackAwaiting(pi: ProgressInfoForState, historyRef: ActorRef, safePoint: Int): Receive = {
+    case StateStarted => sender() ! RollbackTo(pi.pi.branchPoint.get, safePoint)
+    case RegisterState(reader) =>
+      context.become(viewReceive(historyRef, sender(), reader))
+      val newProgressInfo = pi.pi.copy(toRemove = Seq.empty)
+      self ! pi.copy(pi = newProgressInfo)
   }
 
   def awaitingHistoryBranchPoint(history: ActorRef): Receive = ???
