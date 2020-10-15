@@ -436,7 +436,7 @@ class Starter(settings: EncryAppSettings,
         context.system.actorSelection("/user/cliListener") ! StartListening
       }
 
-      EncryApp.startHttp(dataHolderForApi, memoryPool)
+      EncryApp.startHttp(dataHolderForApi, memoryPool, newSettings)
   }
 }
 

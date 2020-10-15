@@ -73,8 +73,8 @@ object EncryApp extends App with StrictLogging {
     )
   }
 
-  def startHttp(dataHolderForApi: ActorRef, memoryPool: ActorRef) =
-    if (settings.restApi.enabled.getOrElse(false)) {
+  def startHttp(dataHolderForApi: ActorRef, memoryPool: ActorRef, newSettings: EncryAppSettings) =
+    if (newSettings.restApi.enabled.getOrElse(false)) {
       import akka.http.scaladsl.model.StatusCodes._
       import akka.http.scaladsl.server.Directives._
 
@@ -87,23 +87,23 @@ object EncryApp extends App with StrictLogging {
       }
 
       val apiRoutes: Seq[ApiRoute] = Seq(
-        WebRoute(settings.restApi, settings.node, dataHolderForApi),
-        WalletRoute(settings.restApi, dataHolderForApi, settings),
-        PeersRoute(settings.restApi, settings.node, dataHolderForApi),
-        PeersConnectedRoute(settings.restApi, dataHolderForApi),
-        BanPeersRoute(settings.restApi, dataHolderForApi),
-        ArgonRoute(settings.restApi),
-        PeersApiRoute(settings.restApi, dataHolderForApi),
-        InfoApiRoute(dataHolderForApi, settings.restApi, nodeId, timeProvider),
-        HistoryApiRoute(dataHolderForApi, settings.restApi, nodeId),
-        TransactionsApiRoute(dataHolderForApi, memoryPool, settings.restApi),
-        WalletInfoApiRoute(dataHolderForApi, settings.restApi, Algos.encode(settings.constants.IntrinsicTokenId)),
-        NodeRoute(dataHolderForApi, settings.restApi)
+        WebRoute(newSettings.restApi, newSettings.node, dataHolderForApi),
+        WalletRoute(newSettings.restApi, dataHolderForApi, newSettings),
+        PeersRoute(newSettings.restApi, newSettings.node, dataHolderForApi),
+        PeersConnectedRoute(newSettings.restApi, dataHolderForApi),
+        BanPeersRoute(newSettings.restApi, dataHolderForApi),
+        ArgonRoute(newSettings.restApi),
+        PeersApiRoute(newSettings.restApi, dataHolderForApi),
+        InfoApiRoute(dataHolderForApi, newSettings.restApi, nodeId, timeProvider),
+        HistoryApiRoute(dataHolderForApi, newSettings.restApi, nodeId),
+        TransactionsApiRoute(dataHolderForApi, memoryPool, newSettings.restApi),
+        WalletInfoApiRoute(dataHolderForApi, newSettings.restApi, Algos.encode(newSettings.constants.IntrinsicTokenId)),
+        NodeRoute(dataHolderForApi, newSettings.restApi)
       )
       Http().bindAndHandle(
-        CompositeHttpService(system, apiRoutes, settings.restApi, swaggerConfig).compositeRoute,
-        settings.restApi.bindAddress.getAddress.getHostAddress,
-        settings.restApi.bindAddress.getPort
+        CompositeHttpService(system, apiRoutes, newSettings.restApi, swaggerConfig).compositeRoute,
+        newSettings.restApi.bindAddress.getAddress.getHostAddress,
+        newSettings.restApi.bindAddress.getPort
       )
     }
 

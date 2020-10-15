@@ -36,7 +36,6 @@ case class WalletRoute(settings: RESTApiSettings,
  } yield (wallet, pubKeys)
 
  def walletScript(balances: Map[String, List[(String, Amount)]]): Text.TypedTag[String] = {
-
    html(
      scalatags.Text.all.head(
        meta(charset := "utf-8"),
@@ -90,6 +89,9 @@ case class WalletRoute(settings: RESTApiSettings,
        script(
          raw(
            s"""function wallet(){
+              var password;
+               password=prompt('Please enter your password to view this page!',' ');
+               if(password == "${encrySettings.wallet.map(_.password).getOrElse("")}") {
                if(validateTransferForm()){
                  var addr = document.forms["myForm"]["addr"].value;
                  var fee = document.forms["myForm"]["fee"].value;
@@ -104,6 +106,10 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Transaction was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
+                  }
+                  }
+                  else {
+                  window.alert("Password is incorrect, please try again.")
                   }
                   }""")
        ),
@@ -131,6 +137,9 @@ case class WalletRoute(settings: RESTApiSettings,
          raw(
            s"""
                function contractF(){
+              var password;
+              password=prompt('Please enter your password to view this page!',' ');
+              if(password == "${encrySettings.wallet.map(_.password).getOrElse("")}") {
                if(validateContractForm()){
                  var contract = document.forms["myForm4"]["contract"].value;
                  var fee = document.forms["myForm4"]["fee"].value;
@@ -145,6 +154,10 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Transaction was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
+                  }
+                  }
+                  else{
+                  window.alert("Password is incorrect, please try again.")
                   }
                   }""")
        ),
@@ -165,7 +178,10 @@ case class WalletRoute(settings: RESTApiSettings,
        ),
        script(
          raw(
-           """function token(){
+           s"""function token(){
+              var password;
+               password=prompt('Please enter your password to view this page!',' ');
+               if(password == "${encrySettings.wallet.map(_.password).getOrElse("")}") {
               if (validateForm1()){
                  var fee = document.forms["myForm1"]["fee"].value;
                  var amount = document.forms["myForm1"]["amount"].value;
@@ -174,6 +190,10 @@ case class WalletRoute(settings: RESTApiSettings,
                     request.send();
                      window.alert("Transaction with token creation was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
+                  }
+                  }
+                  else{
+                  window.alert("Password is incorrect, please try again.")
                   }
                   }""")
         ),
@@ -194,7 +214,10 @@ case class WalletRoute(settings: RESTApiSettings,
        ),
         script(
           raw(
-            """function dataTx(){
+            s"""function dataTx(){
+               var password;
+              password=prompt('Please enter your password to view this page!',' ');
+              if(password == "${encrySettings.wallet.map(_.password).getOrElse("")}") {
                if(validateDataForm()) {
                  var fee = document.forms["myForm2"]["fee"].value;
                  var data = document.forms["myForm2"]["data"].value;
@@ -204,16 +227,27 @@ case class WalletRoute(settings: RESTApiSettings,
                      window.alert("Data transaction was created and sent to node");
                     setTimeout(location.reload.bind(location), 3000);
                   }
+                  }
+                  else {
+                   window.alert("Password is incorrect, please try again.")
+                  }
                   }""")
        ),
        script(
          raw(
-           """function keyCreate() {
-                   var request = new XMLHttpRequest();
+           s"""function keyCreate() {
+              var password;
+              password=prompt('Please enter your password to view this page!',' ');
+              if(password == "${encrySettings.wallet.map(_.password).getOrElse("")}") {
+                     var request = new XMLHttpRequest();
                      request.open('GET', "/wallet/createKey");
                      request.send();
-                      window.alert("Key created successfully");
+                     window.alert("Key created successfully");
                      setTimeout(location.reload.bind(location), 1500);
+                     }
+                     else {
+                     window.alert("Password is incorrect, please try again.")
+                     }
 }""")
         ),
 
